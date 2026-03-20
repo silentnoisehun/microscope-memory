@@ -1,0 +1,35 @@
+[package]
+name = "microscope-memory"
+version = "0.1.0"
+edition = "2021"
+description = "Zoom-based hierarchical memory — CPU analogy: same block size, different depth. Vector L2 + mmap, sub-microsecond queries."
+
+[features]
+default = []
+viz = ["dep:wgpu", "dep:winit", "dep:egui", "dep:egui-wgpu", "dep:egui-winit", "dep:glam", "dep:bytemuck", "dep:pollster"]
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+colored = "2"
+memmap2 = "0.9"
+sha2 = "0.10"
+
+# Visualization (optional, --features viz)
+wgpu = { version = "27", optional = true }
+winit = { version = "0.30", optional = true }
+egui = { version = "0.33", optional = true }
+egui-wgpu = { version = "0.33", features = ["winit"], optional = true }
+egui-winit = { version = "0.33", default-features = false, optional = true }
+glam = { version = "0.32", optional = true }
+bytemuck = { version = "1", features = ["derive"], optional = true }
+pollster = { version = "0.4", optional = true }
+
+[[bin]]
+name = "microscope-viz"
+path = "src/bin/viz.rs"
+required-features = ["viz"]
+
+[profile.release]
+opt-level = 3
+lto = true
+strip = true

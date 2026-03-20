@@ -28,14 +28,14 @@ Egyetlen Rust binarisban: build, query, store, recall, verify.
 D0: Identity          1 blokk     — Az egesz memoria egy mondatban
 D1: Layer summaries   9 blokk     — Retegenkent 1 osszefoglalo
 D2: Topic clusters   112 blokk    — 5 elem/cluster csoportositas
-D3: Individual items  540 blokk   — Egyeni memoria elemek
-D4: Sentences       1,363 blokk   — Mondat szintu felbontas
-D5: Tokens          6,138 blokk   — Szavak (max 8/mondat)
-D6: Syllables      26,353 blokk   — Szotagok (3-5 char chunk)
-D7: Characters     96,714 blokk   — Egyeni karakterek
-D8: Raw bytes      97,031 blokk   — Hex byte reprezentacio
+D3: Individual items  537 blokk   — Egyeni memoria elemek
+D4: Sentences       1,360 blokk   — Mondat szintu felbontas
+D5: Tokens          6,114 blokk   — Szavak (max 8/mondat)
+D6: Syllables      26,308 blokk   — Szotagok (3-5 char chunk)
+D7: Characters     96,594 blokk   — Egyeni karakterek
+D8: Raw bytes      96,911 blokk   — Hex byte reprezentacio
                   ──────────
-                  228,261 total
+                  227,946 total
 ```
 
 A Rust D0-D8-ig generalja a teljes hierarchiat (reteg osszefoglalo -> mondat -> szotag -> karakter -> byte), ami a teljes "optikai zoom" metaforat valosit meg.
@@ -62,11 +62,11 @@ _pad: [u8; 2]   — alignment padding
 ### Fajlok
 | Fajl | Meret | Tartalom |
 |------|-------|----------|
-| `microscope.bin` | 7,133 KB | Header tomb (228K x 32 byte) |
-| `data.bin` | 891 KB | Szoveges adat blokkok |
+| `microscope.bin` | 7,123 KB | Header tomb (228K x 32 byte) |
+| `data.bin` | 890 KB | Szoveges adat blokkok |
 | `meta.bin` | 88 byte | Magic + block count + depth ranges |
-| `chain.bin` | 17,833 KB | SHA-256 hash chain (228K link) |
-| `merkle.bin` | 7,133 KB | Merkle fa (228K node x 32 byte hash) |
+| `chain.bin` | 17,808 KB | SHA-256 hash chain (228K link) |
+| `merkle.bin` | 7,123 KB | Merkle fa (228K node x 32 byte hash) |
 | `append.bin` | valtozo | Store append log (rebuild-ig) |
 
 **Osszesen: ~33 MB** binaris, amibol az aktiv query-hez csak 8 MB kell (headers + data).
@@ -233,17 +233,17 @@ recall "query"
 
 | Muvelet | Ido |
 |---------|-----|
-| **Look (D0, 1 blokk)** | ~37-100 ns |
-| **Look (D3, 540 blokk, Grid)** | ~5 us |
-| **Look (D7, 97K blokk, Grid 32^3)** | ~32 us |
-| **Look (D8, 97K blokk, Grid 32^3)** | ~35 us |
+| **Look (D0, 1 blokk)** | ~37-61 ns |
+| **Look (D3, 537 blokk, Grid)** | ~3.6 us |
+| **Look (D7, 97K blokk, Grid 32^3)** | ~26 us |
+| **Look (D8, 97K blokk, Grid 32^3)** | ~26 us |
 | **Store** | ~6 ms |
 | **Recall** | ~700 us |
 | **Find (text search)** | <1 ms |
-| **Build** | ~110 ms (228K blokk) |
+| **Build** | ~91 ms (228K blokk) |
 | **Verify chain** | 25 ms |
-| **Verify merkle** | 50 ms |
-| **Tiered vs AoS** | **15.9x speedup** |
+| **Verify merkle** | 41 ms |
+| **Tiered vs AoS** | **17.3x speedup** |
 
 ---
 

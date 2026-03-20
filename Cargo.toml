@@ -2,7 +2,7 @@
 name = "microscope-memory"
 version = "0.1.0"
 edition = "2021"
-description = "Zoom-based hierarchical memory — 9-depth binary mmap, tiered spatial grid (16x speedup), SHA-256 chain + Merkle tree, store/recall/verify CLI. 228K blocks in 8 MB."
+description = "Pure Rust zoom-based hierarchical memory — 9-depth binary mmap, tiered spatial grid (17x speedup), SHA-256 chain + Merkle tree, store/recall/verify CLI. 228K blocks in 8 MB."
 default-run = "microscope-memory"
 
 [features]

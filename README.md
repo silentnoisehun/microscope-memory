@@ -6,18 +6,18 @@
 Depth 0: Identity          (1 block)
 Depth 1: Layer summaries   (9 blocks)
 Depth 2: Topic clusters    (112 blocks)
-Depth 3: Individual memories (540 blocks)
-Depth 4: Sentences         (1,363 blocks)
-Depth 5: Raw tokens        (6,138 blocks)
-Depth 6: Syllables         (26,353 blocks)
-Depth 7: Characters        (96,714 blocks)
-Depth 8: Raw bytes         (97,031 blocks)
+Depth 3: Individual memories (537 blocks)
+Depth 4: Sentences         (1,360 blocks)
+Depth 5: Raw tokens        (6,114 blocks)
+Depth 6: Syllables         (26,308 blocks)
+Depth 7: Characters        (96,594 blocks)
+Depth 8: Raw bytes         (96,911 blocks)
 ```
 
 Same block size (256 chars) at every depth. Only the zoom level changes.
 Like a CPU cache hierarchy — L1/L2/L3 but for cognitive memory.
 
-**228,261 blocks total. 8 MB binary. Sub-microsecond queries.**
+**227,946 blocks total. 8 MB binary. Sub-microsecond queries.**
 
 ## Architecture
 
@@ -101,8 +101,8 @@ Requires wgpu/egui/winit — 3D spatial viewer of the memory graph.
 
 ### SHA-256 chain + Merkle tree
 ```
-Chain:   228,261 links (17.8 MB), sequential hash chain
-Merkle:  228,261 nodes (7.1 MB), root=cafe8887d0a5d4fe
+Chain:   227,946 links (17.8 MB), sequential hash chain
+Merkle:  227,946 nodes (7.1 MB), root=cafe8887d0a5d4fe
 Verify:  Full chain validation in 25 ms, Merkle in 50 ms
 Branch:  Any block verifiable to root in O(log n) steps
 ```
@@ -137,27 +137,27 @@ The `BlockHeader` is 32 bytes `#[repr(C, packed)]`, mmap zero-copy. Grid cells h
 
 ## Performance
 
-### Rust — AoS mmap (baseline)
+### AoS mmap (baseline)
 ```
 ZOOM 0:      37 ns/query   (1 block)
-ZOOM 3:     1.7 us/query   (540 blocks)
-ZOOM 5:    16.6 us/query   (6,138 blocks)
-ZOOM 7:   813.3 us/query   (96,714 blocks)
-ZOOM 8:   957.1 us/query   (97,031 blocks)
-AVG: 206,997 ns
+ZOOM 3:     1.7 us/query   (537 blocks)
+ZOOM 5:    16.5 us/query   (6,114 blocks)
+ZOOM 7:   666.5 us/query   (96,594 blocks)
+ZOOM 8:   771.1 us/query   (96,911 blocks)
+AVG: 169,861 ns
 ```
 
-### Rust — Tiered Grid (optimized)
+### Tiered Grid (optimized)
 ```
-ZOOM 0:     102 ns/query   (1 block)       [mmap/L1]
-ZOOM 3:     5.4 us/query   (540 blocks)    [Grid 8^3]
-ZOOM 5:    17.1 us/query   (6,138 blocks)  [Grid 16^3]
-ZOOM 7:    31.9 us/query   (96,714 blocks) [Grid 32^3]  <-- 25.5x faster
-ZOOM 8:    34.5 us/query   (97,031 blocks) [Grid 32^3]  <-- 27.7x faster
-AVG: 12,991 ns
+ZOOM 0:      61 ns/query   (1 block)        [mmap/L1]
+ZOOM 3:     3.6 us/query   (537 blocks)     [Grid 8^3]
+ZOOM 5:    10.4 us/query   (6,114 blocks)   [Grid 16^3]
+ZOOM 7:    26.0 us/query   (96,594 blocks)  [Grid 32^3]  <-- 25.6x faster
+ZOOM 8:    25.9 us/query   (96,911 blocks)  [Grid 32^3]  <-- 29.8x faster
+AVG: 9,841 ns
 ```
 
-**Overall: 15.9x speedup.** The grid eliminates scanning irrelevant spatial regions entirely.
+**Overall: 17.3x speedup.** The grid eliminates scanning irrelevant spatial regions entirely.
 
 ### Store / Recall
 ```

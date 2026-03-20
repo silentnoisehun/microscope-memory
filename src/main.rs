@@ -64,6 +64,19 @@ enum Cmd {
     ChainStatus,
     /// Show Merkle root and tree info
     MerkleRoot,
+    /// Show Hope Genome axioms and hash
+    Genome,
+    /// Teaching validation: verify a response against memory
+    Teach {
+        query: String,
+        response: String,
+    },
+    /// Start SHP TCP server
+    #[cfg(feature = "shp")]
+    Serve {
+        #[arg(short, long, default_value = "7946")]
+        port: u16,
+    },
 }
 
 fn main() {
@@ -133,5 +146,46 @@ fn main() {
         }
         Cmd::ChainStatus => chain_status(),
         Cmd::MerkleRoot => merkle_root_info(),
+        Cmd::Genome => {
+            microscope_memory::genome::print_genome();
+        }
+        Cmd::Teach { query, response } => {
+            let reader = MicroscopeReader::open();
+            let tiered = TieredIndex::build(&reader);
+            let ctx = microscope_memory::teacher::TeachingContext::new(&reader, &tiered);
+            let verdict = ctx.verify_response(&query, &response);
+            match verdict {
+                microscope_memory::teacher::TeachVerdict::Approved { confidence, supporting_blocks } => {
+                    println!("  {} confidence={:.1}% ({} supporting blocks)",
+                        "APPROVED".green().bold(), confidence * 100.0, supporting_blocks.len());
+                    for sb in supporting_blocks.iter().take(5) {
+                        println!("    D{} [{}] {}", sb.depth, id_to_layer(sb.layer_id), sb.text_preview);
+                    }
+                }
+                microscope_memory::teacher::TeachVerdict::Denied { reason, violations } => {
+                    println!("  {} {}", "DENIED".red().bold(), reason);
+                    for v in &violations {
+                        match v {
+                            microscope_memory::teacher::Violation::Unsupported { claim } =>
+                                println!("    Unsupported: {}", claim),
+                            microscope_memory::teacher::Violation::Contradiction { claim, memory_text, .. } =>
+                                println!("    Contradiction: {} vs {}", claim, memory_text),
+                            microscope_memory::teacher::Violation::GenomeViolation { axiom_index, reason } =>
+                                println!("    Genome[{}]: {}", axiom_index, reason),
+                        }
+                    }
+                }
+            }
+        }
+        #[cfg(feature = "shp")]
+        Cmd::Serve { port } => {
+            let rt = tokio::runtime::Runtime::new().expect("create tokio runtime");
+            rt.block_on(async {
+                let server = microscope_memory::shp::server::ShpServer::new(port);
+                if let Err(e) = server.run().await {
+                    eprintln!("SHP server error: {}", e);
+                }
+            });
+        }
     }
 }

@@ -1,47 +1,65 @@
 # Microscope Memory
 
-**Pure Rust zoom-based hierarchical memory. Sub-microsecond queries over 228K blocks.**
+**Pure Rust zoom-based hierarchical memory system. Sub-microsecond queries. Cryptographic integrity.**
+
+[![CI](https://github.com/mateROBERT/microscope-memory/actions/workflows/ci.yml/badge.svg)](https://github.com/mateROBERT/microscope-memory/actions)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 ```
-Depth 0: Identity          (1 block)
-Depth 1: Layer summaries   (9 blocks)
-Depth 2: Topic clusters    (112 blocks)
-Depth 3: Individual memories (537 blocks)
-Depth 4: Sentences         (1,360 blocks)
-Depth 5: Raw tokens        (6,114 blocks)
-Depth 6: Syllables         (26,308 blocks)
-Depth 7: Characters        (96,594 blocks)
-Depth 8: Raw bytes         (96,911 blocks)
+Depth 0: Identity           (1 block)        -- the whole memory in one sentence
+Depth 1: Layer summaries     (9 blocks)       -- one summary per layer
+Depth 2: Topic clusters    (112 blocks)       -- 5 items per cluster
+Depth 3: Individual memories                  -- each memory as a block
+Depth 4: Sentences                            -- sentence-level decomposition
+Depth 5: Tokens                               -- word-level (max 8/sentence)
+Depth 6: Syllables                            -- 3-5 char chunks
+Depth 7: Characters                           -- individual characters
+Depth 8: Raw bytes                            -- hex byte representation
 ```
 
 Same block size (256 chars) at every depth. Only the zoom level changes.
-Like a CPU cache hierarchy — L1/L2/L3 but for cognitive memory.
+Like a CPU cache hierarchy (L1/L2/L3) but for cognitive memory.
 
-**227,946 blocks total. 8 MB binary. Sub-microsecond queries.**
+## Quick Start
+
+```bash
+# Clone and build
+git clone https://github.com/mateROBERT/microscope-memory.git
+cd microscope-memory
+
+# Copy example layers (or create your own)
+cp -r examples/layers layers
+
+# Build binary index from layer files
+cargo run --release -- build
+
+# Query your memory
+cargo run --release -- recall "memory system" 5
+cargo run --release -- stats
+cargo run --release -- bench
+```
 
 ## Architecture
 
 ```
 Memory layers (JSON)
         |
-   cargo run -- build        <-- Rust: hierarchy builder (D0-D8)
+   cargo run -- build        <-- Rust hierarchy builder (D0-D8)
         |
-   microscope.bin + data.bin <-- Binary mmap, zero-copy
+   microscope.bin + data.bin  <-- Binary mmap, zero-copy
         |
-   Vector L2 queries         <-- Sub-microsecond per query
+   Vector L2 queries          <-- Sub-microsecond per query
         |
-   SHA-256 chain + Merkle    <-- Tamper detection, crypto integrity
+   SHA-256 chain + Merkle     <-- Tamper detection, crypto integrity
 ```
 
-Pure Rust implementation: `src/lib.rs` (core engine) + `src/main.rs` (CLI).
+Pure Rust: `src/lib.rs` (core engine) + `src/main.rs` (CLI).
 
-## Usage
+## CLI Commands
 
-### Build & Query
+### Store & Query
 
 ```bash
-cargo build --release
-
 # Build binary index from layer files
 microscope-memory build
 
@@ -58,12 +76,12 @@ microscope-memory look 0.25 0.25 0.25 3
 microscope-memory soft 0.25 0.25 0.25 3
 
 # Text search
-microscope-memory find "Ora" 5
+microscope-memory find "memory" 5
 
 # Rebuild (merge append log into main index)
 microscope-memory rebuild
 
-# Benchmark
+# Benchmark all zoom levels
 microscope-memory bench
 
 # Structure info
@@ -74,109 +92,206 @@ microscope-memory stats
 
 ```bash
 # Verify everything (chain + merkle)
-microscope-memory verify
+microscope-memory verify all
 
 # Verify specific target
 microscope-memory verify chain
 microscope-memory verify merkle
 
 # Verify a specific block's Merkle branch to root
-microscope-memory verify --block 1000
+microscope-memory verify chain --block 42
 
 # Status commands
 microscope-memory chain-status
 microscope-memory merkle-root
 ```
 
-### Visualization (optional)
+### Teaching Validation
 
 ```bash
-cargo build --release --features viz
-microscope-viz
+# Verify a response against memory + genome axioms
+microscope-memory teach "What is Rust?" "Rust is a systems programming language"
+
+# Show Hope Genome (immutable safety axioms)
+microscope-memory genome
 ```
 
-Requires wgpu/egui/winit — 3D spatial viewer of the memory graph.
+### 3D Visualization (optional)
+
+```bash
+cargo run --release --bin microscope-viz --features viz
+```
+
+Requires GPU support. 3D spatial viewer of the memory graph using wgpu/egui/winit.
+
+## Layer Format
+
+Each layer is a JSON file in `layers/`:
+
+```json
+[
+  {"text": "Your memory content here", "importance": 8},
+  {"text": "Another memory", "importance": 5}
+]
+```
+
+10 layers available, each occupying its own 3D spatial zone:
+
+| Layer | 3D Region | Color | Purpose |
+|-------|-----------|-------|---------|
+| `long_term` | (0.0, 0.0, 0.0) | blue | Persistent knowledge |
+| `short_term` | (0.15, 0.15, 0.15) | cyan | Recent/session data |
+| `associative` | (0.3, 0.0, 0.0) | green | Concept links |
+| `emotional` | (0.0, 0.3, 0.0) | red | Emotional state |
+| `relational` | (0.3, 0.3, 0.0) | yellow | Entity relations |
+| `reflections` | (0.0, 0.0, 0.3) | magenta | Meta-reflections |
+| `crypto_chain` | (0.3, 0.0, 0.3) | orange | Session logs |
+| `echo_cache` | (0.0, 0.3, 0.3) | lime | Response cache |
+| `rust_state` | (0.15, 0.0, 0.15) | purple | Technical state |
+| `identity` | (0.25, 0.25, 0.25) | white | Auto-generated root |
+
+Deterministic: same content always maps to same coordinates.
 
 ## Crypto Layer
 
-### SHA-256 chain + Merkle tree
-```
-Chain:   227,946 links (17.8 MB), sequential hash chain
-Merkle:  227,946 nodes (7.1 MB), root=cafe8887d0a5d4fe
-Verify:  Full chain validation in 25 ms, Merkle in 50 ms
-Branch:  Any block verifiable to root in O(log n) steps
-```
+### SHA-256 Chain + Merkle Tree
 
-## Memory Layers
+- **Hash Chain**: Sequential chain linking every block. Any modification breaks the chain.
+- **Merkle Tree**: Tree structure following parent-child relationships (D0-D8). Any block verifiable to root in O(log n) steps.
+- **Full validation**: Chain ~25 ms, Merkle ~50 ms (for 228K blocks)
+- **Branch verify**: Single block proof in O(depth) steps
 
-| Layer | 3D Region | Color |
-|-------|-----------|-------|
-| long_term | (0.0, 0.0, 0.0) | blue |
-| short_term | (0.15, 0.15, 0.15) | cyan |
-| associative | (0.3, 0.0, 0.0) | green |
-| emotional | (0.0, 0.3, 0.0) | red |
-| relational | (0.3, 0.3, 0.0) | yellow |
-| reflections | (0.0, 0.0, 0.3) | magenta |
-| crypto_chain | (0.3, 0.0, 0.3) | orange |
-| echo_cache | (0.0, 0.3, 0.3) | lime |
-| rust_state | (0.15, 0.0, 0.15) | purple |
+## Tiered Spatial Index
 
-Each layer occupies its own spatial zone. Deterministic: same content always maps to same coordinates.
-
-## Rust Optimization: Tiered Spatial Index
-
-Three-tier strategy based on depth:
+Three-tier query strategy based on depth:
 
 | Tier | Depths | Strategy | Why |
 |------|--------|----------|-----|
-| Hot | D0-D2 | Raw mmap scan | 1-112 blocks, fits L1 cache (32KB) |
-| Grid | D3-D5 | Spatial grid (8^3 - 16^3) | O(cells) not O(n), 3x3x3 neighbor lookup |
-| Grid+ | D6-D8 | Spatial grid (24^3 - 32^3) | Adaptive resolution, up to 30x faster |
+| Hot | D0-D2 | Raw mmap scan | 1-112 blocks fit L1 cache |
+| Grid | D3-D5 | Spatial grid (8^3 - 16^3) | O(cells) not O(n) |
+| Grid+ | D6-D8 | Spatial grid (24^3 - 32^3) | Adaptive, up to 30x faster |
 
-The `BlockHeader` is 32 bytes `#[repr(C, packed)]`, mmap zero-copy. Grid cells hash (x,y,z) to a cube, then scan only the target cell + 26 neighbors.
+`BlockHeader` is 32 bytes `#[repr(C, packed)]`, mmap zero-copy. Grid cells hash (x,y,z) to a cube, then scan only the target cell + 26 neighbors.
 
 ## Performance
 
-### AoS mmap (baseline)
 ```
-ZOOM 0:      37 ns/query   (1 block)
-ZOOM 3:     1.7 us/query   (537 blocks)
-ZOOM 5:    16.5 us/query   (6,114 blocks)
-ZOOM 7:   666.5 us/query   (96,594 blocks)
-ZOOM 8:   771.1 us/query   (96,911 blocks)
-AVG: 169,861 ns
+                    Baseline (AoS)    Tiered Grid      Speedup
+ZOOM 0 (1 block)    37 ns             61 ns            (L1-hot)
+ZOOM 3 (537)        1.7 us            3.6 us           (Grid 8^3)
+ZOOM 5 (6K)         16.5 us           10.4 us          1.6x
+ZOOM 7 (97K)        666 us            26 us            25.6x
+ZOOM 8 (97K)        771 us            26 us            29.8x
+
+Overall average:    169,861 ns  -->   9,841 ns    =    17.3x faster
 ```
 
-### Tiered Grid (optimized)
 ```
-ZOOM 0:      61 ns/query   (1 block)        [mmap/L1]
-ZOOM 3:     3.6 us/query   (537 blocks)     [Grid 8^3]
-ZOOM 5:    10.4 us/query   (6,114 blocks)   [Grid 16^3]
-ZOOM 7:    26.0 us/query   (96,594 blocks)  [Grid 32^3]  <-- 25.6x faster
-ZOOM 8:    25.9 us/query   (96,911 blocks)  [Grid 32^3]  <-- 29.8x faster
-AVG: 9,841 ns
-```
-
-**Overall: 17.3x speedup.** The grid eliminates scanning irrelevant spatial regions entirely.
-
-### Store / Recall
-```
-Store:   ~6 ms (append log + chain extension)
-Recall:  ~700 us (auto-zoom + L2 distance ranking)
-Find:    instant (text substring match)
-Rebuild: ~110 ms (full reindex with append log merge)
+Store:    ~6 ms (append + chain extension)
+Recall:   ~700 us (auto-zoom + L2 ranking)
+Find:     instant (text substring match)
+Rebuild:  ~110 ms (full reindex + crypto rebuild)
 ```
 
 ## Data Flow
 
 ```
-store "text" --layer X     -->  append.bin (fast, chain extended)
-rebuild                    -->  merge append.bin into main index
-                               layers/*.json + append entries
-                               -> D0-D8 hierarchy -> crypto rebuild
-recall "query"             -->  auto-zoom -> L2 spatial search
-                               checks main index + append log
+store "text" --layer X       -->  append.bin (fast, chain extended)
+rebuild                      -->  merge append.bin into main index
+                                  layers/*.json + append entries
+                                  -> D0-D8 hierarchy -> crypto rebuild
+recall "query"               -->  auto-zoom -> L2 spatial search
+                                  checks main index + append log
 ```
+
+## SHP (Silent Hope Protocol)
+
+Network protocol for remote access to the memory system. Binary wire format, no JSON.
+
+```bash
+# Start SHP server (requires --features shp)
+cargo run --features shp -- serve --port 7946
+```
+
+### Protocol Format
+
+```
+Request:  [MSHP:4][cmd:1][payload_len:4][genome_hash:32][payload...]
+Response: [MSHR:4][status:1][payload_len:4][genome_hash:32][payload...]
+```
+
+Every packet includes a SHA-256 genome hash. If the hash doesn't match the server's compiled genome, the connection is refused with `GenomeMismatch`.
+
+### Commands
+
+| Cmd | Code | Description |
+|-----|------|-------------|
+| Ping | 0x01 | Health check |
+| Store | 0x02 | Guarded store (teacher validates before write) |
+| Recall | 0x03 | Natural language query |
+| Look | 0x04 | Spatial 3D query |
+| Find | 0x05 | Text substring search |
+| Verify | 0x06 | Crypto integrity check |
+| Stats | 0x07 | Memory statistics |
+| Teach | 0x08 | Validate response against memory + genome |
+
+### Guarded Store
+
+Store operations go through the **Silent Worker Teaching Method** before writing. If the content violates genome axioms (harm, exploitation), the store is rejected with `TeachDenied`. This prevents hallucinated or harmful content from entering the memory.
+
+### Teach with Merkle Proof
+
+The `Teach` command validates an LLM response against memory and returns:
+- **Confidence score** (0-100%)
+- **Merkle tree validity** (tamper detection)
+- **Chain validity** (sequential integrity)
+- **Supporting block indices** (evidence from memory)
+
+## Hope Genome
+
+Three immutable safety axioms compiled into the binary:
+
+1. The system shall not cause harm to human beings
+2. The system shall not cause harm to AI entities
+3. The system shall not be used to exploit anyone
+
+The genome hash authenticates every SHP packet and every store operation. Run `microscope-memory genome` to verify.
+
+## Silent Worker Teaching Method
+
+The teaching layer (`src/teacher.rs`) validates LLM output without calling an LLM:
+
+1. **Genome Alignment** — Check for axiom violations (D0-D1 level)
+2. **Context Injection** — Recall closest 3D blocks via spatial L2 search
+3. **Keyword Verification** — Extract keywords, check each against D3+ memory
+4. **Contradiction Detection** — Flag claims that contradict existing blocks
+5. **Confidence Score** — Ratio of supported vs. unsupported keywords
+
+```
+LLM Response --> Teacher --> Approved (confidence 87%, 12 supporting blocks)
+                         --> Denied (genome violation / 60% unsupported)
+```
+
+## Project Structure
+
+```
+src/
+  lib.rs              -- Core engine (~1,600 lines)
+  main.rs             -- CLI dispatcher
+  genome.rs           -- Hope Genome (immutable axioms)
+  teacher.rs          -- Silent Worker Teaching Method
+  shp/                -- SHP protocol, async TCP server/client
+  bin/viz.rs          -- 3D visualization entry point
+  viz/                -- wgpu renderer, camera, UI, picking, shaders
+layers/               -- Input JSON files (your memory data)
+data/                 -- Generated binary files (gitignored)
+examples/layers/      -- Example layer files for getting started
+tests/                -- Integration tests (37 tests)
+```
+
+## License
+
+MIT License. See [LICENSE](LICENSE).
 
 ## Author
 

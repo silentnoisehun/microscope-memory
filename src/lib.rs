@@ -19,6 +19,11 @@
 #[cfg(feature = "viz")]
 pub mod viz;
 
+pub mod genome;
+pub mod teacher;
+#[cfg(feature = "shp")]
+pub mod shp;
+
 use std::fs;
 use std::io::{Write as IoWrite, BufWriter, BufRead, BufReader, Seek, SeekFrom};
 use std::path::Path;
@@ -1628,4 +1633,122 @@ pub fn merkle_root_info() {
     }
     println!("  Depth levels: 9 (0..8)");
     println!("{}", "=".repeat(50));
+}
+
+// ─── SHP Result Types ──────────────────────────────
+
+/// Chain verification result (for SHP server, no stdout printing).
+pub struct ChainVerifyResult {
+    pub valid: bool,
+    pub link_count: usize,
+    pub head_hash: [u8; 32],
+    pub broken_at: Option<usize>,
+}
+
+/// Merkle verification result (for SHP server).
+pub struct MerkleVerifyResult {
+    pub valid: bool,
+    pub node_count: usize,
+    pub root_hash: [u8; 32],
+    pub mismatch_count: usize,
+}
+
+/// Stats result (for SHP server).
+pub struct StatsResult {
+    pub block_count: usize,
+    pub depth_ranges: [(u32, u32); 9],
+    pub header_size: usize,
+    pub data_size: usize,
+}
+
+pub fn verify_chain_result() -> ChainVerifyResult {
+    let path = Path::new(CHAIN_PATH);
+    if !path.exists() {
+        return ChainVerifyResult { valid: false, link_count: 0, head_hash: [0; 32], broken_at: Some(0) };
+    }
+    let data = fs::read(path).expect("read chain.bin");
+    if data.len() < CHAIN_HEADER_SIZE || &data[0..4] != b"MSCN" {
+        return ChainVerifyResult { valid: false, link_count: 0, head_hash: [0; 32], broken_at: Some(0) };
+    }
+    let link_count = u32::from_le_bytes(data[8..12].try_into().unwrap()) as usize;
+    if data.len() < CHAIN_HEADER_SIZE + link_count * CHAIN_LINK_SIZE {
+        return ChainVerifyResult { valid: false, link_count, head_hash: [0; 32], broken_at: Some(0) };
+    }
+
+    let mut prev_hash = [0u8; 32];
+    for i in 0..link_count {
+        let off = CHAIN_HEADER_SIZE + i * CHAIN_LINK_SIZE;
+        let link_bytes = &data[off..off + CHAIN_LINK_SIZE];
+        let stored_prev: [u8; 32] = link_bytes[32..64].try_into().unwrap();
+        if stored_prev != prev_hash {
+            return ChainVerifyResult { valid: false, link_count, head_hash: prev_hash, broken_at: Some(i) };
+        }
+        prev_hash = sha256(link_bytes);
+    }
+    ChainVerifyResult { valid: true, link_count, head_hash: prev_hash, broken_at: None }
+}
+
+pub fn verify_merkle_result() -> MerkleVerifyResult {
+    let path = Path::new(MERKLE_PATH);
+    if !path.exists() {
+        return MerkleVerifyResult { valid: false, node_count: 0, root_hash: [0; 32], mismatch_count: 0 };
+    }
+    let reader = MicroscopeReader::open();
+    let n = reader.block_count;
+    let merkle_data = fs::read(path).expect("read merkle.bin");
+    if merkle_data.len() < MERKLE_HEADER_SIZE || &merkle_data[0..4] != b"MSMT" {
+        return MerkleVerifyResult { valid: false, node_count: 0, root_hash: [0; 32], mismatch_count: 0 };
+    }
+    let node_count = u32::from_le_bytes(merkle_data[8..12].try_into().unwrap()) as usize;
+    if node_count != n {
+        return MerkleVerifyResult { valid: false, node_count, root_hash: [0; 32], mismatch_count: 1 };
+    }
+
+    let mut stored: Vec<[u8; 32]> = Vec::with_capacity(n);
+    for i in 0..n {
+        let off = MERKLE_HEADER_SIZE + i * MERKLE_NODE_SIZE;
+        stored.push(merkle_data[off..off + 32].try_into().unwrap());
+    }
+
+    let mut children_of: Vec<Vec<u32>> = vec![Vec::new(); n];
+    for i in 0..n {
+        let parent = reader.header(i).parent_idx;
+        if parent != u32::MAX && (parent as usize) < n {
+            children_of[parent as usize].push(i as u32);
+        }
+    }
+
+    let mut recomputed: Vec<[u8; 32]> = vec![[0u8; 32]; n];
+    let mut mismatches = 0usize;
+    for i in (0..n).rev() {
+        let content_hash = sha256(reader.text(i).as_bytes());
+        let children = &children_of[i];
+        if children.is_empty() {
+            recomputed[i] = content_hash;
+        } else {
+            let mut hasher = Sha256::new();
+            hasher.update(content_hash);
+            for &ci in children {
+                hasher.update(recomputed[ci as usize]);
+            }
+            recomputed[i] = hasher.finalize().into();
+        }
+        if recomputed[i] != stored[i] { mismatches += 1; }
+    }
+
+    MerkleVerifyResult {
+        valid: mismatches == 0,
+        node_count,
+        root_hash: recomputed[0],
+        mismatch_count: mismatches,
+    }
+}
+
+pub fn stats_result(reader: &MicroscopeReader) -> StatsResult {
+    StatsResult {
+        block_count: reader.block_count,
+        depth_ranges: reader.depth_ranges,
+        header_size: reader.block_count * HEADER_SIZE,
+        data_size: reader.data.len(),
+    }
 }

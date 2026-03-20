@@ -1,2 +1,5 @@
 /target
 /data/*.bin
+/data/
+*.bin
+append.bin

@@ -2,18 +2,24 @@
 name = "microscope-memory"
 version = "0.1.0"
 edition = "2021"
-description = "Pure Rust zoom-based hierarchical memory — 9-depth binary mmap, tiered spatial grid (17x speedup), SHA-256 chain + Merkle tree, store/recall/verify CLI. 228K blocks in 8 MB."
+description = "Pure Rust zoom-based hierarchical memory — 9-depth binary mmap, tiered spatial grid (17x speedup), SHA-256 chain + Merkle tree, store/recall/verify CLI."
+license = "MIT"
+repository = "https://github.com/mateROBERT/microscope-memory"
 default-run = "microscope-memory"
 
 [features]
 default = []
 viz = ["dep:wgpu", "dep:winit", "dep:egui", "dep:egui-wgpu", "dep:egui-winit", "dep:glam", "dep:bytemuck", "dep:pollster"]
+shp = ["dep:tokio"]
 
 [dependencies]
 clap = { version = "4", features = ["derive"] }
 colored = "2"
 memmap2 = "0.9"
 sha2 = "0.10"
+
+# SHP server (optional, --features shp)
+tokio = { version = "1", features = ["full"], optional = true }
 
 # Visualization (optional, --features viz)
 wgpu = { version = "27", optional = true }

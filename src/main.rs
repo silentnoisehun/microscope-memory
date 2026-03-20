@@ -14,6 +14,11 @@
 //!   microscope-mem bench                    # speed test
 //!   microscope-mem stats                    # structure info
 //!   microscope-mem find "Ora"               # text search
+//!   microscope-mem embed "query"            # semantic search with embeddings
+//!   microscope-mem stream                    # start streaming update server
+
+mod embeddings;
+mod streaming;
 
 use std::collections::HashMap;
 use std::fs;
@@ -955,6 +960,77 @@ fn recall(query: &str, k: usize) {
     println!("\n  {} results in {:.0} us", shown, elapsed.as_micros());
 }
 
+// ─── SEMANTIC SEARCH with embeddings ─────────────────
+fn semantic_search(query: &str, k: usize, metric: &str) {
+    use embeddings::{MockEmbeddingProvider, EmbeddingProvider, cosine_similarity_simd};
+
+    let t0 = Instant::now();
+    println!("{} '{}' using {} metric",
+        "SEMANTIC SEARCH".cyan().bold(),
+        safe_truncate(query, 50),
+        metric.green());
+
+    // Initialize embedding provider (mock for now)
+    let provider = MockEmbeddingProvider::new(128);
+
+    // Get query embedding
+    let query_embedding = match provider.embed(query) {
+        Ok(e) => e,
+        Err(_) => {
+            println!("  {} Failed to generate embedding", "ERROR:".red());
+            return;
+        }
+    };
+
+    let reader = MicroscopeReader::open();
+    let mut results: Vec<(f32, usize)> = Vec::new();
+
+    // For each block, compute embedding similarity
+    for i in 0..reader.block_count {
+        let text = reader.text(i);
+        if let Ok(block_embedding) = provider.embed(text) {
+            let similarity = match metric {
+                "cosine" => cosine_similarity_simd(&query_embedding, &block_embedding),
+                "dot" => query_embedding.iter().zip(block_embedding.iter())
+                    .map(|(a, b)| a * b).sum(),
+                "l2" => {
+                    let dist: f32 = query_embedding.iter().zip(block_embedding.iter())
+                        .map(|(a, b)| (a - b).powi(2)).sum::<f32>().sqrt();
+                    1.0 / (1.0 + dist) // Convert distance to similarity
+                },
+                _ => cosine_similarity_simd(&query_embedding, &block_embedding),
+            };
+
+            // Only keep high similarity results
+            if similarity > 0.5 {
+                results.push((similarity, i));
+            }
+        }
+    }
+
+    // Sort by similarity (descending)
+    results.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
+    results.truncate(k);
+
+    // Display results
+    println!("\n  {} {} results:", "Found".green(), results.len());
+    for (sim, idx) in results {
+        let h = reader.header(idx);
+        let text = reader.text(idx);
+        let layer = LAYER_NAMES.get(h.layer_id as usize).unwrap_or(&"?");
+        let preview: String = text.chars().take(70).filter(|&c| c != '\n').collect();
+
+        println!("  {} {} {} {}",
+            format!("D{}", h.depth).cyan(),
+            format!("Sim={:.3}", sim).yellow(),
+            format!("[{}/{}]", layer, layer_color(h.layer_id)).green(),
+            preview);
+    }
+
+    let elapsed = t0.elapsed();
+    println!("\n  Semantic search completed in {:.1} ms", elapsed.as_micros() as f64 / 1000.0);
+}
+
 // ─── CLI ─────────────────────────────────────────────
 #[derive(Parser)]
 #[command(name = "microscope-mem", about = "Zoom-based hierarchical memory — pure binary, zero JSON")]
@@ -993,6 +1069,14 @@ enum Cmd {
     Find { query: String, #[arg(default_value = "5")] k: usize },
     /// Rebuild — incorporate append log into main index
     Rebuild,
+    /// Semantic search using embeddings
+    Embed {
+        query: String,
+        #[arg(default_value = "10")]
+        k: usize,
+        #[arg(short, long, default_value = "cosine")]
+        metric: String, // cosine, l2, dot
+    },
 }
 
 fn main() {
@@ -1040,6 +1124,9 @@ fn main() {
             // Clear append log
             let _ = fs::remove_file(APPEND_PATH);
             println!("  Append log cleared.");
+        }
+        Cmd::Embed { query, k, metric } => {
+            semantic_search(&query, k, &metric);
         }
     }
 }

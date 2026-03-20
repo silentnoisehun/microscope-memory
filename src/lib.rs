@@ -153,6 +153,10 @@ pub fn layer_to_id(name: &str) -> u8 {
     LAYER_NAMES.iter().position(|&n| n == name).unwrap_or(0) as u8
 }
 
+pub fn id_to_layer(id: u8) -> &'static str {
+    LAYER_NAMES.get(id as usize).unwrap_or(&"long_term")
+}
+
 // ─── Deterministic coords from content hash ──────────
 pub fn content_coords(text: &str, layer: &str) -> (f32, f32, f32) {
     let mut h: [u64; 3] = [0xcbf29ce484222325, 0x100000001b3, 0xa5a5a5a5a5a5a5a5];
@@ -384,6 +388,29 @@ pub fn build() {
                 child_count: 0,
             });
             depth3_positions.push((x, y, z));
+        }
+    }
+
+    // MERGE APPEND LOG into D3
+    let appended = read_append_log();
+    if !appended.is_empty() {
+        println!("  {} append log: {} entries merged", ">".green(), appended.len());
+        for entry in &appended {
+            let layer_name = id_to_layer(entry.layer_id);
+            let (x, y, z) = (entry.x, entry.y, entry.z);
+            blocks.push(RawBlock {
+                data: to_block(&entry.text),
+                depth: 3, x, y, z,
+                layer_id: entry.layer_id,
+                parent_idx: u32::MAX,
+                child_count: 0,
+            });
+            depth3_positions.push((x, y, z));
+
+            // Also update layer_texts so deeper depths can decompose these
+            if let Some((_name, texts)) = layer_texts.iter_mut().find(|(n, _)| *n == layer_name) {
+                texts.push(entry.text.clone());
+            }
         }
     }
 

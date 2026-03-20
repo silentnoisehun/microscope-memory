@@ -20,6 +20,15 @@
 mod embeddings;
 mod streaming;
 
+#[cfg(target_arch = "wasm32")]
+mod wasm;
+
+#[cfg(feature = "python")]
+mod python;
+
+#[cfg(feature = "gpu")]
+mod gpu;
+
 use std::collections::HashMap;
 use std::fs;
 use std::io::{Write as IoWrite, BufWriter, BufRead, BufReader};

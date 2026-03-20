@@ -1,6 +1,6 @@
 //! Microscope Memory — zoom-based hierarchical memory
 //!
-//! ZERO JSON. Pure binary. mmap. Sub-microsecond.
+//! ZERO JSON. Pure binary. mmap. Nanosecond at shallow depth, microsecond at full.
 //! A KOD MAGA A GRAF.
 //!
 //! CPU analogy: data exists in uniform blocks at every depth.

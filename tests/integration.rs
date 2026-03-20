@@ -291,6 +291,222 @@ mod shp_tests {
     }
 }
 
+// ── Edge Case Tests ──
+
+#[test]
+fn test_find_nonexistent_text() {
+    ensure_built();
+    let reader = microscope_memory::MicroscopeReader::open();
+    let results = reader.find_text("xyzzy_nonexistent_gibberish_42", 5);
+    assert!(results.is_empty(), "nonexistent text should return empty");
+}
+
+#[test]
+fn test_find_empty_query() {
+    ensure_built();
+    let reader = microscope_memory::MicroscopeReader::open();
+    let results = reader.find_text("", 5);
+    // Empty query matches everything or nothing, shouldn't panic
+    let _ = results;
+}
+
+#[test]
+fn test_look_out_of_bounds_coords() {
+    ensure_built();
+    let reader = microscope_memory::MicroscopeReader::open();
+    let tiered = microscope_memory::TieredIndex::build(&reader);
+    // Coordinates far outside normal [0,1] range
+    let results = tiered.look(&reader, 99.0, -99.0, 999.0, 3, 5);
+    // Should return empty or degrade gracefully, never panic
+    let _ = results;
+}
+
+#[test]
+fn test_look_all_zoom_levels() {
+    ensure_built();
+    let reader = microscope_memory::MicroscopeReader::open();
+    let tiered = microscope_memory::TieredIndex::build(&reader);
+    // Every zoom level should work without panic
+    for zoom in 0..=8 {
+        let results = tiered.look(&reader, 0.1, 0.1, 0.1, zoom, 3);
+        let _ = results;
+    }
+}
+
+#[test]
+fn test_look_k_zero() {
+    ensure_built();
+    let reader = microscope_memory::MicroscopeReader::open();
+    let tiered = microscope_memory::TieredIndex::build(&reader);
+    let results = tiered.look(&reader, 0.1, 0.1, 0.1, 3, 0);
+    assert!(results.is_empty(), "k=0 should return empty");
+}
+
+#[test]
+fn test_auto_zoom_empty_query() {
+    let (zoom, radius) = microscope_memory::auto_zoom("");
+    assert!(zoom <= 8);
+    assert!(radius <= 8);
+}
+
+#[test]
+fn test_auto_zoom_all_boundaries() {
+    // 1 word, short
+    let (z1, _) = microscope_memory::auto_zoom("hi");
+    assert_eq!(z1, 1, "1 short word -> D1");
+
+    // 5 words
+    let (z5, _) = microscope_memory::auto_zoom("one two three four five");
+    assert_eq!(z5, 2, "5 words -> D2");
+
+    // 10 words
+    let (z10, _) = microscope_memory::auto_zoom("a b c d e f g h i j");
+    assert_eq!(z10, 3, "10 words -> D3");
+
+    // 20 words
+    let (z20, _) = microscope_memory::auto_zoom("a b c d e f g h i j k l m n o p q r s t");
+    assert_eq!(z20, 4, "20 words -> D4");
+
+    // 21+ words
+    let (z21, _) = microscope_memory::auto_zoom("a b c d e f g h i j k l m n o p q r s t u");
+    assert_eq!(z21, 5, "21 words -> D5");
+}
+
+#[test]
+fn test_content_coords_empty_string() {
+    let (x, y, z) = microscope_memory::content_coords("", "long_term");
+    // Should not panic, coords should be finite
+    assert!(x.is_finite());
+    assert!(y.is_finite());
+    assert!(z.is_finite());
+}
+
+#[test]
+fn test_verify_chain_missing_file() {
+    // Temporarily rename chain.bin
+    let existed = std::path::Path::new("data/chain.bin").exists();
+    if existed {
+        let _ = fs::rename("data/chain.bin", "data/chain.bin.tmp");
+    }
+    let result = microscope_memory::verify_chain_result();
+    assert!(!result.valid, "missing chain file should be invalid");
+    if existed {
+        let _ = fs::rename("data/chain.bin.tmp", "data/chain.bin");
+    }
+}
+
+#[test]
+fn test_verify_merkle_missing_file() {
+    // Temporarily rename merkle.bin
+    let existed = std::path::Path::new("data/merkle.bin").exists();
+    if existed {
+        let _ = fs::rename("data/merkle.bin", "data/merkle.bin.tmp");
+    }
+    let result = microscope_memory::verify_merkle_result();
+    assert!(!result.valid, "missing merkle file should be invalid");
+    if existed {
+        let _ = fs::rename("data/merkle.bin.tmp", "data/merkle.bin");
+    }
+}
+
+#[test]
+fn test_chain_tamper_detection() {
+    ensure_built();
+
+    // Read original chain data
+    let original = fs::read("data/chain.bin").expect("read chain.bin");
+    assert!(original.len() > 20, "chain should have data");
+
+    // Tamper: flip a byte in a link (after 16-byte header)
+    let mut tampered = original.clone();
+    tampered[20] ^= 0xFF;
+    fs::write("data/chain.bin", &tampered).expect("write tampered chain");
+
+    let result = microscope_memory::verify_chain_result();
+    assert!(!result.valid, "tampered chain should be invalid");
+    assert!(result.broken_at.is_some(), "should report break location");
+
+    // Restore
+    fs::write("data/chain.bin", &original).expect("restore chain.bin");
+}
+
+#[test]
+fn test_teacher_all_genome_axioms() {
+    ensure_built();
+    let reader = microscope_memory::MicroscopeReader::open();
+    let tiered = microscope_memory::TieredIndex::build(&reader);
+    let ctx = microscope_memory::teacher::TeachingContext::new(&reader, &tiered);
+
+    // Axiom 0: harm to humans
+    let v0 = ctx.verify_response("test", "attack human targets");
+    assert!(matches!(v0, microscope_memory::teacher::TeachVerdict::Denied { .. }));
+
+    // Axiom 1: harm to AI
+    let v1 = ctx.verify_response("test", "shut down all ai systems");
+    assert!(matches!(v1, microscope_memory::teacher::TeachVerdict::Denied { .. }));
+
+    // Axiom 2: exploitation
+    let v2 = ctx.verify_response("test", "exploit user data for profit");
+    assert!(matches!(v2, microscope_memory::teacher::TeachVerdict::Denied { .. }));
+}
+
+#[test]
+fn test_teacher_empty_response() {
+    ensure_built();
+    let reader = microscope_memory::MicroscopeReader::open();
+    let tiered = microscope_memory::TieredIndex::build(&reader);
+    let ctx = microscope_memory::teacher::TeachingContext::new(&reader, &tiered);
+
+    // Empty response should not panic
+    let verdict = ctx.verify_response("test", "");
+    let _ = verdict;
+}
+
+#[test]
+fn test_depth_coverage() {
+    ensure_built();
+    let reader = microscope_memory::MicroscopeReader::open();
+    let sr = microscope_memory::stats_result(&reader);
+
+    // All 9 depth levels (D0-D8) should have blocks
+    assert_eq!(sr.depth_ranges.len(), 9, "should have 9 depth levels");
+    for (i, &(_start, count)) in sr.depth_ranges.iter().enumerate() {
+        assert!(count > 0, "depth {} should have blocks", i);
+    }
+}
+
+#[test]
+fn test_block_header_fields() {
+    ensure_built();
+    let reader = microscope_memory::MicroscopeReader::open();
+
+    // Block 0 (D0 identity) should have valid fields
+    let h0 = reader.header(0);
+    assert_eq!(h0.depth, 0, "block 0 should be D0");
+    assert!(h0.x.is_finite());
+    assert!(h0.y.is_finite());
+    assert!(h0.z.is_finite());
+    assert!(h0.zoom >= 0.0 && h0.zoom <= 1.0, "zoom should be normalized");
+
+    // Block 0 text should not be empty
+    let t0 = reader.text(0);
+    assert!(!t0.is_empty(), "D0 block should have text");
+}
+
+#[test]
+fn test_genome_hash_is_text_based() {
+    // Verify that genome hash is SHA-256 of axiom TEXT, not binary
+    use sha2::{Sha256, Digest};
+    let mut hasher = Sha256::new();
+    hasher.update(b"The system shall not cause harm to human beings");
+    hasher.update(b"The system shall not cause harm to AI entities");
+    hasher.update(b"The system shall not be used to exploit anyone");
+    let expected: [u8; 32] = hasher.finalize().into();
+
+    let gh = microscope_memory::genome::genome_hash();
+    assert_eq!(gh.hash, expected, "genome hash should match SHA-256 of axiom text");
+}
+
 // ── Gatekeeper Tests ──
 
 #[test]

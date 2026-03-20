@@ -1,6 +1,6 @@
 # Microscope Memory
 
-**Pure Rust zoom-based hierarchical memory system. Sub-microsecond queries. Cryptographic integrity.**
+**Pure Rust zoom-based hierarchical memory system. Nanosecond queries at shallow depth, microsecond at full depth. Cryptographic integrity.**
 
 [![CI](https://github.com/mateROBERT/microscope-memory/actions/workflows/ci.yml/badge.svg)](https://github.com/mateROBERT/microscope-memory/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
@@ -19,6 +19,12 @@ Depth 8: Raw bytes                            -- hex byte representation
 
 Same block size (256 chars) at every depth. Only the zoom level changes.
 Like a CPU cache hierarchy (L1/L2/L3) but for cognitive memory.
+
+> **D7/D8 trade-off**: At D7 (characters) and D8 (raw bytes), each entry occupies a
+> full 256-byte block despite holding only 1-4 bytes of content. This is an intentional
+> design choice: uniform block size enables zero-copy mmap access with fixed offsets
+> and no per-block size parsing. The cost is storage overhead at the deepest levels
+> (~900 blocks × 32 bytes/header = 28 KB headers for D7/D8 combined).
 
 ## Quick Start
 
@@ -48,7 +54,7 @@ Memory layers (JSON)
         |
    microscope.bin + data.bin  <-- Binary mmap, zero-copy
         |
-   Vector L2 queries          <-- Sub-microsecond per query
+   Spatial L2 distance queries  <-- 3D Euclidean distance, not embedding space
         |
    SHA-256 chain + Merkle     <-- Tamper detection, crypto integrity
 ```
@@ -66,7 +72,7 @@ microscope-memory build
 # Store new memories (append log + chain extension)
 microscope-memory store "Rust is my primary language" --layer long_term --importance 8
 
-# Natural language recall (auto-zoom, L2 distance)
+# Natural language recall (auto-zoom, spatial Euclidean distance)
 microscope-memory recall "programming language" 10
 
 # Manual spatial look: x y z zoom [k]
@@ -188,10 +194,26 @@ Overall average:    169,861 ns  -->   9,841 ns    =    17.3x faster
 
 ```
 Store:    ~6 ms (append + chain extension)
-Recall:   ~700 us (auto-zoom + L2 ranking)
+Recall:   ~700 us (auto-zoom + spatial distance ranking)
 Find:     instant (text substring match)
 Rebuild:  ~110 ms (full reindex + crypto rebuild)
 ```
+
+## Auto-Zoom Heuristic
+
+The `recall` command automatically selects a zoom level based on query length:
+
+| Query | Words | Chars | Zoom | Search Range |
+|-------|-------|-------|------|--------------|
+| Short (1-2 words, <15 chars) | `<= 2` | `< 15` | D1 | D0-D2 (summaries) |
+| Medium (3-5 words) | `<= 5` | any | D2 | D1-D3 (clusters) |
+| Long (6-10 words) | `<= 10` | any | D3 | D2-D4 (memories) |
+| Detailed (11-20 words) | `<= 20` | any | D4 | D3-D5 (sentences) |
+| Very detailed (21+ words) | `> 20` | any | D5 | D4-D6 (tokens) |
+
+The search radius is always ±1 zoom level from center. This is a word-count heuristic,
+not semantic analysis. Short queries match high-level summaries; long queries drill
+into granular content.
 
 ## Data Flow
 
@@ -200,7 +222,7 @@ store "text" --layer X       -->  append.bin (fast, chain extended)
 rebuild                      -->  merge append.bin into main index
                                   layers/*.json + append entries
                                   -> D0-D8 hierarchy -> crypto rebuild
-recall "query"               -->  auto-zoom -> L2 spatial search
+recall "query"               -->  auto-zoom -> Euclidean spatial search
                                   checks main index + append log
 ```
 
@@ -249,27 +271,48 @@ The `Teach` command validates an LLM response against memory and returns:
 
 ## Hope Genome
 
-Three immutable safety axioms compiled into the binary:
+Three immutable safety axioms, their text compiled as `const` strings:
 
 1. The system shall not cause harm to human beings
 2. The system shall not cause harm to AI entities
 3. The system shall not be used to exploit anyone
 
-The genome hash authenticates every SHP packet and every store operation. Run `microscope-memory genome` to verify.
+The genome hash is `SHA-256(axiom1_text || axiom2_text || axiom3_text)` — derived from
+the **axiom text content**, not from the binary itself. Forks that keep the same axiom
+strings produce the same hash. Changing the axiom text changes the hash, causing
+`GenomeMismatch` on SHP connections to servers with the original axioms.
+
+The hash authenticates every SHP packet and every store operation. Run `microscope-memory genome` to verify.
 
 ## Silent Worker Teaching Method
 
 The teaching layer (`src/teacher.rs`) validates LLM output without calling an LLM:
 
-1. **Genome Alignment** — Check for axiom violations (D0-D1 level)
-2. **Context Injection** — Recall closest 3D blocks via spatial L2 search
-3. **Keyword Verification** — Extract keywords, check each against D3+ memory
-4. **Contradiction Detection** — Flag claims that contradict existing blocks
-5. **Confidence Score** — Ratio of supported vs. unsupported keywords
+1. **Genome Alignment** — Check for axiom violations (hard reject on match)
+2. **Context Injection** — Recall closest 3D blocks via spatial Euclidean search
+3. **Keyword Extraction** — Split response into unique words >2 chars
+4. **Keyword Verification** — Check each keyword (>4 chars, non-stopword) against D3+ text search
+5. **Decision** — Based on unsupported keyword ratio
+
+**Confidence formula** (keyword-frequency, not semantic):
 
 ```
-LLM Response --> Teacher --> Approved (confidence 87%, 12 supporting blocks)
-                         --> Denied (genome violation / 60% unsupported)
+significant_keywords = keywords where len > 4 AND not stopword
+unsupported_count    = significant_keywords not found in any memory block
+unsupported_ratio    = unsupported_count / significant_keywords
+confidence           = 1.0 - unsupported_ratio
+
+DENIED if:  genome violation OR contradiction OR unsupported_ratio > 0.5
+APPROVED if: unsupported_ratio <= 0.5
+```
+
+This is a **keyword-match heuristic**, not semantic validation. The confidence
+percentage reflects what fraction of significant words appear somewhere in memory.
+It does not measure factual accuracy or logical consistency.
+
+```
+LLM Response --> Teacher --> Approved (confidence=100%, words found in memory)
+                         --> Denied (genome violation / >50% unsupported keywords)
 ```
 
 ## Project Structure
@@ -286,7 +329,7 @@ src/
 layers/               -- Input JSON files (your memory data)
 data/                 -- Generated binary files (gitignored)
 examples/layers/      -- Example layer files for getting started
-tests/                -- Integration tests (37 tests)
+tests/                -- Integration tests (54+ tests)
 ```
 
 ## License

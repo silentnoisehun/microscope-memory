@@ -1,0 +1,62 @@
+# Microscope Memory Configuration Example
+
+[paths]
+# Directory containing memory layer JSON files
+layers_dir = "D:/Claude Memory/layers"
+
+# Output directory for binary index files
+output_dir = "D:/Claude Memory/microscope"
+
+# Temporary directory for processing
+temp_dir = "/tmp/microscope"
+
+[index]
+# Block size in characters (fixed viewport)
+block_size = 256
+
+# Maximum depth levels (0-8)
+max_depth = 8
+
+# Header size in bytes
+header_size = 32
+
+[search]
+# Default number of results
+default_k = 10
+
+# Zoom weight for 4D search
+zoom_weight = 2.0
+
+# Keyword boost factor
+keyword_boost = 0.1
+
+[memory_layers]
+# Configure which layers to include
+layers = [
+    "long_term",
+    "short_term",
+    "associative",
+    "emotional",
+    "relational",
+    "reflections",
+    "crypto_chain",
+    "echo_cache",
+    "rust_state"
+]
+
+[performance]
+# Use memory mapping
+use_mmap = true
+
+# Cache size in MB
+cache_size = 64
+
+# Number of parallel workers for building
+build_workers = 4
+
+[logging]
+# Log level: trace, debug, info, warn, error
+level = "info"
+
+# Log file path (optional)
+file = "microscope.log"

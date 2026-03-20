@@ -1,0 +1,25 @@
+[package]
+name = "microscope-memory"
+version = "0.1.0"
+edition = "2021"
+authors = ["Máté Róbert (Silent) <your.email@example.com>"]
+description = "Zoom-based hierarchical memory — CPU analogy: same block size, different depth. Vector L2 + mmap, sub-microsecond queries."
+readme = "README.md"
+homepage = "https://github.com/yourusername/microscope-memory"
+repository = "https://github.com/yourusername/microscope-memory"
+license = "MIT"
+keywords = ["memory", "indexing", "mmap", "vector-search", "hierarchical"]
+categories = ["data-structures", "algorithms", "memory-management"]
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+clap = { version = "4", features = ["derive"] }
+colored = "2"
+memmap2 = "0.9"
+
+[profile.release]
+opt-level = 3
+lto = true
+strip = true
+codegen-units = 1

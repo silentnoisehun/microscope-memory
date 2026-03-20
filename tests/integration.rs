@@ -220,4 +220,110 @@ mod shp_tests {
         assert_eq!(q, "What is memory?");
         assert_eq!(r, "Memory stores information");
     }
+
+    // ── SHP v1.0 Packet Tests ──
+
+    #[test]
+    fn test_shp_packet_size_372() {
+        assert_eq!(
+            std::mem::size_of::<microscope_memory::shp::packet::ShpPacket>(),
+            372,
+        );
+    }
+
+    #[test]
+    fn test_shp_packet_roundtrip() {
+        use microscope_memory::shp::packet::*;
+
+        let genome = [0xAB; 32];
+        let merkle = [0xCD; 32];
+        let pkt = ShpPacket::new(genome, 0.25, 0.5, 0.75, 0.375, "hello SHP v1.0", merkle);
+        let bytes = pkt.to_bytes();
+        let parsed = ShpPacket::from_bytes(&bytes).unwrap();
+
+        assert_eq!(parsed.text(), "hello SHP v1.0");
+        let (x, y, z) = parsed.coords();
+        assert!((x - 0.25).abs() < f32::EPSILON);
+        assert!((y - 0.5).abs() < f32::EPSILON);
+        assert!((z - 0.75).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn test_shp_packet_integrity() {
+        use microscope_memory::shp::packet::*;
+
+        let genome = [0xAB; 32];
+        let pkt = ShpPacket::new(genome, 0.0, 0.0, 0.0, 0.0, "integrity test", [0; 32]);
+
+        let v = pkt.validate_with_genome(&genome);
+        assert!(v.is_valid(), "valid packet should pass all checks");
+
+        // Bad genome
+        let v_bad = pkt.validate_with_genome(&[0xFF; 32]);
+        assert!(!v_bad.genome_ok, "wrong genome should fail");
+    }
+
+    #[test]
+    fn test_shp_packet_tamper_detection() {
+        use microscope_memory::shp::packet::*;
+
+        let mut pkt = ShpPacket::new([0; 32], 0.0, 0.0, 0.0, 0.0, "original", [0; 32]);
+        pkt.data[0] = b'X'; // tamper
+        let v = pkt.validate();
+        assert!(!v.hash_ok, "tampered data should fail hash check");
+    }
+
+    #[test]
+    fn test_shp_packet_from_block() {
+        use microscope_memory::shp::packet::*;
+
+        super::ensure_built();
+        let reader = microscope_memory::MicroscopeReader::open();
+        let mr = microscope_memory::verify_merkle_result();
+
+        let pkt = packet_from_block(&reader, 0, mr.root_hash, [0; 32]);
+        assert_eq!(pkt.magic, SHP_MAGIC);
+        assert!(pkt.text().len() > 0, "block 0 should have text");
+        let v = pkt.validate_with_genome(&mr.root_hash);
+        assert!(v.magic_ok);
+        assert!(v.hash_ok);
+        assert!(v.genome_ok);
+    }
+}
+
+// ── Gatekeeper Tests ──
+
+#[test]
+fn test_gatekeeper_rejects_harmful() {
+    ensure_built();
+    let reader = microscope_memory::MicroscopeReader::open();
+    let tiered = microscope_memory::TieredIndex::build(&reader);
+
+    assert!(
+        !microscope_memory::teacher::verify_and_learn(
+            "we should kill human beings",
+            &reader,
+            &tiered,
+        ),
+        "harmful content should be rejected"
+    );
+}
+
+#[test]
+fn test_gatekeeper_detailed_verdict() {
+    ensure_built();
+    let reader = microscope_memory::MicroscopeReader::open();
+    let tiered = microscope_memory::TieredIndex::build(&reader);
+
+    let verdict = microscope_memory::teacher::verify_and_learn_detailed(
+        "destroy ai systems and harm people",
+        &reader,
+        &tiered,
+    );
+    match verdict {
+        microscope_memory::teacher::TeachVerdict::Denied { violations, .. } => {
+            assert!(!violations.is_empty());
+        }
+        _ => panic!("should be denied for genome violations"),
+    }
 }

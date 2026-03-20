@@ -119,6 +119,9 @@ async fn handle_connection(
             Command::Teach => {
                 handle_teach(&mut stream, &payload, &our_hash, &reader, &tiered).await?;
             }
+            Command::LookPacket => {
+                handle_look_packet(&mut stream, &payload, &our_hash, &reader, &tiered).await?;
+            }
         }
     }
 }
@@ -357,4 +360,42 @@ async fn handle_teach(
             send_response(stream, Status::TeachDenied, gh, reason.as_bytes()).await
         }
     }
+}
+
+/// LookPacket: return results as raw SHP v1.0 packets (372 bytes each).
+async fn handle_look_packet(
+    stream: &mut TcpStream,
+    payload: &[u8],
+    gh: &[u8; 32],
+    reader: &MicroscopeReader,
+    tiered: &TieredIndex,
+) -> std::io::Result<()> {
+    let (x, y, z, zoom, k) = match decode_look(payload) {
+        Some(v) => v,
+        None => return send_response(stream, Status::Error, gh, b"bad look payload").await,
+    };
+
+    let mr = crate::verify_merkle_result();
+    let results = tiered.look(reader, x, y, z, zoom, k as usize);
+
+    // Build response: [count:u16][ShpPacket...] (each 372 bytes)
+    let count = results.len().min(u16::MAX as usize) as u16;
+    let mut buf = Vec::with_capacity(2 + (count as usize) * super::packet::SHP_PACKET_SIZE);
+    buf.extend_from_slice(&count.to_le_bytes());
+
+    for (_dist, idx) in results.iter().take(count as usize) {
+        let hdr = reader.header(*idx);
+        // Use the block's content hash as merkle proof placeholder
+        let block_merkle = crate::sha256(reader.text(*idx).as_bytes());
+        let pkt = super::packet::ShpPacket::new(
+            mr.root_hash,
+            hdr.x, hdr.y, hdr.z,
+            hdr.zoom,
+            reader.text(*idx),
+            block_merkle,
+        );
+        buf.extend_from_slice(&pkt.to_bytes());
+    }
+
+    send_response(stream, Status::Ok, gh, &buf).await
 }

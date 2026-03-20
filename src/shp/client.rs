@@ -88,4 +88,26 @@ impl ShpClient {
     pub async fn stats(&mut self) -> std::io::Result<(Status, Vec<u8>)> {
         self.request(Command::Stats, &[]).await
     }
+
+    /// LookPacket: returns raw SHP v1.0 packets (372 bytes each, zero-copy format).
+    pub async fn look_packet(&mut self, x: f32, y: f32, z: f32, zoom: u8, k: u16) -> std::io::Result<Vec<super::packet::ShpPacket>> {
+        let payload = encode_look(x, y, z, zoom, k);
+        let (status, resp) = self.request(Command::LookPacket, &payload).await?;
+        if status != Status::Ok { return Ok(Vec::new()); }
+        if resp.len() < 2 { return Ok(Vec::new()); }
+
+        let count = u16::from_le_bytes([resp[0], resp[1]]) as usize;
+        let mut packets = Vec::with_capacity(count);
+        let mut off = 2;
+        for _ in 0..count {
+            if off + super::packet::SHP_PACKET_SIZE > resp.len() { break; }
+            let mut buf = [0u8; super::packet::SHP_PACKET_SIZE];
+            buf.copy_from_slice(&resp[off..off + super::packet::SHP_PACKET_SIZE]);
+            if let Some(pkt) = super::packet::ShpPacket::from_bytes(&buf) {
+                packets.push(*pkt);
+            }
+            off += super::packet::SHP_PACKET_SIZE;
+        }
+        Ok(packets)
+    }
 }

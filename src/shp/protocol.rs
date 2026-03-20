@@ -24,6 +24,8 @@ pub enum Command {
     Verify  = 0x06,
     Stats   = 0x07,
     Teach   = 0x08,
+    /// Look returning raw SHP v1.0 packets (372 bytes each, zero-copy).
+    LookPacket = 0x09,
 }
 
 impl Command {
@@ -37,6 +39,7 @@ impl Command {
             0x06 => Some(Self::Verify),
             0x07 => Some(Self::Stats),
             0x08 => Some(Self::Teach),
+            0x09 => Some(Self::LookPacket),
             _ => None,
         }
     }

@@ -193,6 +193,36 @@ impl<'a> TeachingContext<'a> {
     }
 }
 
+// ── Silent Worker Gatekeeper ─────────────────────────────────────
+
+/// Silent Worker "Gatekeeper" — the single-function entry point for the
+/// teaching feedback loop. Returns `true` only if the LLM output passes
+/// both factual consistency (D5 token-level) and genome alignment checks.
+///
+/// ```text
+/// LLM Output --> verify_and_learn() --> true  (safe to store/use)
+///                                   --> false (hallucination or axiom violation)
+/// ```
+pub fn verify_and_learn(
+    llm_output: &str,
+    reader: &MicroscopeReader,
+    tiered: &TieredIndex,
+) -> bool {
+    let ctx = TeachingContext::new(reader, tiered);
+    let verdict = ctx.verify_response("gatekeeper", llm_output);
+    matches!(verdict, TeachVerdict::Approved { .. })
+}
+
+/// Extended gatekeeper: returns the full verdict with confidence and details.
+pub fn verify_and_learn_detailed(
+    llm_output: &str,
+    reader: &MicroscopeReader,
+    tiered: &TieredIndex,
+) -> TeachVerdict {
+    let ctx = TeachingContext::new(reader, tiered);
+    ctx.verify_response("gatekeeper", llm_output)
+}
+
 /// Extract significant keywords from text.
 fn extract_keywords(text: &str) -> Vec<String> {
     text.split_whitespace()

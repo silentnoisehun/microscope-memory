@@ -3,16 +3,21 @@
 **Zoom-based hierarchical memory. The code IS the graph.**
 
 ```
-Depth 0: Identity        (1 block)
-Depth 1: Layer summaries (9 blocks)
-Depth 2: Topic clusters  (97 blocks)
-Depth 3: Individual memories
-Depth 4: Sentences
-Depth 5: Raw tokens
+Depth 0: Identity          (1 block)
+Depth 1: Layer summaries   (9 blocks)
+Depth 2: Topic clusters    (112 blocks)
+Depth 3: Individual memories (540 blocks)
+Depth 4: Sentences         (1,363 blocks)
+Depth 5: Raw tokens        (6,138 blocks)
+Depth 6: Syllables         (26,353 blocks)
+Depth 7: Characters        (96,714 blocks)
+Depth 8: Raw bytes         (97,031 blocks)
 ```
 
 Same block size (256 chars) at every depth. Only the zoom level changes.
 Like a CPU cache hierarchy — L1/L2/L3 but for cognitive memory.
+
+**228,261 blocks total. 8 MB binary. Sub-microsecond queries.**
 
 ## Architecture
 
@@ -26,11 +31,75 @@ Claude's 8-layer memory (JSON)
    microscope.bin + data.bin <-- Rust: binary mmap, zero-copy
         |
    Vector L2 queries         <-- Sub-microsecond per query
+        |
+   SHA-256 chain + Merkle    <-- Tamper detection, crypto integrity
 ```
 
 **Dual implementation:**
 - **Python** (`build_blocks.py`) — builds hierarchy, consciousness graph, crypto signing
-- **Rust** (`src/main.rs`) — binary mmap storage, production-speed queries
+- **Rust** (`src/lib.rs` + `src/main.rs`) — binary mmap storage, production-speed queries
+
+## Usage
+
+### Build & Query
+
+```bash
+cargo build --release
+
+# Build binary index from layer files
+microscope-memory build
+
+# Store new memories (append log + chain extension)
+microscope-memory store "Rust is my primary language" --layer long_term --importance 8
+
+# Natural language recall (auto-zoom, L2 distance)
+microscope-memory recall "programming language" 10
+
+# Manual spatial look: x y z zoom [k]
+microscope-memory look 0.25 0.25 0.25 3
+
+# 4D soft zoom with interpolation
+microscope-memory soft 0.25 0.25 0.25 3
+
+# Text search
+microscope-memory find "Ora" 5
+
+# Rebuild (merge append log into main index)
+microscope-memory rebuild
+
+# Benchmark
+microscope-memory bench
+
+# Structure info
+microscope-memory stats
+```
+
+### Crypto Verification
+
+```bash
+# Verify everything (chain + merkle)
+microscope-memory verify
+
+# Verify specific target
+microscope-memory verify chain
+microscope-memory verify merkle
+
+# Verify a specific block's Merkle branch to root
+microscope-memory verify --block 1000
+
+# Status commands
+microscope-memory chain-status
+microscope-memory merkle-root
+```
+
+### Visualization (optional)
+
+```bash
+cargo build --release --features viz
+microscope-viz
+```
+
+Requires wgpu/egui/winit — 3D spatial viewer of the memory graph.
 
 ## Consciousness Code Integration
 
@@ -55,8 +124,7 @@ explain("build_microscope")  # -> the function explains itself
 
 ## Crypto Layer
 
-Ed25519 signatures on every `@aware` block:
-
+### Python side — Ed25519 signatures
 ```
 Author:    Silent
 Key:       Ed25519 (persistent, auto-generated)
@@ -64,31 +132,12 @@ Signing:   SHA3-256 code hash + intent + timestamp
 Manifest:  signed_manifest.json (all signatures + verification)
 ```
 
-Cryptographic proof of authorship. Every node in the graph is signed and verifiable.
-
-## Usage
-
-### Python — Build + Query
-
-```bash
-pip install consciousness-code
-python build_blocks.py
+### Rust side — SHA-256 chain + Merkle tree
 ```
-
-Output:
-- `microscope_blocks.json` — block hierarchy
-- `signed_manifest.json` — crypto signatures
-- `silent_author.key` — Ed25519 keypair
-
-### Rust — Binary mmap
-
-```bash
-cargo build --release
-./target/release/microscope-memory build
-./target/release/microscope-memory look 0.25 0.25 0.25 3
-./target/release/microscope-memory find "Ora"
-./target/release/microscope-memory bench
-./target/release/microscope-memory stats
+Chain:   228,261 links (17.8 MB), sequential hash chain
+Merkle:  228,261 nodes (7.1 MB), root=cafe8887d0a5d4fe
+Verify:  Full chain validation in 25 ms, Merkle in 50 ms
+Branch:  Any block verifiable to root in O(log n) steps
 ```
 
 ## Memory Layers
@@ -113,42 +162,54 @@ Three-tier strategy based on depth:
 
 | Tier | Depths | Strategy | Why |
 |------|--------|----------|-----|
-| Hot | D0-D2 | Raw mmap scan | 1-108 blocks, fits L1 cache (32KB) |
+| Hot | D0-D2 | Raw mmap scan | 1-112 blocks, fits L1 cache (32KB) |
 | Grid | D3-D5 | Spatial grid (8^3 - 16^3) | O(cells) not O(n), 3x3x3 neighbor lookup |
-| Grid+ | D6-D8 | Spatial grid (24^3 - 32^3) | Adaptive resolution, up to 29x faster |
+| Grid+ | D6-D8 | Spatial grid (24^3 - 32^3) | Adaptive resolution, up to 30x faster |
 
 The `BlockHeader` is 32 bytes `#[repr(C, packed)]`, mmap zero-copy. Grid cells hash (x,y,z) to a cube, then scan only the target cell + 26 neighbors.
 
 ## Performance
 
-### Python (NumPy L2)
+### Rust — AoS mmap (baseline)
 ```
-ZOOM 0: ~13 us/query   (1 block)
-ZOOM 3: ~34 us/query   (471 blocks)
-ZOOM 5: ~124 us/query  (4008 blocks)
-```
-
-### Rust — AoS mmap (original)
-```
-ZOOM 0:     36 ns/query   (1 block)
-ZOOM 3:    1.7 us/query   (523 blocks)
-ZOOM 5:   17.2 us/query   (6070 blocks)
-ZOOM 7:  705.2 us/query   (96297 blocks)
-ZOOM 8:  766.9 us/query   (96613 blocks)
-AVG: 174,046 ns
+ZOOM 0:      37 ns/query   (1 block)
+ZOOM 3:     1.7 us/query   (540 blocks)
+ZOOM 5:    16.6 us/query   (6,138 blocks)
+ZOOM 7:   813.3 us/query   (96,714 blocks)
+ZOOM 8:   957.1 us/query   (97,031 blocks)
+AVG: 206,997 ns
 ```
 
 ### Rust — Tiered Grid (optimized)
 ```
-ZOOM 0:     61 ns/query   (1 block)      [mmap/L1]
-ZOOM 3:    3.7 us/query   (523 blocks)   [Grid 8^3]
-ZOOM 5:   11.4 us/query   (6070 blocks)  [Grid 16^3]
-ZOOM 7:   26.8 us/query   (96297 blocks) [Grid 32^3]  <-- 26.3x faster
-ZOOM 8:   26.5 us/query   (96613 blocks) [Grid 32^3]  <-- 28.9x faster
-AVG: 10,457 ns
+ZOOM 0:     102 ns/query   (1 block)       [mmap/L1]
+ZOOM 3:     5.4 us/query   (540 blocks)    [Grid 8^3]
+ZOOM 5:    17.1 us/query   (6,138 blocks)  [Grid 16^3]
+ZOOM 7:    31.9 us/query   (96,714 blocks) [Grid 32^3]  <-- 25.5x faster
+ZOOM 8:    34.5 us/query   (97,031 blocks) [Grid 32^3]  <-- 27.7x faster
+AVG: 12,991 ns
 ```
 
-**Overall: 16.6x speedup.** The grid eliminates scanning irrelevant spatial regions entirely.
+**Overall: 15.9x speedup.** The grid eliminates scanning irrelevant spatial regions entirely.
+
+### Store / Recall
+```
+Store:   ~6 ms (append log + chain extension)
+Recall:  ~700 us (auto-zoom + L2 distance ranking)
+Find:    instant (text substring match)
+Rebuild: ~110 ms (full reindex with append log merge)
+```
+
+## Data Flow
+
+```
+store "text" --layer X     -->  append.bin (fast, chain extended)
+rebuild                    -->  merge append.bin into main index
+                               layers/*.json + append entries
+                               -> D0-D8 hierarchy -> crypto rebuild
+recall "query"             -->  auto-zoom -> L2 spatial search
+                               checks main index + append log
+```
 
 ## Hope Ecosystem
 

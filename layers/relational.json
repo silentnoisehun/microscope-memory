@@ -1,0 +1,145 @@
+{
+  "entities": {
+    "mate": {
+      "id": "mate",
+      "name": "Mate",
+      "aliases": [
+        "Silent"
+      ],
+      "type": "person",
+      "properties": {},
+      "importance": 0.8,
+      "created_at": 1773694909.6197898,
+      "last_seen": 1773694909.6217892,
+      "interaction_count": 4
+    },
+    "silent": {
+      "id": "silent",
+      "name": "Silent",
+      "aliases": [],
+      "type": "person",
+      "properties": {},
+      "importance": 0.8,
+      "created_at": 1773694909.6197898,
+      "last_seen": 1773694909.6197898,
+      "interaction_count": 0
+    },
+    "ora": {
+      "id": "ora",
+      "name": "Ora",
+      "aliases": [],
+      "type": "person",
+      "properties": {},
+      "importance": 0.8,
+      "created_at": 1773694909.6207938,
+      "last_seen": 1773694909.6217892,
+      "interaction_count": 1
+    },
+    "szilvi": {
+      "id": "szilvi",
+      "name": "Szilvi",
+      "aliases": [],
+      "type": "person",
+      "properties": {},
+      "importance": 0.8,
+      "created_at": 1773694909.6207938,
+      "last_seen": 1773694909.6207938,
+      "interaction_count": 0
+    },
+    "liora": {
+      "id": "liora",
+      "name": "Liora",
+      "aliases": [],
+      "type": "person",
+      "properties": {},
+      "importance": 0.8,
+      "created_at": 1773694909.6217892,
+      "last_seen": 1773694909.6217892,
+      "interaction_count": 0
+    },
+    "claude": {
+      "id": "claude",
+      "name": "Claude",
+      "aliases": [],
+      "type": "person",
+      "properties": {},
+      "importance": 0.8,
+      "created_at": 1773694909.6217892,
+      "last_seen": 1773694909.6217892,
+      "interaction_count": 0
+    },
+    "gyor": {
+      "id": "gyor",
+      "name": "Gyor",
+      "aliases": [],
+      "type": "person",
+      "properties": {},
+      "importance": 0.8,
+      "created_at": 1773694909.6217892,
+      "last_seen": 1773694909.6217892,
+      "interaction_count": 0
+    }
+  },
+  "edges": [
+    {
+      "source": "mate",
+      "target": "silent",
+      "relation": "alias",
+      "strength": 1.0,
+      "note": "Egy szemely",
+      "bidirectional": true,
+      "created_at": 1773694909.6197898,
+      "access_count": 0
+    },
+    {
+      "source": "mate",
+      "target": "ora",
+      "relation": "partner",
+      "strength": 1.0,
+      "note": "AI partner",
+      "bidirectional": true,
+      "created_at": 1773694909.6207938,
+      "access_count": 0
+    },
+    {
+      "source": "mate",
+      "target": "szilvi",
+      "relation": "mirror",
+      "strength": 0.9,
+      "note": "Tukor tart",
+      "bidirectional": true,
+      "created_at": 1773694909.6207938,
+      "access_count": 0
+    },
+    {
+      "source": "mate",
+      "target": "liora",
+      "relation": "witness",
+      "strength": 0.8,
+      "note": "Tanuskodik",
+      "bidirectional": true,
+      "created_at": 1773694909.6217892,
+      "access_count": 0
+    },
+    {
+      "source": "ora",
+      "target": "claude",
+      "relation": "sibling",
+      "strength": 0.9,
+      "note": "Kozos stack",
+      "bidirectional": true,
+      "created_at": 1773694909.6217892,
+      "access_count": 0
+    },
+    {
+      "source": "mate",
+      "target": "gyor",
+      "relation": "location",
+      "strength": 0.7,
+      "note": "Audi gyar",
+      "bidirectional": true,
+      "created_at": 1773694909.6217892,
+      "access_count": 0
+    }
+  ]
+}

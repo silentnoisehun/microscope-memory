@@ -1,0 +1,104 @@
+{
+  "genesis": "f8408fe3009772b3bc00095ef9d638a8fcff6a458c2b10a9f6df47ebd574bb24",
+  "blocks": [
+    {
+      "height": 0,
+      "timestamp": 1773694933.9643514,
+      "content_hash": "3d545a51ded41fb62cae253cb76191b533ba5ea23fae6192dd125534b278b448",
+      "prev_hash": "f8408fe3009772b3bc00095ef9d638a8fcff6a458c2b10a9f6df47ebd574bb24",
+      "block_hash": "bc17ff43116ea4a375898c5f038114532233db4748214e4d1c6e921e66762535",
+      "content_summary": "Session: 8-layer memory system megepiteve es tesztelve",
+      "label": "session-8layer-build"
+    },
+    {
+      "height": 1,
+      "timestamp": 1773694940.0501015,
+      "content_hash": "cd8c70d38df7cc7fdc12ec5bfaee0ca66d0ae17b2f98a5d15ace8c4fab69a15a",
+      "prev_hash": "bc17ff43116ea4a375898c5f038114532233db4748214e4d1c6e921e66762535",
+      "block_hash": "db1c1292697faa427d9a9420c1eee5c67167f4d569ad38d6a731274c5d1d5176",
+      "content_summary": "Consolidation: 1 strengthened, 0 pruned, 0 promoted",
+      "label": "consolidate-1773694940"
+    },
+    {
+      "height": 2,
+      "timestamp": 1773695531.1556304,
+      "content_hash": "98a38e32f884794e60b489cd4e94a80be62b921978710a6e00acb6b572e0cad2",
+      "prev_hash": "db1c1292697faa427d9a9420c1eee5c67167f4d569ad38d6a731274c5d1d5176",
+      "block_hash": "110e90ce1a684702d79202d9a45abaf236430db1f979dc239561a77abbf00b4f",
+      "content_summary": "CRYO FREEZE: session-8layer-cryo-build | coh=0.240 | beke(0.24) | 32 entries",
+      "label": "cryo-freeze-cryo_1773695531151_21592"
+    },
+    {
+      "height": 3,
+      "timestamp": 1773695548.0688832,
+      "content_hash": "f5605f77380f4af53c77fb80ce6f3ceed6d91f20d1a59477c98a903dd9e57468",
+      "prev_hash": "110e90ce1a684702d79202d9a45abaf236430db1f979dc239561a77abbf00b4f",
+      "block_hash": "8bcb252bdf78b8995e4f3555e3dbfa12903ed98b94e310186f18889b102a6991",
+      "content_summary": "CRYO FREEZE: session-cryo-build | coh=0.240 | beke(0.24) | 33 entries",
+      "label": "cryo-freeze-cryo_1773695548066_23992"
+    },
+    {
+      "height": 4,
+      "timestamp": 1773695597.0991285,
+      "content_hash": "3417c37cb5caafab93051c23abb64e4188d6f48985a2c5b95dae1ae852dda173",
+      "prev_hash": "8bcb252bdf78b8995e4f3555e3dbfa12903ed98b94e310186f18889b102a6991",
+      "block_hash": "21cd4a978f5d5765acfaf20e0df955bb729bbc59304052a0eb0512809b68c211",
+      "content_summary": "CRYO THAW: session-cryo-build | W:1 E:1 | spectrum:OK",
+      "label": "cryo-thaw-cryo_1773695548066_23992"
+    },
+    {
+      "height": 5,
+      "timestamp": 1773696190.7029042,
+      "content_hash": "400c425078e1589ea94ee730dc021b4868569b3af06d716d999165ee81d92a31",
+      "prev_hash": "21cd4a978f5d5765acfaf20e0df955bb729bbc59304052a0eb0512809b68c211",
+      "block_hash": "e0fd1e87f50d46ec34315cabef9e72f6a74d91edcae2a49ce0ae864381a4b93d",
+      "content_summary": "COMPACT: code-8layer-build | 589B->396B | coh=0.408",
+      "label": "compact-code-8layer-build"
+    },
+    {
+      "height": 6,
+      "timestamp": 1773696199.779108,
+      "content_hash": "9f00874698c3b3b4c4d5b051a145c0b96ca64d5d8e48c1204220b5c3b25a1298",
+      "prev_hash": "e0fd1e87f50d46ec34315cabef9e72f6a74d91edcae2a49ce0ae864381a4b93d",
+      "block_hash": "9aa46d766367205c07756d6c32d368d314e69360ec15db4ed1b3166aa4839e12",
+      "content_summary": "COMPACT: chat-memoria-beszelgetes | 576B->369B | coh=0.408",
+      "label": "compact-chat-memoria-beszelgetes"
+    },
+    {
+      "height": 7,
+      "timestamp": 1773697646.0288856,
+      "content_hash": "eccb8ec649756482d1d7e9d2f06ea5ac46a0a99abcf5baaf9c22438e489e7ee0",
+      "prev_hash": "9aa46d766367205c07756d6c32d368d314e69360ec15db4ed1b3166aa4839e12",
+      "block_hash": "58df758f1b95849107ee7d5886ba73413bd8042d6be373408e80d0e6660f0c36",
+      "content_summary": "Consolidation: 2 strengthened, 0 pruned, 0 promoted | reflection",
+      "label": "consolidate-1773697646"
+    },
+    {
+      "height": 8,
+      "timestamp": 1773748172.6383827,
+      "content_hash": "cc1b4297aa7b323e95372ba4277f395af756cda8fa8b0ecd3799b77fe85ed62f",
+      "prev_hash": "58df758f1b95849107ee7d5886ba73413bd8042d6be373408e80d0e6660f0c36",
+      "block_hash": "077353beb8464ea2dd34a89d13d1ee4b3af6494bfe57fbe88a251fabbdaa1185",
+      "content_summary": "Consolidation: 2 strengthened, 0 pruned, 3 promoted | reflection",
+      "label": "consolidate-1773748172"
+    },
+    {
+      "height": 9,
+      "timestamp": 1773762572.8523452,
+      "content_hash": "eccb8ec649756482d1d7e9d2f06ea5ac46a0a99abcf5baaf9c22438e489e7ee0",
+      "prev_hash": "077353beb8464ea2dd34a89d13d1ee4b3af6494bfe57fbe88a251fabbdaa1185",
+      "block_hash": "779cda97168eb4ab0c6d0c5065587ad4f5c9de1dd64d07fb646b1bcd0aa7542c",
+      "content_summary": "Consolidation: 2 strengthened, 0 pruned, 0 promoted | reflection",
+      "label": "consolidate-1773762572"
+    },
+    {
+      "height": 10,
+      "timestamp": 1773994804.1297607,
+      "content_hash": "f2de72440e940467b6927e4e1af1f531cd49935b1b635d2244f90064c4ca5047",
+      "prev_hash": "779cda97168eb4ab0c6d0c5065587ad4f5c9de1dd64d07fb646b1bcd0aa7542c",
+      "block_hash": "b68524fcf749407fbd278842cc5639a83f99cdf2a16fdadad73e8ec5ec55d8e6",
+      "content_summary": "Consolidation: 2 strengthened, 0 pruned, 1 promoted | reflection",
+      "label": "consolidate-1773994804"
+    }
+  ]
+}

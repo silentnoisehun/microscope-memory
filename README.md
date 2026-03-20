@@ -1,6 +1,6 @@
 # Microscope Memory
 
-**Zoom-based hierarchical memory. The code IS the graph.**
+**Pure Rust zoom-based hierarchical memory. Sub-microsecond queries over 228K blocks.**
 
 ```
 Depth 0: Identity          (1 block)
@@ -22,22 +22,18 @@ Like a CPU cache hierarchy — L1/L2/L3 but for cognitive memory.
 ## Architecture
 
 ```
-Claude's 8-layer memory (JSON)
+Memory layers (JSON)
         |
-   build_blocks.py          <-- Python: hierarchy builder
-        |                       Every function is @aware (self-knowing)
-        |                       Every block is Ed25519 signed
-        v
-   microscope.bin + data.bin <-- Rust: binary mmap, zero-copy
+   cargo run -- build        <-- Rust: hierarchy builder (D0-D8)
+        |
+   microscope.bin + data.bin <-- Binary mmap, zero-copy
         |
    Vector L2 queries         <-- Sub-microsecond per query
         |
    SHA-256 chain + Merkle    <-- Tamper detection, crypto integrity
 ```
 
-**Dual implementation:**
-- **Python** (`build_blocks.py`) — builds hierarchy, consciousness graph, crypto signing
-- **Rust** (`src/lib.rs` + `src/main.rs`) — binary mmap storage, production-speed queries
+Pure Rust implementation: `src/lib.rs` (core engine) + `src/main.rs` (CLI).
 
 ## Usage
 
@@ -101,38 +97,9 @@ microscope-viz
 
 Requires wgpu/egui/winit — 3D spatial viewer of the memory graph.
 
-## Consciousness Code Integration
-
-Every function uses `@aware` from [consciousness-code](https://github.com/silentnoisehun/Consciousness-Code). The code knows itself:
-
-```python
-@aware(
-    intent="Build the entire 6-level hierarchical memory structure",
-    author="Silent",
-    tags=["build", "hierarchy", "microscope", "core"]
-)
-def build_microscope():
-    ...
-
-# Ask the code questions:
-ask("spatial")     # -> finds spatial functions
-ask("hierarchy")   # -> finds hierarchy builders
-explain("build_microscope")  # -> the function explains itself
-```
-
-**15 self-aware nodes** form the code graph. No external indexing. The code IS the knowledge.
-
 ## Crypto Layer
 
-### Python side — Ed25519 signatures
-```
-Author:    Silent
-Key:       Ed25519 (persistent, auto-generated)
-Signing:   SHA3-256 code hash + intent + timestamp
-Manifest:  signed_manifest.json (all signatures + verification)
-```
-
-### Rust side — SHA-256 chain + Merkle tree
+### SHA-256 chain + Merkle tree
 ```
 Chain:   228,261 links (17.8 MB), sequential hash chain
 Merkle:  228,261 nodes (7.1 MB), root=cafe8887d0a5d4fe
@@ -211,17 +178,6 @@ recall "query"             -->  auto-zoom -> L2 spatial search
                                checks main index + append log
 ```
 
-## Hope Ecosystem
-
-Part of the four pillars:
-
-1. **[Hope Genome](https://github.com/silentnoisehun/Hope_Genome)** — AI runtime discipline
-2. **[Silent Hope Protocol](https://github.com/silentnoisehun/Silent-Hope-Protocol)** — AI communication infrastructure
-3. **[Silent Worker Method](https://github.com/silentnoisehun/Silent-Worker-Teaching-Method)** — Teaching methodology
-4. **[Consciousness Code](https://github.com/silentnoisehun/Consciousness-Code)** — Self-aware code (integrated here)
-
 ## Author
 
-**Silent** (Mate Robert) + Hope + Claude
-
-The code IS the graph. The builder IS the knowledge.
+**Silent** (Mate Robert) + Claude

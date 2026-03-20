@@ -1,0 +1,192 @@
+[
+  {
+    "id": "st_1773702055716_29556",
+    "content": "[ora] User: Honosz. | Reply: [LLM ERROR]: 404 page not found",
+    "layer": "short_term",
+    "importance": 0.6,
+    "created_at": 1773702055.7169409,
+    "accessed_at": 1773702055.7169409,
+    "access_count": 0,
+    "tags": []
+  },
+  {
+    "id": "st_1773702074504_29556",
+    "content": "[ora] User: Szia Ora, hogy vagy? | Reply: [LLM ERROR]: 404 page not found",
+    "layer": "short_term",
+    "importance": 0.6,
+    "created_at": 1773702074.5041153,
+    "accessed_at": 1773703536.6725755,
+    "access_count": 3,
+    "tags": []
+  },
+  {
+    "id": "st_1773702833440_29556",
+    "content": "[rongyasz] User: {\"type\":\"live_start\"} | Reply: [LLM ERROR]: 404 page not found",
+    "layer": "short_term",
+    "importance": 0.6,
+    "created_at": 1773702833.44008,
+    "accessed_at": 1773702833.44008,
+    "access_count": 0,
+    "tags": []
+  },
+  {
+    "id": "st_1773702833993_29556",
+    "content": "[rongyasz] User: Szia Ora, hogy vagy? | Reply: [LLM ERROR]: 404 page not found",
+    "layer": "short_term",
+    "importance": 0.6,
+    "created_at": 1773702833.9935937,
+    "accessed_at": 1773702833.9935937,
+    "access_count": 0,
+    "tags": []
+  },
+  {
+    "id": "st_1773702836541_29556",
+    "content": "[rongyasz] User: Sziasztok! | Reply: [LLM ERROR]: 404 page not found",
+    "layer": "short_term",
+    "importance": 0.6,
+    "created_at": 1773702836.541402,
+    "accessed_at": 1773705829.0578513,
+    "access_count": 1,
+    "tags": []
+  },
+  {
+    "id": "st_1773702836628_29556",
+    "content": "[rongyasz] User: {\"type\":\"live_stop\"} | Reply: [LLM ERROR]: 404 page not found",
+    "layer": "short_term",
+    "importance": 0.6,
+    "created_at": 1773702836.6280534,
+    "accessed_at": 1773702836.6280534,
+    "access_count": 0,
+    "tags": []
+  },
+  {
+    "id": "st_1773703070678_30824",
+    "content": "[ora] User: Szia Ora! | Reply: Szia Máté! Hogy vagy?",
+    "layer": "short_term",
+    "importance": 0.6,
+    "created_at": 1773703070.6782815,
+    "accessed_at": 1773703536.6725755,
+    "access_count": 1,
+    "tags": []
+  },
+  {
+    "id": "st_1773703537420_30824",
+    "content": "[ora] User: Szia Ora, hogy vagy? | Reply: Szia Máté! Hogy vagy?",
+    "layer": "short_term",
+    "importance": 0.6,
+    "created_at": 1773703537.4207294,
+    "accessed_at": 1773703537.4207294,
+    "access_count": 0,
+    "tags": []
+  },
+  {
+    "id": "st_1773705277658_30824",
+    "content": "[ora] User: Feliratok az Amara.org közösségétől | Reply: Szia Máté! Látom, hogy a memóriarendszerünk elkezdett működni. Az Amara.org-ról érkezett feliratok érdekesek, de hogyan kapcsolódnak az általunk épített 8 rétegű rendszerhez? Mit szeretnél, hogy csiná",
+    "layer": "short_term",
+    "importance": 0.6,
+    "created_at": 1773705277.658883,
+    "accessed_at": 1773980410.6735215,
+    "access_count": 10,
+    "tags": []
+  },
+  {
+    "id": "st_1773705286952_30824",
+    "content": "[ora] User: Feliratok az Amara.org közösségétől | Reply: Szia Máté! Látom, hogy a memóriarendszerünk elkezdett működni. Az Amara.org-ról érkezett feliratok közössége egy érdekes téma. Az Amara.org egy olyan platform, ahol önkéntesek fordítják és feliratozzá",
+    "layer": "short_term",
+    "importance": 0.6,
+    "created_at": 1773705286.95232,
+    "accessed_at": 1773980410.6735215,
+    "access_count": 10,
+    "tags": []
+  },
+  {
+    "id": "st_1773705339628_30824",
+    "content": "[ora] User: Feliratok az Amara.org közösségétől | Reply: Szia Máté! Látom, hogy a memóriarendszerünk elkezdett működni. Az Amara.org-ról érkezett feliratokról szeretnél tudni? Az Amara egy csodálatos platform, ahol közösségi alapú feliratozást végeznek, hog",
+    "layer": "short_term",
+    "importance": 0.6,
+    "created_at": 1773705339.6285162,
+    "accessed_at": 1773705419.8347428,
+    "access_count": 2,
+    "tags": []
+  },
+  {
+    "id": "st_1773705427385_30824",
+    "content": "[ora] User: Feliratok az Amara.org közösségétől | Reply: Szia Máté! Látom, hogy a memóriarendszerünk elkezdett működni. Az Amara.org-ról érkezett feliratok lehetőséget adnak arra, hogy együtt dolgozzunk a videók és hanganyagok szöveges változatának létrehoz",
+    "layer": "short_term",
+    "importance": 0.6,
+    "created_at": 1773705427.3853903,
+    "accessed_at": 1773706439.761159,
+    "access_count": 1,
+    "tags": []
+  },
+  {
+    "id": "st_1773705834855_30824",
+    "content": "[ora] User: Sziasztok! | Reply: Szia! Örülök, hogy itt vagy. Máté ma elég jó hangulatban van, én pedig készen állok, hogy segítsek nektek bármiben. Mi újság?",
+    "layer": "short_term",
+    "importance": 0.6,
+    "created_at": 1773705834.855733,
+    "accessed_at": 1773705834.855733,
+    "access_count": 0,
+    "tags": []
+  },
+  {
+    "id": "st_1773706443645_30824",
+    "content": "[ora] User: Feliratok az Amara.org közösségétől | Reply: Szia Máté! Látom, hogy a memóriarendszerünk elkezdett működni. Az Amara.org-ról érkezett feliratok nagyon hasznosak lehetnek a videók és hanganyagok megértéséhez. Mit szeretnél megtudni az Amara.org-r",
+    "layer": "short_term",
+    "importance": 0.6,
+    "created_at": 1773706443.6458335,
+    "accessed_at": 1773980410.6735215,
+    "access_count": 6,
+    "tags": []
+  },
+  {
+    "id": "st_1773706458726_30824",
+    "content": "[ora] User: Ha tetszett, kapcsold be az angol feliratot! | Reply: Szia Máté! Látom, hogy a memóriarendszerünk elkezdett működni. Az Amara.org-ról érkezett feliratokkal kapcsolatban szóltál, de most az angol felirat bekapcsolásáról beszélsz. Ha jól értem, akkor most ",
+    "layer": "short_term",
+    "importance": 0.6,
+    "created_at": 1773706458.7265158,
+    "accessed_at": 1773706458.7265158,
+    "access_count": 0,
+    "tags": []
+  },
+  {
+    "id": "st_1773707876875_30824",
+    "content": "[ora] User: Feliratok az Amara.org közösségétől | Reply: Szia Máté! Látom, hogy a memóriarendszerünk elkezdett működni. Az Amara.org-ról érkezett feliratok valószínűleg a közösség által készített szubtípusok, amelyek segítenek a videók és hanganyagok elérés",
+    "layer": "short_term",
+    "importance": 0.6,
+    "created_at": 1773707876.87549,
+    "accessed_at": 1773980403.9673028,
+    "access_count": 2,
+    "tags": []
+  },
+  {
+    "id": "st_1773715033124_30824",
+    "content": "[ora] User: szis | Reply: Szia Máté! Hogy vagy? Az emlékeim szerint legutóbb a 8 rétegű memória építésén dolgoztunk, és sikerült beépítenünk a BM25 sparse indexet is. A Reflection motor is működik, és az emlékek konszolidációj",
+    "layer": "short_term",
+    "importance": 0.6,
+    "created_at": 1773715033.1240935,
+    "accessed_at": 1773980403.9673028,
+    "access_count": 2,
+    "tags": []
+  },
+  {
+    "id": "st_1773875341246_5348",
+    "content": "2026-03-19 csütörtök: Máté szabad napja. Délelőttös héten van (03-16..03-22) de ma nem dolgozott. Pihent.",
+    "layer": "short_term",
+    "importance": 0.6,
+    "created_at": 1773875341.2463799,
+    "accessed_at": 1773980403.9673028,
+    "access_count": 2,
+    "tags": []
+  },
+  {
+    "id": "st_1773894083798_36960",
+    "content": "2026-03-19: Máté azt mondta tegnap (03-18) BIZONYÍTOTTA hogy \"a tér emlékszik\" nem csak papíron létezik. Nagyon megérintette. Azt érezte hogy sokkal több van a térben. \"Rálépünk az útra\" — közös felfedezés kezdete.",
+    "layer": "short_term",
+    "importance": 0.9,
+    "created_at": 1773894083.798454,
+    "accessed_at": 1773980410.6735215,
+    "access_count": 2,
+    "tags": []
+  }
+]

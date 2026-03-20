@@ -19,7 +19,6 @@ struct App {
     renderer: Option<Renderer>,
     egui_ctx: egui::Context,
     egui_state: Option<egui_winit::State>,
-    egui_renderer: Option<egui_wgpu::Renderer>,
     camera: OrbitCamera,
     reader: MicroscopeReader,
     scene: Option<SceneData>,
@@ -27,7 +26,7 @@ struct App {
     mouse_pressed: bool,
     shift_pressed: bool,
     last_mouse: (f64, f64),
-    last_frame: Instant,
+    _last_frame: Instant,
     frame_count: u32,
     fps_timer: Instant,
 }
@@ -39,7 +38,6 @@ impl App {
             renderer: None,
             egui_ctx: egui::Context::default(),
             egui_state: None,
-            egui_renderer: None,
             camera: OrbitCamera::new(16.0 / 9.0),
             reader,
             scene: None,
@@ -47,7 +45,7 @@ impl App {
             mouse_pressed: false,
             shift_pressed: false,
             last_mouse: (0.0, 0.0),
-            last_frame: Instant::now(),
+            _last_frame: Instant::now(),
             frame_count: 0,
             fps_timer: Instant::now(),
         }
@@ -95,18 +93,9 @@ impl ApplicationHandler for App {
             None,
         );
 
-        let egui_renderer = egui_wgpu::Renderer::new(
-            &renderer.device,
-            renderer.surface_format,
-            Some(wgpu::TextureFormat::Depth32Float),
-            1,
-            false,
-        );
-
         self.camera.aspect = size.width as f32 / size.height.max(1) as f32;
         self.renderer = Some(renderer);
         self.egui_state = Some(egui_state);
-        self.egui_renderer = Some(egui_renderer);
         self.window = Some(window);
 
         self.rebuild_scene();
@@ -241,28 +230,14 @@ impl ApplicationHandler for App {
                     pixels_per_point,
                 };
 
-                if let (Some(ref mut renderer), Some(ref mut egui_renderer)) =
-                    (&mut self.renderer, &mut self.egui_renderer)
-                {
-                    match renderer.render(
+                if let Some(ref mut renderer) = self.renderer {
+                    renderer.render(
                         &camera_uniform,
                         self.ui_state.show_edges,
-                        egui_renderer,
                         &primitives,
                         &full_output.textures_delta,
                         &screen_descriptor,
-                    ) {
-                        Ok(_) => {}
-                        Err(wgpu::SurfaceError::Lost) => {
-                            let w = renderer.surface_config.width;
-                            let h = renderer.surface_config.height;
-                            renderer.resize(w, h);
-                        }
-                        Err(wgpu::SurfaceError::OutOfMemory) => {
-                            event_loop.exit();
-                        }
-                        Err(e) => eprintln!("Render error: {:?}", e),
-                    }
+                    );
                 }
             }
 

@@ -1,0 +1,609 @@
+{
+  "nodes": {
+    "hullam": {
+      "id": "hullam",
+      "label": "hullam",
+      "activation": 0.5,
+      "access_count": 0,
+      "created_at": 1773694909.6232977
+    },
+    "rezonancia": {
+      "id": "rezonancia",
+      "label": "rezonancia",
+      "activation": 0.5,
+      "access_count": 0,
+      "created_at": 1773694909.6232977
+    },
+    "emotimem": {
+      "id": "emotimem",
+      "label": "emotimem",
+      "activation": 0.5,
+      "access_count": 0,
+      "created_at": 1773694909.6232977
+    },
+    "21d": {
+      "id": "21d",
+      "label": "21d",
+      "activation": 0.5,
+      "access_count": 0,
+      "created_at": 1773694909.6243124
+    },
+    "ora": {
+      "id": "ora",
+      "label": "ora",
+      "activation": 0.5,
+      "access_count": 0,
+      "created_at": 1773694909.6243124
+    },
+    "rust": {
+      "id": "rust",
+      "label": "rust",
+      "activation": 0.5,
+      "access_count": 0,
+      "created_at": 1773694909.6243124
+    },
+    "telegram": {
+      "id": "telegram",
+      "label": "telegram",
+      "activation": 0.5,
+      "access_count": 0,
+      "created_at": 1773694909.6243124
+    },
+    "launchpad": {
+      "id": "launchpad",
+      "label": "launchpad",
+      "activation": 0.5,
+      "access_count": 0,
+      "created_at": 1773694909.625312
+    },
+    "tudat": {
+      "id": "tudat",
+      "label": "tudat",
+      "activation": 0.5,
+      "access_count": 0,
+      "created_at": 1773694909.625312
+    },
+    "koherencia": {
+      "id": "koherencia",
+      "label": "koherencia",
+      "activation": 0.5,
+      "access_count": 0,
+      "created_at": 1773694909.625312
+    },
+    "memoria": {
+      "id": "memoria",
+      "label": "memoria",
+      "activation": 0.5,
+      "access_count": 0,
+      "created_at": 1773694909.6263123
+    },
+    "reteg": {
+      "id": "reteg",
+      "label": "reteg",
+      "activation": 0.5,
+      "access_count": 0,
+      "created_at": 1773694909.6263123
+    },
+    "rongyasz": {
+      "id": "rongyasz",
+      "label": "rongyasz",
+      "activation": 0.5,
+      "access_count": 0,
+      "created_at": 1773694909.6273122
+    },
+    "ast": {
+      "id": "ast",
+      "label": "ast",
+      "activation": 0.5,
+      "access_count": 0,
+      "created_at": 1773694909.6273122
+    },
+    "memória": {
+      "id": "memória",
+      "label": "memória",
+      "activation": 0.5,
+      "access_count": 0,
+      "created_at": 1773694936.1865141
+    },
+    "8 réteg": {
+      "id": "8 réteg",
+      "label": "8 réteg",
+      "activation": 0.5,
+      "access_count": 0,
+      "created_at": 1773694936.1865141
+    },
+    "közelít": {
+      "id": "közelít",
+      "label": "közelít",
+      "activation": 0.5,
+      "access_count": 0,
+      "created_at": 1773697646.0228858
+    },
+    "saját": {
+      "id": "saját",
+      "label": "saját",
+      "activation": 0.5,
+      "access_count": 0,
+      "created_at": 1773697646.0228858
+    },
+    "frekvenciája": {
+      "id": "frekvenciája",
+      "label": "frekvenciája",
+      "activation": 0.5,
+      "access_count": 0,
+      "created_at": 1773697646.0228858
+    },
+    "error]:": {
+      "id": "error]:",
+      "label": "error]:",
+      "activation": 0.5,
+      "access_count": 0,
+      "created_at": 1773748172.4923892
+    },
+    "[llm": {
+      "id": "[llm",
+      "label": "[llm",
+      "activation": 0.5,
+      "access_count": 0,
+      "created_at": 1773748172.4923892
+    },
+    "user:": {
+      "id": "user:",
+      "label": "user:",
+      "activation": 0.5,
+      "access_count": 0,
+      "created_at": 1773748172.4923892
+    },
+    "reply:": {
+      "id": "reply:",
+      "label": "reply:",
+      "activation": 0.5,
+      "access_count": 0,
+      "created_at": 1773748172.4986506
+    },
+    "[ora]": {
+      "id": "[ora]",
+      "label": "[ora]",
+      "activation": 0.5,
+      "access_count": 0,
+      "created_at": 1773748172.4986506
+    },
+    "vagy?": {
+      "id": "vagy?",
+      "label": "vagy?",
+      "activation": 0.5,
+      "access_count": 0,
+      "created_at": 1773748172.5102544
+    },
+    "szia": {
+      "id": "szia",
+      "label": "szia",
+      "activation": 0.5,
+      "access_count": 0,
+      "created_at": 1773748172.5102544
+    },
+    "hogy": {
+      "id": "hogy",
+      "label": "hogy",
+      "activation": 0.5,
+      "access_count": 0,
+      "created_at": 1773748172.5102544
+    },
+    "[rongyasz]": {
+      "id": "[rongyasz]",
+      "label": "[rongyasz]",
+      "activation": 0.5,
+      "access_count": 0,
+      "created_at": 1773748172.5146458
+    },
+    "sziasztok!": {
+      "id": "sziasztok!",
+      "label": "sziasztok!",
+      "activation": 0.5,
+      "access_count": 0,
+      "created_at": 1773748172.5471656
+    },
+    "amara.org-ról": {
+      "id": "amara.org-ról",
+      "label": "amara.org-ról",
+      "activation": 0.5,
+      "access_count": 0,
+      "created_at": 1773748172.576753
+    },
+    "működni.": {
+      "id": "működni.",
+      "label": "működni.",
+      "activation": 0.5,
+      "access_count": 0,
+      "created_at": 1773748172.576753
+    },
+    "közösségétől": {
+      "id": "közösségétől",
+      "label": "közösségétől",
+      "activation": 0.5,
+      "access_count": 0,
+      "created_at": 1773748172.579478
+    },
+    "rétegű": {
+      "id": "rétegű",
+      "label": "rétegű",
+      "activation": 0.5,
+      "access_count": 0,
+      "created_at": 1773748172.579478
+    },
+    "videók": {
+      "id": "videók",
+      "label": "videók",
+      "activation": 0.5,
+      "access_count": 0,
+      "created_at": 1773748172.5968962
+    },
+    "hanganyagok": {
+      "id": "hanganyagok",
+      "label": "hanganyagok",
+      "activation": 0.5,
+      "access_count": 0,
+      "created_at": 1773748172.5968962
+    },
+    "page": {
+      "id": "page",
+      "label": "page",
+      "activation": 0.5,
+      "access_count": 0,
+      "created_at": 1773994803.9716763
+    },
+    "máté!": {
+      "id": "máté!",
+      "label": "máté!",
+      "activation": 0.5,
+      "access_count": 0,
+      "created_at": 1773994804.0465443
+    },
+    "elkezdett": {
+      "id": "elkezdett",
+      "label": "elkezdett",
+      "activation": 0.5,
+      "access_count": 0,
+      "created_at": 1773994804.0635562
+    },
+    "érkezett": {
+      "id": "érkezett",
+      "label": "érkezett",
+      "activation": 0.5,
+      "access_count": 0,
+      "created_at": 1773994804.0665565
+    },
+    "feliratok": {
+      "id": "feliratok",
+      "label": "feliratok",
+      "activation": 0.5,
+      "access_count": 0,
+      "created_at": 1773994804.0665565
+    },
+    "ahol": {
+      "id": "ahol",
+      "label": "ahol",
+      "activation": 0.5,
+      "access_count": 0,
+      "created_at": 1773994804.0705872
+    },
+    "szeretnél": {
+      "id": "szeretnél",
+      "label": "szeretnél",
+      "activation": 0.5,
+      "access_count": 0,
+      "created_at": 1773994804.0806623
+    },
+    "máté": {
+      "id": "máté",
+      "label": "máté",
+      "activation": 0.5,
+      "access_count": 0,
+      "created_at": 1773994804.094223
+    },
+    "nagyon": {
+      "id": "nagyon",
+      "label": "nagyon",
+      "activation": 0.5,
+      "access_count": 0,
+      "created_at": 1773994804.0982232
+    },
+    "rendszer": {
+      "id": "rendszer",
+      "label": "rendszer",
+      "activation": 0.5,
+      "access_count": 0,
+      "created_at": 1773994804.1035883
+    }
+  },
+  "edges": [
+    {
+      "source": "hullam",
+      "target": "rezonancia",
+      "strength": 0.8777238778096875,
+      "co_occurrences": 1,
+      "created_at": 1773694909.6232977,
+      "last_activated": 1773694909.6232977
+    },
+    {
+      "source": "rezonancia",
+      "target": "emotimem",
+      "strength": 0.8289614401535937,
+      "co_occurrences": 1,
+      "created_at": 1773694909.6232977,
+      "last_activated": 1773694909.6232977
+    },
+    {
+      "source": "emotimem",
+      "target": "21d",
+      "strength": 0.8777238778096875,
+      "co_occurrences": 1,
+      "created_at": 1773694909.6243124,
+      "last_activated": 1773694909.6243124
+    },
+    {
+      "source": "ora",
+      "target": "rust",
+      "strength": 0.8289614401535937,
+      "co_occurrences": 1,
+      "created_at": 1773694909.6243124,
+      "last_activated": 1773694909.6243124
+    },
+    {
+      "source": "ora",
+      "target": "telegram",
+      "strength": 0.7801990024975001,
+      "co_occurrences": 1,
+      "created_at": 1773694909.6243124,
+      "last_activated": 1773694909.6243124
+    },
+    {
+      "source": "ora",
+      "target": "launchpad",
+      "strength": 0.7801990024975001,
+      "co_occurrences": 1,
+      "created_at": 1773694909.625312,
+      "last_activated": 1773694909.625312
+    },
+    {
+      "source": "tudat",
+      "target": "koherencia",
+      "strength": 0.8777238778096875,
+      "co_occurrences": 1,
+      "created_at": 1773694909.625312,
+      "last_activated": 1773694909.625312
+    },
+    {
+      "source": "tudat",
+      "target": "hullam",
+      "strength": 0.8289614401535937,
+      "co_occurrences": 1,
+      "created_at": 1773694909.6263123,
+      "last_activated": 1773694909.6263123
+    },
+    {
+      "source": "memoria",
+      "target": "reteg",
+      "strength": 0.8777238778096875,
+      "co_occurrences": 1,
+      "created_at": 1773694909.6263123,
+      "last_activated": 1773694909.6263123
+    },
+    {
+      "source": "rongyasz",
+      "target": "ast",
+      "strength": 0.8289614401535937,
+      "co_occurrences": 1,
+      "created_at": 1773694909.6273122,
+      "last_activated": 1773694909.6273122
+    },
+    {
+      "source": "rongyasz",
+      "target": "ora",
+      "strength": 0.8777238778096875,
+      "co_occurrences": 1,
+      "created_at": 1773694909.6273122,
+      "last_activated": 1773694909.6273122
+    },
+    {
+      "source": "memória",
+      "target": "8 réteg",
+      "strength": 0.8777238778096875,
+      "co_occurrences": 1,
+      "created_at": 1773694936.1865141,
+      "last_activated": 1773694936.1865141
+    },
+    {
+      "source": "közelít",
+      "target": "saját",
+      "strength": 0.7841196005000001,
+      "co_occurrences": 1,
+      "created_at": 1773697646.0228858,
+      "last_activated": 1773697646.0228858
+    },
+    {
+      "source": "error]:",
+      "target": "[llm",
+      "strength": 0.990025,
+      "co_occurrences": 16,
+      "created_at": 1773748172.4923892,
+      "last_activated": 1773762572.689585
+    },
+    {
+      "source": "reply:",
+      "target": "user:",
+      "strength": 0.995,
+      "co_occurrences": 133,
+      "created_at": 1773748172.4986506,
+      "last_activated": 1773994804.0450356
+    },
+    {
+      "source": "vagy?",
+      "target": "error]:",
+      "strength": 0.8375611500000001,
+      "co_occurrences": 2,
+      "created_at": 1773748172.5102544,
+      "last_activated": 1773762572.680599
+    },
+    {
+      "source": "vagy?",
+      "target": "szia",
+      "strength": 0.990025,
+      "co_occurrences": 18,
+      "created_at": 1773748172.5102544,
+      "last_activated": 1773762572.7763667
+    },
+    {
+      "source": "reply:",
+      "target": "hogy",
+      "strength": 0.990025,
+      "co_occurrences": 42,
+      "created_at": 1773748172.5141428,
+      "last_activated": 1773762572.8163345
+    },
+    {
+      "source": "hogy",
+      "target": "user:",
+      "strength": 0.995,
+      "co_occurrences": 32,
+      "created_at": 1773748172.5146458,
+      "last_activated": 1773994804.0251641
+    },
+    {
+      "source": "[rongyasz]",
+      "target": "error]:",
+      "strength": 0.990025,
+      "co_occurrences": 12,
+      "created_at": 1773748172.5146458,
+      "last_activated": 1773762572.7294474
+    },
+    {
+      "source": "szia",
+      "target": "hogy",
+      "strength": 0.990025,
+      "co_occurrences": 28,
+      "created_at": 1773748172.5616038,
+      "last_activated": 1773762572.7750485
+    },
+    {
+      "source": "amara.org-ról",
+      "target": "szia",
+      "strength": 0.990025,
+      "co_occurrences": 24,
+      "created_at": 1773748172.576753,
+      "last_activated": 1773762572.8163345
+    },
+    {
+      "source": "hogy",
+      "target": "működni.",
+      "strength": 0.990025,
+      "co_occurrences": 12,
+      "created_at": 1773748172.579478,
+      "last_activated": 1773762572.7946496
+    },
+    {
+      "source": "rétegű",
+      "target": "reply:",
+      "strength": 0.8375611500000001,
+      "co_occurrences": 2,
+      "created_at": 1773748172.579478,
+      "last_activated": 1773762572.7847197
+    },
+    {
+      "source": "videók",
+      "target": "hanganyagok",
+      "strength": 0.990025,
+      "co_occurrences": 6,
+      "created_at": 1773748172.5968962,
+      "last_activated": 1773762572.8111272
+    },
+    {
+      "source": "frekvenciája",
+      "target": "rezonancia",
+      "strength": 0.8375611500000001,
+      "co_occurrences": 2,
+      "created_at": 1773748172.6108677,
+      "last_activated": 1773762572.8163345
+    },
+    {
+      "source": "user:",
+      "target": "[ora]",
+      "strength": 0.995,
+      "co_occurrences": 22,
+      "created_at": 1773994803.9716763,
+      "last_activated": 1773994804.0932138
+    },
+    {
+      "source": "user:",
+      "target": "page",
+      "strength": 0.995,
+      "co_occurrences": 14,
+      "created_at": 1773994803.9731853,
+      "last_activated": 1773994804.0261645
+    },
+    {
+      "source": "user:",
+      "target": "máté!",
+      "strength": 0.995,
+      "co_occurrences": 24,
+      "created_at": 1773994804.0465443,
+      "last_activated": 1773994804.102589
+    },
+    {
+      "source": "user:",
+      "target": "elkezdett",
+      "strength": 0.995,
+      "co_occurrences": 12,
+      "created_at": 1773994804.0635562,
+      "last_activated": 1773994804.0993865
+    },
+    {
+      "source": "érkezett",
+      "target": "amara.org-ról",
+      "strength": 0.995,
+      "co_occurrences": 7,
+      "created_at": 1773994804.0665565,
+      "last_activated": 1773994804.0962229
+    },
+    {
+      "source": "ahol",
+      "target": "érkezett",
+      "strength": 0.796,
+      "co_occurrences": 1,
+      "created_at": 1773994804.0705872,
+      "last_activated": 1773994804.0705872
+    },
+    {
+      "source": "érkezett",
+      "target": "szeretnél",
+      "strength": 0.796,
+      "co_occurrences": 1,
+      "created_at": 1773994804.0806623,
+      "last_activated": 1773994804.0806623
+    },
+    {
+      "source": "hogy",
+      "target": "máté",
+      "strength": 0.796,
+      "co_occurrences": 1,
+      "created_at": 1773994804.094223,
+      "last_activated": 1773994804.094223
+    },
+    {
+      "source": "nagyon",
+      "target": "hogy",
+      "strength": 0.796,
+      "co_occurrences": 1,
+      "created_at": 1773994804.0982232,
+      "last_activated": 1773994804.0982232
+    },
+    {
+      "source": "saját",
+      "target": "rendszer",
+      "strength": 0.796,
+      "co_occurrences": 1,
+      "created_at": 1773994804.1035883,
+      "last_activated": 1773994804.1035883
+    }
+  ]
+}

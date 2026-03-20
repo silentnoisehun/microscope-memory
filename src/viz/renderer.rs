@@ -22,6 +22,7 @@ pub struct Renderer {
     pub quad_index_buffer: wgpu::Buffer,
     pub depth_texture_view: wgpu::TextureView,
     pub surface_format: wgpu::TextureFormat,
+    pub egui_renderer: egui_wgpu::Renderer,
 }
 
 impl Renderer {
@@ -242,6 +243,15 @@ impl Renderer {
 
         let depth_texture_view = Self::create_depth_texture(&device, width, height);
 
+        let egui_renderer = egui_wgpu::Renderer::new(
+            &device,
+            surface_format,
+            egui_wgpu::RendererOptions {
+                depth_stencil_format: Some(wgpu::TextureFormat::Depth32Float),
+                ..Default::default()
+            },
+        );
+
         Renderer {
             device,
             queue,
@@ -258,6 +268,7 @@ impl Renderer {
             quad_index_buffer,
             depth_texture_view,
             surface_format,
+            egui_renderer,
         }
     }
 
@@ -313,7 +324,6 @@ impl Renderer {
         &mut self,
         camera: &CameraUniform,
         show_edges: bool,
-        egui_renderer: &mut egui_wgpu::Renderer,
         egui_primitives: &[egui::ClippedPrimitive],
         egui_textures_delta: &egui::TexturesDelta,
         screen_descriptor: &egui_wgpu::ScreenDescriptor,
@@ -325,13 +335,14 @@ impl Renderer {
 
         // Update egui textures
         for (id, delta) in &egui_textures_delta.set {
-            egui_renderer.update_texture(&self.device, &self.queue, *id, delta);
+            self.egui_renderer.update_texture(&self.device, &self.queue, *id, delta);
         }
-        egui_renderer.update_buffers(&self.device, &self.queue, egui_primitives, screen_descriptor);
 
         let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
             label: Some("render encoder"),
         });
+
+        let egui_cmd_bufs = self.egui_renderer.update_buffers(&self.device, &self.queue, &mut encoder, egui_primitives, screen_descriptor);
 
         // Main 3D render pass
         {
@@ -340,6 +351,7 @@ impl Renderer {
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                     view: &view,
                     resolve_target: None,
+                    depth_slice: None,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(wgpu::Color {
                             r: 0.02, g: 0.02, b: 0.05, a: 1.0,
@@ -379,7 +391,7 @@ impl Renderer {
 
         // egui render pass
         {
-            let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            let pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("egui pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                     view: &view,
@@ -393,17 +405,21 @@ impl Renderer {
                 depth_stencil_attachment: None,
                 timestamp_writes: None,
                 occlusion_query_set: None,
-                multiview: None,
             });
 
-            egui_renderer.render(&mut pass, egui_primitives, screen_descriptor);
+            let mut pass = pass.forget_lifetime();
+            self.egui_renderer.render(&mut pass, egui_primitives, screen_descriptor);
         }
 
         for id in &egui_textures_delta.free {
-            egui_renderer.free_texture(id);
+            self.egui_renderer.free_texture(id);
         }
 
-        self.queue.submit(std::iter::once(encoder.finish()));
+        {
+            let mut cmd_bufs = egui_cmd_bufs;
+            cmd_bufs.push(encoder.finish());
+            self.queue.submit(cmd_bufs);
+        }
         output.present();
     }
 }

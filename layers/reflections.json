@@ -1,0 +1,66 @@
+[
+  {
+    "timestamp": 1773697646.0238855,
+    "timestamp_human": "2026-03-16 22:47:26",
+    "themes": [
+      "saját",
+      "rezonancia",
+      "rendszer",
+      "közelít",
+      "frekvenciája"
+    ],
+    "emotion": "beke",
+    "intensity": 0.41,
+    "coherence": 0.408,
+    "memory_count": 6,
+    "text": "Reflection [2026-03-16 22:47]: Fo temak: saját, rezonancia, rendszer, közelít, frekvenciája. Erzelmi allapot: beke (0.41), koherencia: 0.408. Vizsgalt emlekek: 6."
+  },
+  {
+    "timestamp": 1773748172.6135314,
+    "timestamp_human": "2026-03-17 12:49:32",
+    "themes": [
+      "user:",
+      "reply:",
+      "hogy",
+      "szia",
+      "[ora]"
+    ],
+    "emotion": "beke",
+    "intensity": 0.41,
+    "coherence": 0.408,
+    "memory_count": 20,
+    "text": "Reflection [2026-03-17 12:49]: Fo temak: user:, reply:, hogy, szia, [ora]. Erzelmi allapot: beke (0.41), koherencia: 0.408. Vizsgalt emlekek: 20."
+  },
+  {
+    "timestamp": 1773762572.8163345,
+    "timestamp_human": "2026-03-17 16:49:32",
+    "themes": [
+      "user:",
+      "reply:",
+      "hogy",
+      "szia",
+      "[ora]"
+    ],
+    "emotion": "beke",
+    "intensity": 0.41,
+    "coherence": 0.408,
+    "memory_count": 20,
+    "text": "Reflection [2026-03-17 16:49]: Fo temak: user:, reply:, hogy, szia, [ora]. Erzelmi allapot: beke (0.41), koherencia: 0.408. Vizsgalt emlekek: 20."
+  },
+  {
+    "timestamp": 1773994804.1046572,
+    "timestamp_human": "2026-03-20 09:20:04",
+    "themes": [
+      "hogy",
+      "user:",
+      "reply:",
+      "szia",
+      "[ora]"
+    ],
+    "emotion": "beke",
+    "intensity": 0.41,
+    "coherence": 0.408,
+    "memory_count": 21,
+    "text": "Reflection [2026-03-20 09:20]: Fo temak: hogy, user:, reply:, szia, [ora]. Erzelmi allapot: beke (0.41), koherencia: 0.408. Vizsgalt emlekek: 21."
+  }
+]

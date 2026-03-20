@@ -1,0 +1,50 @@
+{
+  "62d9f888232dfdda38f31eb820a9f70b606ea058f60fb458b3fc9bf99c253be7": {
+    "pattern": "szia",
+    "response": "Szia Mate! Hogy vagy?",
+    "pattern_hash": "62d9f888232dfdda38f31eb820a9f70b606ea058f60fb458b3fc9bf99c253be7",
+    "hit_count": 1,
+    "access_count": 1,
+    "created_at": 1773694909.6283991,
+    "last_hit": 1773694935.4451592,
+    "confidence": 0.9,
+    "pheromone": 1.1,
+    "context_tags": []
+  },
+  "d2b23242ccd419894f347557af6cc03f9bd2f75d26a525e934c4147bbd89d1f5": {
+    "pattern": "ki vagy",
+    "response": "Ora vagyok, Mate partnere.",
+    "pattern_hash": "d2b23242ccd419894f347557af6cc03f9bd2f75d26a525e934c4147bbd89d1f5",
+    "hit_count": 0,
+    "access_count": 0,
+    "created_at": 1773694909.6283991,
+    "last_hit": 1773694909.6283991,
+    "confidence": 0.9,
+    "pheromone": 1.0,
+    "context_tags": []
+  },
+  "dba3ea4daa01909e692332814d4d18cc6dfe71694c377def3f6e3316f35a003a": {
+    "pattern": "status",
+    "response": "Minden rendszer mukodik.",
+    "pattern_hash": "dba3ea4daa01909e692332814d4d18cc6dfe71694c377def3f6e3316f35a003a",
+    "hit_count": 0,
+    "access_count": 0,
+    "created_at": 1773694909.6294198,
+    "last_hit": 1773694909.6294198,
+    "confidence": 0.9,
+    "pheromone": 1.0,
+    "context_tags": []
+  },
+  "996b08f3de57de94384641695707caaed1cfa53483e13c741dd44da37830e3c8": {
+    "pattern": "mi a helyzet",
+    "response": "A rendszer stabil, a koherencia jo.",
+    "pattern_hash": "996b08f3de57de94384641695707caaed1cfa53483e13c741dd44da37830e3c8",
+    "hit_count": 0,
+    "access_count": 0,
+    "created_at": 1773694909.6294198,
+    "last_hit": 1773694909.6294198,
+    "confidence": 0.9,
+    "pheromone": 1.0,
+    "context_tags": []
+  }
+}

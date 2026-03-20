@@ -29,15 +29,15 @@ use sha2::{Sha256, Digest};
 
 // ─── Constants ───────────────────────────────────────
 pub const BLOCK_DATA_SIZE: usize = 256;
-pub const LAYERS_DIR: &str = r"D:\Claude Memory\layers";
-pub const BIN_DIR: &str = r"D:\Claude Memory\microscope";
-pub const HDR_PATH: &str = r"D:\Claude Memory\microscope\microscope.bin";
-pub const DAT_PATH: &str = r"D:\Claude Memory\microscope\data.bin";
-pub const META_PATH: &str = r"D:\Claude Memory\microscope\meta.bin";
+pub const LAYERS_DIR: &str = "layers";
+pub const BIN_DIR: &str = "data";
+pub const HDR_PATH: &str = "data/microscope.bin";
+pub const DAT_PATH: &str = "data/data.bin";
+pub const META_PATH: &str = "data/meta.bin";
 
 // ─── Crypto file paths ──────────────────────────────
-pub const CHAIN_PATH: &str = r"D:\Claude Memory\microscope\chain.bin";
-pub const MERKLE_PATH: &str = r"D:\Claude Memory\microscope\merkle.bin";
+pub const CHAIN_PATH: &str = "data/chain.bin";
+pub const MERKLE_PATH: &str = "data/merkle.bin";
 pub const CHAIN_HEADER_SIZE: usize = 16;
 pub const CHAIN_LINK_SIZE: usize = 80;
 pub const MERKLE_HEADER_SIZE: usize = 16;
@@ -1016,7 +1016,7 @@ pub fn stats(reader: &MicroscopeReader) {
 }
 
 // ─── APPEND LOG ──────────────────────────────────────
-pub const APPEND_PATH: &str = r"D:\Claude Memory\microscope\append.bin";
+pub const APPEND_PATH: &str = "data/append.bin";
 
 pub fn store_memory(text: &str, layer: &str, importance: u8) {
     let t0 = Instant::now();

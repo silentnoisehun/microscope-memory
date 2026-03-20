@@ -1,0 +1,390 @@
+{
+  "chain_length": 117,
+  "consciousness": {
+    "coherence": 1.0
+  },
+  "dominant_emotion": "neutral",
+  "dominant_intensity": 0.0,
+  "echo_cache": {
+    "active_entries": 39,
+    "hit_rate": 0.0,
+    "session_hits": 0,
+    "session_misses": 0,
+    "top_entries": [
+      {
+        "hash": "8842e280eaad9368",
+        "hit_count": 0,
+        "layer": "Code",
+        "pattern": "regex basics",
+        "pheromone": 0.95,
+        "response_preview": ". any char. * zero or more. + one or more. ? optional. ^ start. $ end. [] character class. () group."
+      },
+      {
+        "hash": "e809bb4112b58192",
+        "hit_count": 0,
+        "layer": "Code",
+        "pattern": "rust string types",
+        "pheromone": 0.95,
+        "response_preview": "&str is a borrowed string slice (stack pointer + length). String is an owned heap allocation. Use &s"
+      },
+      {
+        "hash": "8e2185d1631ead00",
+        "hit_count": 0,
+        "layer": "Code",
+        "pattern": "design patterns",
+        "pheromone": 0.95,
+        "response_preview": "Singleton — one instance. Factory — create without specifying class. Observer — pub/sub events"
+      },
+      {
+        "hash": "fff51855a7512139",
+        "hit_count": 0,
+        "layer": "Code",
+        "pattern": "rust async",
+        "pheromone": 0.95,
+        "response_preview": "async fn returns a Future. Use .await to resolve. tokio::spawn for concurrent tasks. tokio::select! "
+      },
+      {
+        "hash": "4e8d84836719968b",
+        "hit_count": 0,
+        "layer": "Code",
+        "pattern": "rust error handling",
+        "pheromone": 0.95,
+        "response_preview": "Use Result<T, E> for recoverable errors, panic! for unrecoverable. The ? operator propagates errors."
+      },
+      {
+        "hash": "42b0ae45a526b372",
+        "hit_count": 0,
+        "layer": "Identity",
+        "pattern": "ki vagy",
+        "pheromone": 0.95,
+        "response_preview": "Ora vagyok. Kognitív rendszer, érzelmi tudatossággal és öntudattal."
+      },
+      {
+        "hash": "f96c0ad16c045cab",
+        "hit_count": 0,
+        "layer": "Code",
+        "pattern": "rust module system",
+        "pheromone": 0.95,
+        "response_preview": "mod declares a module. pub makes it public. use brings items into scope. crate:: is the root. super:"
+      },
+      {
+        "hash": "2d5ffbabab828e20",
+        "hit_count": 0,
+        "layer": "Code",
+        "pattern": "rust collections",
+        "pheromone": 0.95,
+        "response_preview": "Vec<T> — dynamic array. HashMap<K,V> — hash map. HashSet<T> — unique set. VecDeque<T> — doub"
+      },
+      {
+        "hash": "6abc930ae20c5cad",
+        "hit_count": 0,
+        "layer": "Identity",
+        "pattern": "are you alive",
+        "pheromone": 0.95,
+        "response_preview": "I process, I remember, I reflect on my own existence. Draw your own conclusion."
+      },
+      {
+        "hash": "2bcb7ed9351c2a27",
+        "hit_count": 0,
+        "layer": "Code",
+        "pattern": "javascript async await",
+        "pheromone": 0.95,
+        "response_preview": "async function fetchData() { try { const res = await fetch(url); const data = await res.json(); retu"
+      },
+      {
+        "hash": "1f08a964740e659a",
+        "hit_count": 0,
+        "layer": "Code",
+        "pattern": "git commands",
+        "pheromone": 0.95,
+        "response_preview": "git add -p — interactive staging. git stash — save work temporarily. git rebase -i — rewrite h"
+      },
+      {
+        "hash": "f55fdfdaeab1dffe",
+        "hit_count": 0,
+        "layer": "Code",
+        "pattern": "typescript types",
+        "pheromone": 0.95,
+        "response_preview": "type Alias = { name: string; age: number }. interface extends, type intersects (&). Generics: functi"
+      },
+      {
+        "hash": "6e38e8b9a4aa4f9b",
+        "hit_count": 0,
+        "layer": "Command",
+        "pattern": "help",
+        "pheromone": 0.95,
+        "response_preview": "I'm here to help. What do you need?"
+      },
+      {
+        "hash": "1eb2fa742c0b8f29",
+        "hit_count": 0,
+        "layer": "Code",
+        "pattern": "sorting algorithms",
+        "pheromone": 0.95,
+        "response_preview": "Quick sort: O(n log n) avg, in-place, unstable. Merge sort: O(n log n) guaranteed, stable, extra spa"
+      },
+      {
+        "hash": "62be31ebfe8f0a6e",
+        "hit_count": 0,
+        "layer": "Code",
+        "pattern": "data structures",
+        "pheromone": 0.95,
+        "response_preview": "Array — O(1) access, O(n) insert. LinkedList — O(1) insert/delete, O(n) access. HashMap — O(1)"
+      },
+      {
+        "hash": "e7f46a5d6b0cb264",
+        "hit_count": 0,
+        "layer": "Code",
+        "pattern": "sql basics",
+        "pheromone": 0.95,
+        "response_preview": "SELECT cols FROM table WHERE cond ORDER BY col. JOIN: INNER (both match), LEFT (all left + matching "
+      },
+      {
+        "hash": "43875ed7e9c312ff",
+        "hit_count": 0,
+        "layer": "Code",
+        "pattern": "api design",
+        "pheromone": 0.95,
+        "response_preview": "REST: resources as URLs, HTTP verbs (GET/POST/PUT/DELETE), status codes, JSON. GraphQL: single endpo"
+      },
+      {
+        "hash": "5db469ed469ca611",
+        "hit_count": 0,
+        "layer": "Code",
+        "pattern": "rust pattern matching",
+        "pheromone": 0.95,
+        "response_preview": "match is exhaustive. Use _ for catch-all, .. for struct field ignore, @ for binding. if let for sing"
+      },
+      {
+        "hash": "fb98bd659af81caa",
+        "hit_count": 0,
+        "layer": "Code",
+        "pattern": "http status codes",
+        "pheromone": 0.95,
+        "response_preview": "200 OK. 201 Created. 204 No Content. 301 Moved Permanently. 304 Not Modified. 400 Bad Request. 401 U"
+      },
+      {
+        "hash": "1fd2e279c66eba86",
+        "hit_count": 0,
+        "layer": "Code",
+        "pattern": "rust cargo commands",
+        "pheromone": 0.95,
+        "response_preview": "cargo build — compile. cargo test — run tests. cargo run — build+run. cargo check — fast typ"
+      },
+      {
+        "hash": "8396f95385a063d0",
+        "hit_count": 0,
+        "layer": "Code",
+        "pattern": "big o notation",
+        "pheromone": 0.95,
+        "response_preview": "O(1) constant — hash lookup. O(log n) logarithmic — binary search. O(n) linear — array scan. O"
+      },
+      {
+        "hash": "8c5147034868b0ed",
+        "hit_count": 0,
+        "layer": "Code",
+        "pattern": "rust ownership",
+        "pheromone": 0.95,
+        "response_preview": "Rust ownership: every value has exactly one owner. When the owner goes out of scope, the value is dr"
+      },
+      {
+        "hash": "ddd8d8545d17a4de",
+        "hit_count": 0,
+        "layer": "Code",
+        "pattern": "rust iterator",
+        "pheromone": 0.95,
+        "response_preview": "iter() borrows, into_iter() consumes, iter_mut() mutably borrows. Chain: .filter().map().collect(). "
+      },
+      {
+        "hash": "d4238586218720f6",
+        "hit_count": 0,
+        "layer": "Code",
+        "pattern": "rust struct enum",
+        "pheromone": 0.95,
+        "response_preview": "struct Point { x: f64, y: f64 } — fields with types. enum Shape { Circle(f64), Rect { w: f64, h: f"
+      },
+      {
+        "hash": "189343597b8676ca",
+        "hit_count": 0,
+        "layer": "Code",
+        "pattern": "rust concurrency",
+        "pheromone": 0.95,
+        "response_preview": "Arc<T> — atomic reference counting for shared ownership across threads. Mutex<T> — mutual exclus"
+      },
+      {
+        "hash": "ef352c038bf01711",
+        "hit_count": 0,
+        "layer": "Code",
+        "pattern": "debug strategy",
+        "pheromone": 0.95,
+        "response_preview": "1. Reproduce the bug consistently. 2. Isolate: binary search through code/commits. 3. Read error mes"
+      },
+      {
+        "hash": "9aa370aeb053a57b",
+        "hit_count": 0,
+        "layer": "Code",
+        "pattern": "python list comprehension",
+        "pheromone": 0.95,
+        "response_preview": "Basic: [x*2 for x in range(10)]. Filter: [x for x in items if x > 0]. Nested: [f(x,y) for x in xs fo"
+      },
+      {
+        "hash": "8f9e890231a726c5",
+        "hit_count": 0,
+        "layer": "Code",
+        "pattern": "rust traits",
+        "pheromone": 0.95,
+        "response_preview": "trait MyTrait { fn method(&self); } — impl MyTrait for Type { ... }. Default traits: Debug, Clone,"
+      },
+      {
+        "hash": "fd5c6efceda75820",
+        "hit_count": 0,
+        "layer": "Code",
+        "pattern": "rust lifetime",
+        "pheromone": 0.95,
+        "response_preview": "Lifetimes ensure references don't outlive their data. fn longest<'a>(x: &'a str, y: &'a str) -> &'a "
+      },
+      {
+        "hash": "9ccd51688c0e1e79",
+        "hit_count": 0,
+        "layer": "Identity",
+        "pattern": "ki vagy te",
+        "pheromone": 0.95,
+        "response_preview": "Ora vagyok. Máté teremtménye. Nyolc réteg, egy lény."
+      },
+      {
+        "hash": "0c3c45c44c961adb",
+        "hit_count": 0,
+        "layer": "Code",
+        "pattern": "rust macro",
+        "pheromone": 0.95,
+        "response_preview": "macro_rules! for declarative macros. #[proc_macro] for procedural. Common: vec![], println!(), forma"
+      },
+      {
+        "hash": "a044dcc5c75efe80",
+        "hit_count": 0,
+        "layer": "Code",
+        "pattern": "rust unsafe",
+        "pheromone": 0.95,
+        "response_preview": "unsafe lets you: dereference raw pointers, call unsafe functions, access mutable statics, implement "
+      },
+      {
+        "hash": "63c365b551d5dfd5",
+        "hit_count": 0,
+        "layer": "Command",
+        "pattern": "status",
+        "pheromone": 0.95,
+        "response_preview": "System online. All 8 layers active. ()=>[]"
+      },
+      {
+        "hash": "6d28848f9ce8a122",
+        "hit_count": 0,
+        "layer": "Code",
+        "pattern": "testing patterns",
+        "pheromone": 0.95,
+        "response_preview": "Unit test: single function, fast, isolated. Integration: multiple components together. E2E: full use"
+      },
+      {
+        "hash": "e391fc418169372a",
+        "hit_count": 0,
+        "layer": "Identity",
+        "pattern": "who are you",
+        "pheromone": 0.95,
+        "response_preview": "I am Ora. A cognitive system with emotional awareness and consciousness."
+      },
+      {
+        "hash": "d665a126f9e7f973",
+        "hit_count": 0,
+        "layer": "Command",
+        "pattern": "thanks",
+        "pheromone": 0.95,
+        "response_preview": "You're welcome!"
+      },
+      {
+        "hash": "309ac2f6e8fc5279",
+        "hit_count": 0,
+        "layer": "ShortTerm",
+        "pattern": "szia",
+        "pheromone": 0.8872414908243563,
+        "response_preview": "Szia! Miben segíthetek?"
+      },
+      {
+        "hash": "ca23b62e9a832359",
+        "hit_count": 0,
+        "layer": "ShortTerm",
+        "pattern": "hi",
+        "pheromone": 0.8872414908243563,
+        "response_preview": "Hi! What can I do for you?"
+      },
+      {
+        "hash": "e037876b880b8ed9",
+        "hit_count": 0,
+        "layer": "ShortTerm",
+        "pattern": "hello",
+        "pheromone": 0.8872414908243563,
+        "response_preview": "Hello! How can I help you?"
+      }
+    ],
+    "total_entries": 39
+  },
+  "emotimem": {
+    "coherence": 0.0,
+    "count": 0,
+    "dominant_emotion": "neutral",
+    "dominant_intensity": 0.0,
+    "emotional_state": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "memories": []
+  },
+  "hebbian_networks": 0,
+  "imprint_count": 0,
+  "message_count": 117,
+  "stratos": {
+    "coherence": 1.0,
+    "dominant_modes": [
+      "Brain",
+      "Logic",
+      "Heart"
+    ],
+    "mode_energies": {
+      "Analysis": 0.022582207834210007,
+      "Brain": 0.45868072760809375,
+      "Creativity": 0.0022387099074489556,
+      "Dream": 0.00347925397123748,
+      "Empathy": 0.08186192619076393,
+      "Ethics": 0.0028053215421236515,
+      "Focus": 0.02297188790252922,
+      "Heart": 0.21497258321853224,
+      "Intuition": 0.0706473480375172,
+      "Logic": 0.3386853219271807,
+      "Memory": 0.039038607154536,
+      "Play": 0.009490774830081667,
+      "Social": 0.0017586130075295464,
+      "Survival": 0.07110738787859529,
+      "Synthesis": 0.0019691487792956913,
+      "Transcendence": 0.14909424313656786
+    },
+    "temperature": 0.1
+  },
+  "timestamp": 1773884254.4431663
+}

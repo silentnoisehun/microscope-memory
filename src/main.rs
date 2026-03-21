@@ -18,6 +18,7 @@
 //!   microscope-mem serve                    # Start the unified endpoint server (TCP/HTTP)
 
 mod embeddings;
+mod merkle;
 mod streaming;
 
 #[cfg(target_arch = "wasm32")]
@@ -57,18 +58,18 @@ pub const LAYER_NAMES: &[&str] = &[
 /// It is designed to be memory-mapped and accessed with zero-copy overhead.
 #[repr(C, packed)]
 #[derive(Clone, Copy)]
-struct BlockHeader {
-    x: f32,            // 4  — spatial position
-    y: f32,            // 4
-    z: f32,            // 4
-    zoom: f32,         // 4  — depth / 8.0 (normalized)
-    depth: u8,         // 1  — 0..8
-    layer_id: u8,      // 1  — which memory layer
-    data_offset: u32,  // 4  — byte offset into data.bin
-    data_len: u16,     // 2  — actual text bytes (<= 256)
-    parent_idx: u32,   // 4  — parent block index (u32::MAX = root)
-    child_count: u16,  // 2  — number of children
-    _pad: [u8; 2],     // 2  — align to 32
+pub(crate) struct BlockHeader {
+    pub(crate) x: f32,            // 4  — spatial position
+    pub(crate) y: f32,            // 4
+    pub(crate) z: f32,            // 4
+    pub(crate) zoom: f32,         // 4  — depth / 8.0 (normalized)
+    pub(crate) depth: u8,         // 1  — 0..8
+    pub(crate) layer_id: u8,      // 1  — which memory layer
+    pub(crate) data_offset: u32,  // 4  — byte offset into data.bin
+    pub(crate) data_len: u16,     // 2  — actual text bytes (<= 256)
+    pub(crate) parent_idx: u32,   // 4  — parent block index (u32::MAX = root)
+    pub(crate) child_count: u16,  // 2  — number of children
+    pub(crate) crc16: [u8; 2],    // 2  — CRC16-CCITT (0x0000 = no checksum, backward compat)
 }
 
 
@@ -96,6 +97,24 @@ fn layer_color(id: u8) -> &'static str {
 
 pub fn layer_to_id(name: &str) -> u8 {
     LAYER_NAMES.iter().position(|&n| n == name).unwrap_or(0) as u8
+}
+
+// ─── CRC16-CCITT checksum ─────────────────────────────
+/// CRC16-CCITT (poly=0x1021, init=0xFFFF) over arbitrary data.
+/// Used for block-level corruption detection in the binary index.
+fn crc16_ccitt(data: &[u8]) -> u16 {
+    let mut crc: u16 = 0xFFFF;
+    for &byte in data {
+        crc ^= (byte as u16) << 8;
+        for _ in 0..8 {
+            if crc & 0x8000 != 0 {
+                crc = (crc << 1) ^ 0x1021;
+            } else {
+                crc <<= 1;
+            }
+        }
+    }
+    crc
 }
 
 // ─── Deterministic coords from content hash ──────────
@@ -126,6 +145,49 @@ pub fn content_coords(text: &str, layer: &str) -> (f32, f32, f32) {
     };
 
     (ox + bx * 0.25, oy + by * 0.25, oz + bz * 0.25)
+}
+
+// ─── Semantic coords from mock embedding ────────────
+/// Extract pseudo-semantic coordinates from mock embedding (first 3 dims → [0,1]).
+/// Returns None if weight is 0 (disabled) to skip embedding computation.
+fn semantic_coords(text: &str, weight: f32) -> Option<(f32, f32, f32)> {
+    if weight <= 0.0 { return None; }
+    use embeddings::{MockEmbeddingProvider, EmbeddingProvider};
+    let provider = MockEmbeddingProvider::new(128);
+    if let Ok(emb) = provider.embed(text) {
+        if emb.len() >= 3 {
+            // Normalize from [-1,1] to [0,1]
+            let sx = (emb[0] + 1.0) / 2.0;
+            let sy = (emb[1] + 1.0) / 2.0;
+            let sz = (emb[2] + 1.0) / 2.0;
+            return Some((sx, sy, sz));
+        }
+    }
+    None
+}
+
+// ─── Blended coords: hash + semantic ────────────────
+/// Blends deterministic hash coords with embedding-based semantic coords.
+/// weight=0.0 → pure hash (backward compatible), weight=1.0 → pure semantic.
+pub fn content_coords_blended(text: &str, layer: &str, weight: f32) -> (f32, f32, f32) {
+    let (hx, hy, hz) = content_coords(text, layer);
+    if weight <= 0.0 { return (hx, hy, hz); }
+    match semantic_coords(text, weight) {
+        Some((sx, sy, sz)) => {
+            let w = weight.clamp(0.0, 1.0);
+            (
+                (1.0 - w) * hx + w * sx,
+                (1.0 - w) * hy + w * sy,
+                (1.0 - w) * hz + w * sz,
+            )
+        }
+        None => (hx, hy, hz),
+    }
+}
+
+// ─── Hex string helper ──────────────────────────────
+fn hex_str(bytes: &[u8]) -> String {
+    bytes.iter().map(|b| format!("{:02x}", b)).collect::<Vec<_>>().join("")
 }
 
 // ─── Safe UTF-8 truncation ───────────────────────────
@@ -295,11 +357,12 @@ fn build(config: &Config) {
     });
 
     // ═══ DEPTH 1: Layer summaries ═══
+    let sw = config.search.semantic_weight;
     let depth1_start = blocks.len();
     for (name, texts) in &layer_texts {
         let preview: Vec<String> = texts.iter().take(3).map(|s| safe_truncate(s, 40)).collect();
         let summary = format!("[{}] {} elem. {}", name, texts.len(), preview.join(" | "));
-        let (x, y, z) = content_coords(name, name);
+        let (x, y, z) = content_coords_blended(name, name, sw);
         blocks.push(RawBlock {
             data: to_block(&summary),
             depth: 1, x, y, z,
@@ -318,7 +381,7 @@ fn build(config: &Config) {
             let chunk: Vec<String> = texts[ci..texts.len().min(ci + 5)]
                 .iter().map(|s| safe_truncate(s, 40)).collect();
             let summary = format!("[{} #{}] {}", name, ci / 5, chunk.join(" | "));
-            let (x, y, z) = content_coords(&summary, name);
+            let (x, y, z) = content_coords_blended(&summary, name, sw);
             blocks.push(RawBlock {
                 data: to_block(&summary),
                 depth: 2, x, y, z,
@@ -335,7 +398,7 @@ fn build(config: &Config) {
     let mut depth3_positions: Vec<(f32, f32, f32)> = Vec::new();
     for (li, (name, texts)) in layer_texts.iter().enumerate() {
         for (ti, text) in texts.iter().enumerate() {
-            let (x, y, z) = content_coords(text, name);
+            let (x, y, z) = content_coords_blended(text, name, sw);
             let cluster_idx = ti / 5;
             let (d2_start, d2_count) = depth2_layer_offsets[li];
             let parent = if cluster_idx < d2_count { (d2_start + cluster_idx) as u32 } else { u32::MAX };
@@ -580,8 +643,8 @@ fn build(config: &Config) {
     let dat_path = output_dir.join("data.bin");
     let meta_path = output_dir.join("meta.bin");
 
-    let mut hdr_file = BufWriter::new(fs::File::create(hdr_path).expect("create headers"));
-    let mut dat_file = BufWriter::new(fs::File::create(dat_path).expect("create data"));
+    let mut hdr_file = BufWriter::new(fs::File::create(&hdr_path).expect("create headers"));
+    let mut dat_file = BufWriter::new(fs::File::create(&dat_path).expect("create data"));
 
     let mut depth_ranges: Vec<(u32, u32)> = vec![(0, 0); 9];
     let mut cur_depth: u8 = 0;
@@ -595,6 +658,7 @@ fn build(config: &Config) {
 
         let parent = if b.parent_idx == u32::MAX { u32::MAX } else { old_to_new[b.parent_idx as usize] };
 
+        let crc = crc16_ccitt(&b.data[..len as usize]);
         let hdr = BlockHeader {
             x: b.x, y: b.y, z: b.z,
             zoom: b.depth as f32 / 8.0,
@@ -604,7 +668,7 @@ fn build(config: &Config) {
             data_len: len,
             parent_idx: parent,
             child_count: b.child_count,
-            _pad: [0; 2],
+            crc16: crc.to_le_bytes(),
         };
 
         let bytes: &[u8] = unsafe {
@@ -623,16 +687,43 @@ fn build(config: &Config) {
     hdr_file.flush().unwrap();
     dat_file.flush().unwrap();
 
-    // meta.bin — pure binary, no JSON
-    let mut meta_buf = Vec::with_capacity(META_HEADER_SIZE + 9 * DEPTH_ENTRY_SIZE);
-    meta_buf.extend_from_slice(b"MSCM");                           // magic
-    meta_buf.extend_from_slice(&1u32.to_le_bytes());               // version
+    // ═══ Merkle tree: SHA-256 over all block data ═══
+    let merkle_path = output_dir.join("merkle.bin");
+    // Re-read data.bin to get all block data slices for Merkle leaves
+    hdr_file.flush().unwrap();
+    dat_file.flush().unwrap();
+
+    let dat_bytes = fs::read(&dat_path).expect("read data.bin for merkle");
+    let hdr_bytes = fs::read(&hdr_path).expect("read microscope.bin for merkle");
+    let mut leaf_slices: Vec<&[u8]> = Vec::with_capacity(n);
+    for i in 0..n {
+        let hdr_off = i * HEADER_SIZE;
+        let data_offset = u32::from_le_bytes(hdr_bytes[hdr_off + 16..hdr_off + 20].try_into().unwrap()) as usize;
+        let data_len = u16::from_le_bytes(hdr_bytes[hdr_off + 20..hdr_off + 22].try_into().unwrap()) as usize;
+        if data_offset + data_len <= dat_bytes.len() {
+            leaf_slices.push(&dat_bytes[data_offset..data_offset + data_len]);
+        } else {
+            leaf_slices.push(&[]);
+        }
+    }
+
+    let merkle_tree = merkle::MerkleTree::build(&leaf_slices);
+    fs::write(&merkle_path, merkle_tree.to_bytes()).expect("write merkle.bin");
+    println!("  {}: {} leaves, root={}",
+        "merkle".green(), merkle_tree.leaf_count,
+        hex_str(&merkle_tree.root));
+
+    // meta.bin — MSC2 format with merkle root
+    let mut meta_buf = Vec::with_capacity(META_HEADER_SIZE + 9 * DEPTH_ENTRY_SIZE + 32);
+    meta_buf.extend_from_slice(b"MSC2");                           // magic v2
+    meta_buf.extend_from_slice(&2u32.to_le_bytes());               // version
     meta_buf.extend_from_slice(&(n as u32).to_le_bytes());         // block_count
     meta_buf.extend_from_slice(&9u32.to_le_bytes());               // depth_count
     for &(start, count) in &depth_ranges {
         meta_buf.extend_from_slice(&start.to_le_bytes());
         meta_buf.extend_from_slice(&count.to_le_bytes());
     }
+    meta_buf.extend_from_slice(&merkle_tree.root);                 // 32 bytes merkle root
     fs::write(meta_path, &meta_buf).expect("write meta");
 
     // Report
@@ -711,9 +802,10 @@ impl MicroscopeReader {
         let hdr_path = output_dir.join("microscope.bin");
         let dat_path = output_dir.join("data.bin");
 
-        // Read meta.bin — 64 bytes, pure binary
+        // Read meta.bin — supports both MSCM (v1) and MSC2 (v2) formats
         let meta = fs::read(meta_path).expect("open meta.bin — run 'build' first");
-        assert!(&meta[0..4] == b"MSCM", "invalid magic");
+        let magic = &meta[0..4];
+        assert!(magic == b"MSCM" || magic == b"MSC2", "invalid magic: expected MSCM or MSC2");
         let block_count = u32::from_le_bytes(meta[8..12].try_into().unwrap()) as usize;
         let mut depth_ranges = [(0u32, 0u32); 9];
         for d in 0..9 {
@@ -732,7 +824,7 @@ impl MicroscopeReader {
     }
 
     #[inline(always)]
-    fn header(&self, i: usize) -> &BlockHeader {
+    pub(crate) fn header(&self, i: usize) -> &BlockHeader {
         debug_assert!(i < self.block_count);
         unsafe { &*(self.headers.as_ptr().add(i * HEADER_SIZE) as *const BlockHeader) }
     }
@@ -762,10 +854,11 @@ impl MicroscopeReader {
             }
         }
 
-        // Search append log (hot memory)
+        // Search append log (hot memory) — filter by depth
         let append_path = Path::new(&config.paths.output_dir).join("append.bin");
         let appended = read_append_log(&append_path);
         for (ai, entry) in appended.iter().enumerate() {
+            if entry.depth != zoom { continue; }
             let dx = entry.x - x;
             let dy = entry.y - y;
             let dz = entry.z - z;
@@ -800,7 +893,8 @@ impl MicroscopeReader {
             let dx = entry.x - x;
             let dy = entry.y - y;
             let dz = entry.z - z;
-            let dw = (0.5 - qz) * zw; // Append entries are at fixed zoom 0.5 (D4) usually
+            let entry_zoom = entry.depth as f32 / 8.0;
+            let dw = (entry_zoom - qz) * zw;
             results.push((dx*dx + dy*dy + dz*dz + dw*dw, ai + 1_000_000, false));
         }
             
@@ -924,30 +1018,40 @@ fn stats(reader: &MicroscopeReader) {
 
 pub fn store_memory(config: &Config, text: &str, layer: &str, importance: u8) {
     let t0 = Instant::now();
-    let (x, y, z) = content_coords(text, layer);
+    let (x, y, z) = content_coords_blended(text, layer, config.search.semantic_weight);
     let lid = layer_to_id(layer);
+    let depth = auto_depth(text);
 
     // Write to append log
     let append_path = Path::new(&config.paths.output_dir).join("append.bin");
+
+    // Write APv2 magic if file is empty or doesn't exist
+    let needs_magic = !append_path.exists() || fs::metadata(&append_path).map(|m| m.len() == 0).unwrap_or(true);
+
     let mut file = fs::OpenOptions::new()
         .create(true).append(true)
-        .open(append_path).expect("open append log");
+        .open(&append_path).expect("open append log");
+
+    if needs_magic {
+        file.write_all(b"APv2").unwrap();
+    }
 
     let text_bytes = text.as_bytes();
     let len = text_bytes.len().min(BLOCK_DATA_SIZE);
 
-    // Binary record: len(u32) + layer(u8) + importance(u8) + x(f32) + y(f32) + z(f32) + text
+    // APv2 record: len(u32) + layer(u8) + importance(u8) + depth(u8) + x(f32) + y(f32) + z(f32) + text
     file.write_all(&(len as u32).to_le_bytes()).unwrap();
     file.write_all(&[lid]).unwrap();
     file.write_all(&[importance]).unwrap();
+    file.write_all(&[depth]).unwrap();
     file.write_all(&x.to_le_bytes()).unwrap();
     file.write_all(&y.to_le_bytes()).unwrap();
     file.write_all(&z.to_le_bytes()).unwrap();
     file.write_all(&text_bytes[..len]).unwrap();
 
     let elapsed = t0.elapsed();
-    println!("  {} [{}/{}] ({:.3},{:.3},{:.3}) {}",
-        "STORED".green().bold(), layer, layer_color(lid),
+    println!("  {} D{} [{}/{}] ({:.3},{:.3},{:.3}) {}",
+        "STORED".green().bold(), depth, layer, layer_color(lid),
         x, y, z, safe_truncate(text, 60));
     println!("  {} ns", elapsed.as_nanos());
 }
@@ -958,26 +1062,43 @@ pub struct AppendEntry {
     pub text: String,
     pub layer_id: u8,
     pub importance: u8,
+    pub depth: u8,
     pub x: f32, pub y: f32, pub z: f32,
 }
 
 pub fn read_append_log(path: &Path) -> Vec<AppendEntry> {
     if !path.exists() { return vec![]; }
     let data = fs::read(path).unwrap_or_default();
+    if data.is_empty() { return vec![]; }
+
     let mut entries = Vec::new();
     let mut pos = 0;
-    while pos + 18 <= data.len() {
+
+    // Detect APv2 magic
+    let is_v2 = data.len() >= 4 && &data[0..4] == b"APv2";
+    if is_v2 { pos = 4; }
+
+    let header_size = if is_v2 { 19 } else { 18 };
+
+    while pos + header_size <= data.len() {
         let len = u32::from_le_bytes(data[pos..pos+4].try_into().unwrap()) as usize;
         let lid = data[pos+4];
         let imp = data[pos+5];
-        let x = f32::from_le_bytes(data[pos+6..pos+10].try_into().unwrap());
-        let y = f32::from_le_bytes(data[pos+10..pos+14].try_into().unwrap());
-        let z = f32::from_le_bytes(data[pos+14..pos+18].try_into().unwrap());
-        pos += 18;
+
+        let (depth, coords_start) = if is_v2 {
+            (data[pos+6], pos + 7)
+        } else {
+            (4u8, pos + 6) // Legacy: default depth D4
+        };
+
+        let x = f32::from_le_bytes(data[coords_start..coords_start+4].try_into().unwrap());
+        let y = f32::from_le_bytes(data[coords_start+4..coords_start+8].try_into().unwrap());
+        let z = f32::from_le_bytes(data[coords_start+8..coords_start+12].try_into().unwrap());
+        pos += header_size;
         if pos + len > data.len() { break; }
         let text = String::from_utf8_lossy(&data[pos..pos+len]).to_string();
         pos += len;
-        entries.push(AppendEntry { text, layer_id: lid, importance: imp, x, y, z });
+        entries.push(AppendEntry { text, layer_id: lid, importance: imp, depth, x, y, z });
     }
     entries
 }
@@ -989,7 +1110,7 @@ fn print_append_result(appended: &[AppendEntry], idx: usize, dist: f32) {
         let e = &appended[ai];
         let layer = LAYER_NAMES.get(e.layer_id as usize).unwrap_or(&"?");
         println!("  {} {} {} {}",
-            "AP".cyan(),
+            format!("D{}", e.depth).cyan(),
             format!("L2={:.5}", dist).yellow(),
             format!("[{}/new]", layer).green(),
             safe_truncate(&e.text, 70));
@@ -1025,13 +1146,23 @@ pub fn auto_zoom(query: &str) -> (u8, u8) {
     (5, 1)  // search D4-D6
 }
 
+// ─── AUTO DEPTH: text length → virtual depth level ──
+/// Assign a virtual depth to append entries based on text length.
+fn auto_depth(text: &str) -> u8 {
+    let len = text.len();
+    if len >= 100 { 3 }      // Items
+    else if len >= 40 { 4 }  // Sentences
+    else if len >= 15 { 5 }  // Tokens
+    else { 6 }               // Syllables
+}
+
 // ─── RECALL: Semantic/Coord Search ──────────────────
 fn recall(config: &Config, query: &str, k: usize) {
     let t0 = Instant::now();
     let reader = MicroscopeReader::open(config);
     println!("{} '{}':", "RECALL".cyan().bold(), query);
 
-    let (qx, qy, qz) = (0.5, 0.5, 0.5); // Default center
+    let (qx, qy, qz) = content_coords_blended(query, "long_term", config.search.semantic_weight);
     let (zoom_lo, zoom_hi) = match query.len() {
         0..=10 => (0, 3), // broad/top
         11..=40 => (3, 6), // sentences/tokens
@@ -1174,6 +1305,225 @@ fn semantic_search(config: &Config, query: &str, k: usize, metric: &str) {
     println!("\n  Semantic search completed in {:.1} ms", elapsed.as_micros() as f64 / 1000.0);
 }
 
+// ─── VERIFY: CRC16 integrity check ──────────────────
+fn verify_integrity(config: &Config) {
+    let reader = MicroscopeReader::open(config);
+    println!("{} {} blocks...", "VERIFY".cyan().bold(), reader.block_count);
+
+    let mut checked = 0u64;
+    let mut skipped = 0u64;
+    let mut bad = 0u64;
+
+    for i in 0..reader.block_count {
+        let h = reader.header(i);
+        let stored = u16::from_le_bytes(h.crc16);
+        if stored == 0x0000 {
+            skipped += 1;
+            continue;
+        }
+        let start = h.data_offset as usize;
+        let end = start + h.data_len as usize;
+        if end > reader.data.len() {
+            println!("  {} Block {} offset out of bounds", "ERR".red(), i);
+            bad += 1;
+            continue;
+        }
+        let computed = crc16_ccitt(&reader.data[start..end]);
+        if computed != stored {
+            println!("  {} Block {} D{}: CRC mismatch (stored=0x{:04X}, computed=0x{:04X})",
+                "FAIL".red().bold(), i, h.depth, stored, computed);
+            bad += 1;
+        } else {
+            checked += 1;
+        }
+    }
+
+    if bad == 0 {
+        println!("  {} {} blocks verified, {} skipped (no CRC)",
+            "OK".green().bold(), checked, skipped);
+    } else {
+        println!("  {} {} corrupted, {} ok, {} skipped",
+            "FAIL".red().bold(), bad, checked, skipped);
+    }
+}
+
+// ─── GPU BENCH ───────────────────────────────────────
+fn gpu_bench(config: &Config) {
+    let reader = MicroscopeReader::open(config);
+    println!("{} {} blocks", "GPU BENCH".cyan().bold(), reader.block_count);
+
+    // CPU baseline
+    let iters = 1000u64;
+    let mut rng: u64 = 42;
+    let mut next_f32 = || -> f32 {
+        rng = rng.wrapping_mul(6364136223846793005).wrapping_add(1);
+        (rng >> 33) as f32 / (u32::MAX as f32) * 0.5
+    };
+
+    let config_clone = config.clone();
+    let t0 = Instant::now();
+    for _ in 0..iters {
+        let z = (next_f32() * 10.0) as u8 % 6;
+        let r = reader.look_soft(&config_clone, next_f32(), next_f32(), next_f32(), z, 5, config.search.zoom_weight);
+        std::hint::black_box(&r);
+    }
+    let cpu_ns = t0.elapsed().as_nanos() / iters as u128;
+    println!("  CPU: {} ns/query", cpu_ns);
+
+    #[cfg(feature = "gpu")]
+    {
+        match gpu::GpuAccelerator::new(&reader) {
+            Ok(accel) => {
+                // Warmup
+                for _ in 0..10 {
+                    let z = (next_f32() * 10.0) as u8 % 6;
+                    let _ = accel.l2_search_4d(next_f32(), next_f32(), next_f32(), z, config.search.zoom_weight, 5);
+                }
+
+                let t0 = Instant::now();
+                for _ in 0..iters {
+                    let z = (next_f32() * 10.0) as u8 % 6;
+                    let r = accel.l2_search_4d(next_f32(), next_f32(), next_f32(), z, config.search.zoom_weight, 5);
+                    std::hint::black_box(&r);
+                }
+                let gpu_ns = t0.elapsed().as_nanos() / iters as u128;
+                println!("  GPU: {} ns/query", gpu_ns);
+
+                if gpu_ns > 0 {
+                    let speedup = cpu_ns as f64 / gpu_ns as f64;
+                    println!("  Speedup: {:.1}x", speedup);
+                }
+            }
+            Err(e) => {
+                eprintln!("  {} GPU init failed: {}", "ERR".red(), e);
+            }
+        }
+    }
+
+    #[cfg(not(feature = "gpu"))]
+    {
+        println!("  {} GPU feature not compiled. Use: cargo build --features gpu", "WARN".yellow());
+    }
+}
+
+// ─── VERIFY MERKLE ───────────────────────────────────
+fn verify_merkle(config: &Config) {
+    let output_dir = Path::new(&config.paths.output_dir);
+    let merkle_path = output_dir.join("merkle.bin");
+    let meta_path = output_dir.join("meta.bin");
+
+    // Check if merkle.bin exists
+    if !merkle_path.exists() {
+        println!("  {} merkle.bin not found — rebuild with v0.2.0 to generate", "ERR".red());
+        return;
+    }
+
+    // Read stored merkle root from meta.bin
+    let meta = fs::read(&meta_path).expect("read meta.bin");
+    let magic = &meta[0..4];
+    if magic != b"MSC2" {
+        println!("  {} meta.bin is v1 (MSCM) — no merkle root stored. Rebuild first.", "WARN".yellow());
+        return;
+    }
+    let meta_root_offset = META_HEADER_SIZE + 9 * DEPTH_ENTRY_SIZE;
+    let mut stored_root = [0u8; 32];
+    stored_root.copy_from_slice(&meta[meta_root_offset..meta_root_offset + 32]);
+
+    // Read the stored merkle tree
+    let merkle_data = fs::read(&merkle_path).expect("read merkle.bin");
+    let stored_tree = merkle::MerkleTree::from_bytes(&merkle_data)
+        .expect("parse merkle.bin");
+
+    println!("{} {} blocks...", "VERIFY MERKLE".cyan().bold(), stored_tree.leaf_count);
+    println!("  Stored root:   {}", hex_str(&stored_root));
+    println!("  Merkle root:   {}", hex_str(&stored_tree.root));
+
+    if stored_root != stored_tree.root {
+        println!("  {} meta.bin root != merkle.bin root!", "MISMATCH".red().bold());
+        return;
+    }
+
+    // Recompute from data.bin
+    let reader = MicroscopeReader::open(config);
+    let mut bad_blocks = Vec::new();
+    for i in 0..reader.block_count {
+        let h = reader.header(i);
+        let start = h.data_offset as usize;
+        let end = start + h.data_len as usize;
+        if end > reader.data.len() {
+            bad_blocks.push(i);
+            continue;
+        }
+        let data = &reader.data[start..end];
+        if !stored_tree.verify_leaf(i, data) {
+            bad_blocks.push(i);
+        }
+    }
+
+    if bad_blocks.is_empty() {
+        println!("  {} All {} blocks verified against Merkle root",
+            "OK".green().bold(), reader.block_count);
+    } else {
+        println!("  {} {} block(s) failed verification:",
+            "FAIL".red().bold(), bad_blocks.len());
+        for &idx in bad_blocks.iter().take(20) {
+            println!("    Block {}", idx);
+        }
+        if bad_blocks.len() > 20 {
+            println!("    ... and {} more", bad_blocks.len() - 20);
+        }
+    }
+}
+
+// ─── MERKLE PROOF ────────────────────────────────────
+fn merkle_proof(config: &Config, block_index: usize) {
+    let output_dir = Path::new(&config.paths.output_dir);
+    let merkle_path = output_dir.join("merkle.bin");
+
+    if !merkle_path.exists() {
+        println!("  {} merkle.bin not found — rebuild first", "ERR".red());
+        return;
+    }
+
+    let merkle_data = fs::read(&merkle_path).expect("read merkle.bin");
+    let tree = merkle::MerkleTree::from_bytes(&merkle_data)
+        .expect("parse merkle.bin");
+
+    if block_index >= tree.leaf_count {
+        println!("  {} Block index {} out of range (max: {})",
+            "ERR".red(), block_index, tree.leaf_count - 1);
+        return;
+    }
+
+    let reader = MicroscopeReader::open(config);
+    let h = reader.header(block_index);
+    let text = reader.text(block_index);
+    let layer = LAYER_NAMES.get(h.layer_id as usize).unwrap_or(&"?");
+
+    println!("{} Block #{}", "MERKLE PROOF".cyan().bold(), block_index);
+    println!("  D{} [{}] {}", h.depth, layer, safe_truncate(text, 60));
+    println!("  Leaf hash: {}", hex_str(&tree.nodes[block_index]));
+
+    let proof = tree.proof(block_index);
+    println!("  Proof path ({} steps):", proof.len());
+    for (i, (hash, is_right)) in proof.iter().enumerate() {
+        let side = if *is_right { "R" } else { "L" };
+        println!("    [{}] {} sibling={}", i, side, hex_str(hash));
+    }
+
+    // Verify
+    let data_start = h.data_offset as usize;
+    let data_end = data_start + h.data_len as usize;
+    let block_data = &reader.data[data_start..data_end];
+    let valid = merkle::MerkleTree::verify_proof(&tree.root, block_data, &proof);
+    if valid {
+        println!("  {} Proof valid against root {}",
+            "VERIFIED".green().bold(), hex_str(&tree.root));
+    } else {
+        println!("  {} Proof INVALID", "FAIL".red().bold());
+    }
+}
+
 // ─── CLI ─────────────────────────────────────────────
 #[derive(Parser)]
 #[command(name = "microscope-mem", about = "Zoom-based hierarchical memory — pure binary, zero JSON")]
@@ -1203,7 +1553,14 @@ enum Cmd {
     /// Manual look: x y z zoom [k]
     Look { x: f32, y: f32, z: f32, zoom: u8, #[arg(default_value = "10")] k: usize },
     /// 4D soft zoom: x y z zoom [k]
-    Soft { x: f32, y: f32, z: f32, zoom: u8, #[arg(default_value = "10")] k: usize },
+    Soft {
+        x: f32, y: f32, z: f32, zoom: u8,
+        #[arg(default_value = "10")]
+        k: usize,
+        /// Use GPU acceleration (requires gpu feature)
+        #[arg(long)]
+        gpu: bool,
+    },
     /// Benchmark
     Bench,
     /// Stats
@@ -1219,6 +1576,17 @@ enum Cmd {
         k: usize,
         #[arg(short, long, default_value = "cosine")]
         metric: String, // cosine, l2, dot
+    },
+    /// GPU vs CPU benchmark (requires gpu feature)
+    GpuBench,
+    /// Verify CRC16 integrity of all blocks
+    Verify,
+    /// Verify Merkle tree integrity of the entire index
+    VerifyMerkle,
+    /// Show Merkle proof for a specific block
+    Proof {
+        #[arg(help = "Block index")]
+        block_index: usize,
     },
     /// Start the unified endpoint server (TCP/HTTP)
     Serve {
@@ -1259,10 +1627,35 @@ fn main() {
                 }
             }
         }
-        Cmd::Soft { x, y, z, zoom, k } => {
-            let config_clone = config.clone();
+        Cmd::Soft { x, y, z, zoom, k, gpu: use_gpu } => {
             let r = MicroscopeReader::open(&config);
-            println!("{} 4D ({:.2},{:.2},{:.2}) z={}:", "MICROSCOPE".cyan().bold(), x, y, z, zoom);
+            let use_gpu = use_gpu || config.performance.use_gpu;
+            println!("{} 4D ({:.2},{:.2},{:.2}) z={} {}:",
+                "MICROSCOPE".cyan().bold(), x, y, z, zoom,
+                if use_gpu { "[GPU]" } else { "[CPU]" });
+
+            #[cfg(feature = "gpu")]
+            if use_gpu {
+                match gpu::GpuAccelerator::new(&r) {
+                    Ok(accel) => {
+                        let res = accel.l2_search_4d(x, y, z, zoom, config.search.zoom_weight, k);
+                        for (dist, idx) in res {
+                            r.print_result(idx, dist);
+                        }
+                        return;
+                    }
+                    Err(e) => {
+                        eprintln!("  {} GPU init failed: {}, falling back to CPU", "WARN".yellow(), e);
+                    }
+                }
+            }
+
+            #[cfg(not(feature = "gpu"))]
+            if use_gpu {
+                eprintln!("  {} GPU feature not compiled. Use --features gpu", "WARN".yellow());
+            }
+
+            let config_clone = config.clone();
             let res = r.look_soft(&config_clone, x, y, z, zoom, k, config.search.zoom_weight);
             let append_path = Path::new(&config.paths.output_dir).join("append.bin");
             let appended = read_append_log(&append_path);
@@ -1299,11 +1692,48 @@ fn main() {
             let _ = fs::remove_file(append_path);
             println!("  Append log cleared.");
         }
+        Cmd::GpuBench => {
+            gpu_bench(&config);
+        }
         Cmd::Embed { query, k, metric } => {
             semantic_search(&config, &query, k, &metric);
+        }
+        Cmd::Verify => {
+            verify_integrity(&config);
+        }
+        Cmd::VerifyMerkle => {
+            verify_merkle(&config);
+        }
+        Cmd::Proof { block_index } => {
+            merkle_proof(&config, block_index);
         }
         Cmd::Serve { port } => {
             streaming::start_endpoint_server(config, port);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_crc16_ccitt_known_vector() {
+        // Standard CRC16-CCITT test vector: "123456789" → 0x29B1
+        let data = b"123456789";
+        assert_eq!(crc16_ccitt(data), 0x29B1);
+    }
+
+    #[test]
+    fn test_crc16_empty() {
+        assert_eq!(crc16_ccitt(b""), 0xFFFF);
+    }
+
+    #[test]
+    fn test_crc16_deterministic() {
+        let a = crc16_ccitt(b"hello world");
+        let b = crc16_ccitt(b"hello world");
+        assert_eq!(a, b);
+        assert_ne!(a, crc16_ccitt(b"hello worl!"));
     }
 }

@@ -1,64 +1,39 @@
-// WGSL Compute Shader for Microscope Memory
-// Performs parallel L2 distance calculations on GPU
+// Microscope Memory — GPU compute shader for 4D L2 soft search
+//
+// Buffer layout:
+//   positions: array<vec4<f32>>  — (x, y, z, zoom) per block, tightly packed
+//   query:     Query uniform     — (x, y, z, qz, zoom_weight)
+//   distances: array<f32>        — output distance² per block
 
-struct BlockHeader {
-    position: vec3<f32>,
-    zoom: f32,
-    depth: u32,
-    layer_id: u32,
-    data_offset: u32,
-    data_len: u32,
-}
-
-struct QueryData {
-    position: vec3<f32>,
-    zoom_level: f32,
-}
-
-struct Result {
-    block_index: u32,
-    distance: f32,
+struct Query {
+    x: f32,
+    y: f32,
+    z: f32,
+    qz: f32,
+    zw: f32,
 }
 
 @group(0) @binding(0)
-var<storage, read> blocks: array<BlockHeader>;
+var<storage, read> positions: array<vec4<f32>>;
 
 @group(0) @binding(1)
-var<storage, read> query: QueryData;
+var<uniform> query: Query;
 
 @group(0) @binding(2)
-var<storage, read_write> results: array<Result>;
+var<storage, read_write> distances: array<f32>;
 
 @compute @workgroup_size(64)
-fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
-    let index = global_id.x;
-
-    // Bounds check
-    if (index >= arrayLength(&blocks)) {
+fn l2_4d(@builtin(global_invocation_id) gid: vec3<u32>) {
+    let i = gid.x;
+    if (i >= arrayLength(&positions)) {
         return;
     }
 
-    let block = blocks[index];
+    let p = positions[i];
+    let dx = p.x - query.x;
+    let dy = p.y - query.y;
+    let dz = p.z - query.z;
+    let dw = (p.w - query.qz) * query.zw;
 
-    // Calculate L2 distance
-    let diff = block.position - query.position;
-    let distance = length(diff);
-
-    // Store result
-    results[index] = Result(index, distance);
-}
-
-// Cosine similarity kernel
-@compute @workgroup_size(64)
-fn cosine_similarity(@builtin(global_invocation_id) global_id: vec3<u32>) {
-    let index = global_id.x;
-
-    if (index >= arrayLength(&blocks)) {
-        return;
-    }
-
-    // In real implementation, would load embeddings and compute dot product
-    // This is a simplified version
-    let similarity = 0.0;
-    results[index] = Result(index, similarity);
+    distances[i] = dx * dx + dy * dy + dz * dz + dw * dw;
 }

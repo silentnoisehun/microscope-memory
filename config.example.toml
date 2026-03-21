@@ -30,6 +30,9 @@ zoom_weight = 2.0
 # Keyword boost factor
 keyword_boost = 0.1
 
+# Semantic blending weight (0.0 = pure hash coords, 1.0 = pure embedding coords)
+semantic_weight = 0.0
+
 [memory_layers]
 # Configure which layers to include
 layers = [
@@ -53,6 +56,9 @@ cache_size = 64
 
 # Number of parallel workers for building
 build_workers = 4
+
+# Use GPU acceleration for soft search (requires --features gpu)
+use_gpu = false
 
 [logging]
 # Log level: trace, debug, info, warn, error

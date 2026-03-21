@@ -4,7 +4,7 @@ use std::sync::Arc;
 use std::path::Path;
 use serde::{Deserialize, Serialize};
 use crate::config::Config;
-use crate::{MicroscopeReader, store_memory, auto_zoom};
+use crate::{MicroscopeReader, store_memory, auto_zoom, content_coords_blended};
 
 #[derive(Serialize, Deserialize, Debug)]
 struct UpdateRequest {
@@ -91,7 +91,7 @@ fn handle_recall(mut stream: TcpStream, request: &str, config: &Config) {
     if let Ok(req) = serde_json::from_str::<SearchRequest>(body) {
         let reader = MicroscopeReader::open(config);
         let (zoom, _) = auto_zoom(&req.query);
-        let (x, y, z) = crate::content_coords(&req.query, "long_term"); // Placeholder coord
+        let (x, y, z) = content_coords_blended(&req.query, "long_term", config.search.semantic_weight);
         
         let results = reader.look(config, x, y, z, zoom, req.k);
         let mut out = Vec::new();

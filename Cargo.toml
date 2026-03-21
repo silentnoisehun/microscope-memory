@@ -1,6 +1,6 @@
 [package]
 name = "microscope-memory"
-version = "0.1.0"
+version = "0.3.0"
 edition = "2021"
 authors = ["Máté Róbert (Silent)"]
 description = "Zoom-based hierarchical memory — SIMD optimized vector L2 + mmap, sub-microsecond queries."
@@ -28,8 +28,14 @@ console_error_panic_hook = { version = "0.1", optional = true }
 # Python bindings
 pyo3 = { version = "0.20", features = ["extension-module"], optional = true }
 
+# Merkle tree integrity
+sha2 = "0.10"
+
 # GPU acceleration
 wgpu = { version = "0.19", optional = true }
+bytemuck = { version = "1", features = ["derive"], optional = true }
+pollster = { version = "0.4", optional = true }
+futures = { version = "0.3", optional = true }
 
 # For future real embeddings integration
 # openai-api-rust = { version = "0.1", optional = true }
@@ -40,7 +46,7 @@ wgpu = { version = "0.19", optional = true }
 default = []
 wasm = ["wasm-bindgen", "web-sys", "console_error_panic_hook"]
 python = ["pyo3"]
-gpu = ["wgpu"]
+gpu = ["wgpu", "bytemuck", "pollster", "futures"]
 openai = []  # Enable OpenAI embeddings
 huggingface = []  # Enable HuggingFace embeddings
 simd = []  # Force SIMD optimizations

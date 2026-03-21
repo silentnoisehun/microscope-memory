@@ -31,6 +31,8 @@ pub struct Search {
     pub default_k: usize,
     pub zoom_weight: f32,
     pub keyword_boost: f32,
+    #[serde(default)]
+    pub semantic_weight: f32,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -43,6 +45,8 @@ pub struct Performance {
     pub use_mmap: bool,
     pub cache_size: usize,
     pub build_workers: usize,
+    #[serde(default)]
+    pub use_gpu: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -74,6 +78,7 @@ impl Config {
                 default_k: 10,
                 zoom_weight: 2.0,
                 keyword_boost: 0.1,
+                semantic_weight: 0.0,
             },
             memory_layers: MemoryLayers {
                 layers: vec![
@@ -87,6 +92,7 @@ impl Config {
                 use_mmap: true,
                 cache_size: 64,
                 build_workers: 4,
+                use_gpu: false,
             },
             logging: Logging {
                 level: "info".to_string(),

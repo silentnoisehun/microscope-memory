@@ -189,7 +189,7 @@ pub struct EmbeddedBlockHeader {
     pub data_len: u16,
     pub parent_idx: u32,
     pub child_count: u16,
-    pub _pad: [u8; 2],
+    pub crc16: [u8; 2],  // CRC16-CCITT (0x0000 = no checksum)
 
     // New embedding fields
     pub embedding_offset: u32,  // Offset into embedding file

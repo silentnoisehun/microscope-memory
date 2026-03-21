@@ -4,7 +4,7 @@ use std::sync::Arc;
 use std::path::Path;
 use serde::{Deserialize, Serialize};
 use crate::config::Config;
-use crate::{MicroscopeReader, store_memory, layer_to_id, auto_zoom, LAYER_NAMES};
+use crate::{MicroscopeReader, store_memory, auto_zoom};
 
 #[derive(Serialize, Deserialize, Debug)]
 struct UpdateRequest {
@@ -27,10 +27,10 @@ fn default_k() -> usize { 5 }
 
 /// Start the Microscope Endpoint Server
 /// Supports basic HTTP-like JSON endpoints over TCP
-pub fn start_endpoint_server(config: Config) {
-    let addr = format!("{}:{}", config.logging.level.replace("info", "0.0.0.0"), 6060); // Simple trick or just 0.0.0.0:6060
-    let listener = TcpListener::bind("0.0.0.0:6060").expect("Could not bind to port 6060");
-    println!("🔬 {} on 0.0.0.0:6060", "ENDPOINT SERVER ACTIVE".cyan().bold());
+pub fn start_endpoint_server(config: Config, port: u16) {
+    let addr = format!("0.0.0.0:{}", port);
+    let listener = TcpListener::bind(&addr).expect(&format!("Could not bind to port {}", port));
+    println!("🔬 {} on {}", "ENDPOINT SERVER ACTIVE".cyan().bold(), addr);
 
     let config = Arc::new(config);
 

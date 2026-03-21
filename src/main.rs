@@ -918,7 +918,6 @@ fn stats(reader: &MicroscopeReader) {
 }
 
 // ─── APPEND LOG (for store without rebuild) ──────────
-const APPEND_PATH: &str = r"D:\Claude Memory\microscope\append.bin";
 
 // Append format: [u32 text_len][u8 layer_id][f32 x][f32 y][f32 z][text bytes]
 // = 17 byte header + text
@@ -981,6 +980,20 @@ pub fn read_append_log(path: &Path) -> Vec<AppendEntry> {
         entries.push(AppendEntry { text, layer_id: lid, importance: imp, x, y, z });
     }
     entries
+}
+
+/// Display a single append-log result entry.
+fn print_append_result(appended: &[AppendEntry], idx: usize, dist: f32) {
+    let ai = idx - 1_000_000;
+    if ai < appended.len() {
+        let e = &appended[ai];
+        let layer = LAYER_NAMES.get(e.layer_id as usize).unwrap_or(&"?");
+        println!("  {} {} {} {}",
+            "AP".cyan(),
+            format!("L2={:.5}", dist).yellow(),
+            format!("[{}/new]", layer).green(),
+            safe_truncate(&e.text, 70));
+    }
 }
 
 // ─── AUTO ZOOM: query → zoom level ──────────────────
@@ -1081,18 +1094,7 @@ fn recall(config: &Config, query: &str, k: usize) {
         if *is_main {
             reader.print_result(*idx, *dist);
         } else {
-            // Append entry
-            let ai = idx - 1_000_000;
-            if ai < appended.len() {
-                let e = &appended[ai];
-                let layer = LAYER_NAMES.get(e.layer_id as usize).unwrap_or(&"?");
-                let preview = safe_truncate(&e.text, 70);
-                println!("  {} {} {} {}",
-                    "AP".cyan(),
-                    format!("L2={:.5}", dist).yellow(),
-                    format!("[{}/new]", layer).green(),
-                    preview);
-            }
+            print_append_result(&appended, *idx, *dist);
         }
         shown += 1;
     }
@@ -1247,18 +1249,13 @@ fn main() {
             let r = MicroscopeReader::open(&config);
             println!("{} ({:.2},{:.2},{:.2}) zoom={}:", "MICROSCOPE".cyan().bold(), x, y, z, zoom);
             let res = r.look(&config_clone, x, y, z, zoom, k);
+            let append_path = Path::new(&config.paths.output_dir).join("append.bin");
+            let appended = read_append_log(&append_path);
             for (dist, idx, is_main) in res {
                 if is_main {
                     r.print_result(idx, dist);
                 } else {
-                    let append_path = Path::new(&config.paths.output_dir).join("append.bin");
-                    let appended = read_append_log(&append_path);
-                    let ai = idx - 1_000_000;
-                    if ai < appended.len() {
-                        let e = &appended[ai];
-                        let layer = LAYER_NAMES.get(e.layer_id as usize).unwrap_or(&"?");
-                        println!("  {} {} {} {}", "AP".cyan(), format!("L2={:.5}", dist).yellow(), format!("[{}/new]", layer).green(), safe_truncate(&e.text, 70));
-                    }
+                    print_append_result(&appended, idx, dist);
                 }
             }
         }
@@ -1267,18 +1264,13 @@ fn main() {
             let r = MicroscopeReader::open(&config);
             println!("{} 4D ({:.2},{:.2},{:.2}) z={}:", "MICROSCOPE".cyan().bold(), x, y, z, zoom);
             let res = r.look_soft(&config_clone, x, y, z, zoom, k, config.search.zoom_weight);
+            let append_path = Path::new(&config.paths.output_dir).join("append.bin");
+            let appended = read_append_log(&append_path);
             for (dist, idx, is_main) in res {
                 if is_main {
                     r.print_result(idx, dist);
                 } else {
-                    let append_path = Path::new(&config.paths.output_dir).join("append.bin");
-                    let appended = read_append_log(&append_path);
-                    let ai = idx - 1_000_000;
-                    if ai < appended.len() {
-                        let e = &appended[ai];
-                        let layer = LAYER_NAMES.get(e.layer_id as usize).unwrap_or(&"?");
-                        println!("  {} {} {} {}", "AP".cyan(), format!("L2={:.5}", dist).yellow(), format!("[{}/new]", layer).green(), safe_truncate(&e.text, 70));
-                    }
+                    print_append_result(&appended, idx, dist);
                 }
             }
         }
@@ -1310,8 +1302,8 @@ fn main() {
         Cmd::Embed { query, k, metric } => {
             semantic_search(&config, &query, k, &metric);
         }
-        Cmd::Serve { port: _ } => {
-            streaming::start_endpoint_server(config);
+        Cmd::Serve { port } => {
+            streaming::start_endpoint_server(config, port);
         }
     }
 }

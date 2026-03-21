@@ -52,7 +52,9 @@ const LAYER_NAMES: &[&str] = &[
     "relational", "reflections", "crypto_chain", "echo_cache", "rust_state",
 ];
 
-// ─── Block header: 32 bytes, packed, mmap-ready ──────
+/// ─── Block header: 32 bytes, packed, mmap-ready ──────
+/// This structure represents a single memory block in the hierarchical index.
+/// It is designed to be memory-mapped and accessed with zero-copy overhead.
 #[repr(C, packed)]
 #[derive(Clone, Copy)]
 struct BlockHeader {
@@ -688,11 +690,16 @@ fn l2_dist_sq_simd(h: &BlockHeader, x: f32, y: f32, z: f32, qz: f32, zw: f32) ->
     }
 }
 
-// ─── MMAP READER ─────────────────────────────────────
+/// High-performance memory-mapped reader for the Microscope index.
+/// Handles spatial and hierarchical queries using SIMD-accelerated distance metrics.
 struct MicroscopeReader {
+    /// Mmaped headers (32 bytes per block)
     headers: memmap2::Mmap,
+    /// Mmaped raw text data
     data: memmap2::Mmap,
+    /// Total number of blocks in the index
     block_count: usize,
+    /// Start index and count for each depth level (0-8)
     depth_ranges: [(u32, u32); 9],
 }
 
@@ -738,7 +745,8 @@ impl MicroscopeReader {
         std::str::from_utf8(&self.data[start..end]).unwrap_or("<bin>")
     }
 
-    /// The MICROSCOPE: exact depth + spatial L2
+    /// The MICROSCOPE: exact depth + spatial L2 search.
+    /// Returns the k-nearest neighbors at a specific zoom level.
     fn look(&self, x: f32, y: f32, z: f32, zoom: u8, k: usize) -> Vec<(f32, usize)> {
         let (start, count) = self.depth_ranges[zoom as usize];
         let (start, count) = (start as usize, count as usize);
@@ -761,7 +769,9 @@ impl MicroscopeReader {
         results
     }
 
-    /// 4D soft zoom
+    /// 4D soft zoom search.
+    /// Considers zoom (normalized depth) as a weighted spatial dimension.
+    /// This scans ALL blocks in the index using SIMD-accelerated L2 distance.
     fn look_soft(&self, x: f32, y: f32, z: f32, zoom: u8, k: usize, zw: f32) -> Vec<(f32, usize)> {
         let qz = zoom as f32 / 8.0;
         let mut results: Vec<(f32, usize)> = (0..self.block_count)

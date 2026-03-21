@@ -1,41 +1,28 @@
 # Rust
-/target/
-**/*.rs.bk
-*.pdb
+target/
 Cargo.lock
 
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-env/
-venv/
-.venv
-
-# Memory data files (sensitive)
-/layers/
-/microscope/
-*.bin
-append.bin
-
-# IDE
-.idea/
+# IDEs
 .vscode/
-*.swp
-*.swo
-*~
+.idea/
 
 # OS
 .DS_Store
 Thumbs.db
-Desktop.ini
 
-# Logs
+# Microscope Data (binary data should not be in git)
+*.bin
+layers/*.json
+!layers/.gitkeep
+
+# Config (user specific)
+config.toml
+!config.example.toml
+
+# Logs and temp files
 *.log
-
-# Test data
-/test-data/
-/temp/
-/tmp/
+*.txt
+tmp/
+build_error*
+check_error*
+error_dump*

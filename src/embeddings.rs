@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 // Embedding module for semantic vector search
 // Supports OpenAI, HuggingFace, and custom embeddings
 

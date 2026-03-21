@@ -15,7 +15,7 @@
 //!   microscope-mem stats                    # structure info
 //!   microscope-mem find "Ora"               # text search
 //!   microscope-mem embed "query"            # semantic search with embeddings
-//!   microscope-mem stream                    # start streaming update server
+//!   microscope-mem serve                    # Start the unified endpoint server (TCP/HTTP)
 
 mod embeddings;
 mod streaming;
@@ -43,11 +43,11 @@ use rayon::prelude::*;
 
 // Defaults (will be overridden by config)
 const DEFAULT_CONFIG_PATH: &str = "config.toml";
-const BLOCK_DATA_SIZE: usize = 256;
-const HEADER_SIZE: usize = 32;
-const META_HEADER_SIZE: usize = 16;
-const DEPTH_ENTRY_SIZE: usize = 8;
-const LAYER_NAMES: &[&str] = &[
+pub const BLOCK_DATA_SIZE: usize = 256;
+pub const HEADER_SIZE: usize = 32;
+pub const META_HEADER_SIZE: usize = 16;
+pub const DEPTH_ENTRY_SIZE: usize = 8;
+pub const LAYER_NAMES: &[&str] = &[
     "identity", "long_term", "short_term", "associative", "emotional",
     "relational", "reflections", "crypto_chain", "echo_cache", "rust_state",
 ];
@@ -94,12 +94,12 @@ fn layer_color(id: u8) -> &'static str {
     }
 }
 
-fn layer_to_id(name: &str) -> u8 {
+pub fn layer_to_id(name: &str) -> u8 {
     LAYER_NAMES.iter().position(|&n| n == name).unwrap_or(0) as u8
 }
 
 // ─── Deterministic coords from content hash ──────────
-fn content_coords(text: &str, layer: &str) -> (f32, f32, f32) {
+pub fn content_coords(text: &str, layer: &str) -> (f32, f32, f32) {
     // Simple hash → 3D position
     let mut h: [u64; 3] = [0xcbf29ce484222325, 0x100000001b3, 0xa5a5a5a5a5a5a5a5];
     for &b in text.as_bytes().iter().take(128) {
@@ -692,19 +692,19 @@ fn l2_dist_sq_simd(h: &BlockHeader, x: f32, y: f32, z: f32, qz: f32, zw: f32) ->
 
 /// High-performance memory-mapped reader for the Microscope index.
 /// Handles spatial and hierarchical queries using SIMD-accelerated distance metrics.
-struct MicroscopeReader {
+pub struct MicroscopeReader {
     /// Mmaped headers (32 bytes per block)
-    headers: memmap2::Mmap,
+    pub headers: memmap2::Mmap,
     /// Mmaped raw text data
-    data: memmap2::Mmap,
+    pub data: memmap2::Mmap,
     /// Total number of blocks in the index
-    block_count: usize,
+    pub block_count: usize,
     /// Start index and count for each depth level (0-8)
-    depth_ranges: [(u32, u32); 9],
+    pub depth_ranges: [(u32, u32); 9],
 }
 
 impl MicroscopeReader {
-    fn open(config: &Config) -> Self {
+    pub fn open(config: &Config) -> Self {
         // Paths from config
         let output_dir = Path::new(&config.paths.output_dir);
         let meta_path = output_dir.join("meta.bin");
@@ -738,7 +738,7 @@ impl MicroscopeReader {
     }
 
     #[inline(always)]
-    fn text(&self, i: usize) -> &str {
+    pub fn text(&self, i: usize) -> &str {
         let h = self.header(i);
         let start = h.data_offset as usize;
         let end = start + h.data_len as usize;
@@ -747,7 +747,7 @@ impl MicroscopeReader {
 
     /// The MICROSCOPE: exact depth + spatial L2 search.
     /// Returns the k-nearest neighbors at a specific zoom level.
-    fn look(&self, config: &Config, x: f32, y: f32, z: f32, zoom: u8, k: usize) -> Vec<(f32, usize, bool)> {
+    pub fn look(&self, config: &Config, x: f32, y: f32, z: f32, zoom: u8, k: usize) -> Vec<(f32, usize, bool)> {
         let (start, count) = self.depth_ranges[zoom as usize];
         let (start, count) = (start as usize, count as usize);
         
@@ -923,7 +923,7 @@ const APPEND_PATH: &str = r"D:\Claude Memory\microscope\append.bin";
 // Append format: [u32 text_len][u8 layer_id][f32 x][f32 y][f32 z][text bytes]
 // = 17 byte header + text
 
-fn store_memory(config: &Config, text: &str, layer: &str, importance: u8) {
+pub fn store_memory(config: &Config, text: &str, layer: &str, importance: u8) {
     let t0 = Instant::now();
     let (x, y, z) = content_coords(text, layer);
     let lid = layer_to_id(layer);
@@ -955,14 +955,14 @@ fn store_memory(config: &Config, text: &str, layer: &str, importance: u8) {
 
 // Read append log entries
 #[allow(dead_code)]
-struct AppendEntry {
-    text: String,
-    layer_id: u8,
-    importance: u8,
-    x: f32, y: f32, z: f32,
+pub struct AppendEntry {
+    pub text: String,
+    pub layer_id: u8,
+    pub importance: u8,
+    pub x: f32, pub y: f32, pub z: f32,
 }
 
-fn read_append_log(path: &Path) -> Vec<AppendEntry> {
+pub fn read_append_log(path: &Path) -> Vec<AppendEntry> {
     if !path.exists() { return vec![]; }
     let data = fs::read(path).unwrap_or_default();
     let mut entries = Vec::new();
@@ -984,7 +984,7 @@ fn read_append_log(path: &Path) -> Vec<AppendEntry> {
 }
 
 // ─── AUTO ZOOM: query → zoom level ──────────────────
-fn auto_zoom(query: &str) -> (u8, u8) {
+pub fn auto_zoom(query: &str) -> (u8, u8) {
     // Stopwords for better complexity estimation
     let stopwords = ["a", "the", "is", "of", "and", "to", "in", "it", "on", "for"];
     let unique_content_words = query.to_lowercase()
@@ -1218,6 +1218,11 @@ enum Cmd {
         #[arg(short, long, default_value = "cosine")]
         metric: String, // cosine, l2, dot
     },
+    /// Start the unified endpoint server (TCP/HTTP)
+    Serve {
+        #[arg(short, long, default_value_t = 6060)]
+        port: u16,
+    },
 }
 
 fn main() {
@@ -1304,6 +1309,9 @@ fn main() {
         }
         Cmd::Embed { query, k, metric } => {
             semantic_search(&config, &query, k, &metric);
+        }
+        Cmd::Serve { port: _ } => {
+            streaming::start_endpoint_server(config);
         }
     }
 }

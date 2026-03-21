@@ -55,7 +55,7 @@ We're particularly interested in contributions for:
 
 ```bash
 # Clone your fork
-git clone https://github.com/yourusername/microscope-memory.git
+git clone https://github.com/silentnoisehun/microscope-memory.git
 cd microscope-memory
 
 # Install Rust (if needed)

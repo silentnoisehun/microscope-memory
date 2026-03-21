@@ -1,6 +1,5 @@
 # Rust
 target/
-Cargo.lock
 
 # IDEs
 .vscode/
@@ -26,3 +25,6 @@ tmp/
 build_error*
 check_error*
 error_dump*
+
+# Claude Code
+.claude/

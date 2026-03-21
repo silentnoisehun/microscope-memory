@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.1.0] - 2024-03-20
+## [0.1.0] - 2026-03-21
 
 ### Added
 - Initial release of Microscope Memory
@@ -41,4 +41,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Build time: ~2 seconds for 500+ memories
 - Total index size: ~8 MB for 227,168 blocks
 
-[0.1.0]: https://github.com/yourusername/microscope-memory/releases/tag/v0.1.0
+[0.1.0]: https://github.com/silentnoisehun/microscope-memory/releases/tag/v0.1.0

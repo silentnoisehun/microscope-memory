@@ -1,5 +1,8 @@
 # Microscope Memory
 
+[![CI](https://github.com/silentnoisehun/microscope-memory/actions/workflows/ci.yml/badge.svg)](https://github.com/silentnoisehun/microscope-memory/actions)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 **Zoom-based hierarchical memory system with sub-microsecond queries**
 
 A memory indexing system that treats data like looking through a microscope — the zoom level determines what you see. Pure binary, zero JSON, powered by mmap, L2 vector search, and rayon parallelism.
@@ -48,7 +51,7 @@ Benchmarked on 227,168 blocks (10,000 queries per depth):
 ### Build from source
 
 ```bash
-git clone https://github.com/mater-robert/microscope-memory.git
+git clone https://github.com/silentnoisehun/microscope-memory.git
 cd microscope-memory
 
 cargo build --release
@@ -216,9 +219,10 @@ src/
 ## Streaming Server (`streaming.rs`)
 
 The system includes a high-performance TCP server for asynchronous memory updates:
-- **Default Port**: 6060
+- **Default Port**: 6060 (configurable via `--port`)
 - **Protocol**: JSON-over-TCP
-- **Function**: Receives raw text/layer data, handles atomic appends to `append.bin`, and triggers internal cache invalidation. This enables Ora to push memories without CLI overhead.
+- **Endpoints**: `POST /store`, `GET/POST /recall`, `GET /stats`
+- **Function**: Receives raw text/layer data, handles atomic appends to `append.bin`. Enables external systems to push memories without CLI overhead.
 
 ## Semantic Search & Embeddings
 
@@ -264,6 +268,8 @@ Contributions welcome. Areas of interest:
 ## License
 
 MIT License - See [LICENSE](LICENSE) file for details.
+
+For a deeper technical overview, see the [Whitepaper](WHITEPAPER.md).
 
 ---
 

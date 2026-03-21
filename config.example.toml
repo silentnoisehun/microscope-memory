@@ -2,13 +2,13 @@
 
 [paths]
 # Directory containing memory layer JSON files
-layers_dir = "D:/Claude Memory/layers"
+layers_dir = "./layers"
 
 # Output directory for binary index files
-output_dir = "D:/Claude Memory/microscope"
+output_dir = "./output"
 
 # Temporary directory for processing
-temp_dir = "/tmp/microscope"
+temp_dir = "./tmp"
 
 [index]
 # Block size in characters (fixed viewport)

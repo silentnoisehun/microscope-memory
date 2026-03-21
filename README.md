@@ -208,12 +208,24 @@ D8: Raw bytes         — hex representation (atomic limit)
 ```
 src/
 ├── main.rs          — Core engine: build, query, mmap reader, CLI
-├── streaming.rs     — Real-time streaming update server
+├── streaming.rs     — Real-time streaming update server (TCP:6060)
 ├── embeddings.rs    — Semantic vector search (SIMD cosine similarity)
-├── gpu.rs           — wgpu GPU acceleration (optional)
-├── python.rs        — PyO3 Python bindings (optional)
-├── wasm.rs          — WASM target (optional)
-└── shaders/         — GPU compute shaders
+├── config.rs        — Dynamic configuration system (TOML)
+└── ...
+
+## Streaming Server (`streaming.rs`)
+
+The system includes a high-performance TCP server for asynchronous memory updates:
+- **Default Port**: 6060
+- **Protocol**: JSON-over-TCP
+- **Function**: Receives raw text/layer data, handles atomic appends to `append.bin`, and triggers internal cache invalidation. This enables Ora to push memories without CLI overhead.
+
+## Semantic Search & Embeddings
+
+Current status: **Architecture Ready**.
+- **Engine**: SIMD-accelerated (SSE4/AVX2) cosine similarity is fully implemented in `embeddings.rs`.
+- **Vectors**: Currently uses a `MockEmbeddingProvider` (128d).
+- **Integration**: To enable real semantic search, plug in an OpenAI API key or a local `candle-bert` model in `embeddings.rs`. The spatial L2 search already acts as a high-speed "structural" similarity fallback.
 ```
 
 ## Optional Features

@@ -747,18 +747,29 @@ impl MicroscopeReader {
 
     /// The MICROSCOPE: exact depth + spatial L2 search.
     /// Returns the k-nearest neighbors at a specific zoom level.
-    fn look(&self, x: f32, y: f32, z: f32, zoom: u8, k: usize) -> Vec<(f32, usize)> {
+    fn look(&self, config: &Config, x: f32, y: f32, z: f32, zoom: u8, k: usize) -> Vec<(f32, usize, bool)> {
         let (start, count) = self.depth_ranges[zoom as usize];
         let (start, count) = (start as usize, count as usize);
-        if count == 0 { return vec![]; }
+        
+        let mut results: Vec<(f32, usize, bool)> = Vec::with_capacity(count + 10);
+        if count > 0 {
+            for i in start..(start + count) {
+                let h = self.header(i);
+                let dx = h.x - x;
+                let dy = h.y - y;
+                let dz = h.z - z;
+                results.push((dx*dx + dy*dy + dz*dz, i, true));
+            }
+        }
 
-        let mut results: Vec<(f32, usize)> = Vec::with_capacity(count);
-        for i in start..(start + count) {
-            let h = self.header(i);
-            let dx = h.x - x;
-            let dy = h.y - y;
-            let dz = h.z - z;
-            results.push((dx*dx + dy*dy + dz*dz, i));
+        // Search append log (hot memory)
+        let append_path = Path::new(&config.paths.output_dir).join("append.bin");
+        let appended = read_append_log(&append_path);
+        for (ai, entry) in appended.iter().enumerate() {
+            let dx = entry.x - x;
+            let dy = entry.y - y;
+            let dz = entry.z - z;
+            results.push((dx*dx + dy*dy + dz*dz, ai + 1_000_000, false));
         }
 
         let k = k.min(results.len());
@@ -772,15 +783,26 @@ impl MicroscopeReader {
     /// 4D soft zoom search.
     /// Considers zoom (normalized depth) as a weighted spatial dimension.
     /// This scans ALL blocks in the index using SIMD-accelerated L2 distance.
-    fn look_soft(&self, x: f32, y: f32, z: f32, zoom: u8, k: usize, zw: f32) -> Vec<(f32, usize)> {
+    fn look_soft(&self, config: &Config, x: f32, y: f32, z: f32, zoom: u8, k: usize, zw: f32) -> Vec<(f32, usize, bool)> {
         let qz = zoom as f32 / 8.0;
-        let mut results: Vec<(f32, usize)> = (0..self.block_count)
+        let mut results: Vec<(f32, usize, bool)> = (0..self.block_count)
             .into_par_iter()
             .map(|i| {
                 let h = self.header(i);
-                (l2_dist_sq_simd(h, x, y, z, qz, zw), i)
+                (l2_dist_sq_simd(h, x, y, z, qz, zw), i, true)
             })
             .collect();
+
+        // Search append log (hot memory)
+        let append_path = Path::new(&config.paths.output_dir).join("append.bin");
+        let appended = read_append_log(&append_path);
+        for (ai, entry) in appended.iter().enumerate() {
+            let dx = entry.x - x;
+            let dy = entry.y - y;
+            let dz = entry.z - z;
+            let dw = (0.5 - qz) * zw; // Append entries are at fixed zoom 0.5 (D4) usually
+            results.push((dx*dx + dy*dy + dz*dz + dw*dw, ai + 1_000_000, false));
+        }
             
         let k = k.min(results.len());
         if k == 0 { return vec![]; }
@@ -839,8 +861,9 @@ fn bench(config: &Config, reader: &MicroscopeReader) {
 
     for zoom in 0..9u8 {
         let t0 = Instant::now();
+        let config_clone = config.clone();
         for _ in 0..iters {
-            let r = reader.look(next_f32(), next_f32(), next_f32(), zoom, 5);
+            let r = reader.look(&config_clone, next_f32(), next_f32(), next_f32(), zoom, 5);
             std::hint::black_box(&r);
         }
         let ns = t0.elapsed().as_nanos() as u64;
@@ -858,9 +881,10 @@ fn bench(config: &Config, reader: &MicroscopeReader) {
     // 4D
     println!("\n{}", "4D soft zoom (all blocks):".cyan());
     let t0 = Instant::now();
+    let config_clone = config.clone();
     for _ in 0..iters {
         let z = (next_f32() * 10.0) as u8 % 6;
-        let r = reader.look_soft(next_f32(), next_f32(), next_f32(), z, 5, 2.0);
+        let r = reader.look_soft(&config_clone, next_f32(), next_f32(), next_f32(), z, 5, 2.0);
         std::hint::black_box(&r);
     }
     let ns = t0.elapsed().as_nanos() / iters as u128;
@@ -961,28 +985,30 @@ fn read_append_log(path: &Path) -> Vec<AppendEntry> {
 
 // ─── AUTO ZOOM: query → zoom level ──────────────────
 fn auto_zoom(query: &str) -> (u8, u8) {
-    // Returns (center_zoom, radius) — search center ± radius
-    let words = query.split_whitespace().count();
-    let len = query.len();
-    let _has_question = query.contains('?');
+    // Stopwords for better complexity estimation
+    let stopwords = ["a", "the", "is", "of", "and", "to", "in", "it", "on", "for"];
+    let unique_content_words = query.to_lowercase()
+        .split_whitespace()
+        .filter(|w| !stopwords.contains(&w) && w.len() > 2)
+        .count();
 
-    // Single word or very short → broad (identity/summary)
-    if words <= 2 && len < 15 {
+    // broad (identity/summary)
+    if unique_content_words <= 1 {
         return (1, 1);  // search D0-D2
     }
-    // Short question → topic level
-    if words <= 5 {
+    // topic level
+    if unique_content_words <= 3 {
         return (2, 1);  // search D1-D3
     }
-    // Medium → individual memories
-    if words <= 10 {
+    // individual memories
+    if unique_content_words <= 6 {
         return (3, 1);  // search D2-D4
     }
-    // Long/specific → sentence level
-    if words <= 20 {
+    // sentence level
+    if unique_content_words <= 10 {
         return (4, 1);  // search D3-D5
     }
-    // Very specific → token level
+    // token level
     (5, 1)  // search D4-D6
 }
 
@@ -1212,14 +1238,44 @@ fn main() {
             recall(&config, &query, k);
         }
         Cmd::Look { x, y, z, zoom, k } => {
+            let config_clone = config.clone();
             let r = MicroscopeReader::open(&config);
             println!("{} ({:.2},{:.2},{:.2}) zoom={}:", "MICROSCOPE".cyan().bold(), x, y, z, zoom);
-            for (d, i) in r.look(x, y, z, zoom, k) { r.print_result(i, d); }
+            let res = r.look(&config_clone, x, y, z, zoom, k);
+            for (dist, idx, is_main) in res {
+                if is_main {
+                    r.print_result(idx, dist);
+                } else {
+                    let append_path = Path::new(&config.paths.output_dir).join("append.bin");
+                    let appended = read_append_log(&append_path);
+                    let ai = idx - 1_000_000;
+                    if ai < appended.len() {
+                        let e = &appended[ai];
+                        let layer = LAYER_NAMES.get(e.layer_id as usize).unwrap_or(&"?");
+                        println!("  {} {} {} {}", "AP".cyan(), format!("L2={:.5}", dist).yellow(), format!("[{}/new]", layer).green(), safe_truncate(&e.text, 70));
+                    }
+                }
+            }
         }
         Cmd::Soft { x, y, z, zoom, k } => {
+            let config_clone = config.clone();
             let r = MicroscopeReader::open(&config);
             println!("{} 4D ({:.2},{:.2},{:.2}) z={}:", "MICROSCOPE".cyan().bold(), x, y, z, zoom);
-            for (d, i) in r.look_soft(x, y, z, zoom, k, config.search.zoom_weight) { r.print_result(i, d); }
+            let res = r.look_soft(&config_clone, x, y, z, zoom, k, config.search.zoom_weight);
+            for (dist, idx, is_main) in res {
+                if is_main {
+                    r.print_result(idx, dist);
+                } else {
+                    let append_path = Path::new(&config.paths.output_dir).join("append.bin");
+                    let appended = read_append_log(&append_path);
+                    let ai = idx - 1_000_000;
+                    if ai < appended.len() {
+                        let e = &appended[ai];
+                        let layer = LAYER_NAMES.get(e.layer_id as usize).unwrap_or(&"?");
+                        println!("  {} {} {} {}", "AP".cyan(), format!("L2={:.5}", dist).yellow(), format!("[{}/new]", layer).green(), safe_truncate(&e.text, 70));
+                    }
+                }
+            }
         }
         Cmd::Bench => bench(&config, &MicroscopeReader::open(&config)),
         Cmd::Stats => {

@@ -1,7 +1,8 @@
+#![allow(dead_code)]
 // Real-time streaming updates module
 // Allows live updates to the microscope index
 
-use std::sync::{Arc, RwLock, mpsc};
+use std::sync::{Arc, RwLock, Mutex, mpsc};
 use std::thread;
 use std::time::{Duration, Instant};
 use std::fs::{File, OpenOptions};
@@ -10,7 +11,7 @@ use std::path::Path;
 
 pub struct StreamingUpdate {
     sender: mpsc::Sender<UpdateCommand>,
-    receiver: Arc<RwLock<mpsc::Receiver<UpdateCommand>>>,
+    receiver: Arc<Mutex<mpsc::Receiver<UpdateCommand>>>,
     index_lock: Arc<RwLock<StreamingIndex>>,
 }
 
@@ -44,6 +45,16 @@ pub enum UpdateField {
     Depth(u8),
 }
 
+impl Clone for UpdateField {
+    fn clone(&self) -> Self {
+        match self {
+            UpdateField::Text(t) => UpdateField::Text(t.clone()),
+            UpdateField::Position(x, y, z) => UpdateField::Position(*x, *y, *z),
+            UpdateField::Depth(d) => UpdateField::Depth(*d),
+        }
+    }
+}
+
 pub enum UpdateCommand {
     Add(LiveBlock),
     Update(usize, UpdateField),
@@ -64,7 +75,7 @@ impl StreamingUpdate {
 
         Self {
             sender: tx,
-            receiver: Arc::new(RwLock::new(rx)),
+            receiver: Arc::new(Mutex::new(rx)),
             index_lock: Arc::new(RwLock::new(index)),
         }
     }
@@ -75,7 +86,7 @@ impl StreamingUpdate {
         let index = Arc::clone(&self.index_lock);
 
         thread::spawn(move || {
-            let rx = receiver.write().unwrap();
+            let rx = receiver.lock().unwrap();
             loop {
                 match rx.recv_timeout(Duration::from_millis(100)) {
                     Ok(cmd) => {
@@ -88,25 +99,25 @@ impl StreamingUpdate {
                             UpdateCommand::Update(id, field) => {
                                 let mut idx = index.write().unwrap();
                                 if id < idx.blocks.len() {
-                                    match field {
+                                    match &field {
                                         UpdateField::Text(text) => {
-                                            idx.blocks[id].text = text;
+                                            idx.blocks[id].text = text.clone();
                                             idx.blocks[id].version += 1;
                                         }
                                         UpdateField::Position(x, y, z) => {
-                                            idx.blocks[id].x = x;
-                                            idx.blocks[id].y = y;
-                                            idx.blocks[id].z = z;
+                                            idx.blocks[id].x = *x;
+                                            idx.blocks[id].y = *y;
+                                            idx.blocks[id].z = *z;
                                             idx.blocks[id].version += 1;
                                         }
                                         UpdateField::Depth(depth) => {
-                                            idx.blocks[id].depth = depth;
+                                            idx.blocks[id].depth = *depth;
                                             idx.blocks[id].version += 1;
                                         }
                                     }
                                     idx.pending_updates.push(PendingUpdate {
                                         block_id: id,
-                                        field,
+                                        field: field.clone(),
                                         timestamp: std::time::SystemTime::now()
                                             .duration_since(std::time::UNIX_EPOCH)
                                             .unwrap()
@@ -121,7 +132,7 @@ impl StreamingUpdate {
                                 }
                             }
                             UpdateCommand::Batch(commands) => {
-                                for cmd in commands {
+                                for _cmd in commands {
                                     // Recursively process batch commands
                                     // In real implementation, would send through channel
                                 }

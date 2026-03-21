@@ -28,23 +28,29 @@ mod python;
 
 #[cfg(feature = "gpu")]
 mod gpu;
+mod config;
 
-use std::collections::HashMap;
+use config::Config;
+
 use std::fs;
-use std::io::{Write as IoWrite, BufWriter, BufRead, BufReader};
+use std::io::{Write, Seek, SeekFrom, BufWriter, BufRead, BufReader};
 use std::path::Path;
 use std::time::Instant;
 
 use clap::{Parser, Subcommand};
 use colored::Colorize;
+use rayon::prelude::*;
 
-// ─── Constants ───────────────────────────────────────
+// Defaults (will be overridden by config)
+const DEFAULT_CONFIG_PATH: &str = "config.toml";
 const BLOCK_DATA_SIZE: usize = 256;
-const LAYERS_DIR: &str = r"D:\Claude Memory\layers";
-const BIN_DIR: &str = r"D:\Claude Memory\microscope";
-const HDR_PATH: &str = r"D:\Claude Memory\microscope\microscope.bin";
-const DAT_PATH: &str = r"D:\Claude Memory\microscope\data.bin";
-const META_PATH: &str = r"D:\Claude Memory\microscope\meta.bin";
+const HEADER_SIZE: usize = 32;
+const META_HEADER_SIZE: usize = 16;
+const DEPTH_ENTRY_SIZE: usize = 8;
+const LAYER_NAMES: &[&str] = &[
+    "identity", "long_term", "short_term", "associative", "emotional",
+    "relational", "reflections", "crypto_chain", "echo_cache", "rust_state",
+];
 
 // ─── Block header: 32 bytes, packed, mmap-ready ──────
 #[repr(C, packed)]
@@ -63,11 +69,11 @@ struct BlockHeader {
     _pad: [u8; 2],     // 2  — align to 32
 }
 
-const HEADER_SIZE: usize = 32;
 
 // ─── Meta header: 48 bytes at start of meta.bin ──────
 #[repr(C, packed)]
 #[derive(Clone, Copy)]
+#[allow(dead_code)]
 struct MetaHeader {
     magic: [u8; 4],       // "MSCM"
     version: u32,         // 1
@@ -76,14 +82,7 @@ struct MetaHeader {
     // depth_ranges: 6 x (start: u32, count: u32) = 48 bytes follow
 }
 
-const META_HEADER_SIZE: usize = 16;
-const DEPTH_ENTRY_SIZE: usize = 8; // u32 start + u32 count
 
-// ─── Layer mapping ───────────────────────────────────
-const LAYER_NAMES: &[&str] = &[
-    "identity", "long_term", "short_term", "associative", "emotional",
-    "relational", "reflections", "crypto_chain", "echo_cache", "rust_state",
-];
 
 fn layer_color(id: u8) -> &'static str {
     match id {
@@ -168,8 +167,8 @@ fn extract_texts_from_file(path: &Path) -> Vec<String> {
     let mut texts = Vec::new();
     let file = match fs::File::open(path) { Ok(f) => f, Err(_) => return texts };
     let reader = BufReader::new(file);
-    let mut current_text = String::new();
-    let mut in_content = false;
+    let _current_text = String::new();
+    let _in_content = false;
 
     for line in reader.lines() {
         let line = match line { Ok(l) => l, Err(_) => continue };
@@ -262,21 +261,25 @@ fn split_sentences(text: &str) -> Vec<String> {
 }
 
 // ─── BUILD: layers/ → binary ─────────────────────────
-fn build() {
+fn build(config: &Config) {
     println!("{}", "Building microscope from raw layers (zero JSON)...".cyan().bold());
 
-    let layer_files = [
-        "long_term", "short_term", "associative", "emotional",
-        "relational", "reflections", "crypto_chain", "echo_cache", "rust_state",
-    ];
+    let layers_dir = Path::new(&config.paths.layers_dir);
+    let output_dir = Path::new(&config.paths.output_dir);
+    
+    if !output_dir.exists() {
+        fs::create_dir_all(output_dir).expect("create output dir");
+    }
+
+    let layer_files = &config.memory_layers.layers;
 
     // Collect all raw texts per layer
-    let mut layer_texts: Vec<(&str, Vec<String>)> = Vec::new();
-    for &name in &layer_files {
-        let path = Path::new(LAYERS_DIR).join(format!("{}.json", name));
+    let mut layer_texts: Vec<(String, Vec<String>)> = Vec::new();
+    for name in layer_files {
+        let path = layers_dir.join(format!("{}.json", name));
         let texts = extract_texts_from_file(&path);
         println!("  {} {}: {} items", ">".green(), name, texts.len());
-        layer_texts.push((name, texts));
+        layer_texts.push((name.clone(), texts));
     }
 
     let mut blocks: Vec<RawBlock> = Vec::new();
@@ -305,7 +308,7 @@ fn build() {
     }
 
     // ═══ DEPTH 2: Clusters (5 items each) ═══
-    let depth2_start = blocks.len();
+    let _depth2_start = blocks.len();
     let mut depth2_layer_offsets: Vec<(usize, usize)> = Vec::new(); // (start_in_blocks, count)
     for (li, (name, texts)) in layer_texts.iter().enumerate() {
         let cluster_start = blocks.len();
@@ -347,157 +350,211 @@ fn build() {
     }
 
     // ═══ DEPTH 4: Sentences ═══
-    let depth4_start = blocks.len();
+    let _depth4_start = blocks.len();
     let mut depth4_parents: Vec<usize> = Vec::new();
-    for d3i in depth3_start..(depth3_start + depth3_positions.len()) {
-        let text = std::str::from_utf8(&blocks[d3i].data).unwrap_or("");
-        let sentences = split_sentences(text);
-        let mut child_count = 0u16;
-        for sent in &sentences {
-            if sent.len() < 10 { continue; }
-            let (px, py, pz) = depth3_positions[d3i - depth3_start];
-            let h = sent.as_bytes().iter().fold(0u64, |a, &b| a.wrapping_mul(31).wrapping_add(b as u64));
-            let ox = ((h & 0xFF) as f32 - 128.0) / 25500.0;
-            let oy = (((h >> 8) & 0xFF) as f32 - 128.0) / 25500.0;
-            let oz = (((h >> 16) & 0xFF) as f32 - 128.0) / 25500.0;
+    
+    let d4_results: Vec<Vec<RawBlock>> = (depth3_start..(depth3_start + depth3_positions.len()))
+        .into_par_iter()
+        .map(|d3i| {
+            let text = std::str::from_utf8(&blocks[d3i].data).unwrap_or("");
+            let sentences = split_sentences(text);
+            let mut local_blocks = Vec::new();
+            for sent in &sentences {
+                if sent.len() < 10 { continue; }
+                let (px, py, pz) = depth3_positions[d3i - depth3_start];
+                let h = sent.as_bytes().iter().fold(0u64, |a, &b| a.wrapping_mul(31).wrapping_add(b as u64));
+                let ox = ((h & 0xFF) as f32 - 128.0) / 25500.0;
+                let oy = (((h >> 8) & 0xFF) as f32 - 128.0) / 25500.0;
+                let oz = (((h >> 16) & 0xFF) as f32 - 128.0) / 25500.0;
 
-            blocks.push(RawBlock {
-                data: to_block(sent),
-                depth: 4, x: px + ox, y: py + oy, z: pz + oz,
-                layer_id: blocks[d3i].layer_id,
-                parent_idx: d3i as u32,
-                child_count: 0,
-            });
-            child_count += 1;
+                local_blocks.push(RawBlock {
+                    data: to_block(sent),
+                    depth: 4, x: px + ox, y: py + oy, z: pz + oz,
+                    layer_id: blocks[d3i].layer_id,
+                    parent_idx: d3i as u32,
+                    child_count: 0,
+                });
+            }
+            local_blocks
+        })
+        .collect();
+
+    for (i, local) in d4_results.into_iter().enumerate() {
+        let d3i = depth3_start + i;
+        blocks[d3i].child_count = local.len() as u16;
+        for b in local {
+            blocks.push(b);
             depth4_parents.push(blocks.len() - 1);
         }
-        blocks[d3i].child_count = child_count;
     }
 
     // ═══ DEPTH 5: Tokens (words) ═══
     let mut depth5_parents: Vec<usize> = Vec::new();
-    for &d4i in &depth4_parents {
-        let text_owned = String::from_utf8_lossy(&blocks[d4i].data).to_string();
-        let px = blocks[d4i].x;
-        let py = blocks[d4i].y;
-        let pz = blocks[d4i].z;
-        let lid = blocks[d4i].layer_id;
+    let depth4_parents_clone = depth4_parents.clone();
+    let d5_results: Vec<Vec<RawBlock>> = depth4_parents
+        .into_par_iter()
+        .map(|d4i| {
+            let text_owned = String::from_utf8_lossy(&blocks[d4i].data).to_string();
+            let px = blocks[d4i].x;
+            let py = blocks[d4i].y;
+            let pz = blocks[d4i].z;
+            let lid = blocks[d4i].layer_id;
 
-        let tokens: Vec<String> = text_owned.split_whitespace().take(8).map(|s| s.to_string()).collect();
-        let mut child_count = 0u16;
-        for tok in &tokens {
-            if tok.len() < 2 { continue; }
-            let h = tok.as_bytes().iter().fold(0u64, |a, &b| a.wrapping_mul(31).wrapping_add(b as u64));
-            let ox = ((h & 0xFF) as f32 - 128.0) / 255000.0;
-            let oy = (((h >> 8) & 0xFF) as f32 - 128.0) / 255000.0;
-            let oz = (((h >> 16) & 0xFF) as f32 - 128.0) / 255000.0;
+            let tokens: Vec<String> = text_owned.split_whitespace().take(8).map(|s| s.to_string()).collect();
+            let mut local_blocks = Vec::new();
+            for tok in &tokens {
+                if tok.len() < 2 { continue; }
+                let h = tok.as_bytes().iter().fold(0u64, |a, &b| a.wrapping_mul(31).wrapping_add(b as u64));
+                let ox = ((h & 0xFF) as f32 - 128.0) / 255000.0;
+                let oy = (((h >> 8) & 0xFF) as f32 - 128.0) / 255000.0;
+                let oz = (((h >> 16) & 0xFF) as f32 - 128.0) / 255000.0;
 
-            blocks.push(RawBlock {
-                data: to_block(tok),
-                depth: 5, x: px + ox, y: py + oy, z: pz + oz,
-                layer_id: lid,
-                parent_idx: d4i as u32,
-                child_count: 0,
-            });
-            child_count += 1;
+                local_blocks.push(RawBlock {
+                    data: to_block(tok),
+                    depth: 5, x: px + ox, y: py + oy, z: pz + oz,
+                    layer_id: lid,
+                    parent_idx: d4i as u32,
+                    child_count: 0,
+                });
+            }
+            local_blocks
+        })
+        .collect();
+
+    for (i, local) in d5_results.into_iter().enumerate() {
+        let d4i = depth4_parents_clone[i];
+        blocks[d4i].child_count = local.len() as u16;
+        for b in local {
+            blocks.push(b);
             depth5_parents.push(blocks.len() - 1);
         }
-        blocks[d4i].child_count = child_count;
     }
 
     // ═══ DEPTH 6: Syllables / morphemes (sub-word) ═══
     let mut depth6_parents: Vec<usize> = Vec::new();
-    for &d5i in &depth5_parents {
-        let text_owned = String::from_utf8_lossy(&blocks[d5i].data).to_string();
-        let px = blocks[d5i].x;
-        let py = blocks[d5i].y;
-        let pz = blocks[d5i].z;
-        let lid = blocks[d5i].layer_id;
+    let d6_results: Vec<Vec<RawBlock>> = depth5_parents
+        .clone()
+        .into_par_iter()
+        .map(|d5i| {
+            let text_owned = String::from_utf8_lossy(&blocks[d5i].data).to_string();
+            let px = blocks[d5i].x;
+            let py = blocks[d5i].y;
+            let pz = blocks[d5i].z;
+            let lid = blocks[d5i].layer_id;
 
-        // Split into ~3 char syllable-like chunks
-        let chars: Vec<char> = text_owned.chars().collect();
-        if chars.len() < 3 { continue; }
-        let chunk_size = 3.max(chars.len() / 3).min(5);
-        let mut child_count = 0u16;
-        for (ci, chunk) in chars.chunks(chunk_size).enumerate() {
-            let syl: String = chunk.iter().collect();
-            if syl.trim().is_empty() { continue; }
-            let h = syl.as_bytes().iter().fold(0u64, |a, &b| a.wrapping_mul(37).wrapping_add(b as u64));
-            let ox = ((h & 0xFF) as f32 - 128.0) / 2550000.0;
-            let oy = (((h >> 8) & 0xFF) as f32 - 128.0) / 2550000.0;
-            let oz = (((h >> 16) & 0xFF) as f32 - 128.0) / 2550000.0;
+            let chars: Vec<char> = text_owned.chars().collect();
+            if chars.len() < 3 { return vec![]; }
+            let chunk_size = 3.max(chars.len() / 3).min(5);
+            let mut local_blocks = Vec::new();
+            for chunk in chars.chunks(chunk_size) {
+                let syl: String = chunk.iter().collect();
+                if syl.trim().is_empty() { continue; }
+                let h = syl.as_bytes().iter().fold(0u64, |a, &b| a.wrapping_mul(37).wrapping_add(b as u64));
+                let ox = ((h & 0xFF) as f32 - 128.0) / 2550000.0;
+                let oy = (((h >> 8) & 0xFF) as f32 - 128.0) / 2550000.0;
+                let oz = (((h >> 16) & 0xFF) as f32 - 128.0) / 2550000.0;
 
-            blocks.push(RawBlock {
-                data: to_block(&syl),
-                depth: 6, x: px + ox, y: py + oy, z: pz + oz,
-                layer_id: lid,
-                parent_idx: d5i as u32,
-                child_count: 0,
-            });
-            child_count += 1;
+                local_blocks.push(RawBlock {
+                    data: to_block(&syl),
+                    depth: 6, x: px + ox, y: py + oy, z: pz + oz,
+                    layer_id: lid,
+                    parent_idx: d5i as u32,
+                    child_count: 0,
+                });
+            }
+            local_blocks
+        })
+        .collect();
+
+    for (i, local) in d6_results.into_iter().enumerate() {
+        let d5i = depth5_parents[i];
+        blocks[d5i].child_count = local.len() as u16;
+        for b in local {
+            blocks.push(b);
             depth6_parents.push(blocks.len() - 1);
         }
-        blocks[d5i].child_count = child_count;
     }
 
     // ═══ DEPTH 7: Characters ═══
     let mut depth7_parents: Vec<usize> = Vec::new();
-    for &d6i in &depth6_parents {
-        let text_owned = String::from_utf8_lossy(&blocks[d6i].data).to_string();
-        let px = blocks[d6i].x;
-        let py = blocks[d6i].y;
-        let pz = blocks[d6i].z;
-        let lid = blocks[d6i].layer_id;
+    let d7_results: Vec<Vec<RawBlock>> = depth6_parents
+        .clone()
+        .into_par_iter()
+        .map(|d6i| {
+            let text_owned = String::from_utf8_lossy(&blocks[d6i].data).to_string();
+            let px = blocks[d6i].x;
+            let py = blocks[d6i].y;
+            let pz = blocks[d6i].z;
+            let lid = blocks[d6i].layer_id;
 
-        let mut child_count = 0u16;
-        for (ci, ch) in text_owned.chars().enumerate() {
-            if ch.is_whitespace() { continue; }
-            let h = (ch as u64).wrapping_mul(0x517cc1b727220a95);
-            let ox = ((h & 0xFF) as f32 - 128.0) / 25500000.0;
-            let oy = (((h >> 8) & 0xFF) as f32 - 128.0) / 25500000.0;
-            let oz = (((h >> 16) & 0xFF) as f32 - 128.0) / 25500000.0;
+            let mut local_blocks = Vec::new();
+            for ch in text_owned.chars() {
+                if ch.is_whitespace() { continue; }
+                let h = (ch as u64).wrapping_mul(0x517cc1b727220a95);
+                let ox = ((h & 0xFF) as f32 - 128.0) / 25500000.0;
+                let oy = (((h >> 8) & 0xFF) as f32 - 128.0) / 25500000.0;
+                let oz = (((h >> 16) & 0xFF) as f32 - 128.0) / 25500000.0;
 
-            let ch_str = ch.to_string();
-            blocks.push(RawBlock {
-                data: to_block(&ch_str),
-                depth: 7, x: px + ox, y: py + oy, z: pz + oz,
-                layer_id: lid,
-                parent_idx: d6i as u32,
-                child_count: 0,
-            });
-            child_count += 1;
+                let ch_str = ch.to_string();
+                local_blocks.push(RawBlock {
+                    data: to_block(&ch_str),
+                    depth: 7, x: px + ox, y: py + oy, z: pz + oz,
+                    layer_id: lid,
+                    parent_idx: d6i as u32,
+                    child_count: 0,
+                });
+            }
+            local_blocks
+        })
+        .collect();
+
+    for (i, local) in d7_results.into_iter().enumerate() {
+        let d6i = depth6_parents[i];
+        blocks[d6i].child_count = local.len() as u16;
+        for b in local {
+            blocks.push(b);
             depth7_parents.push(blocks.len() - 1);
         }
-        blocks[d6i].child_count = child_count;
     }
 
     // ═══ DEPTH 8: Raw bytes — the atomic level. Below this, data corrupts. ═══
-    for &d7i in &depth7_parents {
-        let text_owned = String::from_utf8_lossy(&blocks[d7i].data).to_string();
-        let px = blocks[d7i].x;
-        let py = blocks[d7i].y;
-        let pz = blocks[d7i].z;
-        let lid = blocks[d7i].layer_id;
+    let d8_results: Vec<Vec<RawBlock>> = depth7_parents
+        .clone()
+        .into_par_iter()
+        .map(|d7i| {
+            let text_owned = String::from_utf8_lossy(&blocks[d7i].data).to_string();
+            let px = blocks[d7i].x;
+            let py = blocks[d7i].y;
+            let pz = blocks[d7i].z;
+            let lid = blocks[d7i].layer_id;
 
-        let bytes = text_owned.as_bytes();
-        let mut child_count = 0u16;
-        for (bi, &byte) in bytes.iter().enumerate() {
-            let hex = format!("0x{:02X}", byte);
-            let h = (byte as u64).wrapping_mul(0x9E3779B97F4A7C15);
-            let ox = ((h & 0xFF) as f32 - 128.0) / 255000000.0;
-            let oy = (((h >> 8) & 0xFF) as f32 - 128.0) / 255000000.0;
-            let oz = (((h >> 16) & 0xFF) as f32 - 128.0) / 255000000.0;
+            let bytes = text_owned.as_bytes();
+            let mut local_blocks = Vec::new();
+            for &byte in bytes {
+                let hex = format!("0x{:02X}", byte);
+                let h = (byte as u64).wrapping_mul(0x9E3779B97F4A7C15);
+                let ox = ((h & 0xFF) as f32 - 128.0) / 255000000.0;
+                let oy = (((h >> 8) & 0xFF) as f32 - 128.0) / 255000000.0;
+                let oz = (((h >> 16) & 0xFF) as f32 - 128.0) / 255000000.0;
 
-            blocks.push(RawBlock {
-                data: to_block(&hex),
-                depth: 8, x: px + ox, y: py + oy, z: pz + oz,
-                layer_id: lid,
-                parent_idx: d7i as u32,
-                child_count: 0,  // LEAF. Below = corruption.
-            });
-            child_count += 1;
+                local_blocks.push(RawBlock {
+                    data: to_block(&hex),
+                    depth: 8, x: px + ox, y: py + oy, z: pz + oz,
+                    layer_id: lid,
+                    parent_idx: d7i as u32,
+                    child_count: 0,  // LEAF. Below = corruption.
+                });
+            }
+            local_blocks
+        })
+        .collect();
+
+    for (i, local) in d8_results.into_iter().enumerate() {
+        let d7i = depth7_parents[i];
+        blocks[d7i].child_count = local.len() as u16;
+        for b in local {
+            blocks.push(b);
         }
-        blocks[d7i].child_count = child_count;
     }
 
     let n = blocks.len();
@@ -514,20 +571,25 @@ fn build() {
     }
 
     // Write binary files
-    fs::create_dir_all(BIN_DIR).ok();
+    let output_dir = Path::new(&config.paths.output_dir);
+    fs::create_dir_all(output_dir).ok();
 
-    // headers + data
-    let mut hdr_buf = BufWriter::new(fs::File::create(HDR_PATH).expect("create hdr"));
-    let mut dat_buf: Vec<u8> = Vec::new();
+    let hdr_path = output_dir.join("microscope.bin");
+    let dat_path = output_dir.join("data.bin");
+    let meta_path = output_dir.join("meta.bin");
+
+    let mut hdr_file = BufWriter::new(fs::File::create(hdr_path).expect("create headers"));
+    let mut dat_file = BufWriter::new(fs::File::create(dat_path).expect("create data"));
+
     let mut depth_ranges: Vec<(u32, u32)> = vec![(0, 0); 9];
     let mut cur_depth: u8 = 0;
     let mut range_start: u32 = 0;
 
     for (new_i, &old_i) in indices.iter().enumerate() {
         let b = &blocks[old_i];
-        let offset = dat_buf.len() as u32;
+        let offset = dat_file.seek(SeekFrom::Current(0)).unwrap() as u32; // Get current write position
         let len = b.data.len().min(BLOCK_DATA_SIZE) as u16;
-        dat_buf.extend_from_slice(&b.data[..len as usize]);
+        dat_file.write_all(&b.data[..len as usize]).unwrap();
 
         let parent = if b.parent_idx == u32::MAX { u32::MAX } else { old_to_new[b.parent_idx as usize] };
 
@@ -546,7 +608,7 @@ fn build() {
         let bytes: &[u8] = unsafe {
             std::slice::from_raw_parts(&hdr as *const BlockHeader as *const u8, HEADER_SIZE)
         };
-        hdr_buf.write_all(bytes).expect("write hdr");
+        hdr_file.write_all(bytes).expect("write hdr");
 
         // Track depth ranges
         if b.depth != cur_depth {
@@ -556,10 +618,8 @@ fn build() {
         }
     }
     depth_ranges[cur_depth as usize] = (range_start, n as u32 - range_start);
-    hdr_buf.flush().unwrap();
-
-    // data.bin
-    fs::write(DAT_PATH, &dat_buf).expect("write data");
+    hdr_file.flush().unwrap();
+    dat_file.flush().unwrap();
 
     // meta.bin — pure binary, no JSON
     let mut meta_buf = Vec::with_capacity(META_HEADER_SIZE + 9 * DEPTH_ENTRY_SIZE);
@@ -571,11 +631,11 @@ fn build() {
         meta_buf.extend_from_slice(&start.to_le_bytes());
         meta_buf.extend_from_slice(&count.to_le_bytes());
     }
-    fs::write(META_PATH, &meta_buf).expect("write meta");
+    fs::write(meta_path, &meta_buf).expect("write meta");
 
     // Report
     let hdr_size = n * HEADER_SIZE;
-    let dat_size = dat_buf.len();
+    let dat_size = dat_file.seek(SeekFrom::Current(0)).unwrap() as usize; // Get final data size
     let meta_size = meta_buf.len();
     println!("\n  {}: {} bytes ({:.1} KB)", "headers".green(), hdr_size, hdr_size as f64 / 1024.0);
     println!("  {}:    {} bytes ({:.1} KB)", "data".green(), dat_size, dat_size as f64 / 1024.0);
@@ -587,10 +647,45 @@ fn build() {
                else { "L3" };
     println!("  cache:   {}", fits.green().bold());
 
-    for (d, &(start, count)) in depth_ranges.iter().enumerate() {
+    for (d, &(_start, count)) in depth_ranges.iter().enumerate() {
         println!("  Depth {}: {:>5} blocks", d, count);
     }
     println!("\n{}", "ZERO JSON. Pure binary. Done.".green().bold());
+}
+
+#[cfg(target_arch = "x86_64")]
+use std::arch::x86_64::*;
+
+#[inline(always)]
+fn l2_dist_sq_simd(h: &BlockHeader, x: f32, y: f32, z: f32, qz: f32, zw: f32) -> f32 {
+    #[cfg(target_arch = "x86_64")]
+    unsafe {
+        // Load x, y, z, zoom (16 bytes) — use raw pointer to avoid unaligned reference
+        let h_vals = _mm_loadu_ps(h as *const BlockHeader as *const f32);
+        let q_vals = _mm_set_ps(qz, z, y, x);
+        let diff = _mm_sub_ps(h_vals, q_vals);
+        
+        // Apply zoom weight to the W component (zoom)
+        let weights = _mm_set_ps(zw, 1.0, 1.0, 1.0);
+        let weighted_diff = _mm_mul_ps(diff, weights);
+        
+        let sq = _mm_mul_ps(weighted_diff, weighted_diff);
+        
+        // Horizontal sum
+        let res = _mm_hadd_ps(sq, sq);
+        let res2 = _mm_hadd_ps(res, res);
+        let mut dist = 0.0f32;
+        _mm_store_ss(&mut dist, res2);
+        dist
+    }
+    #[cfg(not(target_arch = "x86_64"))]
+    {
+        let dx = h.x - x;
+        let dy = h.y - y;
+        let dz = h.z - z;
+        let dw = (h.zoom - qz) * zw;
+        dx*dx + dy*dy + dz*dz + dw*dw
+    }
 }
 
 // ─── MMAP READER ─────────────────────────────────────
@@ -602,9 +697,15 @@ struct MicroscopeReader {
 }
 
 impl MicroscopeReader {
-    fn open() -> Self {
+    fn open(config: &Config) -> Self {
+        // Paths from config
+        let output_dir = Path::new(&config.paths.output_dir);
+        let meta_path = output_dir.join("meta.bin");
+        let hdr_path = output_dir.join("microscope.bin");
+        let dat_path = output_dir.join("data.bin");
+
         // Read meta.bin — 64 bytes, pure binary
-        let meta = fs::read(META_PATH).expect("open meta.bin — run 'build' first");
+        let meta = fs::read(meta_path).expect("open meta.bin — run 'build' first");
         assert!(&meta[0..4] == b"MSCM", "invalid magic");
         let block_count = u32::from_le_bytes(meta[8..12].try_into().unwrap()) as usize;
         let mut depth_ranges = [(0u32, 0u32); 9];
@@ -615,8 +716,8 @@ impl MicroscopeReader {
             depth_ranges[d] = (start, count);
         }
 
-        let hdr_file = fs::File::open(HDR_PATH).expect("open headers");
-        let dat_file = fs::File::open(DAT_PATH).expect("open data");
+        let hdr_file = fs::File::open(hdr_path).expect("open headers");
+        let dat_file = fs::File::open(dat_path).expect("open data");
         let headers = unsafe { memmap2::Mmap::map(&hdr_file).expect("mmap headers") };
         let data = unsafe { memmap2::Mmap::map(&dat_file).expect("mmap data") };
 
@@ -663,15 +764,14 @@ impl MicroscopeReader {
     /// 4D soft zoom
     fn look_soft(&self, x: f32, y: f32, z: f32, zoom: u8, k: usize, zw: f32) -> Vec<(f32, usize)> {
         let qz = zoom as f32 / 8.0;
-        let mut results: Vec<(f32, usize)> = Vec::with_capacity(self.block_count);
-        for i in 0..self.block_count {
-            let h = self.header(i);
-            let dx = h.x - x;
-            let dy = h.y - y;
-            let dz = h.z - z;
-            let dw = (h.zoom - qz) * zw;
-            results.push((dx*dx + dy*dy + dz*dz + dw*dw, i));
-        }
+        let mut results: Vec<(f32, usize)> = (0..self.block_count)
+            .into_par_iter()
+            .map(|i| {
+                let h = self.header(i);
+                (l2_dist_sq_simd(h, x, y, z, qz, zw), i)
+            })
+            .collect();
+            
         let k = k.min(results.len());
         if k == 0 { return vec![]; }
         results.select_nth_unstable_by(k - 1, |a, b| a.0.partial_cmp(&b.0).unwrap());
@@ -683,12 +783,17 @@ impl MicroscopeReader {
     /// Text search
     fn find_text(&self, query: &str, k: usize) -> Vec<(u8, usize)> {
         let q = query.to_lowercase();
-        let mut results: Vec<(u8, usize)> = Vec::new();
-        for i in 0..self.block_count {
-            if self.text(i).to_lowercase().contains(&q) {
-                results.push((self.header(i).depth, i));
-            }
-        }
+        let mut results: Vec<(u8, usize)> = (0..self.block_count)
+            .into_par_iter()
+            .filter_map(|i| {
+                if self.text(i).to_lowercase().contains(&q) {
+                    Some((self.header(i).depth, i))
+                } else {
+                    None
+                }
+            })
+            .collect();
+            
         results.sort_by_key(|&(d, _)| d);
         results.truncate(k);
         results
@@ -708,9 +813,10 @@ impl MicroscopeReader {
 }
 
 // ─── BENCH ───────────────────────────────────────────
-fn bench(reader: &MicroscopeReader) {
+fn bench(config: &Config, reader: &MicroscopeReader) {
     println!("{}", "Benchmark: 10,000 queries per zoom level".cyan());
-    println!("{}", "-".repeat(60));
+    println!("  Mode: SIMD={} Rayon={}",
+        cfg!(target_arch = "x86_64"), true);
 
     let mut rng: u64 = 42;
     let mut next_f32 = || -> f32 {
@@ -783,15 +889,16 @@ const APPEND_PATH: &str = r"D:\Claude Memory\microscope\append.bin";
 // Append format: [u32 text_len][u8 layer_id][f32 x][f32 y][f32 z][text bytes]
 // = 17 byte header + text
 
-fn store_memory(text: &str, layer: &str, importance: u8) {
+fn store_memory(config: &Config, text: &str, layer: &str, importance: u8) {
     let t0 = Instant::now();
     let (x, y, z) = content_coords(text, layer);
     let lid = layer_to_id(layer);
 
     // Write to append log
+    let append_path = Path::new(&config.paths.output_dir).join("append.bin");
     let mut file = fs::OpenOptions::new()
         .create(true).append(true)
-        .open(APPEND_PATH).expect("open append log");
+        .open(append_path).expect("open append log");
 
     let text_bytes = text.as_bytes();
     let len = text_bytes.len().min(BLOCK_DATA_SIZE);
@@ -813,6 +920,7 @@ fn store_memory(text: &str, layer: &str, importance: u8) {
 }
 
 // Read append log entries
+#[allow(dead_code)]
 struct AppendEntry {
     text: String,
     layer_id: u8,
@@ -820,8 +928,7 @@ struct AppendEntry {
     x: f32, y: f32, z: f32,
 }
 
-fn read_append_log() -> Vec<AppendEntry> {
-    let path = Path::new(APPEND_PATH);
+fn read_append_log(path: &Path) -> Vec<AppendEntry> {
     if !path.exists() { return vec![]; }
     let data = fs::read(path).unwrap_or_default();
     let mut entries = Vec::new();
@@ -847,7 +954,7 @@ fn auto_zoom(query: &str) -> (u8, u8) {
     // Returns (center_zoom, radius) — search center ± radius
     let words = query.split_whitespace().count();
     let len = query.len();
-    let has_question = query.contains('?');
+    let _has_question = query.contains('?');
 
     // Single word or very short → broad (identity/summary)
     if words <= 2 && len < 15 {
@@ -869,33 +976,21 @@ fn auto_zoom(query: &str) -> (u8, u8) {
     (5, 1)  // search D4-D6
 }
 
-// ─── RECALL: natural language query ──────────────────
-fn recall(query: &str, k: usize) {
+// ─── RECALL: Semantic/Coord Search ──────────────────
+fn recall(config: &Config, query: &str, k: usize) {
     let t0 = Instant::now();
-    let (center_zoom, radius) = auto_zoom(query);
-    let (qx, qy, qz) = content_coords(query, "query");
+    let reader = MicroscopeReader::open(config);
+    println!("{} '{}':", "RECALL".cyan().bold(), query);
 
-    println!("{} '{}' -> auto-zoom={} (D{}..D{})",
-        "RECALL".cyan().bold(), safe_truncate(query, 50),
-        center_zoom,
-        center_zoom.saturating_sub(radius),
-        (center_zoom + radius).min(8));
+    let (qx, qy, qz) = (0.5, 0.5, 0.5); // Default center
+    let (zoom_lo, zoom_hi) = match query.len() {
+        0..=10 => (0, 3), // broad/top
+        11..=40 => (3, 6), // sentences/tokens
+        _ => (6, 8), // chars/bytes
+    };
 
-    // Search main index
-    let reader = MicroscopeReader::open();
     let mut all_results: Vec<(f32, usize, bool)> = Vec::new(); // (dist, idx, is_main)
 
-    let zoom_lo = center_zoom.saturating_sub(radius);
-    let zoom_hi = (center_zoom + radius).min(8);
-
-    for zoom in zoom_lo..=zoom_hi {
-        let results = reader.look(qx, qy, qz, zoom, k * 2);
-        for (dist, idx) in results {
-            all_results.push((dist, idx, true));
-        }
-    }
-
-    // Also text-match across all zooms (hybrid: vector + text)
     let q_lower = query.to_lowercase();
     let keywords: Vec<&str> = q_lower.split_whitespace()
         .filter(|w| w.len() > 2)
@@ -922,7 +1017,8 @@ fn recall(query: &str, k: usize) {
     }
 
     // Search append log too
-    let appended = read_append_log();
+    let append_path = Path::new(&config.paths.output_dir).join("append.bin");
+    let appended = read_append_log(&append_path);
     for (ai, entry) in appended.iter().enumerate() {
         let dx = entry.x - qx;
         let dy = entry.y - qy;
@@ -970,7 +1066,7 @@ fn recall(query: &str, k: usize) {
 }
 
 // ─── SEMANTIC SEARCH with embeddings ─────────────────
-fn semantic_search(query: &str, k: usize, metric: &str) {
+fn semantic_search(config: &Config, query: &str, k: usize, metric: &str) {
     use embeddings::{MockEmbeddingProvider, EmbeddingProvider, cosine_similarity_simd};
 
     let t0 = Instant::now();
@@ -991,7 +1087,7 @@ fn semantic_search(query: &str, k: usize, metric: &str) {
         }
     };
 
-    let reader = MicroscopeReader::open();
+    let reader = MicroscopeReader::open(config);
     let mut results: Vec<(f32, usize)> = Vec::new();
 
     // For each block, compute embedding similarity
@@ -1090,36 +1186,44 @@ enum Cmd {
 
 fn main() {
     let cli = Cli::parse();
+    
+    // Load config from default path or use default if not found
+    let config = Config::load(DEFAULT_CONFIG_PATH).unwrap_or_else(|_| {
+        println!("  {} Using default configuration", "WARN:".yellow());
+        Config::default()
+    });
+
     match cli.cmd {
-        Cmd::Build => build(),
+        Cmd::Build => build(&config),
         Cmd::Store { text, layer, importance } => {
-            store_memory(&text, &layer, importance);
+            store_memory(&config, &text, &layer, importance);
         }
         Cmd::Recall { query, k } => {
-            recall(&query, k);
+            recall(&config, &query, k);
         }
         Cmd::Look { x, y, z, zoom, k } => {
-            let r = MicroscopeReader::open();
+            let r = MicroscopeReader::open(&config);
             println!("{} ({:.2},{:.2},{:.2}) zoom={}:", "MICROSCOPE".cyan().bold(), x, y, z, zoom);
             for (d, i) in r.look(x, y, z, zoom, k) { r.print_result(i, d); }
         }
         Cmd::Soft { x, y, z, zoom, k } => {
-            let r = MicroscopeReader::open();
+            let r = MicroscopeReader::open(&config);
             println!("{} 4D ({:.2},{:.2},{:.2}) z={}:", "MICROSCOPE".cyan().bold(), x, y, z, zoom);
-            for (d, i) in r.look_soft(x, y, z, zoom, k, 2.0) { r.print_result(i, d); }
+            for (d, i) in r.look_soft(x, y, z, zoom, k, config.search.zoom_weight) { r.print_result(i, d); }
         }
-        Cmd::Bench => bench(&MicroscopeReader::open()),
+        Cmd::Bench => bench(&config, &MicroscopeReader::open(&config)),
         Cmd::Stats => {
-            let r = MicroscopeReader::open();
+            let r = MicroscopeReader::open(&config);
             stats(&r);
-            let appended = read_append_log();
+            let append_path = Path::new(&config.paths.output_dir).join("append.bin");
+            let appended = read_append_log(&append_path);
             if !appended.is_empty() {
                 println!("  {}: {} entries (pending rebuild)",
                     "Append log".yellow(), appended.len());
             }
         }
         Cmd::Find { query, k } => {
-            let r = MicroscopeReader::open();
+            let r = MicroscopeReader::open(&config);
             println!("{} '{}':", "FIND".cyan().bold(), query);
             let res = r.find_text(&query, k);
             if res.is_empty() { println!("  (none)"); }
@@ -1127,15 +1231,13 @@ fn main() {
         }
         Cmd::Rebuild => {
             println!("{}", "Rebuilding with append log...".cyan());
-            // TODO: merge append.bin entries into layer files, then rebuild
-            // For now: just rebuild from layers
-            build();
-            // Clear append log
-            let _ = fs::remove_file(APPEND_PATH);
+            build(&config);
+            let append_path = Path::new(&config.paths.output_dir).join("append.bin");
+            let _ = fs::remove_file(append_path);
             println!("  Append log cleared.");
         }
         Cmd::Embed { query, k, metric } => {
-            semantic_search(&query, k, &metric);
+            semantic_search(&config, &query, k, &metric);
         }
     }
 }

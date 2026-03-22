@@ -38,6 +38,13 @@ pub struct PyBlock {
 }
 
 #[cfg(feature = "python")]
+impl Default for PyMicroscope {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[cfg(feature = "python")]
 #[pymethods]
 impl PyMicroscope {
     #[new]

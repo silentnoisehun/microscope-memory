@@ -151,7 +151,7 @@ fn split_sentences(text: &str) -> Vec<String> {
 }
 
 // ─── Compute deterministic SHA-256 hash of all layer source files ────
-pub(crate) fn compute_layers_hash(config: &Config) -> [u8; 32] {
+pub fn compute_layers_hash(config: &Config) -> [u8; 32] {
     let layers_dir = Path::new(&config.paths.layers_dir);
     let layer_files = &config.memory_layers.layers;
     let mut sorted_names: Vec<&String> = layer_files.iter().collect();
@@ -170,7 +170,7 @@ pub(crate) fn compute_layers_hash(config: &Config) -> [u8; 32] {
 }
 
 // ─── BUILD: layers/ → binary ─────────────────────────
-pub(crate) fn build(config: &Config, force: bool) {
+pub fn build(config: &Config, force: bool) {
     let layers_hash = compute_layers_hash(config);
 
     // Incremental build check — skip if layers unchanged
@@ -654,9 +654,9 @@ pub(crate) fn build(config: &Config, force: bool) {
     for i in 0..n {
         let hdr_off = i * HEADER_SIZE;
         let data_offset =
-            u32::from_le_bytes(hdr_bytes[hdr_off + 16..hdr_off + 20].try_into().unwrap()) as usize;
+            u32::from_le_bytes(hdr_bytes[hdr_off + 18..hdr_off + 22].try_into().unwrap()) as usize;
         let data_len =
-            u16::from_le_bytes(hdr_bytes[hdr_off + 20..hdr_off + 22].try_into().unwrap()) as usize;
+            u16::from_le_bytes(hdr_bytes[hdr_off + 22..hdr_off + 24].try_into().unwrap()) as usize;
         if data_offset + data_len <= dat_bytes.len() {
             leaf_slices.push(&dat_bytes[data_offset..data_offset + data_len]);
         } else {

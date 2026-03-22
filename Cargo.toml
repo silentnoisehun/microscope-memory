@@ -50,6 +50,9 @@ zstd = { version = "0.13", optional = true }
 # HTTP server
 tiny_http = "0.12"
 
+[dev-dependencies]
+tempfile = "3"
+
 [features]
 default = []
 wasm = ["wasm-bindgen", "web-sys", "console_error_panic_hook"]

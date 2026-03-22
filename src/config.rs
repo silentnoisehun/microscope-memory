@@ -124,8 +124,10 @@ impl Config {
         let config: Config = toml::from_str(&content)?;
         Ok(config)
     }
+}
 
-    pub fn default() -> Self {
+impl Default for Config {
+    fn default() -> Self {
         Self {
             paths: Paths {
                 layers_dir: "D:/Claude Memory/layers".to_string(),

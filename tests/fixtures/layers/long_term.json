@@ -1,0 +1,7 @@
+[
+  {"content": "Rust is a systems programming language focused on safety and performance"},
+  {"content": "Memory management in Rust uses ownership and borrowing rules"},
+  {"content": "The Microscope Memory system uses hierarchical zoom-based indexing"},
+  {"content": "Binary formats enable sub-microsecond query performance"},
+  {"content": "Spatial coordinates are derived from content hashing"}
+]

@@ -7,13 +7,13 @@ use clap::{Parser, Subcommand};
     name = "microscope-mem",
     about = "Zoom-based hierarchical memory — pure binary, zero JSON"
 )]
-pub(crate) struct Cli {
+pub struct Cli {
     #[command(subcommand)]
     pub cmd: Cmd,
 }
 
 #[derive(Subcommand)]
-pub(crate) enum Cmd {
+pub enum Cmd {
     /// Build binary from raw layer files
     Build {
         #[arg(long)]

@@ -15,32 +15,32 @@ use crate::{
 /// Block header: 32 bytes, packed, mmap-ready.
 #[repr(C, packed)]
 #[derive(Clone, Copy)]
-pub(crate) struct BlockHeader {
-    pub(crate) x: f32,
-    pub(crate) y: f32,
-    pub(crate) z: f32,
-    pub(crate) zoom: f32,
-    pub(crate) depth: u8,
-    pub(crate) layer_id: u8,
-    pub(crate) data_offset: u32,
-    pub(crate) data_len: u16,
-    pub(crate) parent_idx: u32,
-    pub(crate) child_count: u16,
-    pub(crate) crc16: [u8; 2],
+pub struct BlockHeader {
+    pub x: f32,
+    pub y: f32,
+    pub z: f32,
+    pub zoom: f32,
+    pub depth: u8,
+    pub layer_id: u8,
+    pub data_offset: u32,
+    pub data_len: u16,
+    pub parent_idx: u32,
+    pub child_count: u16,
+    pub crc16: [u8; 2],
 }
 
 // Meta header: 48 bytes at start of meta.bin
 #[repr(C, packed)]
 #[derive(Clone, Copy)]
 #[allow(dead_code)]
-pub(crate) struct MetaHeader {
-    pub(crate) magic: [u8; 4],
-    pub(crate) version: u32,
-    pub(crate) block_count: u32,
-    pub(crate) depth_count: u32,
+pub struct MetaHeader {
+    pub magic: [u8; 4],
+    pub version: u32,
+    pub block_count: u32,
+    pub depth_count: u32,
 }
 
-pub(crate) fn layer_color(id: u8) -> &'static str {
+pub fn layer_color(id: u8) -> &'static str {
     match id {
         0 => "white",
         1 => "blue",
@@ -177,7 +177,7 @@ impl MicroscopeReader {
     }
 
     #[inline(always)]
-    pub(crate) fn header(&self, i: usize) -> &BlockHeader {
+    pub fn header(&self, i: usize) -> &BlockHeader {
         debug_assert!(i < self.block_count);
         unsafe { &*(self.headers.as_ptr().add(i * HEADER_SIZE) as *const BlockHeader) }
     }
@@ -238,7 +238,7 @@ impl MicroscopeReader {
 
     /// 4D soft zoom search with SIMD.
     #[allow(clippy::too_many_arguments)]
-    pub(crate) fn look_soft(
+    pub fn look_soft(
         &self,
         config: &Config,
         x: f32,
@@ -279,7 +279,7 @@ impl MicroscopeReader {
     }
 
     /// Text search
-    pub(crate) fn find_text(&self, query: &str, k: usize) -> Vec<(u8, usize)> {
+    pub fn find_text(&self, query: &str, k: usize) -> Vec<(u8, usize)> {
         let q = query.to_lowercase();
         let mut results: Vec<(u8, usize)> = (0..self.block_count)
             .into_par_iter()
@@ -297,7 +297,7 @@ impl MicroscopeReader {
         results
     }
 
-    pub(crate) fn print_result(&self, i: usize, dist: f32) {
+    pub fn print_result(&self, i: usize, dist: f32) {
         let h = self.header(i);
         let text = self.text(i);
         let layer = LAYER_NAMES.get(h.layer_id as usize).unwrap_or(&"?");
@@ -382,7 +382,7 @@ pub fn read_append_log(path: &Path) -> Vec<AppendEntry> {
 }
 
 /// Display a single append-log result entry.
-pub(crate) fn print_append_result(appended: &[AppendEntry], idx: usize, dist: f32) {
+pub fn print_append_result(appended: &[AppendEntry], idx: usize, dist: f32) {
     let ai = idx - 1_000_000;
     if ai < appended.len() {
         let e = &appended[ai];

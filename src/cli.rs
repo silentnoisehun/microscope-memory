@@ -42,6 +42,17 @@ pub enum Cmd {
         #[arg(default_value = "10")]
         k: usize,
     },
+    /// Radial search: find blocks within radius at a depth
+    Radial {
+        x: f32,
+        y: f32,
+        z: f32,
+        depth: u8,
+        #[arg(short, long, default_value = "0.1")]
+        radius: f32,
+        #[arg(default_value = "10")]
+        k: usize,
+    },
     /// 4D soft zoom: x y z zoom [k]
     Soft {
         x: f32,
@@ -61,6 +72,19 @@ pub enum Cmd {
     /// Text search
     Find {
         query: String,
+        #[arg(default_value = "5")]
+        k: usize,
+    },
+    /// Build structural fingerprints and wormhole links
+    Fingerprint,
+    /// Show structural links (wormholes) for a block
+    Links {
+        #[arg(help = "Block index")]
+        block_index: usize,
+    },
+    /// Find structurally similar blocks to a text
+    Similar {
+        text: String,
         #[arg(default_value = "5")]
         k: usize,
     },
@@ -121,6 +145,8 @@ pub enum Cmd {
         #[arg(default_value = "10")]
         k: usize,
     },
+    /// Exchange resonance pulses across federated indices (mirror neuron protocol)
+    PulseExchange,
     /// Federated text search across multiple indices
     FederatedFind {
         query: String,

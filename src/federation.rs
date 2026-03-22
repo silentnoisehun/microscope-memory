@@ -309,3 +309,76 @@ fn merge_results(all: Vec<Vec<FederatedResult>>, k: usize) -> Vec<FederatedResul
     merged.truncate(k);
     merged
 }
+
+// ─── Mirror Neuron Pulse Exchange ───────────────────
+
+/// Exchange resonance pulses across federated indices.
+/// Each index exports its outgoing pulses, and imports others' pulses.
+/// Returns total pulses exchanged.
+pub fn exchange_pulses(config: &Config) -> Result<usize, String> {
+    use crate::resonance::ResonanceState;
+
+    let output_dir = Path::new(&config.paths.output_dir);
+    let mut local = ResonanceState::load_or_init(output_dir);
+
+    // Export our outgoing pulses
+    let our_pulses = local.export_pulses();
+    let mut total_exchanged = 0usize;
+
+    // Read local headers for proximity matching
+    let reader = MicroscopeReader::open(config).map_err(|e| format!("open reader: {}", e))?;
+    let local_headers: Vec<(f32, f32, f32)> = (0..reader.block_count)
+        .map(|i| {
+            let h = reader.header(i);
+            (h.x, h.y, h.z)
+        })
+        .collect();
+
+    // For each federated index, exchange pulses
+    for idx_config in &config.federation.indices {
+        let idx_cfg =
+            Config::load(&idx_config.config_path).map_err(|e| format!("load config: {}", e))?;
+        let idx_dir = Path::new(&idx_cfg.paths.output_dir);
+
+        // Load the other index's resonance state
+        let mut other = ResonanceState::load_or_init(idx_dir);
+
+        // Send our pulses to them
+        let their_headers: Vec<(f32, f32, f32)> = {
+            if let Ok(r) = MicroscopeReader::open(&idx_cfg) {
+                (0..r.block_count)
+                    .map(|i| {
+                        let h = r.header(i);
+                        (h.x, h.y, h.z)
+                    })
+                    .collect()
+            } else {
+                continue;
+            }
+        };
+
+        let our_decoded = ResonanceState::import_pulses(&our_pulses);
+        for pulse in our_decoded {
+            other.receive_pulse(pulse, &their_headers, 0.05);
+            total_exchanged += 1;
+        }
+
+        // Receive their pulses
+        let their_pulses = other.export_pulses();
+        let their_decoded = ResonanceState::import_pulses(&their_pulses);
+        for pulse in their_decoded {
+            local.receive_pulse(pulse, &local_headers, 0.05);
+            total_exchanged += 1;
+        }
+
+        // Save the other index's updated state
+        let _ = other.save(idx_dir);
+    }
+
+    // Save our updated state
+    local
+        .save(output_dir)
+        .map_err(|e| format!("save resonance: {}", e))?;
+
+    Ok(total_exchanged)
+}

@@ -785,6 +785,96 @@ pub fn build(config: &Config, force: bool) -> Result<(), String> {
         }
     }
 
+    // ═══ Hebbian delta integration ═══
+    let hebb_path = output_dir.join("activations.bin");
+    if hebb_path.exists() {
+        let hebb = crate::hebbian::HebbianState::load_or_init(output_dir, n);
+        let drifted = hebb
+            .activations
+            .iter()
+            .filter(|r| {
+                r.drift_x.abs() > 0.001 || r.drift_y.abs() > 0.001 || r.drift_z.abs() > 0.001
+            })
+            .count();
+
+        if drifted > 0 {
+            apply_hebbian_deltas(output_dir, &hebb, n)?;
+            println!(
+                "  {} Hebbian deltas applied to {} blocks",
+                "HEBBIAN".magenta(),
+                drifted
+            );
+        }
+    }
+
+    // ═══ Structural fingerprinting ═══
+    {
+        let reader = MicroscopeReader::open(config)?;
+        let texts: Vec<&str> = (0..reader.block_count).map(|i| reader.text(i)).collect();
+        let table = crate::fingerprint::LinkTable::build(&texts);
+        table.save(output_dir)?;
+        let stats = table.stats();
+        println!(
+            "  {} {} links across {} blocks",
+            "FINGERPRINT".cyan(),
+            stats.link_count,
+            stats.block_count
+        );
+    }
+
     println!("\n{}", "ZERO JSON. Pure binary. Done.".green().bold());
     Ok(())
+}
+
+/// Post-process: apply Hebbian drift deltas to microscope.bin header coordinates.
+fn apply_hebbian_deltas(
+    output_dir: &Path,
+    hebb: &crate::hebbian::HebbianState,
+    block_count: usize,
+) -> Result<(), String> {
+    let hdr_path = output_dir.join("microscope.bin");
+    let mut data = fs::read(&hdr_path).map_err(|e| format!("read microscope.bin: {}", e))?;
+
+    for i in 0..block_count.min(hebb.activations.len()) {
+        let rec = &hebb.activations[i];
+        if rec.drift_x.abs() < 0.001 && rec.drift_y.abs() < 0.001 && rec.drift_z.abs() < 0.001 {
+            continue;
+        }
+
+        let off = i * HEADER_SIZE;
+        if off + 12 > data.len() {
+            break;
+        }
+
+        // Read current x, y, z (first 12 bytes of header, 3×f32 LE)
+        let x = f32::from_le_bytes(data[off..off + 4].try_into().unwrap());
+        let y = f32::from_le_bytes(data[off + 4..off + 8].try_into().unwrap());
+        let z = f32::from_le_bytes(data[off + 8..off + 12].try_into().unwrap());
+
+        // Apply drift
+        let new_x = x + rec.drift_x;
+        let new_y = y + rec.drift_y;
+        let new_z = z + rec.drift_z;
+
+        data[off..off + 4].copy_from_slice(&new_x.to_le_bytes());
+        data[off + 4..off + 8].copy_from_slice(&new_y.to_le_bytes());
+        data[off + 8..off + 12].copy_from_slice(&new_z.to_le_bytes());
+    }
+
+    fs::write(&hdr_path, &data).map_err(|e| format!("write microscope.bin: {}", e))?;
+
+    // Clear drift values after integration (they're now baked in)
+    let mut hebb_clone = crate::hebbian::HebbianState {
+        activations: hebb.activations.clone(),
+        coactivations: hebb.coactivations.clone(),
+        fingerprints: hebb.fingerprints.clone(),
+    };
+    for rec in &mut hebb_clone.activations {
+        rec.drift_x = 0.0;
+        rec.drift_y = 0.0;
+        rec.drift_z = 0.0;
+    }
+    hebb_clone
+        .save(output_dir)
+        .map_err(|e| format!("save cleared Hebbian: {}", e))
 }

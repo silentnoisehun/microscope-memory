@@ -8,8 +8,10 @@ pub mod cache;
 pub mod config;
 pub mod embedding_index;
 pub mod embeddings;
+pub mod emotional;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod federation;
+pub mod fingerprint;
 pub mod hebbian;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod mcp;
@@ -39,6 +41,7 @@ pub mod cli;
 // Re-export commonly used items
 pub use reader::{
     read_append_log, store_memory, AppendEntry, BlockHeader, DataStore, MicroscopeReader,
+    RadialResult, ResultSet,
 };
 
 // Re-export CLI

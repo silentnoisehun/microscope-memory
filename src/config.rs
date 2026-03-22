@@ -39,6 +39,8 @@ pub struct Search {
     pub keyword_boost: f32,
     #[serde(default)]
     pub semantic_weight: f32,
+    #[serde(default)]
+    pub emotional_bias_weight: f32,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -176,6 +178,7 @@ impl Default for Config {
                 zoom_weight: 2.0,
                 keyword_boost: 0.1,
                 semantic_weight: 0.0,
+                emotional_bias_weight: 0.0,
             },
             memory_layers: MemoryLayers {
                 layers: vec![

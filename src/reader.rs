@@ -308,6 +308,102 @@ impl MicroscopeReader {
         results
     }
 
+    /// Radial search: find all blocks within `radius` of (x, y, z) at a specific depth.
+    /// Returns a ResultSet with the closest match as primary and neighbors distance-weighted.
+    #[allow(clippy::too_many_arguments)]
+    pub fn radial_search(
+        &self,
+        config: &Config,
+        x: f32,
+        y: f32,
+        z: f32,
+        depth: u8,
+        radius: f32,
+        k: usize,
+    ) -> ResultSet {
+        let radius_sq = radius * radius;
+        let (start, count) = self.depth_ranges[depth as usize];
+        let (start, count) = (start as usize, count as usize);
+
+        // SIMD-accelerated radial scan within depth band
+        let mut candidates: Vec<(f32, usize, bool)> = if count > 0 {
+            (start..(start + count))
+                .into_par_iter()
+                .filter_map(|i| {
+                    let h = self.header(i);
+                    let qz = depth as f32 / 8.0;
+                    let dist_sq = l2_dist_sq_simd(h, x, y, z, qz, 0.0); // no zoom weight for radial
+                    if dist_sq <= radius_sq {
+                        Some((dist_sq, i, true))
+                    } else {
+                        None
+                    }
+                })
+                .collect()
+        } else {
+            Vec::new()
+        };
+
+        // Include append log entries at the same depth
+        let append_path = Path::new(&config.paths.output_dir).join("append.bin");
+        let appended = read_append_log(&append_path);
+        for (ai, entry) in appended.iter().enumerate() {
+            if entry.depth != depth {
+                continue;
+            }
+            let dx = entry.x - x;
+            let dy = entry.y - y;
+            let dz = entry.z - z;
+            let dist_sq = dx * dx + dy * dy + dz * dz;
+            if dist_sq <= radius_sq {
+                candidates.push((dist_sq, ai + 1_000_000, false));
+            }
+        }
+
+        candidates.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+
+        // Build ResultSet
+        let primary = candidates
+            .first()
+            .map(|&(dist, idx, is_main)| RadialResult {
+                block_idx: idx,
+                dist_sq: dist,
+                weight: 1.0,
+                is_main,
+            });
+
+        let neighbors: Vec<RadialResult> = candidates
+            .iter()
+            .skip(1)
+            .take(k.saturating_sub(1))
+            .map(|&(dist_sq, idx, is_main)| {
+                // Weight: inverse distance, normalized so closest neighbor = 1.0
+                let weight = if dist_sq > 0.0001 {
+                    (radius_sq - dist_sq) / radius_sq
+                } else {
+                    1.0
+                };
+                RadialResult {
+                    block_idx: idx,
+                    dist_sq,
+                    weight,
+                    is_main,
+                }
+            })
+            .collect();
+
+        let total_within_radius = candidates.len();
+
+        ResultSet {
+            primary,
+            neighbors,
+            center: (x, y, z),
+            depth,
+            radius,
+            total_within_radius,
+        }
+    }
+
     /// Text search
     pub fn find_text(&self, query: &str, k: usize) -> Vec<(u8, usize)> {
         let q = query.to_lowercase();
@@ -424,6 +520,48 @@ pub fn print_append_result(appended: &[AppendEntry], idx: usize, dist: f32) {
             format!("[{}/new]", layer).green(),
             safe_truncate(&e.text, 70)
         );
+    }
+}
+
+// ─── RADIAL SEARCH TYPES ─────────────────────────────
+
+/// A single result from radial search.
+#[derive(Debug, Clone)]
+pub struct RadialResult {
+    pub block_idx: usize,
+    pub dist_sq: f32,
+    pub weight: f32, // 1.0 = primary, decays with distance for neighbors
+    pub is_main: bool,
+}
+
+/// ResultSet from radial search: primary hit + distance-weighted neighbors.
+#[derive(Debug)]
+pub struct ResultSet {
+    pub primary: Option<RadialResult>,
+    pub neighbors: Vec<RadialResult>,
+    pub center: (f32, f32, f32),
+    pub depth: u8,
+    pub radius: f32,
+    pub total_within_radius: usize,
+}
+
+impl ResultSet {
+    /// All results (primary + neighbors) as a flat list.
+    pub fn all(&self) -> Vec<&RadialResult> {
+        let mut v = Vec::with_capacity(1 + self.neighbors.len());
+        if let Some(ref p) = self.primary {
+            v.push(p);
+        }
+        v.extend(self.neighbors.iter());
+        v
+    }
+
+    /// Block indices of all results (for Hebbian co-activation).
+    pub fn block_indices(&self) -> Vec<(u32, f32)> {
+        self.all()
+            .iter()
+            .map(|r| (r.block_idx as u32, r.weight))
+            .collect()
     }
 }
 

@@ -38,7 +38,6 @@ pub struct PyBlock {
 }
 
 #[cfg(feature = "python")]
-#[allow(non_local_definitions)]
 #[pymethods]
 impl PyMicroscope {
     #[new]

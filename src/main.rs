@@ -28,6 +28,7 @@ mod streaming;
 mod wasm;
 
 #[cfg(feature = "python")]
+#[allow(non_local_definitions)]
 mod python;
 
 mod config;

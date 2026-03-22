@@ -24,6 +24,7 @@ pub mod snapshot;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod streaming;
 
+pub mod predictive_cache;
 pub mod thought_graph;
 pub mod viz;
 

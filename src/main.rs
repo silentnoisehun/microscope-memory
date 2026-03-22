@@ -191,11 +191,33 @@ fn recall(config: &Config, query: &str, k: usize) {
         }
     }
 
-    // ─── ThoughtGraph: pattern boost before sorting ──
+    // ─── ThoughtGraph + Predictive Cache ──
     let output_dir_tg = Path::new(&config.paths.output_dir);
     let mut thought_graph =
         microscope_memory::thought_graph::ThoughtGraphState::load_or_init(output_dir_tg);
+    let mut pred_cache =
+        microscope_memory::predictive_cache::PredictiveCache::load_or_init(output_dir_tg);
     let qh_tg = microscope_memory::hebbian::query_hash(query);
+
+    // Check predictive cache — instant boost from pre-fetched blocks
+    if let Some((cached_blocks, confidence)) = pred_cache.check(qh_tg) {
+        let boost = confidence * microscope_memory::thought_graph::PATTERN_BOOST_WEIGHT;
+        let cached_set: std::collections::HashSet<u32> =
+            cached_blocks.iter().copied().collect();
+        for (dist, idx, is_main) in &mut all_results {
+            if *is_main && cached_set.contains(&(*idx as u32)) {
+                *dist = (*dist - boost).max(0.0);
+            }
+        }
+        println!(
+            "  {} {} blocks pre-fetched (confidence={:.0}%)",
+            "PREDICT:".green(),
+            cached_blocks.len(),
+            confidence * 100.0
+        );
+    }
+
+    // Pattern boost from ThoughtGraph
     let pattern_boosts: std::collections::HashMap<u32, f32> = thought_graph
         .pattern_boost(qh_tg)
         .into_iter()
@@ -292,11 +314,27 @@ fn recall(config: &Config, query: &str, k: usize) {
         thought_graph.update_pattern_blocks(qh, &result_block_ids);
         thought_graph.detect_patterns();
 
+        // Predictive cache: evaluate prediction accuracy and predict next
+        let (hit_type, overlap) = pred_cache.evaluate(qh, &result_block_ids, &mut thought_graph);
+        if hit_type != "none" {
+            let symbol = match hit_type {
+                "hit" => "+".green(),
+                "partial" => "~".yellow(),
+                _ => "-".red(),
+            };
+            println!(
+                "  {} prediction {} (overlap={})",
+                symbol, hit_type, overlap
+            );
+        }
+        pred_cache.predict_next(&thought_graph);
+
         let _ = hebb.save(output_dir);
         let _ = mirror.save(output_dir);
         let _ = resonance.save(output_dir);
         let _ = archetypes.save(output_dir);
         let _ = thought_graph.save(output_dir);
+        let _ = pred_cache.save(output_dir);
     }
 
     let elapsed = t0.elapsed();
@@ -1568,6 +1606,41 @@ fn main() {
                     if si >= sessions {
                         break;
                     }
+                }
+            }
+        }
+
+        Cmd::Predictions => {
+            let output_dir = Path::new(&config.paths.output_dir);
+            let cache =
+                microscope_memory::predictive_cache::PredictiveCache::load_or_init(output_dir);
+            let stats = &cache.stats;
+            println!("{}", "PREDICTIVE CACHE".cyan().bold());
+            println!(
+                "  predictions={} hits={} misses={} partial={} hit_rate={:.1}%",
+                stats.total_predictions,
+                stats.total_hits,
+                stats.total_misses,
+                stats.total_partial_hits,
+                stats.hit_rate() * 100.0
+            );
+            println!(
+                "  active={} avg_confidence={:.1}%",
+                stats.current_predictions,
+                stats.avg_confidence * 100.0
+            );
+
+            if !cache.predictions.is_empty() {
+                println!("\n  {}", "Active predictions:".yellow());
+                for (i, p) in cache.predictions.iter().enumerate() {
+                    println!(
+                        "  #{} hash={:04x} blocks={} conf={:.0}% pattern=#{}",
+                        i + 1,
+                        p.predicted_query_hash & 0xFFFF,
+                        p.blocks.len(),
+                        p.confidence * 100.0,
+                        p.pattern_id
+                    );
                 }
             }
         }

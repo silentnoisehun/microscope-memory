@@ -204,4 +204,6 @@ pub enum Cmd {
         #[arg(default_value = "5")]
         sessions: usize,
     },
+    /// Show predictive cache stats and active predictions
+    Predictions,
 }

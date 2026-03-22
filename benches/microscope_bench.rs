@@ -41,12 +41,9 @@ fn setup_built_env() -> (
 
 fn bench_build_pipeline(c: &mut Criterion) {
     c.bench_function("build_pipeline", |b| {
-        b.iter_with_setup(
-            setup_test_env,
-            |(_tmp, config)| {
-                microscope_memory::build::build(black_box(&config), true).expect("build");
-            },
-        );
+        b.iter_with_setup(setup_test_env, |(_tmp, config)| {
+            microscope_memory::build::build(black_box(&config), true).expect("build");
+        });
     });
 }
 

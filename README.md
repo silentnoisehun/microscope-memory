@@ -327,7 +327,11 @@ D8: Raw bytes         — hex representation (atomic limit)
 
 ```
 src/
-├── main.rs              — Core engine: build, query, mmap reader, CLI
+├── lib.rs               — Library crate: public API, shared constants/functions
+├── main.rs              — Binary entry point: CLI command dispatch
+├── cli.rs               — CLI definitions (clap derive)
+├── build.rs             — Build pipeline: layers → binary decomposition (D0-D8)
+├── reader.rs            — MicroscopeReader, BlockHeader, DataStore, append log
 ├── config.rs            — Configuration system (TOML-based)
 ├── embeddings.rs        — Embedding providers (Mock + Candle BERT)
 ├── embedding_index.rs   — Mmap-backed pre-computed embedding index
@@ -338,6 +342,9 @@ src/
 ├── gpu.rs               — Optional wgpu GPU acceleration
 ├── wasm.rs              — WASM target support
 └── python.rs            — PyO3 Python bindings
+tests/
+├── integration.rs       — 11 integration tests (build → query → verify pipeline)
+└── fixtures/            — Test layer JSON files and config
 ```
 
 ## Optional Features

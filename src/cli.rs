@@ -127,6 +127,22 @@ pub enum Cmd {
         #[arg(default_value = "10")]
         k: usize,
     },
+    /// Show Hebbian learning state (activations, co-activations, energy)
+    Hebbian,
+    /// Apply Hebbian drift — co-activated blocks pull coordinates closer
+    HebbianDrift,
+    /// Show hottest blocks (most recently/frequently activated)
+    Hottest {
+        #[arg(default_value = "10")]
+        k: usize,
+    },
+    /// Show mirror neuron state (resonance echoes, boosted blocks)
+    Mirror,
+    /// Show most resonant blocks (strongest mirror neuron signal)
+    Resonant {
+        #[arg(default_value = "10")]
+        k: usize,
+    },
     /// Start native MCP server (JSON-RPC 2.0 over stdio)
     Mcp,
 }

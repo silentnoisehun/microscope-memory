@@ -197,6 +197,33 @@ fn recall(config: &Config, query: &str, k: usize) {
         shown += 1;
     }
 
+    // ─── Hebbian + Mirror: record activations & detect resonance ──
+    let output_dir = Path::new(&config.paths.output_dir);
+    let mut hebb =
+        microscope_memory::hebbian::HebbianState::load_or_init(output_dir, reader.block_count);
+    let mut mirror = microscope_memory::mirror::MirrorState::load_or_init(output_dir);
+    let activated: Vec<(u32, f32)> = all_results
+        .iter()
+        .filter(|(_, _, is_main)| *is_main)
+        .take(k)
+        .map(|(score, idx, _)| (*idx as u32, *score))
+        .collect();
+    if !activated.is_empty() {
+        let qh = microscope_memory::hebbian::query_hash(query);
+        // Mirror: detect resonance before recording (so new fingerprint doesn't match itself)
+        let boosts = microscope_memory::mirror::mirror_boost(&hebb, &mut mirror, &activated, qh);
+        if !boosts.is_empty() {
+            println!(
+                "  {} {} blocks resonated",
+                "MIRROR:".magenta(),
+                boosts.len()
+            );
+        }
+        hebb.record_activation(&activated, qh);
+        let _ = hebb.save(output_dir);
+        let _ = mirror.save(output_dir);
+    }
+
     let elapsed = t0.elapsed();
     println!("\n  {} results in {:.0} us", shown, elapsed.as_micros());
 }
@@ -825,6 +852,91 @@ fn main() {
                 Err(e) => eprintln!("  {} {}", "ERROR:".red(), e),
             }
         }
+        Cmd::Hebbian => {
+            let reader = open_reader(&config);
+            let output_dir = Path::new(&config.paths.output_dir);
+            let hebb = microscope_memory::hebbian::HebbianState::load_or_init(
+                output_dir,
+                reader.block_count,
+            );
+            let stats = hebb.stats();
+            println!("{}", "HEBBIAN STATE".cyan().bold());
+            println!("  Blocks:             {}", stats.block_count);
+            println!("  Active blocks:      {}", stats.active_blocks);
+            println!("  Total activations:  {}", stats.total_activations);
+            println!("  Hot blocks (>0.1):  {}", stats.hot_blocks);
+            println!("  Drifted blocks:     {}", stats.drifted_blocks);
+            println!("  Co-activation pairs:{}", stats.coactivation_pairs);
+            println!("  Fingerprints:       {}", stats.fingerprint_count);
+
+            let top = hebb.strongest_pairs(5);
+            if !top.is_empty() {
+                println!("\n  Strongest co-activations:");
+                for pair in top {
+                    let text_a = safe_truncate(reader.text(pair.block_a as usize), 30);
+                    let text_b = safe_truncate(reader.text(pair.block_b as usize), 30);
+                    println!("    {}x  [{}] <-> [{}]", pair.count, text_a, text_b);
+                }
+            }
+        }
+        Cmd::HebbianDrift => {
+            let reader = open_reader(&config);
+            let output_dir = Path::new(&config.paths.output_dir);
+            let mut hebb = microscope_memory::hebbian::HebbianState::load_or_init(
+                output_dir,
+                reader.block_count,
+            );
+
+            let headers: Vec<(f32, f32, f32)> = (0..reader.block_count)
+                .map(|i| {
+                    let h = reader.header(i);
+                    (h.x, h.y, h.z)
+                })
+                .collect();
+
+            let before_drifted = hebb.stats().drifted_blocks;
+            hebb.apply_drift(&headers);
+            let after_drifted = hebb.stats().drifted_blocks;
+
+            hebb.save(output_dir).expect("save Hebbian state");
+            println!(
+                "{} Drift applied ({} -> {} drifted blocks)",
+                "HEBBIAN".cyan().bold(),
+                before_drifted,
+                after_drifted
+            );
+        }
+        Cmd::Hottest { k } => {
+            let reader = open_reader(&config);
+            let output_dir = Path::new(&config.paths.output_dir);
+            let hebb = microscope_memory::hebbian::HebbianState::load_or_init(
+                output_dir,
+                reader.block_count,
+            );
+            let hot = hebb.hottest_blocks(k);
+
+            println!("{} top {} blocks:", "HOTTEST".cyan().bold(), k);
+            if hot.is_empty() {
+                println!("  (no active blocks — run some queries first)");
+            }
+            for (idx, energy) in &hot {
+                let h = reader.header(*idx);
+                let text = reader.text(*idx);
+                let layer = LAYER_NAMES.get(h.layer_id as usize).unwrap_or(&"?");
+                let rec = &hebb.activations[*idx];
+                println!(
+                    "  {} {} {} count={} drift=({:.3},{:.3},{:.3}) {}",
+                    format!("E={:.3}", energy).yellow(),
+                    format!("D{}", h.depth).cyan(),
+                    format!("[{}]", layer).green(),
+                    rec.activation_count,
+                    rec.drift_x,
+                    rec.drift_y,
+                    rec.drift_z,
+                    safe_truncate(text, 50)
+                );
+            }
+        }
         Cmd::FederatedRecall { query, k } => {
             let fed = microscope_memory::federation::FederatedSearch::from_config(&config)
                 .expect("federation config");
@@ -870,6 +982,62 @@ fn main() {
                     r.layer,
                     r.source_index.cyan(),
                     microscope_memory::safe_truncate(&r.text, 80)
+                );
+            }
+        }
+        Cmd::Mirror => {
+            let output_dir = Path::new(&config.paths.output_dir);
+            let mirror = microscope_memory::mirror::MirrorState::load_or_init(output_dir);
+            let stats = mirror.stats();
+            println!("{}", "MIRROR NEURON STATE".magenta().bold());
+            println!("  Resonance echoes:   {}", stats.total_echoes);
+            println!("  Resonant blocks:    {}", stats.resonant_blocks);
+            println!("  Avg similarity:     {:.3}", stats.avg_similarity);
+            if let Some((idx, strength)) = stats.strongest_block {
+                let reader = open_reader(&config);
+                let text = reader.text(idx as usize);
+                println!(
+                    "  Strongest:          block {} (str={:.3}) {}",
+                    idx,
+                    strength,
+                    safe_truncate(text, 50)
+                );
+            }
+
+            if !mirror.echoes.is_empty() {
+                println!("\n  Recent echoes:");
+                for echo in mirror.echoes.iter().rev().take(5) {
+                    println!(
+                        "    sim={:.3} shared={} blocks  trigger={:x} echo={:x}",
+                        echo.similarity,
+                        echo.shared_blocks.len(),
+                        echo.trigger_hash,
+                        echo.echo_hash,
+                    );
+                }
+            }
+        }
+        Cmd::Resonant { k } => {
+            let reader = open_reader(&config);
+            let output_dir = Path::new(&config.paths.output_dir);
+            let mirror = microscope_memory::mirror::MirrorState::load_or_init(output_dir);
+            let top = mirror.most_resonant(k);
+
+            println!("{} top {} blocks:", "RESONANT".magenta().bold(), k);
+            if top.is_empty() {
+                println!("  (no resonant blocks — run queries to build mirror state)");
+            }
+            for (idx, res) in &top {
+                let h = reader.header(*idx as usize);
+                let text = reader.text(*idx as usize);
+                let layer = LAYER_NAMES.get(h.layer_id as usize).unwrap_or(&"?");
+                println!(
+                    "  {} {} {} echoes={} {}",
+                    format!("S={:.3}", res.strength).magenta(),
+                    format!("D{}", h.depth).cyan(),
+                    format!("[{}]", layer).green(),
+                    res.echo_count,
+                    safe_truncate(text, 50)
                 );
             }
         }

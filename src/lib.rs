@@ -9,9 +9,11 @@ pub mod embedding_index;
 pub mod embeddings;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod federation;
+pub mod hebbian;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod mcp;
 pub mod merkle;
+pub mod mirror;
 pub mod query;
 pub mod reader;
 pub mod snapshot;

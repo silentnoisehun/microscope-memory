@@ -5,7 +5,7 @@
 
 **Zoom-based hierarchical memory system with sub-microsecond queries**
 
-A memory indexing system that treats data like looking through a microscope — the zoom level determines what you see. Pure binary, zero JSON, powered by mmap, L2 vector search, and rayon parallelism.
+A memory indexing system that treats data like looking through a microscope — the zoom level determines what you see. Pure binary, zero JSON, powered by mmap, SIMD vector search, and rayon parallelism.
 
 ## Features
 
@@ -14,9 +14,17 @@ A memory indexing system that treats data like looking through a microscope — 
 - **3D spatial indexing**: Content-based deterministic positioning
 - **Zero-copy mmap**: Direct memory access, no serialization overhead
 - **Hybrid search**: L2 distance + keyword matching + semantic embeddings
+- **Real embeddings**: Candle BERT models (all-MiniLM-L6-v2) with mmap-backed embedding index
+- **Query language (MQL)**: Structured queries with layer/depth/spatial filters and boolean operators
+- **HTTP server**: tiny_http-powered REST API with thread pool
+- **Snapshot archives**: `.mscope` format for backup, restore, and diff
+- **Merkle integrity**: SHA-256 tree with per-block verification and proofs
 - **Fixed viewport**: 256 bytes per block at every zoom level
 - **Parallel build**: Rayon-based multi-threaded index construction
-- **SSE4 SIMD**: Hardware-accelerated L2 distance on x86_64
+- **SSE4/AVX2 SIMD**: Hardware-accelerated L2 distance and cosine similarity
+- **GPU compute**: Optional wgpu-based acceleration
+- **WASM support**: Compiles to WebAssembly
+- **Python bindings**: PyO3-based Python integration
 
 ## Performance
 
@@ -46,7 +54,6 @@ Benchmarked on 227,168 blocks (10,000 queries per depth):
 ### Prerequisites
 
 - Rust 1.70+
-- Python 3.8+ with NumPy (optional, for Python implementation)
 
 ### Build from source
 
@@ -70,8 +77,11 @@ Edit `config.toml` to set your `layers_dir` and `output_dir`.
 ### Build the index
 
 ```bash
-# Build binary index from memory layer JSON files (configured in config.toml)
+# Build binary index from memory layer JSON files
 microscope-memory build
+
+# Rebuild — merges append log into main index
+microscope-memory rebuild
 ```
 
 ### Recall — natural language query
@@ -82,11 +92,38 @@ microscope-memory recall "What is Ora?" 10
 ```
 
 The auto-zoom selects depth based on query length:
-- 1-2 words → D0-D2 (identity/summaries)
-- 3-5 words → D1-D3 (topic clusters)
-- 6-10 words → D2-D4 (individual memories)
-- 11-20 words → D3-D5 (sentences)
-- 20+ words → D4-D6 (tokens)
+- 1-2 words -> D0-D2 (identity/summaries)
+- 3-5 words -> D1-D3 (topic clusters)
+- 6-10 words -> D2-D4 (individual memories)
+- 11-20 words -> D3-D5 (sentences)
+- 20+ words -> D4-D6 (tokens)
+
+### MQL — Microscope Query Language
+
+```bash
+# Filter by layer and depth range
+microscope-memory query 'layer:long_term depth:2..5 "Ora"'
+
+# Boolean operators
+microscope-memory query '"memory" AND "Rust"'
+microscope-memory query '"emotional" OR "relational"'
+
+# Spatial filter (x,y,z,radius)
+microscope-memory query 'near:0.2,0.3,0.1,0.05 "pattern"'
+
+# Override result limit
+microscope-memory query 'limit:20 layer:associative "concept"'
+```
+
+MQL supports:
+| Filter | Syntax | Example |
+|--------|--------|---------|
+| Layer | `layer:NAME` | `layer:long_term` |
+| Depth | `depth:N` or `depth:N..M` | `depth:3`, `depth:2..5` |
+| Spatial | `near:X,Y,Z[,R]` | `near:0.2,0.3,0.1,0.05` |
+| Keyword | `"quoted"` or `bare` | `"Ora"`, `memory` |
+| Boolean | `AND`, `OR` | `"foo" AND "bar"` |
+| Limit | `limit:N` | `limit:20` |
 
 ### Manual microscope control
 
@@ -118,18 +155,73 @@ microscope-memory store "Feeling good about progress" --layer emotional --import
 ### Semantic search (embeddings)
 
 ```bash
-# Cosine similarity search (mock embeddings for now)
+# Cosine similarity search using pre-built embedding index
 microscope-memory embed "quantum physics" 10
 
 # Alternative metrics: l2, dot
 microscope-memory embed "quantum physics" 10 --metric l2
 ```
 
-### Rebuild index
+When built with `--features embeddings`, uses a real Candle BERT model (all-MiniLM-L6-v2, 384 dimensions). Otherwise falls back to a mock hash-based embedding provider.
+
+The embedding index (`embeddings.bin`) is built automatically during `build` and `rebuild`, providing mmap-backed zero-copy semantic search.
+
+### HTTP Server
 
 ```bash
-# Rebuild from layers + merge append log
-microscope-memory rebuild
+# Start server (default port 6060)
+microscope-memory serve
+
+# Custom port
+microscope-memory serve --port 8080
+```
+
+Endpoints:
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/health` | Health check |
+| `GET` | `/stats` | Index statistics (block count, depths, append count) |
+| `GET` | `/find?q=...&k=N` | Text search |
+| `POST` | `/store` | Store memory: `{"text":"...", "layer":"...", "importance": N}` |
+| `POST` | `/recall` | Recall query: `{"query":"...", "k": N}` |
+| `POST` | `/query` | MQL query: `{"mql":"layer:long_term \"Ora\""}` |
+
+Examples:
+```bash
+curl http://localhost:6060/stats
+curl http://localhost:6060/find?q=Ora&k=5
+curl -X POST http://localhost:6060/store -d '{"text":"test memory","layer":"long_term"}'
+curl -X POST http://localhost:6060/recall -d '{"query":"What is Ora?","k":5}'
+curl -X POST http://localhost:6060/query -d '{"mql":"layer:long_term depth:2..5 \"Ora\""}'
+```
+
+### Snapshot — backup, restore, diff
+
+```bash
+# Export entire index to a single .mscope archive
+microscope-memory export backup.mscope
+
+# Import archive into a directory
+microscope-memory import backup.mscope --output-dir ./restored
+
+# Compare two archives (Merkle roots, file sizes, block counts)
+microscope-memory diff v1.mscope v2.mscope
+```
+
+The `.mscope` format bundles all index files (`meta.bin`, `microscope.bin`, `data.bin`, `merkle.bin`, `append.bin`, `embeddings.bin`) into a single portable archive.
+
+### Integrity verification
+
+```bash
+# CRC16 checksum verification of all blocks
+microscope-memory verify
+
+# Merkle tree verification (SHA-256)
+microscope-memory verify-merkle
+
+# Generate Merkle proof for a specific block
+microscope-memory proof 42
 ```
 
 ### Stats and benchmark
@@ -137,6 +229,7 @@ microscope-memory rebuild
 ```bash
 microscope-memory stats
 microscope-memory bench
+microscope-memory gpu-bench  # requires --features gpu
 ```
 
 ## Architecture
@@ -144,26 +237,36 @@ microscope-memory bench
 ### Binary Structure
 
 ```
-microscope.bin  — Block headers (mmap'd)
-├── BlockHeader[0..n]: 32 bytes each
-│   ├── x, y, z: f32        (3D spatial position)
-│   ├── zoom: f32            (normalized depth: depth/8.0)
-│   ├── depth: u8            (0-8)
-│   ├── layer_id: u8         (memory layer index)
-│   ├── data_offset: u32     (byte offset into data.bin)
-│   ├── data_len: u16        (actual text bytes, <= 256)
-│   ├── parent_idx: u32      (parent block index)
-│   ├── child_count: u16     (number of children)
-│   └── _pad: [u8; 2]        (alignment to 32 bytes)
+microscope.bin  — Block headers (32 bytes each, mmap'd)
+├── x, y, z: f32          (3D spatial position)
+├── zoom: f32              (normalized depth: depth/8.0)
+├── depth: u8              (0-8)
+├── layer_id: u8           (memory layer index)
+├── data_offset: u32       (byte offset into data.bin)
+├── data_len: u16          (actual text bytes, <= 256)
+├── parent_idx: u32        (parent block index)
+├── child_count: u16       (number of children)
+└── crc16: [u8; 2]         (CRC16-CCITT integrity check)
 
 data.bin        — Raw UTF-8 text content
 
-meta.bin        — Index metadata (88 bytes)
-├── magic: "MSCM"
+meta.bin        — Index metadata (MSC2 format)
+├── magic: "MSC2"          (4 bytes)
 ├── version: u32
 ├── block_count: u32
 ├── depth_count: u32
-└── depth_ranges: 9 x (start: u32, count: u32)
+├── depth_ranges: 9 x (start: u32, count: u32)
+└── merkle_root: [u8; 32]  (SHA-256 root hash)
+
+merkle.bin      — Full Merkle tree (SHA-256)
+
+embeddings.bin  — Pre-computed embedding vectors (mmap'd)
+├── block_count: u32
+├── dim: u32
+├── max_depth: u32
+└── vectors: f32 x dim x block_count
+
+append.bin      — Hot memory append log (APv2 format)
 ```
 
 ### Memory Layers
@@ -172,6 +275,7 @@ The system integrates 9 cognitive layers:
 
 | Layer | Description | 3D Region |
 |-------|-------------|-----------|
+| `identity` | System identity | (root) |
 | `long_term` | Persistent knowledge | (0.0, 0.0, 0.0) |
 | `short_term` | Working memory | (0.15, 0.15, 0.15) |
 | `associative` | Concept connections | (0.3, 0.0, 0.0) |
@@ -198,72 +302,130 @@ D8: Raw bytes         — hex representation (atomic limit)
 
 ## How It Works
 
-1. **Content → Position**: Text is FNV-hashed to deterministic 3D coordinates, offset by layer
-2. **Hierarchical decomposition**: Each memory decomposes into sentences → tokens → syllables → characters → bytes
+1. **Content -> Position**: Text is FNV-hashed to deterministic 3D coordinates, offset by layer
+2. **Hierarchical decomposition**: Each memory decomposes into sentences -> tokens -> syllables -> characters -> bytes
 3. **Parallel build**: Depths 4-8 are constructed with rayon parallel iterators
-4. **Spatial queries**: L2 distance in 3D space + zoom level filtering
-5. **mmap access**: Zero-copy reads directly from memory-mapped binary files
-6. **Hybrid ranking**: Vector distance + keyword boosting
-7. **Append log**: New memories stored instantly via binary append, merged on rebuild
+4. **Embedding index**: Build-time embedding generation (mock or Candle BERT) into mmap-backed binary
+5. **Spatial queries**: L2 distance in 3D space + zoom level filtering
+6. **mmap access**: Zero-copy reads directly from memory-mapped binary files
+7. **Hybrid ranking**: Vector distance + keyword boosting + semantic similarity
+8. **Append log**: New memories stored instantly via binary append, merged on rebuild
+9. **Merkle integrity**: SHA-256 tree for tamper detection and per-block proofs
 
 ## Source Structure
 
 ```
 src/
-├── main.rs          — Core engine: build, query, mmap reader, CLI
-├── streaming.rs     — Real-time streaming update server (TCP:6060)
-├── embeddings.rs    — Semantic vector search (SIMD cosine similarity)
-├── config.rs        — Dynamic configuration system (TOML)
-└── ...
-
-## Streaming Server (`streaming.rs`)
-
-The system includes a high-performance TCP server for asynchronous memory updates:
-- **Default Port**: 6060 (configurable via `--port`)
-- **Protocol**: JSON-over-TCP
-- **Endpoints**: `POST /store`, `GET/POST /recall`, `GET /stats`
-- **Function**: Receives raw text/layer data, handles atomic appends to `append.bin`. Enables external systems to push memories without CLI overhead.
-
-## Semantic Search & Embeddings
-
-Current status: **Architecture Ready**.
-- **Engine**: SIMD-accelerated (SSE4/AVX2) cosine similarity is fully implemented in `embeddings.rs`.
-- **Vectors**: Currently uses a `MockEmbeddingProvider` (128d).
-- **Integration**: To enable real semantic search, plug in an OpenAI API key or a local `candle-bert` model in `embeddings.rs`. The spatial L2 search already acts as a high-speed "structural" similarity fallback.
+├── main.rs              — Core engine: build, query, mmap reader, CLI
+├── config.rs            — Configuration system (TOML-based)
+├── embeddings.rs        — Embedding providers (Mock + Candle BERT)
+├── embedding_index.rs   — Mmap-backed pre-computed embedding index
+├── query.rs             — MQL parser and executor
+├── streaming.rs         — HTTP server (tiny_http, thread pool)
+├── snapshot.rs          — .mscope archive: export, import, diff
+├── merkle.rs            — SHA-256 Merkle tree with proofs
+├── gpu.rs               — Optional wgpu GPU acceleration
+├── wasm.rs              — WASM target support
+└── python.rs            — PyO3 Python bindings
 ```
 
 ## Optional Features
 
 ```bash
+# Default build (no optional features)
+cargo build --release
+
+# Real BERT embeddings (downloads model from HuggingFace)
+cargo build --release --features embeddings
+
+# Zstd compression support
+cargo build --release --features compression
+
+# GPU acceleration (wgpu compute shaders)
+cargo build --release --features gpu
+
 # WASM build
 cargo build --release --features wasm --target wasm32-unknown-unknown
 
 # Python bindings
 cargo build --release --features python
 
-# GPU acceleration
-cargo build --release --features gpu
+# All features
+cargo build --release --features "embeddings compression gpu"
 ```
 
-## Python Implementation
+## Configuration
 
-Alternative implementation in `build_blocks.py`:
+Example `config.toml`:
 
-```bash
-python build_blocks.py
+```toml
+[paths]
+layers_dir = "layers"
+output_dir = "output"
+temp_dir = "tmp"
+
+[index]
+block_size = 256
+max_depth = 8
+header_size = 32
+
+[search]
+default_k = 10
+zoom_weight = 2.0
+keyword_boost = 0.1
+semantic_weight = 0.0
+
+[memory_layers]
+layers = ["long_term", "short_term", "associative", "echo_cache"]
+
+[performance]
+use_mmap = true
+cache_size = 64
+build_workers = 4
+use_gpu = false
+compression = false
+
+[embedding]
+provider = "mock"           # "mock" or "candle"
+model = "sentence-transformers/all-MiniLM-L6-v2"
+dim = 384
+max_depth = 4               # Only embed blocks D0-D4
+
+[server]
+port = 6060
+cors_origin = "*"
+
+[logging]
+level = "info"
+file = "microscope.log"
 ```
 
-## Contributing
+## CLI Reference
 
-Contributions welcome. Areas of interest:
+```
+microscope-memory <COMMAND>
 
-- [ ] GPU acceleration for vector search
-- [ ] Distributed index sharding
-- [ ] Real-time index updates
-- [ ] Visualization tools
-- [ ] Alternative distance metrics
-- [ ] Compression algorithms
-- [ ] Real embedding providers (OpenAI, HuggingFace)
+Commands:
+  build          Build binary index from raw layer files
+  rebuild        Rebuild index (merges append log)
+  store          Store a new memory
+  recall         Natural language query with auto-zoom
+  query          MQL query (Microscope Query Language)
+  look           Manual look: x y z zoom [k]
+  soft           4D soft zoom: x y z zoom [k]
+  find           Text search
+  embed          Semantic search using embeddings
+  stats          Index statistics
+  bench          Performance benchmark
+  gpu-bench      GPU vs CPU benchmark
+  verify         CRC16 integrity check
+  verify-merkle  Merkle tree verification
+  proof          Merkle proof for a specific block
+  serve          Start HTTP server
+  export         Export index to .mscope archive
+  import         Import .mscope archive
+  diff           Compare two .mscope archives
+```
 
 ## License
 

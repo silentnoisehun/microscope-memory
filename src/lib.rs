@@ -2,10 +2,12 @@
 //! Re-exports core types and functions for integration tests and external use.
 
 pub mod build;
+#[cfg(not(target_arch = "wasm32"))]
 pub mod cache;
 pub mod config;
 pub mod embedding_index;
 pub mod embeddings;
+#[cfg(not(target_arch = "wasm32"))]
 pub mod federation;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod mcp;
@@ -13,6 +15,7 @@ pub mod merkle;
 pub mod query;
 pub mod reader;
 pub mod snapshot;
+#[cfg(not(target_arch = "wasm32"))]
 pub mod streaming;
 
 #[cfg(target_arch = "wasm32")]

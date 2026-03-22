@@ -196,6 +196,111 @@ pub struct EmbeddedBlockHeader {
     pub has_embedding: bool,     // Whether this block has an embedding
 }
 
+// ─── Candle-based real embedding provider ────────────
+#[cfg(feature = "embeddings")]
+pub struct CandleEmbeddingProvider {
+    model: candle_transformers::models::bert::BertModel,
+    tokenizer: tokenizers::Tokenizer,
+    dim: usize,
+    device: candle_core::Device,
+}
+
+#[cfg(feature = "embeddings")]
+impl CandleEmbeddingProvider {
+    pub fn new(model_id: &str) -> Result<Self, EmbeddingError> {
+        use candle_core::Device;
+        use hf_hub::api::sync::Api;
+
+        let device = Device::Cpu;
+        let api = Api::new().map_err(|e| EmbeddingError::ApiError(e.to_string()))?;
+        let repo = api.model(model_id.to_string());
+
+        // Load tokenizer
+        let tokenizer_path = repo.get("tokenizer.json")
+            .map_err(|e| EmbeddingError::ApiError(format!("tokenizer download: {}", e)))?;
+        let tokenizer = tokenizers::Tokenizer::from_file(tokenizer_path)
+            .map_err(|e| EmbeddingError::ApiError(format!("tokenizer load: {}", e)))?;
+
+        // Load model weights
+        let weights_path = repo.get("model.safetensors")
+            .map_err(|e| EmbeddingError::ApiError(format!("weights download: {}", e)))?;
+        let vb = candle_nn::VarBuilder::from_mmaped_safetensors(
+            &[weights_path], candle_core::DType::F32, &device,
+        ).map_err(|e| EmbeddingError::ApiError(format!("varbuilder: {}", e)))?;
+
+        // Load config
+        let config_path = repo.get("config.json")
+            .map_err(|e| EmbeddingError::ApiError(format!("config download: {}", e)))?;
+        let config_str = std::fs::read_to_string(config_path)
+            .map_err(|e| EmbeddingError::ApiError(format!("config read: {}", e)))?;
+        let config: candle_transformers::models::bert::Config = serde_json::from_str(&config_str)
+            .map_err(|e| EmbeddingError::ApiError(format!("config parse: {}", e)))?;
+        let dim = config.hidden_size;
+
+        let model = candle_transformers::models::bert::BertModel::load(vb, &config)
+            .map_err(|e| EmbeddingError::ApiError(format!("model load: {}", e)))?;
+
+        Ok(Self { model, tokenizer, dim, device })
+    }
+
+    fn embed_inner(&self, text: &str) -> Result<Vec<f32>, EmbeddingError> {
+        use candle_core::Tensor;
+
+        let encoding = self.tokenizer.encode(text, true)
+            .map_err(|e| EmbeddingError::ApiError(format!("tokenize: {}", e)))?;
+
+        let ids = encoding.get_ids();
+        let type_ids = encoding.get_type_ids();
+        let len = ids.len();
+
+        let input_ids = Tensor::new(ids, &self.device)
+            .map_err(|e| EmbeddingError::ApiError(e.to_string()))?
+            .reshape((1, len))
+            .map_err(|e| EmbeddingError::ApiError(e.to_string()))?;
+        let token_type_ids = Tensor::new(type_ids, &self.device)
+            .map_err(|e| EmbeddingError::ApiError(e.to_string()))?
+            .reshape((1, len))
+            .map_err(|e| EmbeddingError::ApiError(e.to_string()))?;
+
+        let output = self.model.forward(&input_ids, &token_type_ids, None)
+            .map_err(|e| EmbeddingError::ApiError(format!("forward: {}", e)))?;
+
+        // Mean pooling over sequence dimension
+        let pooled = output.mean(1)
+            .map_err(|e| EmbeddingError::ApiError(format!("mean pool: {}", e)))?
+            .squeeze(0)
+            .map_err(|e| EmbeddingError::ApiError(format!("squeeze: {}", e)))?;
+
+        let mut embedding: Vec<f32> = pooled.to_vec1()
+            .map_err(|e| EmbeddingError::ApiError(format!("to_vec: {}", e)))?;
+
+        // L2 normalize
+        let norm: f32 = embedding.iter().map(|x| x * x).sum::<f32>().sqrt();
+        if norm > 0.0 {
+            for val in &mut embedding {
+                *val /= norm;
+            }
+        }
+
+        Ok(embedding)
+    }
+}
+
+#[cfg(feature = "embeddings")]
+impl EmbeddingProvider for CandleEmbeddingProvider {
+    fn embed(&self, text: &str) -> Result<Vec<f32>, EmbeddingError> {
+        self.embed_inner(text)
+    }
+
+    fn embed_batch(&self, texts: &[String]) -> Result<Vec<Vec<f32>>, EmbeddingError> {
+        texts.iter().map(|t| self.embed_inner(t)).collect()
+    }
+
+    fn dimension(&self) -> usize {
+        self.dim
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

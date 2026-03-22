@@ -18,8 +18,11 @@
 //!   microscope-mem serve                    # Start the unified endpoint server (TCP/HTTP)
 
 mod embeddings;
+mod embedding_index;
 mod merkle;
 mod streaming;
+mod query;
+mod snapshot;
 
 #[cfg(target_arch = "wasm32")]
 mod wasm;
@@ -743,6 +746,37 @@ fn build(config: &Config) {
     for (d, &(_start, count)) in depth_ranges.iter().enumerate() {
         println!("  Depth {}: {:>5} blocks", d, count);
     }
+
+    // ═══ Embedding index (mock provider, or candle if enabled) ═══
+    if config.embedding.provider != "none" {
+        println!("\n  Building embedding index...");
+        let emb_path = output_dir.join("embeddings.bin");
+        let reader = MicroscopeReader::open(config);
+        let max_depth = config.embedding.max_depth;
+
+        #[cfg(feature = "embeddings")]
+        let provider: Box<dyn embeddings::EmbeddingProvider> = if config.embedding.provider == "candle" {
+            match embeddings::CandleEmbeddingProvider::new(&config.embedding.model) {
+                Ok(p) => Box::new(p),
+                Err(e) => {
+                    eprintln!("  {} Candle init failed: {:?}, using mock", "WARN".yellow(), e);
+                    Box::new(embeddings::MockEmbeddingProvider::new(config.embedding.dim))
+                }
+            }
+        } else {
+            Box::new(embeddings::MockEmbeddingProvider::new(config.embedding.dim))
+        };
+
+        #[cfg(not(feature = "embeddings"))]
+        let provider: Box<dyn embeddings::EmbeddingProvider> =
+            Box::new(embeddings::MockEmbeddingProvider::new(config.embedding.dim));
+
+        match embedding_index::build_embedding_index(&*provider, &reader, max_depth, &emb_path) {
+            Ok(()) => println!("  {} embeddings.bin built", "OK".green()),
+            Err(e) => eprintln!("  {} embedding build: {}", "ERR".red(), e),
+        }
+    }
+
     println!("\n{}", "ZERO JSON. Pure binary. Done.".green().bold());
 }
 
@@ -1238,6 +1272,7 @@ fn recall(config: &Config, query: &str, k: usize) {
 // ─── SEMANTIC SEARCH with embeddings ─────────────────
 fn semantic_search(config: &Config, query: &str, k: usize, metric: &str) {
     use embeddings::{MockEmbeddingProvider, EmbeddingProvider, cosine_similarity_simd};
+    use embedding_index::EmbeddingIndex;
 
     let t0 = Instant::now();
     println!("{} '{}' using {} metric",
@@ -1245,22 +1280,62 @@ fn semantic_search(config: &Config, query: &str, k: usize, metric: &str) {
         safe_truncate(query, 50),
         metric.green());
 
-    // Initialize embedding provider (mock for now)
+    let reader = MicroscopeReader::open(config);
+    let output_dir = Path::new(&config.paths.output_dir);
+    let emb_path = output_dir.join("embeddings.bin");
+
+    // Try to use pre-built embedding index first
+    if let Some(idx) = EmbeddingIndex::open(&emb_path) {
+        println!("  Using pre-built embedding index ({} blocks, {} dim)", idx.block_count(), idx.dim());
+
+        // Create provider for query embedding
+        #[cfg(feature = "embeddings")]
+        let provider: Box<dyn EmbeddingProvider> = if config.embedding.provider == "candle" {
+            match embeddings::CandleEmbeddingProvider::new(&config.embedding.model) {
+                Ok(p) => Box::new(p),
+                Err(_) => Box::new(MockEmbeddingProvider::new(idx.dim())),
+            }
+        } else {
+            Box::new(MockEmbeddingProvider::new(idx.dim()))
+        };
+
+        #[cfg(not(feature = "embeddings"))]
+        let provider: Box<dyn EmbeddingProvider> = Box::new(MockEmbeddingProvider::new(idx.dim()));
+
+        let query_embedding = match provider.embed(query) {
+            Ok(e) => e,
+            Err(_) => { println!("  {} Failed to embed query", "ERROR:".red()); return; }
+        };
+
+        let results = idx.search(&query_embedding, k);
+        println!("\n  {} {} results:", "Found".green(), results.len());
+        for (sim, block_idx) in results {
+            let h = reader.header(block_idx);
+            let text = reader.text(block_idx);
+            let layer = LAYER_NAMES.get(h.layer_id as usize).unwrap_or(&"?");
+            let preview: String = text.chars().take(70).filter(|&c| c != '\n').collect();
+            println!("  {} {} {} {}",
+                format!("D{}", h.depth).cyan(),
+                format!("Sim={:.3}", sim).yellow(),
+                format!("[{}/{}]", layer, layer_color(h.layer_id)).green(),
+                preview);
+        }
+
+        let elapsed = t0.elapsed();
+        println!("\n  Semantic search (indexed) in {:.1} ms", elapsed.as_micros() as f64 / 1000.0);
+        return;
+    }
+
+    // Fallback: compute embeddings on-the-fly
+    println!("  No embedding index — computing on-the-fly (slow)");
     let provider = MockEmbeddingProvider::new(128);
 
-    // Get query embedding
     let query_embedding = match provider.embed(query) {
         Ok(e) => e,
-        Err(_) => {
-            println!("  {} Failed to generate embedding", "ERROR:".red());
-            return;
-        }
+        Err(_) => { println!("  {} Failed to generate embedding", "ERROR:".red()); return; }
     };
 
-    let reader = MicroscopeReader::open(config);
     let mut results: Vec<(f32, usize)> = Vec::new();
-
-    // For each block, compute embedding similarity
     for i in 0..reader.block_count {
         let text = reader.text(i);
         if let Ok(block_embedding) = provider.embed(text) {
@@ -1271,30 +1346,25 @@ fn semantic_search(config: &Config, query: &str, k: usize, metric: &str) {
                 "l2" => {
                     let dist: f32 = query_embedding.iter().zip(block_embedding.iter())
                         .map(|(a, b)| (a - b).powi(2)).sum::<f32>().sqrt();
-                    1.0 / (1.0 + dist) // Convert distance to similarity
+                    1.0 / (1.0 + dist)
                 },
                 _ => cosine_similarity_simd(&query_embedding, &block_embedding),
             };
-
-            // Only keep high similarity results
             if similarity > 0.5 {
                 results.push((similarity, i));
             }
         }
     }
 
-    // Sort by similarity (descending)
     results.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
     results.truncate(k);
 
-    // Display results
     println!("\n  {} {} results:", "Found".green(), results.len());
     for (sim, idx) in results {
         let h = reader.header(idx);
         let text = reader.text(idx);
         let layer = LAYER_NAMES.get(h.layer_id as usize).unwrap_or(&"?");
         let preview: String = text.chars().take(70).filter(|&c| c != '\n').collect();
-
         println!("  {} {} {} {}",
             format!("D{}", h.depth).cyan(),
             format!("Sim={:.3}", sim).yellow(),
@@ -1303,7 +1373,7 @@ fn semantic_search(config: &Config, query: &str, k: usize, metric: &str) {
     }
 
     let elapsed = t0.elapsed();
-    println!("\n  Semantic search completed in {:.1} ms", elapsed.as_micros() as f64 / 1000.0);
+    println!("\n  Semantic search (on-the-fly) in {:.1} ms", elapsed.as_micros() as f64 / 1000.0);
 }
 
 // ─── VERIFY: CRC16 integrity check ──────────────────
@@ -1589,10 +1659,35 @@ enum Cmd {
         #[arg(help = "Block index")]
         block_index: usize,
     },
-    /// Start the unified endpoint server (TCP/HTTP)
+    /// Start the HTTP server
     Serve {
         #[arg(short, long, default_value_t = 6060)]
         port: u16,
+    },
+    /// MQL query (Microscope Query Language)
+    Query {
+        /// MQL expression, e.g. 'layer:long_term depth:2..5 "Ora"'
+        mql: String,
+    },
+    /// Export index to .mscope archive
+    Export {
+        /// Output archive path
+        output: String,
+    },
+    /// Import .mscope archive
+    Import {
+        /// Input archive path
+        input: String,
+        /// Output directory (defaults to config output_dir)
+        #[arg(long)]
+        output_dir: Option<String>,
+    },
+    /// Diff two .mscope archives
+    Diff {
+        /// First archive
+        a: String,
+        /// Second archive
+        b: String,
     },
 }
 
@@ -1710,6 +1805,50 @@ fn main() {
         }
         Cmd::Serve { port } => {
             streaming::start_endpoint_server(config, port);
+        }
+        Cmd::Query { mql } => {
+            let t0 = Instant::now();
+            let q = query::parse(&mql);
+            let reader = MicroscopeReader::open(&config);
+            let append_path = Path::new(&config.paths.output_dir).join("append.bin");
+            let appended = read_append_log(&append_path);
+            let results = query::execute(&q, &reader, &appended);
+
+            println!("{} '{}':", "MQL".cyan().bold(), mql);
+            if results.is_empty() {
+                println!("  (no results)");
+            }
+            for r in &results {
+                if r.is_main {
+                    reader.print_result(r.block_idx, r.score);
+                } else {
+                    print_append_result(&appended, r.block_idx, r.score);
+                }
+            }
+            println!("\n  {} results in {:.0} us", results.len(), t0.elapsed().as_micros());
+        }
+        Cmd::Export { output } => {
+            let output_dir = Path::new(&config.paths.output_dir);
+            println!("{}", "EXPORT".cyan().bold());
+            match snapshot::export(output_dir, Path::new(&output)) {
+                Ok(()) => println!("  {}", "Done.".green()),
+                Err(e) => eprintln!("  {} {}", "ERROR:".red(), e),
+            }
+        }
+        Cmd::Import { input, output_dir } => {
+            let out = output_dir.as_deref().unwrap_or(&config.paths.output_dir);
+            println!("{}", "IMPORT".cyan().bold());
+            match snapshot::import(Path::new(&input), Path::new(out)) {
+                Ok(()) => println!("  {}", "Done.".green()),
+                Err(e) => eprintln!("  {} {}", "ERROR:".red(), e),
+            }
+        }
+        Cmd::Diff { a, b } => {
+            println!("{}", "DIFF".cyan().bold());
+            match snapshot::diff(Path::new(&a), Path::new(&b)) {
+                Ok(()) => {}
+                Err(e) => eprintln!("  {} {}", "ERROR:".red(), e),
+            }
         }
     }
 }

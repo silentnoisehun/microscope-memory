@@ -10,6 +10,10 @@ pub struct Config {
     pub memory_layers: MemoryLayers,
     pub performance: Performance,
     pub logging: Logging,
+    #[serde(default)]
+    pub embedding: Embedding,
+    #[serde(default)]
+    pub server: Server,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -47,6 +51,52 @@ pub struct Performance {
     pub build_workers: usize,
     #[serde(default)]
     pub use_gpu: bool,
+    #[serde(default)]
+    pub compression: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Embedding {
+    #[serde(default = "default_provider")]
+    pub provider: String,
+    #[serde(default = "default_model")]
+    pub model: String,
+    #[serde(default = "default_dim")]
+    pub dim: usize,
+    #[serde(default = "default_max_depth")]
+    pub max_depth: u8,
+}
+
+fn default_provider() -> String { "mock".to_string() }
+fn default_model() -> String { "sentence-transformers/all-MiniLM-L6-v2".to_string() }
+fn default_dim() -> usize { 384 }
+fn default_max_depth() -> u8 { 4 }
+
+impl Default for Embedding {
+    fn default() -> Self {
+        Self {
+            provider: default_provider(),
+            model: default_model(),
+            dim: default_dim(),
+            max_depth: default_max_depth(),
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Server {
+    #[serde(default = "default_port")]
+    pub port: u16,
+    #[serde(default)]
+    pub cors_origin: Option<String>,
+}
+
+fn default_port() -> u16 { 6060 }
+
+impl Default for Server {
+    fn default() -> Self {
+        Self { port: default_port(), cors_origin: None }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -93,11 +143,14 @@ impl Config {
                 cache_size: 64,
                 build_workers: 4,
                 use_gpu: false,
+                compression: false,
             },
             logging: Logging {
                 level: "info".to_string(),
                 file: Some("microscope.log".to_string()),
             },
+            embedding: Embedding::default(),
+            server: Server::default(),
         }
     }
 }

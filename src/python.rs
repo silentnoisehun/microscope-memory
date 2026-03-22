@@ -38,6 +38,7 @@ pub struct PyBlock {
 }
 
 #[cfg(feature = "python")]
+#[allow(non_local_definitions)]
 #[pymethods]
 impl PyMicroscope {
     #[new]
@@ -160,6 +161,7 @@ impl PyMicroscope {
     }
 
     /// Hybrid search combining semantic and spatial
+    #[allow(clippy::too_many_arguments)]
     pub fn hybrid_search(
         &self,
         query: String,
@@ -259,6 +261,7 @@ fn microscope_memory(_py: Python, m: &PyModule) -> PyResult<()> {
 
 #[cfg(feature = "python")]
 /// Helper function to create NumPy arrays (future enhancement)
+#[allow(dead_code)]
 pub fn blocks_to_numpy(blocks: &[PyBlock]) -> Vec<Vec<f32>> {
     blocks
         .iter()

@@ -226,10 +226,10 @@ mod tests {
         let refs: Vec<&[u8]> = leaves.iter().map(|v| v.as_slice()).collect();
         let tree = MerkleTree::build(&refs);
 
-        for i in 0..8 {
+        for (i, leaf) in leaves.iter().enumerate() {
             let proof = tree.proof(i);
             assert!(
-                MerkleTree::verify_proof(&tree.root, &leaves[i], &proof),
+                MerkleTree::verify_proof(&tree.root, leaf, &proof),
                 "proof failed for leaf {}",
                 i
             );

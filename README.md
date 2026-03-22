@@ -3,33 +3,56 @@
 [![CI](https://github.com/silentnoisehun/microscope-memory/actions/workflows/ci.yml/badge.svg)](https://github.com/silentnoisehun/microscope-memory/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-**Zoom-based hierarchical memory system with sub-microsecond queries**
+**Zoom-based hierarchical memory with sub-microsecond queries and emergent consciousness architecture**
 
-A memory indexing system that treats data like looking through a microscope — the zoom level determines what you see. Pure binary, zero JSON, powered by mmap, SIMD vector search, and rayon parallelism.
+A memory indexing system that treats data like looking through a microscope — the zoom level determines what you see. Pure binary, zero JSON, powered by mmap, SIMD vector search, rayon parallelism, and a 5-layer consciousness stack (Hebbian learning, mirror neurons, resonance fields, archetype emergence, emotional bias).
 
 ## Features
 
+### Core Engine
 - **Sub-microsecond queries**: 37ns to 500us depending on depth
 - **9-level hierarchy**: From identity (D0) to raw bytes (D8)
 - **3D spatial indexing**: Content-based deterministic positioning
 - **Zero-copy mmap**: Direct memory access, no serialization overhead
 - **Hybrid search**: L2 distance + keyword matching + semantic embeddings
+- **Radial search**: Depth-constrained radius queries with SIMD acceleration
 - **Real embeddings**: Candle BERT models (all-MiniLM-L6-v2) with mmap-backed embedding index
 - **Query language (MQL)**: Structured queries with layer/depth/spatial filters and boolean operators
 - **HTTP server**: tiny_http-powered REST API with thread pool + SSE streaming
 - **LRU query cache**: Two-tier cache with TTL for sub-microsecond repeated queries
 - **Multi-index federation**: Query multiple indices in parallel, merge results
-- **ONNX Runtime embeddings**: Native ONNX inference as alternative to Candle (optional)
 - **Snapshot archives**: `.mscope` format for backup, restore, and diff
 - **Merkle integrity**: SHA-256 tree with per-block verification and proofs
-- **Fixed viewport**: 256 bytes per block at every zoom level
-- **Parallel build**: Rayon-based multi-threaded index construction
+- **Structural fingerprinting**: Shannon entropy + byte histograms + wormhole links between similar blocks
+- **MCP server**: Native JSON-RPC 2.0 over stdio for Claude Code integration
+
+### Consciousness Architecture (5 Layers)
+
+| Layer | Module | Description |
+|-------|--------|-------------|
+| **L1: Hebbian Learning** | `hebbian.rs` | Per-block activation tracking, co-activation pairs, energy decay (24h half-life), coordinate drift |
+| **L2: Mirror Neurons** | `mirror.rs` | Sparse cosine similarity between activation fingerprints, resonance echoes, block boosting |
+| **L3: Resonance Fields** | `resonance.rs` | Pulse-based inter-instance communication, quantized spatial field (0.05 grid), pulse exchange |
+| **L4: Archetype Emergence** | `archetype.rs` | Crystallized activation patterns from resonance hot spots, auto-labeling from member content |
+| **L5: Emotional Bias** | `emotional.rs` | Search space warping toward emotional layer centroid, weighted by Hebbian energy |
+
+The consciousness layers activate during every recall:
+1. Query coordinates are **emotionally warped** toward active emotional attractors
+2. Search results trigger **Hebbian activation** (strengthening accessed blocks)
+3. Co-accessed blocks form **co-activation pairs** (learning associations)
+4. **Mirror neurons** detect resonance between activation fingerprints
+5. **Resonance pulses** are emitted into the spatial field
+6. **Archetypes** are reinforced when activation patterns match crystallized patterns
+7. Over time, Hebbian **coordinate drift** pulls co-activated blocks closer in 3D space
+
+### Additional Features
 - **SSE4/AVX2 SIMD**: Hardware-accelerated L2 distance and cosine similarity
 - **Zstd compression**: Optional data.bin compression with transparent decompression
 - **Incremental build**: SHA-256 content hash skips rebuild when layers unchanged
 - **GPU compute**: Optional wgpu-based acceleration
 - **WASM support**: Compiles to WebAssembly
 - **Python bindings**: PyO3-based Python integration
+- **ONNX Runtime embeddings**: Native ONNX inference as alternative to Candle
 
 ## Performance
 
@@ -52,6 +75,7 @@ Benchmarked on 227,168 blocks (10,000 queries per depth):
 - **Fixed viewport size**: Every block is exactly 256 bytes
 - **Zoom determines detail**: Not what data exists, but what you can see
 - **Spatial coherence**: Similar content clusters in 3D space
+- **Emergent consciousness**: Hebbian learning + resonance = memories that self-organize
 - **Atomic boundary**: Below D8 (bytes), data corrupts — a philosophical limit
 
 ## Installation
@@ -92,7 +116,12 @@ microscope-memory build --force
 microscope-memory rebuild
 ```
 
-Builds are **incremental** — if the layer source files haven't changed (verified via SHA-256 content hash in MSC3 meta format), the build is skipped. Use `--force` to override.
+Build is **incremental** — if layers haven't changed (SHA-256 content hash in MSC3), the build is skipped. Use `--force` to override.
+
+Post-build automatically:
+1. Applies Hebbian drift deltas to block coordinates
+2. Generates structural fingerprints and wormhole links
+3. Rebuilds embedding index
 
 ### Recall — natural language query
 
@@ -101,12 +130,14 @@ Builds are **incremental** — if the layer source files haven't changed (verifi
 microscope-memory recall "What is Ora?" 10
 ```
 
-The auto-zoom selects depth based on query length:
-- 1-2 words -> D0-D2 (identity/summaries)
-- 3-5 words -> D1-D3 (topic clusters)
-- 6-10 words -> D2-D4 (individual memories)
-- 11-20 words -> D3-D5 (sentences)
-- 20+ words -> D4-D6 (tokens)
+The recall pipeline:
+1. Computes query coordinates (content hash + semantic blend)
+2. Applies emotional bias warp (if active emotional blocks exist)
+3. Searches across zoom-appropriate depths
+4. Records Hebbian activations and co-activations
+5. Emits resonance pulses
+6. Reinforces matching archetypes
+7. Returns results ranked by distance + keyword boost
 
 ### MQL — Microscope Query Language
 
@@ -116,7 +147,6 @@ microscope-memory query 'layer:long_term depth:2..5 "Ora"'
 
 # Boolean operators
 microscope-memory query '"memory" AND "Rust"'
-microscope-memory query '"emotional" OR "relational"'
 
 # Spatial filter (x,y,z,radius)
 microscope-memory query 'near:0.2,0.3,0.1,0.05 "pattern"'
@@ -134,6 +164,30 @@ MQL supports:
 | Keyword | `"quoted"` or `bare` | `"Ora"`, `memory` |
 | Boolean | `AND`, `OR` | `"foo" AND "bar"` |
 | Limit | `limit:N` | `limit:20` |
+
+### Radial search
+
+```bash
+# Find blocks within radius 0.1 at depth 3
+microscope-memory radial 0.25 0.25 0.25 3 --radius 0.1
+
+# Returns a ResultSet: primary matches + distance-weighted neighbors
+```
+
+### Structural fingerprinting
+
+```bash
+# Build fingerprints and discover wormhole links
+microscope-memory fingerprint
+
+# Show structural links for a specific block
+microscope-memory links 42
+
+# Find structurally similar blocks to a text
+microscope-memory similar "pattern recognition" 5
+```
+
+Fingerprints use Shannon entropy + 16-bucket byte histograms + FNV-1a hashing. Wormhole links connect blocks with similar structural properties across different layers/depths.
 
 ### Manual microscope control
 
@@ -174,7 +228,51 @@ microscope-memory embed "quantum physics" 10 --metric l2
 
 When built with `--features embeddings`, uses a real Candle BERT model (all-MiniLM-L6-v2, 384 dimensions). Otherwise falls back to a mock hash-based embedding provider.
 
-The embedding index (`embeddings.bin`) is built automatically during `build` and `rebuild`, providing mmap-backed zero-copy semantic search.
+### Consciousness commands
+
+```bash
+# Hebbian learning state (activations, co-activations, energy)
+microscope-memory hebbian
+
+# Apply Hebbian drift — co-activated blocks pull coordinates closer
+microscope-memory hebbian-drift
+
+# Show hottest blocks (most recently/frequently activated)
+microscope-memory hottest 10
+
+# Mirror neuron state (resonance echoes, boosted blocks)
+microscope-memory mirror
+
+# Most resonant blocks (strongest mirror neuron signal)
+microscope-memory resonant 10
+
+# Resonance protocol state (pulses, field energy)
+microscope-memory resonance
+
+# Integrate received pulses into local Hebbian state
+microscope-memory integrate
+
+# Exchange resonance pulses across federated indices
+microscope-memory pulse-exchange
+
+# Show emerged archetypes (crystallized activation patterns)
+microscope-memory archetypes
+
+# Detect new archetypes from resonance field and Hebbian state
+microscope-memory emerge
+```
+
+### Visualization
+
+```bash
+# Export full 3D visualization snapshot (JSON)
+microscope-memory viz viz.json
+
+# Export binary density map for fast rendering
+microscope-memory density density.bin --grid 32
+```
+
+The viz snapshot includes: blocks with coordinates, edges (co-activations + wormhole links), resonance field values, archetypes with members, mirror echoes, and aggregate stats.
 
 ### HTTP Server
 
@@ -199,15 +297,6 @@ Endpoints:
 | `GET` | `/recall/stream?q=...&k=N` | SSE streaming recall (real-time results) |
 | `POST` | `/federated/recall` | Federated recall: `{"query":"...", "k": N}` |
 | `POST` | `/federated/find` | Federated text search: `{"query":"...", "k": N}` |
-
-Examples:
-```bash
-curl http://localhost:6060/stats
-curl http://localhost:6060/find?q=Ora&k=5
-curl -X POST http://localhost:6060/store -d '{"text":"test memory","layer":"long_term"}'
-curl -X POST http://localhost:6060/recall -d '{"query":"What is Ora?","k":5}'
-curl -X POST http://localhost:6060/query -d '{"mql":"layer:long_term depth:2..5 \"Ora\""}'
-```
 
 ### MCP Server (Model Context Protocol)
 
@@ -253,7 +342,7 @@ microscope-memory import backup.mscope --output-dir ./restored
 microscope-memory diff v1.mscope v2.mscope
 ```
 
-The `.mscope` format bundles all index files (`meta.bin`, `microscope.bin`, `data.bin`, `merkle.bin`, `append.bin`, `embeddings.bin`) into a single portable archive.
+The `.mscope` format bundles all index files into a single portable archive, including learned state (activations, resonance, archetypes).
 
 ### Integrity verification
 
@@ -282,7 +371,7 @@ microscope-memory gpu-bench  # requires --features gpu
 
 ```
 microscope.bin  — Block headers (32 bytes each, mmap'd)
-├── x, y, z: f32          (3D spatial position)
+├── x, y, z: f32          (3D spatial position — drifts via Hebbian learning)
 ├── zoom: f32              (normalized depth: depth/8.0)
 ├── depth: u8              (0-8)
 ├── layer_id: u8           (memory layer index)
@@ -302,7 +391,7 @@ meta.bin        — Index metadata (MSC3 format)
 ├── depth_count: u32
 ├── depth_ranges: 9 x (start: u32, count: u32)
 ├── merkle_root: [u8; 32]  (SHA-256 root hash)
-└── layers_hash: [u8; 32]  (SHA-256 of source layer files — for incremental build)
+└── layers_hash: [u8; 32]  (SHA-256 of source layer files)
 
 merkle.bin      — Full Merkle tree (SHA-256)
 
@@ -313,6 +402,33 @@ embeddings.bin  — Pre-computed embedding vectors (mmap'd)
 └── vectors: f32 x dim x block_count
 
 append.bin      — Hot memory append log (APv2 format)
+```
+
+### Consciousness State Files
+
+```
+activations.bin    — Hebbian activation records (HEB1)
+├── block_idx: u32, activation_count: u32, last_activated: u64
+├── drift_x, drift_y, drift_z: f32 (coordinate drift deltas)
+└── fingerprint: [f32; 8] (activation pattern vector)
+
+coactivations.bin  — Co-activation pairs (COA1)
+└── block_a: u32, block_b: u32, count: u32, last_co: u64
+
+fingerprints.idx   — Structural fingerprints (FGP1)
+└── entropy: f32, hash: u64, histogram: [f32; 16]
+
+links.bin          — Wormhole links (LNK1)
+└── block_a: u32, block_b: u32, similarity: f32
+
+resonance.bin      — Mirror neuron state (RES1)
+└── block_idx: u32, resonance: f32, echo_count: u32, last_echo: u64
+
+pulses.bin         — Resonance pulses (PLS1)
+└── source_id: u64, x/y/z: f32, layer_hint: u8, strength: f32
+
+archetypes.bin     — Emerged archetypes (ARC1)
+└── id: u32, centroid: (f32,f32,f32), member_count: u32, strength: f32, label
 ```
 
 ### Memory Layers
@@ -351,14 +467,18 @@ D8: Raw bytes         — hex representation (atomic limit)
 1. **Content -> Position**: Text is FNV-hashed to deterministic 3D coordinates, offset by layer
 2. **Hierarchical decomposition**: Each memory decomposes into sentences -> tokens -> syllables -> characters -> bytes
 3. **Parallel build**: Depths 4-8 are constructed with rayon parallel iterators
-4. **Embedding index**: Build-time embedding generation (mock or Candle BERT) into mmap-backed binary
-5. **Spatial queries**: L2 distance in 3D space + zoom level filtering
-6. **mmap access**: Zero-copy reads directly from memory-mapped binary files
-7. **Hybrid ranking**: Vector distance + keyword boosting + semantic similarity
-8. **Append log**: New memories stored instantly via binary append, merged on rebuild
-9. **Merkle integrity**: SHA-256 tree for tamper detection and per-block proofs
-10. **Incremental build**: SHA-256 hash of layer sources stored in MSC3 meta — skips rebuild when unchanged
-11. **Optional compression**: Zstd-compressed `data.bin.zst` with transparent decompression at read time
+4. **Post-build integration**: Hebbian drift deltas applied to block headers, structural fingerprints generated
+5. **Emotional warp**: Query coordinates bent toward active emotional attractors before search
+6. **Spatial queries**: L2 distance in 3D space + zoom level filtering (SIMD-accelerated)
+7. **mmap access**: Zero-copy reads directly from memory-mapped binary files
+8. **Hybrid ranking**: Vector distance + keyword boosting + semantic similarity
+9. **Hebbian activation**: Each recall strengthens accessed blocks and records co-activations
+10. **Mirror resonance**: Activation fingerprints compared via sparse cosine similarity
+11. **Resonance pulses**: Emitted into quantized spatial field, exchangeable across federated indices
+12. **Archetype emergence**: Resonance hot spots crystallize into named activation patterns
+13. **Coordinate drift**: Co-activated blocks gradually migrate closer in 3D space over time
+14. **Append log**: New memories stored instantly via binary append, merged on rebuild
+15. **Merkle integrity**: SHA-256 tree for tamper detection and per-block proofs
 
 ## Source Structure
 
@@ -368,22 +488,29 @@ src/
 ├── main.rs              — Binary entry point: CLI command dispatch
 ├── cli.rs               — CLI definitions (clap derive)
 ├── build.rs             — Build pipeline: layers → binary decomposition (D0-D8)
-├── reader.rs            — MicroscopeReader, BlockHeader, DataStore, append log
+├── reader.rs            — MicroscopeReader, BlockHeader, DataStore, radial search
 ├── config.rs            — Configuration system (TOML-based)
 ├── embeddings.rs        — Embedding providers (Mock + Candle BERT + ONNX Runtime)
 ├── embedding_index.rs   — Mmap-backed pre-computed embedding index
 ├── query.rs             — MQL parser and executor
 ├── cache.rs             — Two-tier LRU query cache with TTL
-├── federation.rs        — Multi-index federated search
+├── federation.rs        — Multi-index federated search + pulse exchange
 ├── mcp.rs               — Native MCP server (JSON-RPC 2.0 over stdio)
 ├── streaming.rs         — HTTP server (tiny_http, SSE streaming, thread pool)
 ├── snapshot.rs          — .mscope archive: export, import, diff
 ├── merkle.rs            — SHA-256 Merkle tree with proofs
+├── hebbian.rs           — Hebbian learning: activations, co-activations, drift, energy
+├── mirror.rs            — Mirror neurons: fingerprint resonance, echo decay, block boosting
+├── resonance.rs         — Resonance fields: pulses, spatial field, integration
+├── archetype.rs         — Archetype emergence: clustering, reinforcement, auto-labeling
+├── emotional.rs         — Emotional bias warp: search space bending toward emotional centroid
+├── fingerprint.rs       — Structural fingerprinting: entropy, histograms, wormhole links
+├── viz.rs               — Visualization: JSON snapshot + binary density map export
 ├── gpu.rs               — Optional wgpu GPU acceleration
 ├── wasm.rs              — WASM target support
 └── python.rs            — PyO3 Python bindings
 tests/
-├── integration.rs       — 11 integration tests (build → query → verify pipeline)
+├── integration.rs       — Integration tests (build → query → verify pipeline)
 └── fixtures/            — Test layer JSON files and config
 ```
 
@@ -435,6 +562,7 @@ default_k = 10
 zoom_weight = 2.0
 keyword_boost = 0.1
 semantic_weight = 0.0
+emotional_bias_weight = 0.0   # 0.0 = disabled, 0.0-1.0 = warp strength
 
 [memory_layers]
 layers = ["long_term", "short_term", "associative", "echo_cache"]
@@ -444,16 +572,14 @@ use_mmap = true
 cache_size = 64
 build_workers = 4
 use_gpu = false
-compression = false              # Enable zstd compression (requires --features compression)
-cache_ttl_secs = 300            # Query cache TTL in seconds
+compression = false
+cache_ttl_secs = 300
 
 [embedding]
 provider = "mock"           # "mock", "candle", or "onnx"
 model = "sentence-transformers/all-MiniLM-L6-v2"
 dim = 384
-max_depth = 4               # Only embed blocks D0-D4
-# onnx_model_path = "models/all-MiniLM-L6-v2.onnx"   # Required for onnx provider
-# tokenizer_path = "models/tokenizer.json"             # Required for onnx provider
+max_depth = 4
 
 [server]
 port = 6060
@@ -468,11 +594,6 @@ file = "microscope.log"
 # name = "project_a"
 # config_path = "/path/to/project_a/config.toml"
 # weight = 1.0
-#
-# [[federation.indices]]
-# name = "project_b"
-# config_path = "/path/to/project_b/config.toml"
-# weight = 0.8
 ```
 
 ## CLI Reference
@@ -481,28 +602,44 @@ file = "microscope.log"
 microscope-memory <COMMAND>
 
 Commands:
-  build          Build binary index from raw layer files [--force]
-  rebuild        Rebuild index (merges append log)
-  store          Store a new memory
-  recall         Natural language query with auto-zoom
-  query          MQL query (Microscope Query Language)
-  look           Manual look: x y z zoom [k]
-  soft           4D soft zoom: x y z zoom [k]
-  find           Text search
-  embed          Semantic search using embeddings
-  stats          Index statistics
-  bench          Performance benchmark
-  gpu-bench      GPU vs CPU benchmark
-  verify         CRC16 integrity check
-  verify-merkle  Merkle tree verification
-  proof          Merkle proof for a specific block
-  serve          Start HTTP server
-  export         Export index to .mscope archive
-  import         Import .mscope archive
-  diff           Compare two .mscope archives
-  federated-recall  Federated recall across multiple indices
-  federated-find    Federated text search across indices
-  mcp            Start native MCP server (JSON-RPC 2.0 over stdio)
+  build              Build binary index from raw layer files [--force]
+  rebuild            Rebuild index (merges append log)
+  store              Store a new memory
+  recall             Natural language query with auto-zoom
+  query              MQL query (Microscope Query Language)
+  look               Manual look: x y z zoom [k]
+  soft               4D soft zoom: x y z zoom [k]
+  radial             Radial search: x y z depth [--radius R] [k]
+  find               Text search
+  embed              Semantic search using embeddings
+  fingerprint        Build structural fingerprints and wormhole links
+  links              Show structural links for a block
+  similar            Find structurally similar blocks to text
+  hebbian            Show Hebbian learning state
+  hebbian-drift      Apply Hebbian drift (co-activated blocks pull closer)
+  hottest            Show hottest blocks (most activated)
+  mirror             Show mirror neuron state
+  resonant           Show most resonant blocks
+  resonance          Show resonance protocol state
+  integrate          Integrate received pulses into Hebbian state
+  pulse-exchange     Exchange resonance pulses across federated indices
+  archetypes         Show emerged archetypes
+  emerge             Detect new archetypes from resonance + Hebbian state
+  viz                Export 3D visualization snapshot (JSON)
+  density            Export binary density map for rendering
+  stats              Index statistics
+  bench              Performance benchmark
+  gpu-bench          GPU vs CPU benchmark
+  verify             CRC16 integrity check
+  verify-merkle      Merkle tree verification
+  proof              Merkle proof for a specific block
+  serve              Start HTTP server
+  export             Export index to .mscope archive
+  import             Import .mscope archive
+  diff               Compare two .mscope archives
+  federated-recall   Federated recall across multiple indices
+  federated-find     Federated text search across indices
+  mcp                Start native MCP server (JSON-RPC 2.0 over stdio)
 ```
 
 ## License

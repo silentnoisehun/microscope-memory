@@ -3,12 +3,12 @@
 //! Format: [u32 block_count][u32 dim][u32 max_depth][f32 × dim × embedded_count]
 //! Only blocks at depth 0..max_depth are embedded.
 
-use std::path::Path;
 use std::fs;
+use std::path::Path;
 
 use rayon::prelude::*;
 
-use crate::embeddings::{EmbeddingProvider, cosine_similarity_simd};
+use crate::embeddings::{cosine_similarity_simd, EmbeddingProvider};
 
 /// Mmap-backed embedding index for fast semantic lookup.
 #[allow(dead_code)]
@@ -24,27 +24,42 @@ const HEADER_SIZE: usize = 12; // 3 × u32
 impl EmbeddingIndex {
     /// Open an existing embeddings.bin file.
     pub fn open(path: &Path) -> Option<Self> {
-        if !path.exists() { return None; }
+        if !path.exists() {
+            return None;
+        }
         let file = fs::File::open(path).ok()?;
         let data = unsafe { memmap2::Mmap::map(&file).ok()? };
-        if data.len() < HEADER_SIZE { return None; }
+        if data.len() < HEADER_SIZE {
+            return None;
+        }
 
         let block_count = u32::from_le_bytes(data[0..4].try_into().unwrap());
         let dim = u32::from_le_bytes(data[4..8].try_into().unwrap());
         let max_depth = u32::from_le_bytes(data[8..12].try_into().unwrap());
 
         let expected = HEADER_SIZE + block_count as usize * dim as usize * 4;
-        if data.len() < expected { return None; }
+        if data.len() < expected {
+            return None;
+        }
 
-        Some(EmbeddingIndex { data, block_count, dim, max_depth })
+        Some(EmbeddingIndex {
+            data,
+            block_count,
+            dim,
+            max_depth,
+        })
     }
 
     /// Get embedding for block at index (zero-copy mmap access).
     pub fn embedding(&self, block_idx: usize) -> Option<&[f32]> {
-        if block_idx >= self.block_count as usize { return None; }
+        if block_idx >= self.block_count as usize {
+            return None;
+        }
         let offset = HEADER_SIZE + block_idx * self.dim as usize * 4;
         let end = offset + self.dim as usize * 4;
-        if end > self.data.len() { return None; }
+        if end > self.data.len() {
+            return None;
+        }
         // Safety: data is aligned to f32 by construction during build
         let ptr = self.data[offset..end].as_ptr() as *const f32;
         Some(unsafe { std::slice::from_raw_parts(ptr, self.dim as usize) })
@@ -69,7 +84,9 @@ impl EmbeddingIndex {
     /// Search for top-k most similar blocks to query embedding.
     /// Returns Vec<(similarity, block_index)> sorted descending.
     pub fn search(&self, query_emb: &[f32], k: usize) -> Vec<(f32, usize)> {
-        if query_emb.len() != self.dim as usize { return vec![]; }
+        if query_emb.len() != self.dim as usize {
+            return vec![];
+        }
 
         let mut results: Vec<(f32, usize)> = (0..self.block_count as usize)
             .into_par_iter()
@@ -77,9 +94,15 @@ impl EmbeddingIndex {
                 let emb = self.embedding(i)?;
                 // Check for zero embedding (unembedded block placeholder)
                 let is_zero = emb.iter().all(|&v| v == 0.0);
-                if is_zero { return None; }
+                if is_zero {
+                    return None;
+                }
                 let sim = cosine_similarity_simd(query_emb, emb);
-                if sim > 0.3 { Some((sim, i)) } else { None }
+                if sim > 0.3 {
+                    Some((sim, i))
+                } else {
+                    None
+                }
             })
             .collect();
 
@@ -107,7 +130,10 @@ pub fn build_embedding_index(
         }
     }
 
-    println!("  Embedding {} blocks (D0-D{}, dim={})...", embed_count, max_depth, dim);
+    println!(
+        "  Embedding {} blocks (D0-D{}, dim={})...",
+        embed_count, max_depth, dim
+    );
 
     // Build embeddings buffer: header + flat f32 vectors
     // Blocks outside max_depth get zero vectors
@@ -153,7 +179,10 @@ pub fn build_embedding_index(
 
     fs::write(output_path, &buf).map_err(|e| format!("write embeddings.bin: {}", e))?;
     let size_kb = buf.len() as f64 / 1024.0;
-    println!("  embeddings.bin: {:.1} KB ({} blocks, {} dim)", size_kb, total_blocks, dim);
+    println!(
+        "  embeddings.bin: {:.1} KB ({} blocks, {} dim)",
+        size_kb, total_blocks, dim
+    );
 
     Ok(())
 }

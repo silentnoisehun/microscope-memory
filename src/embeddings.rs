@@ -148,7 +148,9 @@ impl EmbeddingProvider for MockEmbeddingProvider {
     fn embed(&self, text: &str) -> Result<Vec<f32>, EmbeddingError> {
         // Simple hash-based embedding for testing
         let mut embedding = vec![0.0; self.dimension];
-        let hash = text.bytes().fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64));
+        let hash = text
+            .bytes()
+            .fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64));
 
         for (i, slot) in embedding.iter_mut().enumerate() {
             let val = ((hash.wrapping_mul(i as u64 + 1)) % 1000) as f32 / 1000.0;
@@ -189,11 +191,11 @@ pub struct EmbeddedBlockHeader {
     pub data_len: u16,
     pub parent_idx: u32,
     pub child_count: u16,
-    pub crc16: [u8; 2],  // CRC16-CCITT (0x0000 = no checksum)
+    pub crc16: [u8; 2], // CRC16-CCITT (0x0000 = no checksum)
 
     // New embedding fields
-    pub embedding_offset: u32,  // Offset into embedding file
-    pub has_embedding: bool,     // Whether this block has an embedding
+    pub embedding_offset: u32, // Offset into embedding file
+    pub has_embedding: bool,   // Whether this block has an embedding
 }
 
 // ─── Candle-based real embedding provider ────────────
@@ -216,37 +218,54 @@ impl CandleEmbeddingProvider {
         let repo = api.model(model_id.to_string());
 
         // Load tokenizer
-        let tokenizer_path = repo.get("tokenizer.json")
+        let tokenizer_path = repo
+            .get("tokenizer.json")
             .map_err(|e| EmbeddingError::ApiError(format!("tokenizer download: {}", e)))?;
         let tokenizer = tokenizers::Tokenizer::from_file(tokenizer_path)
             .map_err(|e| EmbeddingError::ApiError(format!("tokenizer load: {}", e)))?;
 
         // Load model weights
-        let weights_path = repo.get("model.safetensors")
+        let weights_path = repo
+            .get("model.safetensors")
             .map_err(|e| EmbeddingError::ApiError(format!("weights download: {}", e)))?;
-        let vb = candle_nn::VarBuilder::from_mmaped_safetensors(
-            &[weights_path], candle_core::DType::F32, &device,
-        ).map_err(|e| EmbeddingError::ApiError(format!("varbuilder: {}", e)))?;
+        // Safety: safetensors file is valid and will remain mapped for the lifetime of the model
+        let vb = unsafe {
+            candle_nn::VarBuilder::from_mmaped_safetensors(
+                &[weights_path],
+                candle_core::DType::F32,
+                &device,
+            )
+        }
+        .map_err(|e| EmbeddingError::ApiError(format!("varbuilder: {}", e)))?;
 
         // Load config
-        let config_path = repo.get("config.json")
+        let config_path = repo
+            .get("config.json")
             .map_err(|e| EmbeddingError::ApiError(format!("config download: {}", e)))?;
         let config_str = std::fs::read_to_string(config_path)
             .map_err(|e| EmbeddingError::ApiError(format!("config read: {}", e)))?;
-        let config: candle_transformers::models::bert::Config = serde_json::from_str(&config_str)
-            .map_err(|e| EmbeddingError::ApiError(format!("config parse: {}", e)))?;
+        let config: candle_transformers::models::bert::Config =
+            serde_json::from_str(&config_str)
+                .map_err(|e| EmbeddingError::ApiError(format!("config parse: {}", e)))?;
         let dim = config.hidden_size;
 
         let model = candle_transformers::models::bert::BertModel::load(vb, &config)
             .map_err(|e| EmbeddingError::ApiError(format!("model load: {}", e)))?;
 
-        Ok(Self { model, tokenizer, dim, device })
+        Ok(Self {
+            model,
+            tokenizer,
+            dim,
+            device,
+        })
     }
 
     fn embed_inner(&self, text: &str) -> Result<Vec<f32>, EmbeddingError> {
         use candle_core::Tensor;
 
-        let encoding = self.tokenizer.encode(text, true)
+        let encoding = self
+            .tokenizer
+            .encode(text, true)
             .map_err(|e| EmbeddingError::ApiError(format!("tokenize: {}", e)))?;
 
         let ids = encoding.get_ids();
@@ -262,16 +281,20 @@ impl CandleEmbeddingProvider {
             .reshape((1, len))
             .map_err(|e| EmbeddingError::ApiError(e.to_string()))?;
 
-        let output = self.model.forward(&input_ids, &token_type_ids, None)
+        let output = self
+            .model
+            .forward(&input_ids, &token_type_ids, None)
             .map_err(|e| EmbeddingError::ApiError(format!("forward: {}", e)))?;
 
         // Mean pooling over sequence dimension
-        let pooled = output.mean(1)
+        let pooled = output
+            .mean(1)
             .map_err(|e| EmbeddingError::ApiError(format!("mean pool: {}", e)))?
             .squeeze(0)
             .map_err(|e| EmbeddingError::ApiError(format!("squeeze: {}", e)))?;
 
-        let mut embedding: Vec<f32> = pooled.to_vec1()
+        let mut embedding: Vec<f32> = pooled
+            .to_vec1()
             .map_err(|e| EmbeddingError::ApiError(format!("to_vec: {}", e)))?;
 
         // L2 normalize

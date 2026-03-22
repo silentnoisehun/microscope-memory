@@ -5,9 +5,9 @@
 //! then does top-k selection on CPU.
 
 #[cfg(feature = "gpu")]
-use wgpu::{Device, Queue, Buffer, BufferUsages};
-#[cfg(feature = "gpu")]
 use std::sync::Arc;
+#[cfg(feature = "gpu")]
+use wgpu::{Buffer, BufferUsages, Device, Queue};
 
 #[cfg(feature = "gpu")]
 use crate::MicroscopeReader;
@@ -34,8 +34,8 @@ pub struct GpuAccelerator {
     compute_pipeline: wgpu::ComputePipeline,
     positions_buffer: Buffer,
     query_buffer: Buffer,
-    distances_buffer: Buffer,    // STORAGE | COPY_SRC
-    staging_buffer: Buffer,      // MAP_READ | COPY_DST
+    distances_buffer: Buffer, // STORAGE | COPY_SRC
+    staging_buffer: Buffer,   // MAP_READ | COPY_DST
     block_count: usize,
 }
 
@@ -180,14 +180,40 @@ impl GpuAccelerator {
     }
 
     /// GPU-accelerated 4D L2 search. Returns top-k (distance², index) pairs.
-    pub fn l2_search_4d(&self, x: f32, y: f32, z: f32, zoom: u8, zw: f32, k: usize) -> Vec<(f32, usize)> {
+    pub fn l2_search_4d(
+        &self,
+        x: f32,
+        y: f32,
+        z: f32,
+        zoom: u8,
+        zw: f32,
+        k: usize,
+    ) -> Vec<(f32, usize)> {
         pollster::block_on(self.l2_search_4d_async(x, y, z, zoom, zw, k))
     }
 
-    async fn l2_search_4d_async(&self, x: f32, y: f32, z: f32, zoom: u8, zw: f32, k: usize) -> Vec<(f32, usize)> {
+    async fn l2_search_4d_async(
+        &self,
+        x: f32,
+        y: f32,
+        z: f32,
+        zoom: u8,
+        zw: f32,
+        k: usize,
+    ) -> Vec<(f32, usize)> {
         let qz = zoom as f32 / 8.0;
-        let query = GpuQuery { x, y, z, qz, zw, _pad0: 0.0, _pad1: 0.0, _pad2: 0.0 };
-        self.queue.write_buffer(&self.query_buffer, 0, bytemuck::bytes_of(&query));
+        let query = GpuQuery {
+            x,
+            y,
+            z,
+            qz,
+            zw,
+            _pad0: 0.0,
+            _pad1: 0.0,
+            _pad2: 0.0,
+        };
+        self.queue
+            .write_buffer(&self.query_buffer, 0, bytemuck::bytes_of(&query));
 
         // Build bind group
         let bind_group_layout = self.compute_pipeline.get_bind_group_layout(0);
@@ -195,15 +221,26 @@ impl GpuAccelerator {
             label: Some("Compute BG"),
             layout: &bind_group_layout,
             entries: &[
-                wgpu::BindGroupEntry { binding: 0, resource: self.positions_buffer.as_entire_binding() },
-                wgpu::BindGroupEntry { binding: 1, resource: self.query_buffer.as_entire_binding() },
-                wgpu::BindGroupEntry { binding: 2, resource: self.distances_buffer.as_entire_binding() },
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: self.positions_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: self.query_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: self.distances_buffer.as_entire_binding(),
+                },
             ],
         });
 
-        let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("Compute Encoder"),
-        });
+        let mut encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("Compute Encoder"),
+            });
 
         {
             let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
@@ -218,7 +255,13 @@ impl GpuAccelerator {
 
         // Copy distances → staging
         let byte_size = (self.block_count * std::mem::size_of::<f32>()) as u64;
-        encoder.copy_buffer_to_buffer(&self.distances_buffer, 0, &self.staging_buffer, 0, byte_size);
+        encoder.copy_buffer_to_buffer(
+            &self.distances_buffer,
+            0,
+            &self.staging_buffer,
+            0,
+            byte_size,
+        );
 
         self.queue.submit(Some(encoder.finish()));
 
@@ -235,7 +278,10 @@ impl GpuAccelerator {
         let distances: &[f32] = bytemuck::cast_slice(&mapped);
 
         // Top-k on CPU
-        let mut results: Vec<(f32, usize)> = distances.iter().copied().enumerate()
+        let mut results: Vec<(f32, usize)> = distances
+            .iter()
+            .copied()
+            .enumerate()
             .map(|(i, d)| (d, i))
             .collect();
 
@@ -243,7 +289,9 @@ impl GpuAccelerator {
         self.staging_buffer.unmap();
 
         let k = k.min(results.len());
-        if k == 0 { return vec![]; }
+        if k == 0 {
+            return vec![];
+        }
         results.select_nth_unstable_by(k - 1, |a, b| a.0.partial_cmp(&b.0).unwrap());
         results.truncate(k);
         results.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());

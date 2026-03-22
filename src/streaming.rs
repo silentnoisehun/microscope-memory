@@ -8,13 +8,13 @@
 //!   POST /query           → MQL query {"mql":"..."}
 //!   GET  /health          → health check
 
-use std::sync::Arc;
-use std::path::Path;
 use colored::Colorize;
 use serde::{Deserialize, Serialize};
+use std::path::Path;
+use std::sync::Arc;
 
 use crate::config::Config;
-use crate::{MicroscopeReader, store_memory, read_append_log, LAYER_NAMES, content_coords_blended};
+use crate::{content_coords_blended, read_append_log, store_memory, MicroscopeReader, LAYER_NAMES};
 
 #[derive(Deserialize)]
 struct StoreRequest {
@@ -25,8 +25,12 @@ struct StoreRequest {
     importance: u8,
 }
 
-fn default_layer() -> String { "long_term".to_string() }
-fn default_importance() -> u8 { 5 }
+fn default_layer() -> String {
+    "long_term".to_string()
+}
+fn default_importance() -> u8 {
+    5
+}
 
 #[derive(Deserialize)]
 struct RecallRequest {
@@ -40,7 +44,9 @@ struct MqlRequest {
     mql: String,
 }
 
-fn default_k() -> usize { 10 }
+fn default_k() -> usize {
+    10
+}
 
 #[derive(Serialize)]
 struct ResultEntry {
@@ -80,7 +86,8 @@ pub fn start_endpoint_server(config: Config, port: u16) {
 
     let config = Arc::new(config);
     let pool_size = std::thread::available_parallelism()
-        .map(|n| n.get().min(8)).unwrap_or(4);
+        .map(|n| n.get().min(8))
+        .unwrap_or(4);
     let server = Arc::new(server);
 
     let mut handles = Vec::new();
@@ -143,11 +150,11 @@ fn content_type_json() -> tiny_http::Header {
 fn respond(request: tiny_http::Request, result: Result<String, String>, cors: &str) {
     match result {
         Ok(json) => {
-            let mut resp = tiny_http::Response::from_string(&json)
-                .with_header(content_type_json());
+            let mut resp = tiny_http::Response::from_string(&json).with_header(content_type_json());
             if !cors.is_empty() {
                 resp = resp.with_header(
-                    tiny_http::Header::from_bytes("Access-Control-Allow-Origin", cors.as_bytes()).unwrap()
+                    tiny_http::Header::from_bytes("Access-Control-Allow-Origin", cors.as_bytes())
+                        .unwrap(),
                 );
             }
             let _ = request.respond(resp);
@@ -170,7 +177,10 @@ fn handle_stats(config: &Config) -> Result<String, String> {
     let stats = StatsResponse {
         block_count: reader.block_count,
         append_count: appended.len(),
-        depths: reader.depth_ranges.iter().enumerate()
+        depths: reader
+            .depth_ranges
+            .iter()
+            .enumerate()
             .map(|(d, &(_, c))| DepthInfo { depth: d, count: c })
             .collect(),
     };
@@ -190,31 +200,40 @@ fn handle_find(url: &str, config: &Config) -> Result<String, String> {
     let reader = MicroscopeReader::open(config);
     let results = reader.find_text(&q, k);
 
-    let entries: Vec<ResultEntry> = results.iter().map(|&(_, idx)| {
-        let h = reader.header(idx);
-        ResultEntry {
-            text: reader.text(idx).to_string(),
-            depth: h.depth,
-            layer: LAYER_NAMES.get(h.layer_id as usize).unwrap_or(&"?").to_string(),
-            score: 0.0,
-            is_append: false,
-        }
-    }).collect();
+    let entries: Vec<ResultEntry> = results
+        .iter()
+        .map(|&(_, idx)| {
+            let h = reader.header(idx);
+            ResultEntry {
+                text: reader.text(idx).to_string(),
+                depth: h.depth,
+                layer: LAYER_NAMES
+                    .get(h.layer_id as usize)
+                    .unwrap_or(&"?")
+                    .to_string(),
+                score: 0.0,
+                is_append: false,
+            }
+        })
+        .collect();
 
     serde_json::to_string(&entries).map_err(|e| e.to_string())
 }
 
 fn handle_store(body: &str, config: &Config) -> Result<String, String> {
-    let req: StoreRequest = serde_json::from_str(body).map_err(|e| format!("invalid JSON: {}", e))?;
+    let req: StoreRequest =
+        serde_json::from_str(body).map_err(|e| format!("invalid JSON: {}", e))?;
     store_memory(config, &req.text, &req.layer, req.importance);
     Ok("{\"status\":\"stored\"}".to_string())
 }
 
 fn handle_recall(body: &str, config: &Config) -> Result<String, String> {
-    let req: RecallRequest = serde_json::from_str(body).map_err(|e| format!("invalid JSON: {}", e))?;
+    let req: RecallRequest =
+        serde_json::from_str(body).map_err(|e| format!("invalid JSON: {}", e))?;
 
     let reader = MicroscopeReader::open(config);
-    let (qx, qy, qz) = content_coords_blended(&req.query, "long_term", config.search.semantic_weight);
+    let (qx, qy, qz) =
+        content_coords_blended(&req.query, "long_term", config.search.semantic_weight);
 
     let q_lower = req.query.to_lowercase();
     let keywords: Vec<&str> = q_lower.split_whitespace().filter(|w| w.len() > 2).collect();
@@ -238,7 +257,7 @@ fn handle_recall(body: &str, config: &Config) -> Result<String, String> {
                 let dx = h.x - qx;
                 let dy = h.y - qy;
                 let dz = h.z - qz;
-                let dist = dx*dx + dy*dy + dz*dz;
+                let dist = dx * dx + dy * dy + dz * dz;
                 let boost = hits as f32 * 0.1;
                 all.push(((dist - boost).max(0.0), i, true));
             }
@@ -251,9 +270,12 @@ fn handle_recall(body: &str, config: &Config) -> Result<String, String> {
         let dx = entry.x - qx;
         let dy = entry.y - qy;
         let dz = entry.z - qz;
-        let dist = dx*dx + dy*dy + dz*dz;
+        let dist = dx * dx + dy * dy + dz * dz;
         let text_lower = entry.text.to_lowercase();
-        let hits = keywords.iter().filter(|&&kw| text_lower.contains(kw)).count();
+        let hits = keywords
+            .iter()
+            .filter(|&&kw| text_lower.contains(kw))
+            .count();
         if dist < 0.1 || hits > 0 {
             let boost = hits as f32 * 0.1;
             all.push(((dist - boost).max(0.0), ai + 1_000_000, false));
@@ -263,28 +285,37 @@ fn handle_recall(body: &str, config: &Config) -> Result<String, String> {
     all.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
     all.truncate(req.k);
 
-    let entries: Vec<ResultEntry> = all.iter().map(|&(score, idx, is_main)| {
-        if is_main {
-            let h = reader.header(idx);
-            ResultEntry {
-                text: reader.text(idx).to_string(),
-                depth: h.depth,
-                layer: LAYER_NAMES.get(h.layer_id as usize).unwrap_or(&"?").to_string(),
-                score,
-                is_append: false,
+    let entries: Vec<ResultEntry> = all
+        .iter()
+        .map(|&(score, idx, is_main)| {
+            if is_main {
+                let h = reader.header(idx);
+                ResultEntry {
+                    text: reader.text(idx).to_string(),
+                    depth: h.depth,
+                    layer: LAYER_NAMES
+                        .get(h.layer_id as usize)
+                        .unwrap_or(&"?")
+                        .to_string(),
+                    score,
+                    is_append: false,
+                }
+            } else {
+                let ai = idx - 1_000_000;
+                let e = &appended[ai];
+                ResultEntry {
+                    text: e.text.clone(),
+                    depth: e.depth,
+                    layer: LAYER_NAMES
+                        .get(e.layer_id as usize)
+                        .unwrap_or(&"?")
+                        .to_string(),
+                    score,
+                    is_append: true,
+                }
             }
-        } else {
-            let ai = idx - 1_000_000;
-            let e = &appended[ai];
-            ResultEntry {
-                text: e.text.clone(),
-                depth: e.depth,
-                layer: LAYER_NAMES.get(e.layer_id as usize).unwrap_or(&"?").to_string(),
-                score,
-                is_append: true,
-            }
-        }
-    }).collect();
+        })
+        .collect();
 
     serde_json::to_string(&entries).map_err(|e| e.to_string())
 }
@@ -299,28 +330,37 @@ fn handle_mql(body: &str, config: &Config) -> Result<String, String> {
 
     let results = crate::query::execute(&q, &reader, &appended);
 
-    let entries: Vec<ResultEntry> = results.iter().map(|r| {
-        if r.is_main {
-            let h = reader.header(r.block_idx);
-            ResultEntry {
-                text: reader.text(r.block_idx).to_string(),
-                depth: h.depth,
-                layer: LAYER_NAMES.get(h.layer_id as usize).unwrap_or(&"?").to_string(),
-                score: r.score,
-                is_append: false,
+    let entries: Vec<ResultEntry> = results
+        .iter()
+        .map(|r| {
+            if r.is_main {
+                let h = reader.header(r.block_idx);
+                ResultEntry {
+                    text: reader.text(r.block_idx).to_string(),
+                    depth: h.depth,
+                    layer: LAYER_NAMES
+                        .get(h.layer_id as usize)
+                        .unwrap_or(&"?")
+                        .to_string(),
+                    score: r.score,
+                    is_append: false,
+                }
+            } else {
+                let ai = r.block_idx - 1_000_000;
+                let e = &appended[ai];
+                ResultEntry {
+                    text: e.text.clone(),
+                    depth: e.depth,
+                    layer: LAYER_NAMES
+                        .get(e.layer_id as usize)
+                        .unwrap_or(&"?")
+                        .to_string(),
+                    score: r.score,
+                    is_append: true,
+                }
             }
-        } else {
-            let ai = r.block_idx - 1_000_000;
-            let e = &appended[ai];
-            ResultEntry {
-                text: e.text.clone(),
-                depth: e.depth,
-                layer: LAYER_NAMES.get(e.layer_id as usize).unwrap_or(&"?").to_string(),
-                score: r.score,
-                is_append: true,
-            }
-        }
-    }).collect();
+        })
+        .collect();
 
     serde_json::to_string(&entries).map_err(|e| e.to_string())
 }

@@ -9,8 +9,10 @@ use wasm_bindgen::prelude::*;
 #[cfg(target_arch = "wasm32")]
 use web_sys::console;
 
-use crate::{BlockHeader, HEADER_SIZE, META_HEADER_SIZE, DEPTH_ENTRY_SIZE, LAYER_NAMES,
-            content_coords_blended, BLOCK_DATA_SIZE};
+use crate::{
+    content_coords_blended, BlockHeader, BLOCK_DATA_SIZE, DEPTH_ENTRY_SIZE, HEADER_SIZE,
+    LAYER_NAMES, META_HEADER_SIZE,
+};
 
 /// JavaScript-accessible block result
 #[cfg(target_arch = "wasm32")]
@@ -29,19 +31,33 @@ pub struct WasmBlock {
 #[wasm_bindgen]
 impl WasmBlock {
     #[wasm_bindgen(getter)]
-    pub fn text(&self) -> String { self.text.clone() }
+    pub fn text(&self) -> String {
+        self.text.clone()
+    }
     #[wasm_bindgen(getter)]
-    pub fn x(&self) -> f32 { self.x }
+    pub fn x(&self) -> f32 {
+        self.x
+    }
     #[wasm_bindgen(getter)]
-    pub fn y(&self) -> f32 { self.y }
+    pub fn y(&self) -> f32 {
+        self.y
+    }
     #[wasm_bindgen(getter)]
-    pub fn z(&self) -> f32 { self.z }
+    pub fn z(&self) -> f32 {
+        self.z
+    }
     #[wasm_bindgen(getter)]
-    pub fn depth(&self) -> u8 { self.depth }
+    pub fn depth(&self) -> u8 {
+        self.depth
+    }
     #[wasm_bindgen(getter)]
-    pub fn layer(&self) -> String { self.layer.clone() }
+    pub fn layer(&self) -> String {
+        self.layer.clone()
+    }
     #[wasm_bindgen(getter)]
-    pub fn distance(&self) -> f32 { self.distance }
+    pub fn distance(&self) -> f32 {
+        self.distance
+    }
 }
 
 /// Internal reader that owns the binary data (no mmap).
@@ -65,18 +81,27 @@ impl WasmReader {
 
         let expected_hdr_size = block_count * HEADER_SIZE;
         if headers.len() < expected_hdr_size {
-            return Err(format!("headers too small: {} < {}", headers.len(), expected_hdr_size));
+            return Err(format!(
+                "headers too small: {} < {}",
+                headers.len(),
+                expected_hdr_size
+            ));
         }
 
         let mut depth_ranges = [(0u32, 0u32); 9];
         for d in 0..9 {
             let off = META_HEADER_SIZE + d * DEPTH_ENTRY_SIZE;
-            let start = u32::from_le_bytes(meta[off..off+4].try_into().unwrap());
-            let count = u32::from_le_bytes(meta[off+4..off+8].try_into().unwrap());
+            let start = u32::from_le_bytes(meta[off..off + 4].try_into().unwrap());
+            let count = u32::from_le_bytes(meta[off + 4..off + 8].try_into().unwrap());
             depth_ranges[d] = (start, count);
         }
 
-        Ok(WasmReader { headers, data, block_count, depth_ranges })
+        Ok(WasmReader {
+            headers,
+            data,
+            block_count,
+            depth_ranges,
+        })
     }
 
     #[inline(always)]
@@ -106,10 +131,12 @@ impl WasmReader {
             let dx = h.x - x;
             let dy = h.y - y;
             let dz = h.z - z;
-            results.push((dx*dx + dy*dy + dz*dz, i));
+            results.push((dx * dx + dy * dy + dz * dz, i));
         }
         let k = k.min(results.len());
-        if k == 0 { return vec![]; }
+        if k == 0 {
+            return vec![];
+        }
         results.select_nth_unstable_by(k - 1, |a, b| a.0.partial_cmp(&b.0).unwrap());
         results.truncate(k);
         results.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
@@ -125,11 +152,13 @@ impl WasmReader {
                 let dy = h.y - y;
                 let dz = h.z - z;
                 let dw = (h.zoom - qz) * zw;
-                (dx*dx + dy*dy + dz*dz + dw*dw, i)
+                (dx * dx + dy * dy + dz * dz + dw * dw, i)
             })
             .collect();
         let k = k.min(results.len());
-        if k == 0 { return vec![]; }
+        if k == 0 {
+            return vec![];
+        }
         results.select_nth_unstable_by(k - 1, |a, b| a.0.partial_cmp(&b.0).unwrap());
         results.truncate(k);
         results.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
@@ -155,9 +184,7 @@ impl WasmReader {
     fn recall(&self, query: &str, k: usize) -> Vec<(f32, usize)> {
         let (qx, qy, qz) = content_coords_blended(query, "long_term", 0.0);
         let q_lower = query.to_lowercase();
-        let keywords: Vec<&str> = q_lower.split_whitespace()
-            .filter(|w| w.len() > 2)
-            .collect();
+        let keywords: Vec<&str> = q_lower.split_whitespace().filter(|w| w.len() > 2).collect();
 
         let zoom_range = match query.len() {
             0..=10 => (0u8, 3u8),
@@ -177,7 +204,7 @@ impl WasmReader {
                     let dx = h.x - qx;
                     let dy = h.y - qy;
                     let dz = h.z - qz;
-                    let spatial = dx*dx + dy*dy + dz*dz;
+                    let spatial = dx * dx + dy * dy + dz * dz;
                     let boost = keyword_hits as f32 * 0.1;
                     results.push(((spatial - boost).max(0.0), i));
                 }
@@ -195,7 +222,9 @@ impl WasmReader {
         let layer = LAYER_NAMES.get(h.layer_id as usize).unwrap_or(&"?");
         WasmBlock {
             text: text.to_string(),
-            x: h.x, y: h.y, z: h.z,
+            x: h.x,
+            y: h.y,
+            z: h.z,
             depth: h.depth,
             layer: layer.to_string(),
             distance: dist,
@@ -209,7 +238,9 @@ struct WasmAppendEntry {
     layer_id: u8,
     importance: u8,
     depth: u8,
-    x: f32, y: f32, z: f32,
+    x: f32,
+    y: f32,
+    z: f32,
 }
 
 /// Main WASM interface for Microscope Memory
@@ -252,7 +283,8 @@ impl MicroscopeWasm {
             Some(r) => r,
             None => return vec![],
         };
-        reader.look(x, y, z, zoom, k)
+        reader
+            .look(x, y, z, zoom, k)
             .into_iter()
             .map(|(dist, idx)| reader.to_wasm_block(idx, dist))
             .collect()
@@ -265,7 +297,8 @@ impl MicroscopeWasm {
             Some(r) => r,
             None => return vec![],
         };
-        reader.look_soft(x, y, z, zoom, k, 2.0)
+        reader
+            .look_soft(x, y, z, zoom, k, 2.0)
             .into_iter()
             .map(|(dist, idx)| reader.to_wasm_block(idx, dist))
             .collect()
@@ -278,7 +311,8 @@ impl MicroscopeWasm {
             Some(r) => r,
             None => return vec![],
         };
-        reader.recall(query, k)
+        reader
+            .recall(query, k)
             .into_iter()
             .map(|(dist, idx)| reader.to_wasm_block(idx, dist))
             .collect()
@@ -291,7 +325,8 @@ impl MicroscopeWasm {
             Some(r) => r,
             None => return vec![],
         };
-        reader.find_text(query, k)
+        reader
+            .find_text(query, k)
             .into_iter()
             .map(|(_d, idx)| reader.to_wasm_block(idx, 0.0))
             .collect()
@@ -302,38 +337,68 @@ impl MicroscopeWasm {
     pub fn store(&mut self, text: &str, layer: &str, importance: u8) {
         let (x, y, z) = content_coords_blended(text, layer, 0.0);
         let layer_id = crate::layer_to_id(layer);
-        let depth = if text.len() >= 100 { 3 } else if text.len() >= 40 { 4 } else if text.len() >= 15 { 5 } else { 6 };
+        let depth = if text.len() >= 100 {
+            3
+        } else if text.len() >= 40 {
+            4
+        } else if text.len() >= 15 {
+            5
+        } else {
+            6
+        };
         self.append_entries.push(WasmAppendEntry {
             text: text.to_string(),
-            layer_id, importance, depth, x, y, z,
+            layer_id,
+            importance,
+            depth,
+            x,
+            y,
+            z,
         });
     }
 
     /// Load append log from binary (APv2 format)
     #[wasm_bindgen]
     pub fn load_append(&mut self, data: &[u8]) {
-        if data.len() < 4 { return; }
+        if data.len() < 4 {
+            return;
+        }
         let is_v2 = &data[0..4] == b"APv2";
         let mut pos = if is_v2 { 4 } else { 0 };
         let hdr_size = if is_v2 { 19 } else { 18 };
 
         while pos + hdr_size <= data.len() {
-            let len = u32::from_le_bytes(data[pos..pos+4].try_into().unwrap()) as usize;
-            let lid = data[pos+4];
-            let imp = data[pos+5];
+            let len = u32::from_le_bytes(data[pos..pos + 4].try_into().unwrap()) as usize;
+            let lid = data[pos + 4];
+            let imp = data[pos + 5];
             let (depth, coords_start) = if is_v2 {
-                (data[pos+6], pos + 7)
+                (data[pos + 6], pos + 7)
             } else {
                 (4u8, pos + 6)
             };
-            let x = f32::from_le_bytes(data[coords_start..coords_start+4].try_into().unwrap());
-            let y = f32::from_le_bytes(data[coords_start+4..coords_start+8].try_into().unwrap());
-            let z = f32::from_le_bytes(data[coords_start+8..coords_start+12].try_into().unwrap());
+            let x = f32::from_le_bytes(data[coords_start..coords_start + 4].try_into().unwrap());
+            let y =
+                f32::from_le_bytes(data[coords_start + 4..coords_start + 8].try_into().unwrap());
+            let z = f32::from_le_bytes(
+                data[coords_start + 8..coords_start + 12]
+                    .try_into()
+                    .unwrap(),
+            );
             pos += hdr_size;
-            if pos + len > data.len() { break; }
-            let text = String::from_utf8_lossy(&data[pos..pos+len]).to_string();
+            if pos + len > data.len() {
+                break;
+            }
+            let text = String::from_utf8_lossy(&data[pos..pos + len]).to_string();
             pos += len;
-            self.append_entries.push(WasmAppendEntry { text, layer_id: lid, importance: imp, depth, x, y, z });
+            self.append_entries.push(WasmAppendEntry {
+                text,
+                layer_id: lid,
+                importance: imp,
+                depth,
+                x,
+                y,
+                z,
+            });
         }
     }
 

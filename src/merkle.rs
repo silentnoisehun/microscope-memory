@@ -3,7 +3,7 @@
 //! Leaf = SHA-256(block_data). Parent = SHA-256(left || right).
 //! Odd leaf count → last leaf is promoted (hashed with itself).
 
-use sha2::{Sha256, Digest};
+use sha2::{Digest, Sha256};
 
 pub struct MerkleTree {
     /// All nodes: leaves first, then internal nodes bottom-up. Root is last.
@@ -65,12 +65,18 @@ impl MerkleTree {
         }
 
         let root = *nodes.last().unwrap();
-        MerkleTree { nodes, leaf_count, root }
+        MerkleTree {
+            nodes,
+            leaf_count,
+            root,
+        }
     }
 
     /// Verify a single leaf at index against stored hash.
     pub fn verify_leaf(&self, index: usize, data: &[u8]) -> bool {
-        if index >= self.leaf_count { return false; }
+        if index >= self.leaf_count {
+            return false;
+        }
         let mut h = Sha256::new();
         h.update(data);
         let computed: [u8; 32] = h.finalize().into();
@@ -80,7 +86,9 @@ impl MerkleTree {
     /// Get Merkle proof path for a leaf.
     /// Returns Vec of (sibling_hash, is_right) pairs from leaf to root.
     pub fn proof(&self, index: usize) -> Vec<([u8; 32], bool)> {
-        if index >= self.leaf_count { return vec![]; }
+        if index >= self.leaf_count {
+            return vec![];
+        }
 
         let mut path = Vec::new();
         let mut level_start = 0;
@@ -148,11 +156,17 @@ impl MerkleTree {
 
     /// Deserialize from bytes.
     pub fn from_bytes(data: &[u8]) -> Option<Self> {
-        if data.len() < 8 { return None; }
+        if data.len() < 8 {
+            return None;
+        }
         let leaf_count = u32::from_le_bytes(data[0..4].try_into().ok()?) as usize;
         let node_count = u32::from_le_bytes(data[4..8].try_into().ok()?) as usize;
-        if data.len() < 8 + node_count * 32 { return None; }
-        if leaf_count == 0 || node_count == 0 { return None; }
+        if data.len() < 8 + node_count * 32 {
+            return None;
+        }
+        if leaf_count == 0 || node_count == 0 {
+            return None;
+        }
 
         let mut nodes = Vec::with_capacity(node_count);
         for i in 0..node_count {
@@ -163,7 +177,11 @@ impl MerkleTree {
         }
 
         let root = *nodes.last()?;
-        Some(MerkleTree { nodes, leaf_count, root })
+        Some(MerkleTree {
+            nodes,
+            leaf_count,
+            root,
+        })
     }
 }
 
@@ -210,8 +228,11 @@ mod tests {
 
         for i in 0..8 {
             let proof = tree.proof(i);
-            assert!(MerkleTree::verify_proof(&tree.root, &leaves[i], &proof),
-                "proof failed for leaf {}", i);
+            assert!(
+                MerkleTree::verify_proof(&tree.root, &leaves[i], &proof),
+                "proof failed for leaf {}",
+                i
+            );
         }
     }
 

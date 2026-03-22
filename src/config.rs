@@ -67,10 +67,18 @@ pub struct Embedding {
     pub max_depth: u8,
 }
 
-fn default_provider() -> String { "mock".to_string() }
-fn default_model() -> String { "sentence-transformers/all-MiniLM-L6-v2".to_string() }
-fn default_dim() -> usize { 384 }
-fn default_max_depth() -> u8 { 4 }
+fn default_provider() -> String {
+    "mock".to_string()
+}
+fn default_model() -> String {
+    "sentence-transformers/all-MiniLM-L6-v2".to_string()
+}
+fn default_dim() -> usize {
+    384
+}
+fn default_max_depth() -> u8 {
+    4
+}
 
 impl Default for Embedding {
     fn default() -> Self {
@@ -91,11 +99,16 @@ pub struct Server {
     pub cors_origin: Option<String>,
 }
 
-fn default_port() -> u16 { 6060 }
+fn default_port() -> u16 {
+    6060
+}
 
 impl Default for Server {
     fn default() -> Self {
-        Self { port: default_port(), cors_origin: None }
+        Self {
+            port: default_port(),
+            cors_origin: None,
+        }
     }
 }
 

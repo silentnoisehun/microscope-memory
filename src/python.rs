@@ -7,7 +7,7 @@ use pyo3::prelude::*;
 #[cfg(feature = "python")]
 use pyo3::types::PyList;
 
-use crate::embeddings::{MockEmbeddingProvider, EmbeddingProvider, cosine_similarity_simd};
+use crate::embeddings::{cosine_similarity_simd, EmbeddingProvider, MockEmbeddingProvider};
 
 #[cfg(feature = "python")]
 #[pyclass]
@@ -53,7 +53,11 @@ impl PyMicroscope {
     pub fn add_block(&mut self, text: String, x: f32, y: f32, z: f32, depth: u8, layer_id: u8) {
         let block = PyBlock {
             text: text.clone(),
-            x, y, z, depth, layer_id,
+            x,
+            y,
+            z,
+            depth,
+            layer_id,
             similarity: 0.0,
         };
 
@@ -68,11 +72,17 @@ impl PyMicroscope {
     }
 
     /// Semantic search using embeddings
-    pub fn semantic_search(&self, query: String, k: usize, metric: Option<String>) -> PyResult<Vec<PyBlock>> {
+    pub fn semantic_search(
+        &self,
+        query: String,
+        k: usize,
+        metric: Option<String>,
+    ) -> PyResult<Vec<PyBlock>> {
         let metric = metric.unwrap_or_else(|| "cosine".to_string());
 
-        let query_embedding = self.provider.embed(&query)
-            .map_err(|_| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>("Failed to generate embedding"))?;
+        let query_embedding = self.provider.embed(&query).map_err(|_| {
+            PyErr::new::<pyo3::exceptions::PyRuntimeError, _>("Failed to generate embedding")
+        })?;
 
         let mut results = Vec::new();
 
@@ -80,22 +90,25 @@ impl PyMicroscope {
             if i < self.embeddings.len() {
                 let similarity = match metric.as_str() {
                     "cosine" => cosine_similarity_simd(&query_embedding, &self.embeddings[i]),
-                    "dot" => query_embedding.iter()
+                    "dot" => query_embedding
+                        .iter()
                         .zip(self.embeddings[i].iter())
                         .map(|(a, b)| a * b)
                         .sum(),
                     "l2" => {
-                        let dist: f32 = query_embedding.iter()
+                        let dist: f32 = query_embedding
+                            .iter()
                             .zip(self.embeddings[i].iter())
                             .map(|(a, b)| (a - b).powi(2))
                             .sum::<f32>()
                             .sqrt();
                         1.0 / (1.0 + dist)
-                    },
+                    }
                     _ => cosine_similarity_simd(&query_embedding, &self.embeddings[i]),
                 };
 
-                if similarity > 0.3 {  // Threshold
+                if similarity > 0.3 {
+                    // Threshold
                     let mut result_block = block.clone();
                     result_block.similarity = similarity;
                     results.push((similarity, result_block));
@@ -110,7 +123,14 @@ impl PyMicroscope {
     }
 
     /// Spatial search (L2 distance in 3D space)
-    pub fn spatial_search(&self, x: f32, y: f32, z: f32, radius: f32, depth: Option<u8>) -> PyResult<Vec<PyBlock>> {
+    pub fn spatial_search(
+        &self,
+        x: f32,
+        y: f32,
+        z: f32,
+        radius: f32,
+        depth: Option<u8>,
+    ) -> PyResult<Vec<PyBlock>> {
         let mut results = Vec::new();
 
         for block in &self.blocks {
@@ -124,7 +144,7 @@ impl PyMicroscope {
             let dx = block.x - x;
             let dy = block.y - y;
             let dz = block.z - z;
-            let dist = (dx*dx + dy*dy + dz*dz).sqrt();
+            let dist = (dx * dx + dy * dy + dz * dz).sqrt();
 
             if dist <= radius {
                 let mut result_block = block.clone();
@@ -140,11 +160,19 @@ impl PyMicroscope {
     }
 
     /// Hybrid search combining semantic and spatial
-    pub fn hybrid_search(&self, query: String, x: f32, y: f32, z: f32,
-                          semantic_weight: f32, spatial_weight: f32, k: usize) -> PyResult<Vec<PyBlock>> {
-
-        let query_embedding = self.provider.embed(&query)
-            .map_err(|_| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>("Failed to generate embedding"))?;
+    pub fn hybrid_search(
+        &self,
+        query: String,
+        x: f32,
+        y: f32,
+        z: f32,
+        semantic_weight: f32,
+        spatial_weight: f32,
+        k: usize,
+    ) -> PyResult<Vec<PyBlock>> {
+        let query_embedding = self.provider.embed(&query).map_err(|_| {
+            PyErr::new::<pyo3::exceptions::PyRuntimeError, _>("Failed to generate embedding")
+        })?;
 
         let mut results = Vec::new();
 
@@ -157,7 +185,7 @@ impl PyMicroscope {
                 let dx = block.x - x;
                 let dy = block.y - y;
                 let dz = block.z - z;
-                let dist = (dx*dx + dy*dy + dz*dz).sqrt();
+                let dist = (dx * dx + dy * dy + dz * dz).sqrt();
                 let spatial_sim = 1.0 / (1.0 + dist);
 
                 // Combined score
@@ -203,9 +231,10 @@ impl PyMicroscope {
 
     /// Export blocks as list
     pub fn export_blocks(&self) -> Vec<(String, f32, f32, f32, u8, u8)> {
-        self.blocks.iter().map(|b| {
-            (b.text.clone(), b.x, b.y, b.z, b.depth, b.layer_id)
-        }).collect()
+        self.blocks
+            .iter()
+            .map(|b| (b.text.clone(), b.x, b.y, b.z, b.depth, b.layer_id))
+            .collect()
     }
 
     /// Get statistics
@@ -231,7 +260,8 @@ fn microscope_memory(_py: Python, m: &PyModule) -> PyResult<()> {
 #[cfg(feature = "python")]
 /// Helper function to create NumPy arrays (future enhancement)
 pub fn blocks_to_numpy(blocks: &[PyBlock]) -> Vec<Vec<f32>> {
-    blocks.iter().map(|b| {
-        vec![b.x, b.y, b.z, b.depth as f32]
-    }).collect()
+    blocks
+        .iter()
+        .map(|b| vec![b.x, b.y, b.z, b.depth as f32])
+        .collect()
 }

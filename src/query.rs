@@ -12,15 +12,15 @@
 //!
 //! Filters compose: `layer:long_term depth:3..5 "Ora" AND "memory"`
 
-use crate::{MicroscopeReader, LAYER_NAMES, AppendEntry};
+use crate::{AppendEntry, MicroscopeReader, LAYER_NAMES};
 
 #[derive(Debug, Clone)]
 pub struct Query {
     pub keywords: Vec<String>,
     pub op: BoolOp,
     pub layer_filter: Option<u8>,
-    pub depth_filter: Option<(u8, u8)>,  // (min, max) inclusive
-    pub spatial_filter: Option<(f32, f32, f32, f32)>,  // x, y, z, radius
+    pub depth_filter: Option<(u8, u8)>, // (min, max) inclusive
+    pub spatial_filter: Option<(f32, f32, f32, f32)>, // x, y, z, radius
     pub limit: usize,
 }
 
@@ -50,7 +50,9 @@ pub fn parse(input: &str) -> Query {
 
     while !remaining.is_empty() {
         remaining = remaining.trim_start();
-        if remaining.is_empty() { break; }
+        if remaining.is_empty() {
+            break;
+        }
 
         // layer:NAME
         if let Some(rest) = remaining.strip_prefix("layer:") {
@@ -115,8 +117,8 @@ pub fn parse(input: &str) -> Query {
         // Quoted keyword: "..."
         if remaining.starts_with('"') {
             if let Some(end) = remaining[1..].find('"') {
-                q.keywords.push(remaining[1..1+end].to_lowercase());
-                remaining = &remaining[2+end..];
+                q.keywords.push(remaining[1..1 + end].to_lowercase());
+                remaining = &remaining[2 + end..];
                 continue;
             }
         }
@@ -143,15 +145,11 @@ fn take_word(s: &str) -> (String, &str) {
 pub struct QueryResult {
     pub score: f32,
     pub block_idx: usize,
-    pub is_main: bool,  // true = main index, false = append log
+    pub is_main: bool, // true = main index, false = append log
 }
 
 /// Execute a parsed query against the reader and append log.
-pub fn execute(
-    q: &Query,
-    reader: &MicroscopeReader,
-    appended: &[AppendEntry],
-) -> Vec<QueryResult> {
+pub fn execute(q: &Query, reader: &MicroscopeReader, appended: &[AppendEntry]) -> Vec<QueryResult> {
     let mut results = Vec::new();
 
     // Search main index
@@ -160,12 +158,16 @@ pub fn execute(
 
         // Layer filter
         if let Some(lid) = q.layer_filter {
-            if h.layer_id != lid { continue; }
+            if h.layer_id != lid {
+                continue;
+            }
         }
 
         // Depth filter
         if let Some((lo, hi)) = q.depth_filter {
-            if h.depth < lo || h.depth > hi { continue; }
+            if h.depth < lo || h.depth > hi {
+                continue;
+            }
         }
 
         // Spatial filter
@@ -173,36 +175,52 @@ pub fn execute(
             let dx = h.x - sx;
             let dy = h.y - sy;
             let dz = h.z - sz;
-            if dx*dx + dy*dy + dz*dz > sr*sr { continue; }
+            if dx * dx + dy * dy + dz * dz > sr * sr {
+                continue;
+            }
         }
 
         // Keyword match
         let text = reader.text(i).to_lowercase();
         let score = keyword_score(&text, &q.keywords, &q.op);
         if score > 0.0 {
-            results.push(QueryResult { score, block_idx: i, is_main: true });
+            results.push(QueryResult {
+                score,
+                block_idx: i,
+                is_main: true,
+            });
         }
     }
 
     // Search append log
     for (ai, entry) in appended.iter().enumerate() {
         if let Some(lid) = q.layer_filter {
-            if entry.layer_id != lid { continue; }
+            if entry.layer_id != lid {
+                continue;
+            }
         }
         if let Some((lo, hi)) = q.depth_filter {
-            if entry.depth < lo || entry.depth > hi { continue; }
+            if entry.depth < lo || entry.depth > hi {
+                continue;
+            }
         }
         if let Some((sx, sy, sz, sr)) = q.spatial_filter {
             let dx = entry.x - sx;
             let dy = entry.y - sy;
             let dz = entry.z - sz;
-            if dx*dx + dy*dy + dz*dz > sr*sr { continue; }
+            if dx * dx + dy * dy + dz * dz > sr * sr {
+                continue;
+            }
         }
 
         let text = entry.text.to_lowercase();
         let score = keyword_score(&text, &q.keywords, &q.op);
         if score > 0.0 {
-            results.push(QueryResult { score, block_idx: ai + 1_000_000, is_main: false });
+            results.push(QueryResult {
+                score,
+                block_idx: ai + 1_000_000,
+                is_main: false,
+            });
         }
     }
 
@@ -213,9 +231,14 @@ pub fn execute(
 }
 
 fn keyword_score(text: &str, keywords: &[String], op: &BoolOp) -> f32 {
-    if keywords.is_empty() { return 1.0; }
+    if keywords.is_empty() {
+        return 1.0;
+    }
 
-    let hits: Vec<bool> = keywords.iter().map(|kw| text.contains(kw.as_str())).collect();
+    let hits: Vec<bool> = keywords
+        .iter()
+        .map(|kw| text.contains(kw.as_str()))
+        .collect();
     let hit_count = hits.iter().filter(|&&h| h).count();
 
     match op {
@@ -286,13 +309,29 @@ mod tests {
 
     #[test]
     fn test_keyword_score_and() {
-        assert_eq!(keyword_score("hello world", &["hello".into(), "world".into()], &BoolOp::And), 2.0);
-        assert_eq!(keyword_score("hello", &["hello".into(), "world".into()], &BoolOp::And), 0.0);
+        assert_eq!(
+            keyword_score(
+                "hello world",
+                &["hello".into(), "world".into()],
+                &BoolOp::And
+            ),
+            2.0
+        );
+        assert_eq!(
+            keyword_score("hello", &["hello".into(), "world".into()], &BoolOp::And),
+            0.0
+        );
     }
 
     #[test]
     fn test_keyword_score_or() {
-        assert_eq!(keyword_score("hello", &["hello".into(), "world".into()], &BoolOp::Or), 1.0);
-        assert_eq!(keyword_score("nope", &["hello".into(), "world".into()], &BoolOp::Or), 0.0);
+        assert_eq!(
+            keyword_score("hello", &["hello".into(), "world".into()], &BoolOp::Or),
+            1.0
+        );
+        assert_eq!(
+            keyword_score("nope", &["hello".into(), "world".into()], &BoolOp::Or),
+            0.0
+        );
     }
 }

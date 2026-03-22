@@ -114,29 +114,50 @@ pub struct MicroscopeReader {
 }
 
 impl MicroscopeReader {
-    pub fn open(config: &Config) -> Self {
+    pub fn open(config: &Config) -> Result<Self, String> {
         let output_dir = Path::new(&config.paths.output_dir);
         let meta_path = output_dir.join("meta.bin");
         let hdr_path = output_dir.join("microscope.bin");
         let dat_path = output_dir.join("data.bin");
 
-        let meta = fs::read(meta_path).expect("open meta.bin — run 'build' first");
+        let meta = fs::read(&meta_path)
+            .map_err(|e| format!("open meta.bin — run 'build' first: {}", e))?;
+        if meta.len() < 12 {
+            return Err("meta.bin too small".to_string());
+        }
         let magic = &meta[0..4];
-        assert!(
-            magic == b"MSCM" || magic == b"MSC2" || magic == b"MSC3",
-            "invalid magic: expected MSCM, MSC2 or MSC3"
-        );
-        let block_count = u32::from_le_bytes(meta[8..12].try_into().unwrap()) as usize;
+        if magic != b"MSCM" && magic != b"MSC2" && magic != b"MSC3" {
+            return Err("invalid magic: expected MSCM, MSC2 or MSC3".to_string());
+        }
+        let block_count = u32::from_le_bytes(
+            meta[8..12]
+                .try_into()
+                .map_err(|_| "meta.bin: bad block_count bytes")?,
+        ) as usize;
         let mut depth_ranges = [(0u32, 0u32); 9];
         for (d, range) in depth_ranges.iter_mut().enumerate() {
             let off = META_HEADER_SIZE + d * DEPTH_ENTRY_SIZE;
-            let start = u32::from_le_bytes(meta[off..off + 4].try_into().unwrap());
-            let count = u32::from_le_bytes(meta[off + 4..off + 8].try_into().unwrap());
+            if off + 8 > meta.len() {
+                return Err(format!("meta.bin truncated at depth {}", d));
+            }
+            let start = u32::from_le_bytes(
+                meta[off..off + 4]
+                    .try_into()
+                    .map_err(|_| "meta.bin: bad depth range bytes")?,
+            );
+            let count = u32::from_le_bytes(
+                meta[off + 4..off + 8]
+                    .try_into()
+                    .map_err(|_| "meta.bin: bad depth range bytes")?,
+            );
             *range = (start, count);
         }
 
-        let hdr_file = fs::File::open(hdr_path).expect("open headers");
-        let headers = unsafe { memmap2::Mmap::map(&hdr_file).expect("mmap headers") };
+        let hdr_file =
+            fs::File::open(&hdr_path).map_err(|e| format!("open microscope.bin: {}", e))?;
+        // Safety: microscope.bin is read-only and will remain valid for the lifetime of MicroscopeReader
+        let headers =
+            unsafe { memmap2::Mmap::map(&hdr_file).map_err(|e| format!("mmap headers: {}", e))? };
 
         #[cfg(feature = "compression")]
         let data = {
@@ -152,28 +173,37 @@ impl MicroscopeReader {
                         })
                         .unwrap_or(false))
             {
-                let compressed = fs::read(&zst_path).expect("read data.bin.zst");
-                let decompressed =
-                    zstd::decode_all(std::io::Cursor::new(&compressed)).expect("zstd decompress");
+                let compressed =
+                    fs::read(&zst_path).map_err(|e| format!("read data.bin.zst: {}", e))?;
+                let decompressed = zstd::decode_all(std::io::Cursor::new(&compressed))
+                    .map_err(|e| format!("zstd decompress: {}", e))?;
                 DataStore::InMemory(decompressed)
             } else {
-                let dat_file = fs::File::open(&dat_path).expect("open data");
-                DataStore::Mmap(unsafe { memmap2::Mmap::map(&dat_file).expect("mmap data") })
+                let dat_file =
+                    fs::File::open(&dat_path).map_err(|e| format!("open data.bin: {}", e))?;
+                // Safety: data.bin is read-only and will remain valid for the lifetime of MicroscopeReader
+                DataStore::Mmap(unsafe {
+                    memmap2::Mmap::map(&dat_file).map_err(|e| format!("mmap data.bin: {}", e))?
+                })
             }
         };
 
         #[cfg(not(feature = "compression"))]
         let data = {
-            let dat_file = fs::File::open(&dat_path).expect("open data");
-            DataStore::Mmap(unsafe { memmap2::Mmap::map(&dat_file).expect("mmap data") })
+            let dat_file =
+                fs::File::open(&dat_path).map_err(|e| format!("open data.bin: {}", e))?;
+            // Safety: data.bin is read-only and will remain valid for the lifetime of MicroscopeReader
+            DataStore::Mmap(unsafe {
+                memmap2::Mmap::map(&dat_file).map_err(|e| format!("mmap data.bin: {}", e))?
+            })
         };
 
-        MicroscopeReader {
+        Ok(MicroscopeReader {
             headers,
             data,
             block_count,
             depth_ranges,
-        }
+        })
     }
 
     #[inline(always)]
@@ -397,7 +427,12 @@ pub fn print_append_result(appended: &[AppendEntry], idx: usize, dist: f32) {
     }
 }
 
-pub fn store_memory(config: &Config, text: &str, layer: &str, importance: u8) {
+pub fn store_memory(
+    config: &Config,
+    text: &str,
+    layer: &str,
+    importance: u8,
+) -> Result<(), String> {
     let t0 = std::time::Instant::now();
     let (x, y, z) = content_coords_blended(text, layer, config.search.semantic_weight);
     let lid = layer_to_id(layer);
@@ -414,23 +449,28 @@ pub fn store_memory(config: &Config, text: &str, layer: &str, importance: u8) {
         .create(true)
         .append(true)
         .open(&append_path)
-        .expect("open append log");
+        .map_err(|e| format!("open append log: {}", e))?;
+
+    let write = |f: &mut fs::File, data: &[u8]| -> Result<(), String> {
+        f.write_all(data)
+            .map_err(|e| format!("write append log: {}", e))
+    };
 
     if needs_magic {
-        file.write_all(b"APv2").unwrap();
+        write(&mut file, b"APv2")?;
     }
 
     let text_bytes = text.as_bytes();
     let len = text_bytes.len().min(BLOCK_DATA_SIZE);
 
-    file.write_all(&(len as u32).to_le_bytes()).unwrap();
-    file.write_all(&[lid]).unwrap();
-    file.write_all(&[importance]).unwrap();
-    file.write_all(&[depth]).unwrap();
-    file.write_all(&x.to_le_bytes()).unwrap();
-    file.write_all(&y.to_le_bytes()).unwrap();
-    file.write_all(&z.to_le_bytes()).unwrap();
-    file.write_all(&text_bytes[..len]).unwrap();
+    write(&mut file, &(len as u32).to_le_bytes())?;
+    write(&mut file, &[lid])?;
+    write(&mut file, &[importance])?;
+    write(&mut file, &[depth])?;
+    write(&mut file, &x.to_le_bytes())?;
+    write(&mut file, &y.to_le_bytes())?;
+    write(&mut file, &z.to_le_bytes())?;
+    write(&mut file, &text_bytes[..len])?;
 
     let elapsed = t0.elapsed();
     println!(
@@ -445,4 +485,5 @@ pub fn store_memory(config: &Config, text: &str, layer: &str, importance: u8) {
         safe_truncate(text, 60)
     );
     println!("  {} ns", elapsed.as_nanos());
+    Ok(())
 }

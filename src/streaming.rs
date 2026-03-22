@@ -170,7 +170,7 @@ fn respond(request: tiny_http::Request, result: Result<String, String>, cors: &s
 }
 
 fn handle_stats(config: &Config) -> Result<String, String> {
-    let reader = MicroscopeReader::open(config);
+    let reader = MicroscopeReader::open(config)?;
     let append_path = Path::new(&config.paths.output_dir).join("append.bin");
     let appended = read_append_log(&append_path);
 
@@ -197,7 +197,7 @@ fn handle_find(url: &str, config: &Config) -> Result<String, String> {
         return Err("missing query parameter 'q'".to_string());
     }
 
-    let reader = MicroscopeReader::open(config);
+    let reader = MicroscopeReader::open(config)?;
     let results = reader.find_text(&q, k);
 
     let entries: Vec<ResultEntry> = results
@@ -223,7 +223,7 @@ fn handle_find(url: &str, config: &Config) -> Result<String, String> {
 fn handle_store(body: &str, config: &Config) -> Result<String, String> {
     let req: StoreRequest =
         serde_json::from_str(body).map_err(|e| format!("invalid JSON: {}", e))?;
-    store_memory(config, &req.text, &req.layer, req.importance);
+    store_memory(config, &req.text, &req.layer, req.importance)?;
     Ok("{\"status\":\"stored\"}".to_string())
 }
 
@@ -231,7 +231,7 @@ fn handle_recall(body: &str, config: &Config) -> Result<String, String> {
     let req: RecallRequest =
         serde_json::from_str(body).map_err(|e| format!("invalid JSON: {}", e))?;
 
-    let reader = MicroscopeReader::open(config);
+    let reader = MicroscopeReader::open(config)?;
     let (qx, qy, qz) =
         content_coords_blended(&req.query, "long_term", config.search.semantic_weight);
 
@@ -324,7 +324,7 @@ fn handle_mql(body: &str, config: &Config) -> Result<String, String> {
     let req: MqlRequest = serde_json::from_str(body).map_err(|e| format!("invalid JSON: {}", e))?;
 
     let q = crate::query::parse(&req.mql);
-    let reader = MicroscopeReader::open(config);
+    let reader = MicroscopeReader::open(config)?;
     let append_path = Path::new(&config.paths.output_dir).join("append.bin");
     let appended = read_append_log(&append_path);
 

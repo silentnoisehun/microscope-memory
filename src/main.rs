@@ -32,6 +32,10 @@ use colored::Colorize;
 
 // ─── Command handlers ────────────────────────────────
 
+fn open_reader(config: &Config) -> MicroscopeReader {
+    MicroscopeReader::open(config).expect("Failed to open microscope index — run 'build' first")
+}
+
 fn bench(config: &Config, reader: &MicroscopeReader) {
     println!("{}", "Benchmark: 10,000 queries per zoom level".cyan());
     println!("  Mode: SIMD={} Rayon=true", cfg!(target_arch = "x86_64"));
@@ -121,7 +125,7 @@ fn stats(reader: &MicroscopeReader) {
 
 fn recall(config: &Config, query: &str, k: usize) {
     let t0 = Instant::now();
-    let reader = MicroscopeReader::open(config);
+    let reader = open_reader(config);
     println!("{} '{}':", "RECALL".cyan().bold(), query);
 
     let (qx, qy, qz) = content_coords_blended(query, "long_term", config.search.semantic_weight);
@@ -211,7 +215,7 @@ fn semantic_search(config: &Config, query: &str, k: usize, metric: &str) {
         metric.green()
     );
 
-    let reader = MicroscopeReader::open(config);
+    let reader = open_reader(config);
     let output_dir = Path::new(&config.paths.output_dir);
     let emb_path = output_dir.join("embeddings.bin");
 
@@ -334,7 +338,7 @@ fn semantic_search(config: &Config, query: &str, k: usize, metric: &str) {
 }
 
 fn verify_integrity(config: &Config) {
-    let reader = MicroscopeReader::open(config);
+    let reader = open_reader(config);
     println!(
         "{} {} blocks...",
         "VERIFY".cyan().bold(),
@@ -394,7 +398,7 @@ fn verify_integrity(config: &Config) {
 }
 
 fn gpu_bench(config: &Config) {
-    let reader = MicroscopeReader::open(config);
+    let reader = open_reader(config);
     println!(
         "{} {} blocks",
         "GPU BENCH".cyan().bold(),
@@ -525,7 +529,7 @@ fn verify_merkle(config: &Config) {
         return;
     }
 
-    let reader = MicroscopeReader::open(config);
+    let reader = open_reader(config);
     let mut bad_blocks = Vec::new();
     for i in 0..reader.block_count {
         let h = reader.header(i);
@@ -586,7 +590,7 @@ fn merkle_proof(config: &Config, block_index: usize) {
         return;
     }
 
-    let reader = MicroscopeReader::open(config);
+    let reader = open_reader(config);
     let h = reader.header(block_index);
     let text = reader.text(block_index);
     let layer = LAYER_NAMES.get(h.layer_id as usize).unwrap_or(&"?");
@@ -628,20 +632,22 @@ fn main() {
     });
 
     match cli.cmd {
-        Cmd::Build { force } => microscope_memory::build::build(&config, force),
+        Cmd::Build { force } => {
+            microscope_memory::build::build(&config, force).expect("build failed");
+        }
         Cmd::Store {
             text,
             layer,
             importance,
         } => {
-            store_memory(&config, &text, &layer, importance);
+            store_memory(&config, &text, &layer, importance).expect("store failed");
         }
         Cmd::Recall { query, k } => {
             recall(&config, &query, k);
         }
         Cmd::Look { x, y, z, zoom, k } => {
             let config_clone = config.clone();
-            let r = MicroscopeReader::open(&config);
+            let r = open_reader(&config);
             println!(
                 "{} ({:.2},{:.2},{:.2}) zoom={}:",
                 "MICROSCOPE".cyan().bold(),
@@ -669,7 +675,7 @@ fn main() {
             k,
             gpu: use_gpu,
         } => {
-            let r = MicroscopeReader::open(&config);
+            let r = open_reader(&config);
             let use_gpu = use_gpu || config.performance.use_gpu;
             println!(
                 "{} 4D ({:.2},{:.2},{:.2}) z={} {}:",
@@ -721,9 +727,9 @@ fn main() {
                 }
             }
         }
-        Cmd::Bench => bench(&config, &MicroscopeReader::open(&config)),
+        Cmd::Bench => bench(&config, &open_reader(&config)),
         Cmd::Stats => {
-            let r = MicroscopeReader::open(&config);
+            let r = open_reader(&config);
             stats(&r);
             let append_path = Path::new(&config.paths.output_dir).join("append.bin");
             let appended = read_append_log(&append_path);
@@ -736,7 +742,7 @@ fn main() {
             }
         }
         Cmd::Find { query, k } => {
-            let r = MicroscopeReader::open(&config);
+            let r = open_reader(&config);
             println!("{} '{}':", "FIND".cyan().bold(), query);
             let res = r.find_text(&query, k);
             if res.is_empty() {
@@ -748,7 +754,7 @@ fn main() {
         }
         Cmd::Rebuild => {
             println!("{}", "Rebuilding with append log...".cyan());
-            microscope_memory::build::build(&config, true);
+            microscope_memory::build::build(&config, true).expect("rebuild failed");
             let append_path = Path::new(&config.paths.output_dir).join("append.bin");
             let _ = fs::remove_file(append_path);
             println!("  Append log cleared.");
@@ -774,7 +780,7 @@ fn main() {
         Cmd::Query { mql } => {
             let t0 = Instant::now();
             let q = microscope_memory::query::parse(&mql);
-            let reader = MicroscopeReader::open(&config);
+            let reader = open_reader(&config);
             let append_path = Path::new(&config.paths.output_dir).join("append.bin");
             let appended = read_append_log(&append_path);
             let results = microscope_memory::query::execute(&q, &reader, &appended);

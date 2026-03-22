@@ -32,7 +32,7 @@ fn test_full_build_pipeline() {
     let (_tmp, config) = setup_test_env();
 
     // Build should succeed
-    microscope_memory::build::build(&config, true);
+    microscope_memory::build::build(&config, true).unwrap();
 
     // Verify output files exist
     let output_dir = Path::new(&config.paths.output_dir);
@@ -61,9 +61,9 @@ fn test_full_build_pipeline() {
 #[test]
 fn test_build_and_read() {
     let (_tmp, config) = setup_test_env();
-    microscope_memory::build::build(&config, true);
+    microscope_memory::build::build(&config, true).unwrap();
 
-    let reader = microscope_memory::MicroscopeReader::open(&config);
+    let reader = microscope_memory::MicroscopeReader::open(&config).expect("open reader");
     assert!(reader.block_count > 0, "should have blocks after build");
 
     // D0 should have exactly 1 block (identity)
@@ -82,9 +82,9 @@ fn test_build_and_read() {
 #[test]
 fn test_text_search() {
     let (_tmp, config) = setup_test_env();
-    microscope_memory::build::build(&config, true);
+    microscope_memory::build::build(&config, true).unwrap();
 
-    let reader = microscope_memory::MicroscopeReader::open(&config);
+    let reader = microscope_memory::MicroscopeReader::open(&config).expect("open reader");
 
     // Search for "Rust" should find matches
     let results = reader.find_text("Rust", 10);
@@ -98,7 +98,7 @@ fn test_text_search() {
 #[test]
 fn test_store_and_recall() {
     let (_tmp, config) = setup_test_env();
-    microscope_memory::build::build(&config, true);
+    microscope_memory::build::build(&config, true).unwrap();
 
     // Store a new memory
     microscope_memory::store_memory(
@@ -106,7 +106,8 @@ fn test_store_and_recall() {
         "Test memory about quantum computing",
         "long_term",
         5,
-    );
+    )
+    .expect("store");
 
     // Verify append log exists
     let append_path = Path::new(&config.paths.output_dir).join("append.bin");
@@ -126,11 +127,11 @@ fn test_incremental_build_skips() {
     let (_tmp, config) = setup_test_env();
 
     // First build
-    microscope_memory::build::build(&config, false);
+    microscope_memory::build::build(&config, false).expect("build");
     let meta1 = fs::read(Path::new(&config.paths.output_dir).join("meta.bin")).unwrap();
 
     // Second build (should skip -- layers unchanged)
-    microscope_memory::build::build(&config, false);
+    microscope_memory::build::build(&config, false).expect("build");
     let meta2 = fs::read(Path::new(&config.paths.output_dir).join("meta.bin")).unwrap();
 
     // Meta should be identical (no rebuild happened)
@@ -145,18 +146,18 @@ fn test_incremental_build_force() {
     let (_tmp, config) = setup_test_env();
 
     // First build
-    microscope_memory::build::build(&config, false);
+    microscope_memory::build::build(&config, false).expect("build");
 
     // Force rebuild should complete without error
-    microscope_memory::build::build(&config, true);
+    microscope_memory::build::build(&config, true).unwrap();
 }
 
 #[test]
 fn test_mql_query() {
     let (_tmp, config) = setup_test_env();
-    microscope_memory::build::build(&config, true);
+    microscope_memory::build::build(&config, true).unwrap();
 
-    let reader = microscope_memory::MicroscopeReader::open(&config);
+    let reader = microscope_memory::MicroscopeReader::open(&config).expect("open reader");
     let append_path = Path::new(&config.paths.output_dir).join("append.bin");
     let appended = microscope_memory::read_append_log(&append_path);
 
@@ -182,9 +183,9 @@ fn test_mql_query() {
 #[test]
 fn test_crc_integrity_after_build() {
     let (_tmp, config) = setup_test_env();
-    microscope_memory::build::build(&config, true);
+    microscope_memory::build::build(&config, true).unwrap();
 
-    let reader = microscope_memory::MicroscopeReader::open(&config);
+    let reader = microscope_memory::MicroscopeReader::open(&config).expect("open reader");
 
     // All blocks should have valid CRC
     for i in 0..reader.block_count {
@@ -203,13 +204,13 @@ fn test_crc_integrity_after_build() {
 #[test]
 fn test_merkle_integrity_after_build() {
     let (_tmp, config) = setup_test_env();
-    microscope_memory::build::build(&config, true);
+    microscope_memory::build::build(&config, true).unwrap();
 
     let output_dir = Path::new(&config.paths.output_dir);
     let merkle_data = fs::read(output_dir.join("merkle.bin")).unwrap();
     let tree = microscope_memory::merkle::MerkleTree::from_bytes(&merkle_data).unwrap();
 
-    let reader = microscope_memory::MicroscopeReader::open(&config);
+    let reader = microscope_memory::MicroscopeReader::open(&config).expect("open reader");
 
     // Verify all leaves against Merkle tree
     for i in 0..reader.block_count {
@@ -228,7 +229,7 @@ fn test_merkle_integrity_after_build() {
 #[test]
 fn test_snapshot_export_import() {
     let (_tmp, config) = setup_test_env();
-    microscope_memory::build::build(&config, true);
+    microscope_memory::build::build(&config, true).unwrap();
 
     let output_dir = Path::new(&config.paths.output_dir);
     let archive_path = output_dir.join("test.mscope");
@@ -251,7 +252,7 @@ fn test_snapshot_export_import() {
 #[test]
 fn test_embedding_index_search() {
     let (_tmp, config) = setup_test_env();
-    microscope_memory::build::build(&config, true);
+    microscope_memory::build::build(&config, true).unwrap();
 
     let output_dir = Path::new(&config.paths.output_dir);
     let emb_path = output_dir.join("embeddings.bin");
@@ -271,7 +272,7 @@ fn test_embedding_index_search() {
 
         // Generate a query embedding — use same text as block 0 for guaranteed match
         use microscope_memory::embeddings::{EmbeddingProvider, MockEmbeddingProvider};
-        let reader = microscope_memory::MicroscopeReader::open(&config);
+        let reader = microscope_memory::MicroscopeReader::open(&config).expect("open reader");
         let block0_text = reader.text(0);
         let provider = MockEmbeddingProvider::new(idx.dim());
         let query_emb = provider.embed(block0_text).unwrap();

@@ -170,7 +170,7 @@ pub fn compute_layers_hash(config: &Config) -> [u8; 32] {
 }
 
 // ─── BUILD: layers/ → binary ─────────────────────────
-pub fn build(config: &Config, force: bool) {
+pub fn build(config: &Config, force: bool) -> Result<(), String> {
     let layers_hash = compute_layers_hash(config);
 
     // Incremental build check — skip if layers unchanged
@@ -182,7 +182,7 @@ pub fn build(config: &Config, force: bool) {
                 let stored_hash = &meta[120..152];
                 if stored_hash == &layers_hash[..] {
                     println!("{}", "Layers unchanged — skipping rebuild".green().bold());
-                    return;
+                    return Ok(());
                 }
             }
         }
@@ -199,7 +199,7 @@ pub fn build(config: &Config, force: bool) {
     let output_dir = Path::new(&config.paths.output_dir);
 
     if !output_dir.exists() {
-        fs::create_dir_all(output_dir).expect("create output dir");
+        fs::create_dir_all(output_dir).map_err(|e| format!("create output dir: {}", e))?;
     }
 
     let layer_files = &config.memory_layers.layers;
@@ -568,8 +568,11 @@ pub fn build(config: &Config, force: bool) {
     let dat_path = output_dir.join("data.bin");
     let meta_path = output_dir.join("meta.bin");
 
-    let mut hdr_file = BufWriter::new(fs::File::create(&hdr_path).expect("create headers"));
-    let mut dat_file = BufWriter::new(fs::File::create(&dat_path).expect("create data"));
+    let mut hdr_file = BufWriter::new(
+        fs::File::create(&hdr_path).map_err(|e| format!("create microscope.bin: {}", e))?,
+    );
+    let mut dat_file =
+        BufWriter::new(fs::File::create(&dat_path).map_err(|e| format!("create data.bin: {}", e))?);
 
     let mut depth_ranges: Vec<(u32, u32)> = vec![(0, 0); 9];
     let mut cur_depth: u8 = 0;
@@ -577,9 +580,13 @@ pub fn build(config: &Config, force: bool) {
 
     for (new_i, &old_i) in indices.iter().enumerate() {
         let b = &blocks[old_i];
-        let offset = dat_file.stream_position().unwrap() as u32; // Get current write position
+        let offset = dat_file
+            .stream_position()
+            .map_err(|e| format!("data.bin stream_position: {}", e))? as u32;
         let len = b.data.len().min(BLOCK_DATA_SIZE) as u16;
-        dat_file.write_all(&b.data[..len as usize]).unwrap();
+        dat_file
+            .write_all(&b.data[..len as usize])
+            .map_err(|e| format!("write data.bin: {}", e))?;
 
         let parent = if b.parent_idx == u32::MAX {
             u32::MAX
@@ -605,7 +612,9 @@ pub fn build(config: &Config, force: bool) {
         let bytes: &[u8] = unsafe {
             std::slice::from_raw_parts(&hdr as *const BlockHeader as *const u8, HEADER_SIZE)
         };
-        hdr_file.write_all(bytes).expect("write hdr");
+        hdr_file
+            .write_all(bytes)
+            .map_err(|e| format!("write microscope.bin: {}", e))?;
 
         // Track depth ranges
         if b.depth != cur_depth {
@@ -615,19 +624,24 @@ pub fn build(config: &Config, force: bool) {
         }
     }
     depth_ranges[cur_depth as usize] = (range_start, n as u32 - range_start);
-    hdr_file.flush().unwrap();
-    dat_file.flush().unwrap();
+    hdr_file
+        .flush()
+        .map_err(|e| format!("flush microscope.bin: {}", e))?;
+    dat_file
+        .flush()
+        .map_err(|e| format!("flush data.bin: {}", e))?;
 
     // ═══ Optional zstd compression of data.bin ═══
     #[cfg(feature = "compression")]
     if config.performance.compression {
-        let raw_data = fs::read(&dat_path).expect("read data.bin for compression");
+        let raw_data =
+            fs::read(&dat_path).map_err(|e| format!("read data.bin for compression: {}", e))?;
         let raw_size = raw_data.len();
-        let compressed =
-            zstd::encode_all(std::io::Cursor::new(&raw_data), 3).expect("zstd compress");
+        let compressed = zstd::encode_all(std::io::Cursor::new(&raw_data), 3)
+            .map_err(|e| format!("zstd compress: {}", e))?;
         let comp_size = compressed.len();
         let zst_path = output_dir.join("data.bin.zst");
-        fs::write(&zst_path, &compressed).expect("write data.bin.zst");
+        fs::write(&zst_path, &compressed).map_err(|e| format!("write data.bin.zst: {}", e))?;
         let ratio = if comp_size > 0 {
             raw_size as f64 / comp_size as f64
         } else {
@@ -645,11 +659,16 @@ pub fn build(config: &Config, force: bool) {
     // ═══ Merkle tree: SHA-256 over all block data ═══
     let merkle_path = output_dir.join("merkle.bin");
     // Re-read data.bin to get all block data slices for Merkle leaves
-    hdr_file.flush().unwrap();
-    dat_file.flush().unwrap();
+    hdr_file
+        .flush()
+        .map_err(|e| format!("flush microscope.bin: {}", e))?;
+    dat_file
+        .flush()
+        .map_err(|e| format!("flush data.bin: {}", e))?;
 
-    let dat_bytes = fs::read(&dat_path).expect("read data.bin for merkle");
-    let hdr_bytes = fs::read(&hdr_path).expect("read microscope.bin for merkle");
+    let dat_bytes = fs::read(&dat_path).map_err(|e| format!("read data.bin for merkle: {}", e))?;
+    let hdr_bytes =
+        fs::read(&hdr_path).map_err(|e| format!("read microscope.bin for merkle: {}", e))?;
     let mut leaf_slices: Vec<&[u8]> = Vec::with_capacity(n);
     for i in 0..n {
         let hdr_off = i * HEADER_SIZE;
@@ -665,7 +684,8 @@ pub fn build(config: &Config, force: bool) {
     }
 
     let merkle_tree = merkle::MerkleTree::build(&leaf_slices);
-    fs::write(&merkle_path, merkle_tree.to_bytes()).expect("write merkle.bin");
+    fs::write(&merkle_path, merkle_tree.to_bytes())
+        .map_err(|e| format!("write merkle.bin: {}", e))?;
     println!(
         "  {}: {} leaves, root={}",
         "merkle".green(),
@@ -685,11 +705,11 @@ pub fn build(config: &Config, force: bool) {
     }
     meta_buf.extend_from_slice(&merkle_tree.root); // 32 bytes merkle root
     meta_buf.extend_from_slice(&layers_hash); // 32 bytes layers content hash
-    fs::write(meta_path, &meta_buf).expect("write meta");
+    fs::write(meta_path, &meta_buf).map_err(|e| format!("write meta.bin: {}", e))?;
 
     // Report
     let hdr_size = n * HEADER_SIZE;
-    let dat_size = dat_file.stream_position().unwrap() as usize; // Get final data size
+    let dat_size = dat_file.stream_position().unwrap_or(0) as usize; // Get final data size
     let meta_size = meta_buf.len();
     println!(
         "\n  {}: {} bytes ({:.1} KB)",
@@ -727,7 +747,7 @@ pub fn build(config: &Config, force: bool) {
     if config.embedding.provider != "none" {
         println!("\n  Building embedding index...");
         let emb_path = output_dir.join("embeddings.bin");
-        let reader = MicroscopeReader::open(config);
+        let reader = MicroscopeReader::open(config)?;
         let max_depth = config.embedding.max_depth;
 
         #[cfg(feature = "embeddings")]
@@ -766,4 +786,5 @@ pub fn build(config: &Config, force: bool) {
     }
 
     println!("\n{}", "ZERO JSON. Pure binary. Done.".green().bold());
+    Ok(())
 }

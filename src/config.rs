@@ -14,6 +14,8 @@ pub struct Config {
     pub embedding: Embedding,
     #[serde(default)]
     pub server: Server,
+    #[serde(default)]
+    pub federation: Federation,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -53,6 +55,12 @@ pub struct Performance {
     pub use_gpu: bool,
     #[serde(default)]
     pub compression: bool,
+    #[serde(default = "default_cache_ttl")]
+    pub cache_ttl_secs: u64,
+}
+
+fn default_cache_ttl() -> u64 {
+    300
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -65,6 +73,10 @@ pub struct Embedding {
     pub dim: usize,
     #[serde(default = "default_max_depth")]
     pub max_depth: u8,
+    #[serde(default)]
+    pub onnx_model_path: Option<String>,
+    #[serde(default)]
+    pub tokenizer_path: Option<String>,
 }
 
 fn default_provider() -> String {
@@ -87,6 +99,8 @@ impl Default for Embedding {
             model: default_model(),
             dim: default_dim(),
             max_depth: default_max_depth(),
+            onnx_model_path: None,
+            tokenizer_path: None,
         }
     }
 }
@@ -116,6 +130,24 @@ impl Default for Server {
 pub struct Logging {
     pub level: String,
     pub file: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+pub struct Federation {
+    #[serde(default)]
+    pub indices: Vec<FederatedIndex>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct FederatedIndex {
+    pub name: String,
+    pub config_path: String,
+    #[serde(default = "default_weight")]
+    pub weight: f32,
+}
+
+fn default_weight() -> f32 {
+    1.0
 }
 
 impl Config {
@@ -159,6 +191,7 @@ impl Default for Config {
                 build_workers: 4,
                 use_gpu: false,
                 compression: false,
+                cache_ttl_secs: default_cache_ttl(),
             },
             logging: Logging {
                 level: "info".to_string(),
@@ -166,6 +199,7 @@ impl Default for Config {
             },
             embedding: Embedding::default(),
             server: Server::default(),
+            federation: Federation::default(),
         }
     }
 }

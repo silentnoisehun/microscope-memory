@@ -825,5 +825,56 @@ fn main() {
                 Err(e) => eprintln!("  {} {}", "ERROR:".red(), e),
             }
         }
+        Cmd::FederatedRecall { query, k } => {
+            let fed = microscope_memory::federation::FederatedSearch::from_config(&config)
+                .expect("federation config");
+            let results = fed.recall(&query, k);
+            println!(
+                "{} '{}' across {} indices:",
+                "FEDERATED RECALL".cyan().bold(),
+                query,
+                config.federation.indices.len()
+            );
+            if results.is_empty() {
+                println!("  (no results)");
+            }
+            for r in &results {
+                println!(
+                    "  [D{} {} score={:.3} src={}] {}",
+                    r.depth,
+                    r.layer,
+                    r.score,
+                    r.source_index.cyan(),
+                    microscope_memory::safe_truncate(&r.text, 80)
+                );
+            }
+            println!("\n  {} results", results.len());
+        }
+        Cmd::FederatedFind { query, k } => {
+            let fed = microscope_memory::federation::FederatedSearch::from_config(&config)
+                .expect("federation config");
+            let results = fed.find_text(&query, k);
+            println!(
+                "{} '{}' across {} indices:",
+                "FEDERATED FIND".cyan().bold(),
+                query,
+                config.federation.indices.len()
+            );
+            if results.is_empty() {
+                println!("  (no results)");
+            }
+            for r in &results {
+                println!(
+                    "  [D{} {} src={}] {}",
+                    r.depth,
+                    r.layer,
+                    r.source_index.cyan(),
+                    microscope_memory::safe_truncate(&r.text, 80)
+                );
+            }
+        }
+        Cmd::Mcp => {
+            microscope_memory::mcp::run(config);
+        }
     }
 }

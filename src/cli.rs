@@ -115,4 +115,18 @@ pub enum Cmd {
         /// Second archive
         b: String,
     },
+    /// Federated recall across multiple indices
+    FederatedRecall {
+        query: String,
+        #[arg(default_value = "10")]
+        k: usize,
+    },
+    /// Federated text search across multiple indices
+    FederatedFind {
+        query: String,
+        #[arg(default_value = "10")]
+        k: usize,
+    },
+    /// Start native MCP server (JSON-RPC 2.0 over stdio)
+    Mcp,
 }

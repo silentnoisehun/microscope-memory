@@ -16,7 +16,10 @@ A memory indexing system that treats data like looking through a microscope — 
 - **Hybrid search**: L2 distance + keyword matching + semantic embeddings
 - **Real embeddings**: Candle BERT models (all-MiniLM-L6-v2) with mmap-backed embedding index
 - **Query language (MQL)**: Structured queries with layer/depth/spatial filters and boolean operators
-- **HTTP server**: tiny_http-powered REST API with thread pool
+- **HTTP server**: tiny_http-powered REST API with thread pool + SSE streaming
+- **LRU query cache**: Two-tier cache with TTL for sub-microsecond repeated queries
+- **Multi-index federation**: Query multiple indices in parallel, merge results
+- **ONNX Runtime embeddings**: Native ONNX inference as alternative to Candle (optional)
 - **Snapshot archives**: `.mscope` format for backup, restore, and diff
 - **Merkle integrity**: SHA-256 tree with per-block verification and proofs
 - **Fixed viewport**: 256 bytes per block at every zoom level
@@ -193,6 +196,9 @@ Endpoints:
 | `POST` | `/store` | Store memory: `{"text":"...", "layer":"...", "importance": N}` |
 | `POST` | `/recall` | Recall query: `{"query":"...", "k": N}` |
 | `POST` | `/query` | MQL query: `{"mql":"layer:long_term \"Ora\""}` |
+| `GET` | `/recall/stream?q=...&k=N` | SSE streaming recall (real-time results) |
+| `POST` | `/federated/recall` | Federated recall: `{"query":"...", "k": N}` |
+| `POST` | `/federated/find` | Federated text search: `{"query":"...", "k": N}` |
 
 Examples:
 ```bash
@@ -202,6 +208,37 @@ curl -X POST http://localhost:6060/store -d '{"text":"test memory","layer":"long
 curl -X POST http://localhost:6060/recall -d '{"query":"What is Ora?","k":5}'
 curl -X POST http://localhost:6060/query -d '{"mql":"layer:long_term depth:2..5 \"Ora\""}'
 ```
+
+### MCP Server (Model Context Protocol)
+
+```bash
+# Start native MCP server (JSON-RPC 2.0 over stdio)
+microscope-memory mcp
+```
+
+Register in Claude Code's `.mcp.json`:
+```json
+{
+  "mcpServers": {
+    "microscope-memory": {
+      "command": "D:/microscope-memory-standalone/target/release/microscope-memory.exe",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+MCP Tools:
+
+| Tool | Description |
+|------|-------------|
+| `memory_status` | Index status: block count, depths, append log |
+| `memory_store` | Store new memory (text, layer, importance) |
+| `memory_recall` | Natural language recall with auto-zoom |
+| `memory_find` | Brute-force text search |
+| `memory_mql_query` | MQL query with layer/depth/spatial filters |
+| `memory_build` | Rebuild index from layer sources |
+| `memory_look` | Spatial look at 3D coordinates + zoom |
 
 ### Snapshot — backup, restore, diff
 
@@ -333,10 +370,13 @@ src/
 ├── build.rs             — Build pipeline: layers → binary decomposition (D0-D8)
 ├── reader.rs            — MicroscopeReader, BlockHeader, DataStore, append log
 ├── config.rs            — Configuration system (TOML-based)
-├── embeddings.rs        — Embedding providers (Mock + Candle BERT)
+├── embeddings.rs        — Embedding providers (Mock + Candle BERT + ONNX Runtime)
 ├── embedding_index.rs   — Mmap-backed pre-computed embedding index
 ├── query.rs             — MQL parser and executor
-├── streaming.rs         — HTTP server (tiny_http, thread pool)
+├── cache.rs             — Two-tier LRU query cache with TTL
+├── federation.rs        — Multi-index federated search
+├── mcp.rs               — Native MCP server (JSON-RPC 2.0 over stdio)
+├── streaming.rs         — HTTP server (tiny_http, SSE streaming, thread pool)
 ├── snapshot.rs          — .mscope archive: export, import, diff
 ├── merkle.rs            — SHA-256 Merkle tree with proofs
 ├── gpu.rs               — Optional wgpu GPU acceleration
@@ -358,6 +398,9 @@ cargo build --release --features embeddings
 
 # Zstd compression (compresses data.bin → data.bin.zst during build)
 cargo build --release --features compression
+
+# ONNX Runtime embeddings (native ONNX inference)
+cargo build --release --features onnx
 
 # GPU acceleration (wgpu compute shaders)
 cargo build --release --features gpu
@@ -402,12 +445,15 @@ cache_size = 64
 build_workers = 4
 use_gpu = false
 compression = false              # Enable zstd compression (requires --features compression)
+cache_ttl_secs = 300            # Query cache TTL in seconds
 
 [embedding]
-provider = "mock"           # "mock" or "candle"
+provider = "mock"           # "mock", "candle", or "onnx"
 model = "sentence-transformers/all-MiniLM-L6-v2"
 dim = 384
 max_depth = 4               # Only embed blocks D0-D4
+# onnx_model_path = "models/all-MiniLM-L6-v2.onnx"   # Required for onnx provider
+# tokenizer_path = "models/tokenizer.json"             # Required for onnx provider
 
 [server]
 port = 6060
@@ -416,6 +462,17 @@ cors_origin = "*"
 [logging]
 level = "info"
 file = "microscope.log"
+
+# Optional: federated multi-index search
+# [[federation.indices]]
+# name = "project_a"
+# config_path = "/path/to/project_a/config.toml"
+# weight = 1.0
+#
+# [[federation.indices]]
+# name = "project_b"
+# config_path = "/path/to/project_b/config.toml"
+# weight = 0.8
 ```
 
 ## CLI Reference
@@ -443,6 +500,9 @@ Commands:
   export         Export index to .mscope archive
   import         Import .mscope archive
   diff           Compare two .mscope archives
+  federated-recall  Federated recall across multiple indices
+  federated-find    Federated text search across indices
+  mcp            Start native MCP server (JSON-RPC 2.0 over stdio)
 ```
 
 ## License

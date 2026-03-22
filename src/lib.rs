@@ -1,6 +1,7 @@
 //! Microscope Memory library interface.
 //! Re-exports core types and functions for integration tests and external use.
 
+pub mod archetype;
 pub mod build;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod cache;

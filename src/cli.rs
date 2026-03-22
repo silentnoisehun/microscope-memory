@@ -136,6 +136,10 @@ pub enum Cmd {
         #[arg(default_value = "10")]
         k: usize,
     },
+    /// Show emerged archetypes (crystallized activation patterns)
+    Archetypes,
+    /// Detect new archetypes from resonance field and Hebbian state
+    Emerge,
     /// Show resonance protocol state (pulses, field energy)
     Resonance,
     /// Integrate received pulses into local Hebbian state

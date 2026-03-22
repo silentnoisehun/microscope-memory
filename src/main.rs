@@ -232,9 +232,22 @@ fn recall(config: &Config, query: &str, k: usize) {
             .collect();
         resonance.emit_pulse(&activated, qh, &headers, 1);
 
+        // Archetype: reinforce any matching archetype
+        let mut archetypes = microscope_memory::archetype::ArchetypeState::load_or_init(output_dir);
+        if let Some((idx, score)) = archetypes.match_archetype(&activated) {
+            println!(
+                "  {} '{}' (score={:.3})",
+                "ARCHETYPE:".cyan(),
+                archetypes.archetypes[idx].label,
+                score
+            );
+        }
+        archetypes.reinforce(&activated);
+
         let _ = hebb.save(output_dir);
         let _ = mirror.save(output_dir);
         let _ = resonance.save(output_dir);
+        let _ = archetypes.save(output_dir);
     }
 
     let elapsed = t0.elapsed();
@@ -995,6 +1008,72 @@ fn main() {
                     r.layer,
                     r.source_index.cyan(),
                     microscope_memory::safe_truncate(&r.text, 80)
+                );
+            }
+        }
+        Cmd::Archetypes => {
+            let output_dir = Path::new(&config.paths.output_dir);
+            let arc = microscope_memory::archetype::ArchetypeState::load_or_init(output_dir);
+            let stats = arc.stats();
+            println!("{}", "ARCHETYPES".cyan().bold());
+            println!("  Emerged:            {}", stats.archetype_count);
+            println!("  Total members:      {}", stats.total_members);
+            if let (Some(label), Some(str)) = (&stats.strongest_label, stats.strongest_strength) {
+                println!("  Strongest:          '{}' (str={:.3})", label, str);
+            }
+
+            if !arc.archetypes.is_empty() {
+                println!();
+                for a in &arc.archetypes {
+                    println!(
+                        "  #{} '{}' str={:.3} members={} reinforced={}x ({:.2},{:.2},{:.2})",
+                        a.id,
+                        a.label,
+                        a.strength,
+                        a.members.len(),
+                        a.reinforcement_count,
+                        a.centroid.0,
+                        a.centroid.1,
+                        a.centroid.2,
+                    );
+                }
+            }
+        }
+        Cmd::Emerge => {
+            let reader = open_reader(&config);
+            let output_dir = Path::new(&config.paths.output_dir);
+            let resonance = microscope_memory::resonance::ResonanceState::load_or_init(output_dir);
+            let hebb = microscope_memory::hebbian::HebbianState::load_or_init(
+                output_dir,
+                reader.block_count,
+            );
+
+            let headers: Vec<(f32, f32, f32)> = (0..reader.block_count)
+                .map(|i| {
+                    let h = reader.header(i);
+                    (h.x, h.y, h.z)
+                })
+                .collect();
+            let texts: Vec<&str> = (0..reader.block_count).map(|i| reader.text(i)).collect();
+
+            let mut arc = microscope_memory::archetype::ArchetypeState::load_or_init(output_dir);
+            let emerged = arc.detect(&resonance, &hebb, &headers, &texts);
+            arc.decay();
+            arc.save(output_dir).expect("save archetypes");
+
+            println!(
+                "{} {} new archetypes emerged ({} total)",
+                "EMERGE".cyan().bold(),
+                emerged,
+                arc.archetypes.len()
+            );
+            for a in arc.archetypes.iter().rev().take(5) {
+                println!(
+                    "  #{} '{}' str={:.3} members={}",
+                    a.id,
+                    a.label,
+                    a.strength,
+                    a.members.len()
                 );
             }
         }

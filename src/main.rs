@@ -34,7 +34,7 @@ mod config;
 use config::Config;
 
 use std::fs;
-use std::io::{Write, Seek, SeekFrom, BufWriter, BufRead, BufReader};
+use std::io::{Write, Seek, BufWriter, BufRead, BufReader};
 use std::path::Path;
 use std::time::Instant;
 
@@ -368,7 +368,7 @@ fn build(config: &Config) {
             depth: 1, x, y, z,
             layer_id: layer_to_id(name),
             parent_idx: 0,
-            child_count: ((texts.len() + 4) / 5) as u16,  // cluster count
+            child_count: texts.len().div_ceil(5) as u16,  // cluster count
         });
     }
 
@@ -652,7 +652,7 @@ fn build(config: &Config) {
 
     for (new_i, &old_i) in indices.iter().enumerate() {
         let b = &blocks[old_i];
-        let offset = dat_file.seek(SeekFrom::Current(0)).unwrap() as u32; // Get current write position
+        let offset = dat_file.stream_position().unwrap() as u32; // Get current write position
         let len = b.data.len().min(BLOCK_DATA_SIZE) as u16;
         dat_file.write_all(&b.data[..len as usize]).unwrap();
 
@@ -728,7 +728,7 @@ fn build(config: &Config) {
 
     // Report
     let hdr_size = n * HEADER_SIZE;
-    let dat_size = dat_file.seek(SeekFrom::Current(0)).unwrap() as usize; // Get final data size
+    let dat_size = dat_file.stream_position().unwrap() as usize; // Get final data size
     let meta_size = meta_buf.len();
     println!("\n  {}: {} bytes ({:.1} KB)", "headers".green(), hdr_size, hdr_size as f64 / 1024.0);
     println!("  {}:    {} bytes ({:.1} KB)", "data".green(), dat_size, dat_size as f64 / 1024.0);
@@ -808,11 +808,11 @@ impl MicroscopeReader {
         assert!(magic == b"MSCM" || magic == b"MSC2", "invalid magic: expected MSCM or MSC2");
         let block_count = u32::from_le_bytes(meta[8..12].try_into().unwrap()) as usize;
         let mut depth_ranges = [(0u32, 0u32); 9];
-        for d in 0..9 {
+        for (d, range) in depth_ranges.iter_mut().enumerate() {
             let off = META_HEADER_SIZE + d * DEPTH_ENTRY_SIZE;
             let start = u32::from_le_bytes(meta[off..off+4].try_into().unwrap());
             let count = u32::from_le_bytes(meta[off+4..off+8].try_into().unwrap());
-            depth_ranges[d] = (start, count);
+            *range = (start, count);
         }
 
         let hdr_file = fs::File::open(hdr_path).expect("open headers");
@@ -876,6 +876,7 @@ impl MicroscopeReader {
     /// 4D soft zoom search.
     /// Considers zoom (normalized depth) as a weighted spatial dimension.
     /// This scans ALL blocks in the index using SIMD-accelerated L2 distance.
+    #[allow(clippy::too_many_arguments)]
     fn look_soft(&self, config: &Config, x: f32, y: f32, z: f32, zoom: u8, k: usize, zw: f32) -> Vec<(f32, usize, bool)> {
         let qz = zoom as f32 / 8.0;
         let mut results: Vec<(f32, usize, bool)> = (0..self.block_count)
@@ -941,8 +942,8 @@ impl MicroscopeReader {
 // ─── BENCH ───────────────────────────────────────────
 fn bench(config: &Config, reader: &MicroscopeReader) {
     println!("{}", "Benchmark: 10,000 queries per zoom level".cyan());
-    println!("  Mode: SIMD={} Rayon={}",
-        cfg!(target_arch = "x86_64"), true);
+    println!("  Mode: SIMD={} Rayon=true",
+        cfg!(target_arch = "x86_64"));
 
     let mut rng: u64 = 42;
     let mut next_f32 = || -> f32 {
@@ -1123,7 +1124,7 @@ pub fn auto_zoom(query: &str) -> (u8, u8) {
     let stopwords = ["a", "the", "is", "of", "and", "to", "in", "it", "on", "for"];
     let unique_content_words = query.to_lowercase()
         .split_whitespace()
-        .filter(|w| !stopwords.contains(&w) && w.len() > 2)
+        .filter(|w| !stopwords.contains(w) && w.len() > 2)
         .count();
 
     // broad (identity/summary)

@@ -212,7 +212,7 @@ impl GpuAccelerator {
             });
             pass.set_pipeline(&self.compute_pipeline);
             pass.set_bind_group(0, &bind_group, &[]);
-            let workgroups = ((self.block_count + 63) / 64) as u32;
+            let workgroups = self.block_count.div_ceil(64) as u32;
             pass.dispatch_workgroups(workgroups, 1, 1);
         }
 
@@ -251,31 +251,28 @@ impl GpuAccelerator {
     }
 }
 
-/// CPU fallback for systems without GPU
-pub struct CpuFallback;
-
-impl CpuFallback {
-    pub fn l2_search(blocks: &[(f32, f32, f32)], query: &[f32; 3], k: usize) -> Vec<(usize, f32)> {
-        let mut results: Vec<(usize, f32)> = blocks
-            .iter()
-            .enumerate()
-            .map(|(i, (x, y, z))| {
-                let dx = x - query[0];
-                let dy = y - query[1];
-                let dz = z - query[2];
-                (i, dx * dx + dy * dy + dz * dz)
-            })
-            .collect();
-
-        results.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
-        results.truncate(k);
-        results
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use super::*;
+    struct CpuFallback;
+
+    impl CpuFallback {
+        fn l2_search(blocks: &[(f32, f32, f32)], query: &[f32; 3], k: usize) -> Vec<(usize, f32)> {
+            let mut results: Vec<(usize, f32)> = blocks
+                .iter()
+                .enumerate()
+                .map(|(i, (x, y, z))| {
+                    let dx = x - query[0];
+                    let dy = y - query[1];
+                    let dz = z - query[2];
+                    (i, dx * dx + dy * dy + dz * dz)
+                })
+                .collect();
+
+            results.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
+            results.truncate(k);
+            results
+        }
+    }
 
     #[test]
     fn test_cpu_fallback() {

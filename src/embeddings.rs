@@ -150,9 +150,9 @@ impl EmbeddingProvider for MockEmbeddingProvider {
         let mut embedding = vec![0.0; self.dimension];
         let hash = text.bytes().fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64));
 
-        for i in 0..self.dimension {
+        for (i, slot) in embedding.iter_mut().enumerate() {
             let val = ((hash.wrapping_mul(i as u64 + 1)) % 1000) as f32 / 1000.0;
-            embedding[i] = val * 2.0 - 1.0; // Normalize to [-1, 1]
+            *slot = val * 2.0 - 1.0; // Normalize to [-1, 1]
         }
 
         // Normalize to unit vector

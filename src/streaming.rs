@@ -29,7 +29,7 @@ fn default_k() -> usize { 5 }
 /// Supports basic HTTP-like JSON endpoints over TCP
 pub fn start_endpoint_server(config: Config, port: u16) {
     let addr = format!("0.0.0.0:{}", port);
-    let listener = TcpListener::bind(&addr).expect(&format!("Could not bind to port {}", port));
+    let listener = TcpListener::bind(&addr).unwrap_or_else(|_| panic!("Could not bind to port {}", port));
     println!("🔬 {} on {}", "ENDPOINT SERVER ACTIVE".cyan().bold(), addr);
 
     let config = Arc::new(config);

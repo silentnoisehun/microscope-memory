@@ -88,7 +88,7 @@ impl MerkleTree {
         let mut pos = index;
 
         while level_len > 1 {
-            let sibling_pos = if pos % 2 == 0 {
+            let sibling_pos = if pos.is_multiple_of(2) {
                 // We are left child, sibling is right
                 if pos + 1 < level_len {
                     pos + 1
@@ -104,7 +104,7 @@ impl MerkleTree {
             path.push((self.nodes[level_start + sibling_pos], is_right));
 
             level_start += level_len;
-            level_len = (level_len + 1) / 2;
+            level_len = level_len.div_ceil(2);
             pos /= 2;
         }
 

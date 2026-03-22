@@ -194,4 +194,14 @@ pub enum Cmd {
     },
     /// Start native MCP server (JSON-RPC 2.0 over stdio)
     Mcp,
+    /// Show thought patterns (crystallized recall sequences)
+    Patterns {
+        #[arg(default_value = "10")]
+        k: usize,
+    },
+    /// Show recent thought paths (recall sequences by session)
+    Paths {
+        #[arg(default_value = "5")]
+        sessions: usize,
+    },
 }

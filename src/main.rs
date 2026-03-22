@@ -191,6 +191,30 @@ fn recall(config: &Config, query: &str, k: usize) {
         }
     }
 
+    // ─── ThoughtGraph: pattern boost before sorting ──
+    let output_dir_tg = Path::new(&config.paths.output_dir);
+    let mut thought_graph =
+        microscope_memory::thought_graph::ThoughtGraphState::load_or_init(output_dir_tg);
+    let qh_tg = microscope_memory::hebbian::query_hash(query);
+    let pattern_boosts: std::collections::HashMap<u32, f32> = thought_graph
+        .pattern_boost(qh_tg)
+        .into_iter()
+        .collect();
+    if !pattern_boosts.is_empty() {
+        for (dist, idx, is_main) in &mut all_results {
+            if *is_main {
+                if let Some(&boost) = pattern_boosts.get(&(*idx as u32)) {
+                    *dist = (*dist - boost).max(0.0);
+                }
+            }
+        }
+        println!(
+            "  {} {} blocks boosted by thought patterns",
+            "PATTERN:".yellow(),
+            pattern_boosts.len()
+        );
+    }
+
     let mut seen = std::collections::HashSet::new();
     all_results.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
     let mut shown = 0;
@@ -258,10 +282,21 @@ fn recall(config: &Config, query: &str, k: usize) {
         }
         archetypes.reinforce(&activated);
 
+        // ThoughtGraph: record recall and detect patterns
+        let dominant_layer = activated
+            .first()
+            .map(|&(idx, _)| reader.header(idx as usize).layer_id)
+            .unwrap_or(0);
+        thought_graph.record_recall(qh, &activated, dominant_layer);
+        let result_block_ids: Vec<u32> = activated.iter().map(|&(idx, _)| idx).collect();
+        thought_graph.update_pattern_blocks(qh, &result_block_ids);
+        thought_graph.detect_patterns();
+
         let _ = hebb.save(output_dir);
         let _ = mirror.save(output_dir);
         let _ = resonance.save(output_dir);
         let _ = archetypes.save(output_dir);
+        let _ = thought_graph.save(output_dir);
     }
 
     let elapsed = t0.elapsed();
@@ -1466,6 +1501,75 @@ fn main() {
         }
         Cmd::Mcp => {
             microscope_memory::mcp::run(config);
+        }
+
+        Cmd::Patterns { k } => {
+            let output_dir = Path::new(&config.paths.output_dir);
+            let tg = microscope_memory::thought_graph::ThoughtGraphState::load_or_init(output_dir);
+            let stats = tg.stats();
+            println!("{}", "THOUGHT GRAPH".cyan().bold());
+            println!(
+                "  nodes={} edges={} patterns={} (crystallized={}) session=#{}",
+                stats.node_count,
+                stats.edge_count,
+                stats.pattern_count,
+                stats.crystallized,
+                stats.current_session_id
+            );
+
+            let top = tg.top_patterns(k);
+            if top.is_empty() {
+                println!("  (no patterns yet — recall more to form thought paths)");
+            } else {
+                println!("\n  {}", "Top patterns:".yellow());
+                for (i, p) in top.iter().enumerate() {
+                    let seq_str: Vec<String> = p
+                        .sequence
+                        .iter()
+                        .map(|h| format!("{:04x}", h & 0xFFFF))
+                        .collect();
+                    let crystallized = if p.frequency >= 3 { "*" } else { " " };
+                    println!(
+                        "  {}#{} {} freq={} str={:.2} blocks={}",
+                        crystallized,
+                        i + 1,
+                        seq_str.join(" → "),
+                        p.frequency,
+                        p.strength,
+                        p.result_blocks.len()
+                    );
+                }
+            }
+        }
+
+        Cmd::Paths { sessions } => {
+            let output_dir = Path::new(&config.paths.output_dir);
+            let tg = microscope_memory::thought_graph::ThoughtGraphState::load_or_init(output_dir);
+            let recent = tg.recent_sessions(sessions);
+
+            if recent.is_empty() {
+                println!("  (no recall sessions recorded yet)");
+            } else {
+                println!("{}", "THOUGHT PATHS".cyan().bold());
+                for (si, session) in recent.iter().enumerate() {
+                    if let Some(first) = session.first() {
+                        println!(
+                            "\n  {} Session #{} ({} recalls):",
+                            "▸".green(),
+                            first.session_id,
+                            session.len()
+                        );
+                        let path_str: Vec<String> = session
+                            .iter()
+                            .map(|n| format!("{:04x}", n.query_hash & 0xFFFF))
+                            .collect();
+                        println!("    {}", path_str.join(" → "));
+                    }
+                    if si >= sessions {
+                        break;
+                    }
+                }
+            }
         }
     }
 }

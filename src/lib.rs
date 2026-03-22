@@ -16,6 +16,7 @@ pub mod merkle;
 pub mod mirror;
 pub mod query;
 pub mod reader;
+pub mod resonance;
 pub mod snapshot;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod streaming;

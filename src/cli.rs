@@ -136,6 +136,10 @@ pub enum Cmd {
         #[arg(default_value = "10")]
         k: usize,
     },
+    /// Show resonance protocol state (pulses, field energy)
+    Resonance,
+    /// Integrate received pulses into local Hebbian state
+    Integrate,
     /// Show mirror neuron state (resonance echoes, boosted blocks)
     Mirror,
     /// Show most resonant blocks (strongest mirror neuron signal)

@@ -103,10 +103,7 @@ impl MirrorState {
                     let entry = boosts.entry(block_idx).or_insert(0.0);
                     *entry += sim * 0.1; // resonance boost factor
 
-                    let res = self
-                        .block_resonance
-                        .entry(block_idx)
-                        .or_default();
+                    let res = self.block_resonance.entry(block_idx).or_default();
                     res.echo_count += 1;
                     res.strength += sim;
                 }

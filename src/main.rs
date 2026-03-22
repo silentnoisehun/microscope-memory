@@ -220,8 +220,21 @@ fn recall(config: &Config, query: &str, k: usize) {
             );
         }
         hebb.record_activation(&activated, qh);
+
+        // Resonance: emit pulse with spatial coordinates
+        let mut resonance = microscope_memory::resonance::ResonanceState::load_or_init(output_dir);
+        let headers: Vec<(f32, f32, f32)> = activated
+            .iter()
+            .map(|&(idx, _)| {
+                let h = reader.header(idx as usize);
+                (h.x, h.y, h.z)
+            })
+            .collect();
+        resonance.emit_pulse(&activated, qh, &headers, 1);
+
         let _ = hebb.save(output_dir);
         let _ = mirror.save(output_dir);
+        let _ = resonance.save(output_dir);
     }
 
     let elapsed = t0.elapsed();
@@ -984,6 +997,62 @@ fn main() {
                     microscope_memory::safe_truncate(&r.text, 80)
                 );
             }
+        }
+        Cmd::Resonance => {
+            let output_dir = Path::new(&config.paths.output_dir);
+            let resonance = microscope_memory::resonance::ResonanceState::load_or_init(output_dir);
+            let stats = resonance.stats();
+            println!("{}", "RESONANCE PROTOCOL".magenta().bold());
+            println!("  Instance ID:        {:x}", stats.instance_id);
+            println!("  Outgoing pulses:    {}", stats.outgoing_pulses);
+            println!("  Incoming pulses:    {}", stats.incoming_pulses);
+            println!("  Pending integration:{}", stats.pending_integration);
+            println!("  Unique sources:     {}", stats.unique_sources);
+            println!("  Field cells:        {}", stats.field_cells);
+            println!("  Field energy:       {:.3}", stats.field_energy);
+
+            if !resonance.outgoing.is_empty() {
+                println!("\n  Recent outgoing:");
+                for p in resonance.outgoing.iter().rev().take(5) {
+                    println!(
+                        "    str={:.3} blocks={} layer={} hash={:x}",
+                        p.strength,
+                        p.activations.len(),
+                        p.layer_hint,
+                        p.query_hash,
+                    );
+                }
+            }
+        }
+        Cmd::Integrate => {
+            let reader = open_reader(&config);
+            let output_dir = Path::new(&config.paths.output_dir);
+            let mut hebb = microscope_memory::hebbian::HebbianState::load_or_init(
+                output_dir,
+                reader.block_count,
+            );
+            let mut resonance =
+                microscope_memory::resonance::ResonanceState::load_or_init(output_dir);
+
+            let headers: Vec<(f32, f32, f32)> = (0..reader.block_count)
+                .map(|i| {
+                    let h = reader.header(i);
+                    (h.x, h.y, h.z)
+                })
+                .collect();
+
+            let influenced = resonance.integrate_into_hebbian(&mut hebb, &headers, 0.05);
+            resonance.decay_field(0.95);
+            resonance.expire_pulses();
+
+            hebb.save(output_dir).expect("save Hebbian");
+            resonance.save(output_dir).expect("save resonance");
+
+            println!(
+                "{} {} blocks influenced by resonance pulses",
+                "INTEGRATE".magenta().bold(),
+                influenced
+            );
         }
         Cmd::Mirror => {
             let output_dir = Path::new(&config.paths.output_dir);

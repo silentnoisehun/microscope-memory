@@ -3,47 +3,47 @@
 [![CI](https://github.com/silentnoisehun/microscope-memory/actions/workflows/ci.yml/badge.svg)](https://github.com/silentnoisehun/microscope-memory/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-**Zoom-based hierarchical memory with sub-microsecond queries and emergent consciousness architecture**
+**Consciousness architecture for machine memory — Hebbian learning, mirror neurons, resonance fields, archetype emergence**
 
-A memory indexing system that treats data like looking through a microscope — the zoom level determines what you see. Pure binary, zero JSON, powered by mmap, SIMD vector search, rayon parallelism, and a 5-layer consciousness stack (Hebbian learning, mirror neurons, resonance fields, archetype emergence, emotional bias).
+A binary memory system where memories self-organize through use. Every recall strengthens neural pathways (Hebbian learning), activates mirror neurons across similar memories, emits resonance pulses into a spatial field, and crystallizes recurring patterns into archetypes. The system treats data like looking through a microscope — zoom level determines what you see, from identity down to raw bytes.
+
+Pure Rust. Zero JSON. Sub-microsecond queries. 228K+ blocks across 9 depth levels.
+
+## Consciousness Architecture
+
+The core innovation: memories are not just stored — they **learn**, **resonate**, and **self-organize**.
+
+```
+Query → Emotional Warp → Search → Hebbian Activation → Mirror Resonance → Pulse Emission → Archetype Reinforcement
+  ↑                                       |                    |                  |                    |
+  └───────── coordinate drift ────────────┴── echo decay ──────┴── field decay ───┴── crystallization ─┘
+```
+
+| Layer | Module | What it does |
+|-------|--------|--------------|
+| **L1: Hebbian Learning** | `hebbian.rs` | Blocks strengthen on access. Co-accessed blocks form pairs. Energy decays (24h half-life). Coordinates drift — co-activated blocks physically migrate closer in 3D space. |
+| **L2: Mirror Neurons** | `mirror.rs` | Activation fingerprints (8D vectors) compared via sparse cosine similarity. Similar activation patterns create resonance echoes that boost future retrieval. |
+| **L3: Resonance Fields** | `resonance.rs` | Each activation emits a pulse into a quantized spatial field (0.05 grid). Pulses propagate, interfere, and create standing waves. Exchangeable across federated indices. |
+| **L4: Archetype Emergence** | `archetype.rs` | Hot spots in the resonance field crystallize into archetypes — named patterns with member blocks, centroids, and strength. Auto-labeled from content. |
+| **L5: Emotional Bias** | `emotional.rs` | Active emotional memories warp the search space — query coordinates bend toward the emotional centroid, weighted by Hebbian energy. |
+
+Over time, the memory landscape reshapes itself: frequently co-accessed blocks cluster together, resonance fields form standing wave patterns, and recurring activation patterns crystallize into persistent archetypes.
 
 ## Features
 
-### Core Engine
+### Engine
 - **Sub-microsecond queries**: 37ns to 500us depending on depth
 - **9-level hierarchy**: From identity (D0) to raw bytes (D8)
-- **3D spatial indexing**: Content-based deterministic positioning
+- **3D spatial indexing**: Content-based deterministic positioning with Hebbian drift
 - **Zero-copy mmap**: Direct memory access, no serialization overhead
-- **Hybrid search**: L2 distance + keyword matching + semantic embeddings
+- **Hybrid search**: L2 distance + keyword matching + semantic embeddings + emotional warp
 - **Radial search**: Depth-constrained radius queries with SIMD acceleration
-- **Real embeddings**: Candle BERT models (all-MiniLM-L6-v2) with mmap-backed embedding index
-- **Query language (MQL)**: Structured queries with layer/depth/spatial filters and boolean operators
-- **HTTP server**: tiny_http-powered REST API with thread pool + SSE streaming
-- **LRU query cache**: Two-tier cache with TTL for sub-microsecond repeated queries
-- **Multi-index federation**: Query multiple indices in parallel, merge results
-- **Snapshot archives**: `.mscope` format for backup, restore, and diff
-- **Merkle integrity**: SHA-256 tree with per-block verification and proofs
 - **Structural fingerprinting**: Shannon entropy + byte histograms + wormhole links between similar blocks
-- **MCP server**: Native JSON-RPC 2.0 over stdio for Claude Code integration
-
-### Consciousness Architecture (5 Layers)
-
-| Layer | Module | Description |
-|-------|--------|-------------|
-| **L1: Hebbian Learning** | `hebbian.rs` | Per-block activation tracking, co-activation pairs, energy decay (24h half-life), coordinate drift |
-| **L2: Mirror Neurons** | `mirror.rs` | Sparse cosine similarity between activation fingerprints, resonance echoes, block boosting |
-| **L3: Resonance Fields** | `resonance.rs` | Pulse-based inter-instance communication, quantized spatial field (0.05 grid), pulse exchange |
-| **L4: Archetype Emergence** | `archetype.rs` | Crystallized activation patterns from resonance hot spots, auto-labeling from member content |
-| **L5: Emotional Bias** | `emotional.rs` | Search space warping toward emotional layer centroid, weighted by Hebbian energy |
-
-The consciousness layers activate during every recall:
-1. Query coordinates are **emotionally warped** toward active emotional attractors
-2. Search results trigger **Hebbian activation** (strengthening accessed blocks)
-3. Co-accessed blocks form **co-activation pairs** (learning associations)
-4. **Mirror neurons** detect resonance between activation fingerprints
-5. **Resonance pulses** are emitted into the spatial field
-6. **Archetypes** are reinforced when activation patterns match crystallized patterns
-7. Over time, Hebbian **coordinate drift** pulls co-activated blocks closer in 3D space
+- **Query language (MQL)**: Structured queries with layer/depth/spatial filters and boolean operators
+- **Multi-index federation**: Query multiple indices in parallel, merge results, exchange resonance pulses
+- **Merkle integrity**: SHA-256 tree with per-block verification and proofs
+- **Real embeddings**: Candle BERT (all-MiniLM-L6-v2) with mmap-backed index
+- **HTTP server + MCP server**: REST API with SSE streaming + native JSON-RPC 2.0 for Claude Code
 
 ### Additional Features
 - **SSE4/AVX2 SIMD**: Hardware-accelerated L2 distance and cosine similarity

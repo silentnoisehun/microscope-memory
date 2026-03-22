@@ -17,27 +17,46 @@ The core innovation: memories are not just stored — they **learn**, **resonate
 
 ```mermaid
 graph LR
-    Q[Query] --> EW[Emotional Warp]
+    Q[Query] --> PC[Predictive Cache Check]
+    PC --> EW[Emotional Warp]
     EW --> S[3D Spatial Search]
-    S --> HA[Hebbian Activation]
+    S --> TG[ThoughtGraph Pattern Boost]
+    TG --> HA[Hebbian Activation]
     HA --> MR[Mirror Resonance]
     MR --> PE[Pulse Emission]
     PE --> AR[Archetype Reinforcement]
-    AR -->|coordinate drift| Q
+    AR --> EV[Evaluate Prediction]
+    EV --> PN[Predict Next]
+    PN -->|coordinate drift| Q
 
     style Q fill:#1a1a2e,stroke:#e94560,color:#fff
+    style PC fill:#1a1a2e,stroke:#3fb950,color:#fff
     style EW fill:#1a1a2e,stroke:#e94560,color:#fff
     style S fill:#1a1a2e,stroke:#0f3460,color:#fff
+    style TG fill:#1a1a2e,stroke:#d29922,color:#fff
     style HA fill:#1a1a2e,stroke:#16213e,color:#fff
     style MR fill:#1a1a2e,stroke:#533483,color:#fff
     style PE fill:#1a1a2e,stroke:#0f3460,color:#fff
     style AR fill:#1a1a2e,stroke:#e94560,color:#fff
+    style EV fill:#1a1a2e,stroke:#3fb950,color:#fff
+    style PN fill:#1a1a2e,stroke:#3fb950,color:#fff
 ```
 
 ### Consciousness Layers
 
 ```mermaid
 graph TB
+    subgraph L7["L7: Predictive Cache"]
+        PRED[Predict Next Blocks] -->|pre-fetch| CACHE[Block Cache]
+        CACHE -->|hit/miss| REWARD[Reward / Penalize Pattern]
+    end
+
+    subgraph L6["L6: ThoughtGraph"]
+        NODE[Recall Nodes] --> EDGE[Directed Edges]
+        EDGE -->|n-gram detection| PAT[Crystallized Patterns]
+        PAT -->|boost| SEARCH
+    end
+
     subgraph L5["L5: Emotional Bias"]
         EB[Emotional Centroid Warp]
         EB -->|bends search coords| SEARCH
@@ -70,12 +89,16 @@ graph TB
     SEARCH --> ACT
     ACT --> FP
     ECHO --> PULSE
+    PAT --> PRED
+    REWARD --> PAT
 
     style L1 fill:#0d1117,stroke:#58a6ff,color:#c9d1d9
     style L2 fill:#0d1117,stroke:#bc8cff,color:#c9d1d9
     style L3 fill:#0d1117,stroke:#3fb950,color:#c9d1d9
     style L4 fill:#0d1117,stroke:#d29922,color:#c9d1d9
     style L5 fill:#0d1117,stroke:#f85149,color:#c9d1d9
+    style L6 fill:#0d1117,stroke:#f0883e,color:#c9d1d9
+    style L7 fill:#0d1117,stroke:#a5d6ff,color:#c9d1d9
 ```
 
 ### How Consciousness Emerges
@@ -115,6 +138,8 @@ graph LR
 | **L3: Resonance Fields** | `resonance.rs` | Each activation emits a pulse into a quantized spatial field (0.05 grid). Pulses propagate, interfere, and create standing waves. Exchangeable across federated indices. |
 | **L4: Archetype Emergence** | `archetype.rs` | Hot spots in the resonance field crystallize into archetypes — named patterns with member blocks, centroids, and strength. Auto-labeled from content. |
 | **L5: Emotional Bias** | `emotional.rs` | Active emotional memories warp the search space — query coordinates bend toward the emotional centroid, weighted by Hebbian energy. |
+| **L6: ThoughtGraph** | `thought_graph.rs` | Tracks sequential recall paths as a directed graph. Recurring sequences (A→B→C) crystallize into patterns that boost future searches matching the same thought path. |
+| **L7: Predictive Cache** | `predictive_cache.rs` | Pre-fetches likely next blocks based on ThoughtGraph patterns. Hits reward the source pattern (+0.3), misses penalize (-0.05) — a reinforcement loop that makes accurate predictions stronger over time. |
 
 ## Features
 
@@ -516,6 +541,17 @@ pulses.bin         — Resonance pulses (PLS1)
 
 archetypes.bin     — Emerged archetypes (ARC1)
 └── id: u32, centroid: (f32,f32,f32), member_count: u32, strength: f32, label
+
+thought_graph.bin  — Recall path graph (THG1)
+├── nodes: timestamp, query_hash, session_id, result_count, dominant_layer
+└── edges: from_hash, to_hash, count, last_traversed
+
+thought_patterns.bin — Crystallized thought patterns (PTN1)
+└── id: u32, sequence: [u64], frequency: u32, strength: f32, result_blocks: [u32]
+
+predictive_cache.bin — Predictive block cache (PRC1)
+├── predictions: query_hash, blocks, confidence, pattern_id
+└── stats: total_predictions, hits, misses, partial_hits
 ```
 
 ### Memory Layers
@@ -563,8 +599,10 @@ D8: Raw bytes         — hex representation (atomic limit)
 10. **Mirror resonance**: Activation fingerprints compared via sparse cosine similarity
 11. **Resonance pulses**: Emitted into quantized spatial field, exchangeable across federated indices
 12. **Archetype emergence**: Resonance hot spots crystallize into named activation patterns
-13. **Coordinate drift**: Co-activated blocks gradually migrate closer in 3D space over time
-14. **Append log**: New memories stored instantly via binary append, merged on rebuild
+13. **Thought path tracking**: Sequential recalls form a directed graph; recurring paths crystallize into patterns
+14. **Predictive caching**: Recognized patterns pre-fetch likely next blocks; hits reward patterns, misses penalize
+15. **Coordinate drift**: Co-activated blocks gradually migrate closer in 3D space over time
+16. **Append log**: New memories stored instantly via binary append, merged on rebuild
 15. **Merkle integrity**: SHA-256 tree for tamper detection and per-block proofs
 
 ## Source Structure
@@ -592,6 +630,8 @@ src/
 ├── archetype.rs         — Archetype emergence: clustering, reinforcement, auto-labeling
 ├── emotional.rs         — Emotional bias warp: search space bending toward emotional centroid
 ├── fingerprint.rs       — Structural fingerprinting: entropy, histograms, wormhole links
+├── thought_graph.rs     — ThoughtGraph (L6): recall path tracking, pattern crystallization
+├── predictive_cache.rs  — Predictive Cache (L7): pre-fetch blocks, hit/miss reinforcement
 ├── viz.rs               — Visualization: JSON snapshot + binary density map export
 ├── gpu.rs               — Optional wgpu GPU acceleration
 ├── wasm.rs              — WASM target support
@@ -712,6 +752,9 @@ Commands:
   pulse-exchange     Exchange resonance pulses across federated indices
   archetypes         Show emerged archetypes
   emerge             Detect new archetypes from resonance + Hebbian state
+  patterns           Show thought graph patterns (crystallized recall sequences)
+  paths              Show recent thought paths (recall sessions)
+  predictions        Show predictive cache stats and active predictions
   viz                Export 3D visualization snapshot (JSON)
   density            Export binary density map for rendering
   stats              Index statistics

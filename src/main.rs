@@ -37,6 +37,7 @@ mod gpu;
 
 use config::Config;
 
+use sha2::{Digest, Sha256};
 use std::fs;
 use std::io::{BufRead, BufReader, BufWriter, Seek, Write};
 use std::path::Path;
@@ -371,8 +372,44 @@ fn split_sentences(text: &str) -> Vec<String> {
     sentences
 }
 
+// ─── Compute deterministic SHA-256 hash of all layer source files ────
+fn compute_layers_hash(config: &Config) -> [u8; 32] {
+    let layers_dir = Path::new(&config.paths.layers_dir);
+    let layer_files = &config.memory_layers.layers;
+    let mut sorted_names: Vec<&String> = layer_files.iter().collect();
+    sorted_names.sort();
+    let mut hasher = Sha256::new();
+    for name in &sorted_names {
+        let path = layers_dir.join(format!("{}.json", name));
+        if let Ok(contents) = fs::read(&path) {
+            hasher.update(&contents);
+        }
+    }
+    let result = hasher.finalize();
+    let mut hash = [0u8; 32];
+    hash.copy_from_slice(&result);
+    hash
+}
+
 // ─── BUILD: layers/ → binary ─────────────────────────
-fn build(config: &Config) {
+fn build(config: &Config, force: bool) {
+    let layers_hash = compute_layers_hash(config);
+
+    // Incremental build check — skip if layers unchanged
+    if !force {
+        let output_dir = Path::new(&config.paths.output_dir);
+        let meta_path = output_dir.join("meta.bin");
+        if let Ok(meta) = fs::read(&meta_path) {
+            if meta.len() >= 152 && &meta[0..4] == b"MSC3" {
+                let stored_hash = &meta[120..152];
+                if stored_hash == &layers_hash[..] {
+                    println!("{}", "Layers unchanged — skipping rebuild".green().bold());
+                    return;
+                }
+            }
+        }
+    }
+
     println!(
         "{}",
         "Building microscope from raw layers (zero JSON)..."
@@ -803,6 +840,30 @@ fn build(config: &Config) {
     hdr_file.flush().unwrap();
     dat_file.flush().unwrap();
 
+    // ═══ Optional zstd compression of data.bin ═══
+    #[cfg(feature = "compression")]
+    if config.performance.compression {
+        let raw_data = fs::read(&dat_path).expect("read data.bin for compression");
+        let raw_size = raw_data.len();
+        let compressed =
+            zstd::encode_all(std::io::Cursor::new(&raw_data), 3).expect("zstd compress");
+        let comp_size = compressed.len();
+        let zst_path = output_dir.join("data.bin.zst");
+        fs::write(&zst_path, &compressed).expect("write data.bin.zst");
+        let ratio = if comp_size > 0 {
+            raw_size as f64 / comp_size as f64
+        } else {
+            0.0
+        };
+        println!(
+            "  {}: {} → {} bytes ({:.1}x ratio)",
+            "zstd".green(),
+            raw_size,
+            comp_size,
+            ratio,
+        );
+    }
+
     // ═══ Merkle tree: SHA-256 over all block data ═══
     let merkle_path = output_dir.join("merkle.bin");
     // Re-read data.bin to get all block data slices for Merkle leaves
@@ -834,10 +895,10 @@ fn build(config: &Config) {
         hex_str(&merkle_tree.root)
     );
 
-    // meta.bin — MSC2 format with merkle root
-    let mut meta_buf = Vec::with_capacity(META_HEADER_SIZE + 9 * DEPTH_ENTRY_SIZE + 32);
-    meta_buf.extend_from_slice(b"MSC2"); // magic v2
-    meta_buf.extend_from_slice(&2u32.to_le_bytes()); // version
+    // meta.bin — MSC3 format with merkle root + layers hash
+    let mut meta_buf = Vec::with_capacity(META_HEADER_SIZE + 9 * DEPTH_ENTRY_SIZE + 32 + 32);
+    meta_buf.extend_from_slice(b"MSC3"); // magic v3
+    meta_buf.extend_from_slice(&3u32.to_le_bytes()); // version
     meta_buf.extend_from_slice(&(n as u32).to_le_bytes()); // block_count
     meta_buf.extend_from_slice(&9u32.to_le_bytes()); // depth_count
     for &(start, count) in &depth_ranges {
@@ -845,6 +906,7 @@ fn build(config: &Config) {
         meta_buf.extend_from_slice(&count.to_le_bytes());
     }
     meta_buf.extend_from_slice(&merkle_tree.root); // 32 bytes merkle root
+    meta_buf.extend_from_slice(&layers_hash); // 32 bytes layers content hash
     fs::write(meta_path, &meta_buf).expect("write meta");
 
     // Report
@@ -956,13 +1018,33 @@ fn l2_dist_sq_simd(h: &BlockHeader, x: f32, y: f32, z: f32, qz: f32, zw: f32) ->
     }
 }
 
+/// Backing store for block data — either memory-mapped or decompressed in-memory.
+pub enum DataStore {
+    /// Normal mmap path (uncompressed data.bin)
+    Mmap(memmap2::Mmap),
+    /// Decompressed data held in memory (from data.bin.zst)
+    #[cfg(feature = "compression")]
+    InMemory(Vec<u8>),
+}
+
+impl std::ops::Deref for DataStore {
+    type Target = [u8];
+    fn deref(&self) -> &[u8] {
+        match self {
+            DataStore::Mmap(m) => m,
+            #[cfg(feature = "compression")]
+            DataStore::InMemory(v) => v,
+        }
+    }
+}
+
 /// High-performance memory-mapped reader for the Microscope index.
 /// Handles spatial and hierarchical queries using SIMD-accelerated distance metrics.
 pub struct MicroscopeReader {
     /// Mmaped headers (32 bytes per block)
     pub headers: memmap2::Mmap,
-    /// Mmaped raw text data
-    pub data: memmap2::Mmap,
+    /// Raw text data (mmap or decompressed)
+    pub data: DataStore,
     /// Total number of blocks in the index
     pub block_count: usize,
     /// Start index and count for each depth level (0-8)
@@ -977,12 +1059,12 @@ impl MicroscopeReader {
         let hdr_path = output_dir.join("microscope.bin");
         let dat_path = output_dir.join("data.bin");
 
-        // Read meta.bin — supports both MSCM (v1) and MSC2 (v2) formats
+        // Read meta.bin — supports MSCM (v1), MSC2 (v2), and MSC3 (v3) formats
         let meta = fs::read(meta_path).expect("open meta.bin — run 'build' first");
         let magic = &meta[0..4];
         assert!(
-            magic == b"MSCM" || magic == b"MSC2",
-            "invalid magic: expected MSCM or MSC2"
+            magic == b"MSCM" || magic == b"MSC2" || magic == b"MSC3",
+            "invalid magic: expected MSCM, MSC2 or MSC3"
         );
         let block_count = u32::from_le_bytes(meta[8..12].try_into().unwrap()) as usize;
         let mut depth_ranges = [(0u32, 0u32); 9];
@@ -994,9 +1076,38 @@ impl MicroscopeReader {
         }
 
         let hdr_file = fs::File::open(hdr_path).expect("open headers");
-        let dat_file = fs::File::open(dat_path).expect("open data");
         let headers = unsafe { memmap2::Mmap::map(&hdr_file).expect("mmap headers") };
-        let data = unsafe { memmap2::Mmap::map(&dat_file).expect("mmap data") };
+
+        // Try compressed data first, fall back to uncompressed
+        #[cfg(feature = "compression")]
+        let data = {
+            let zst_path = output_dir.join("data.bin.zst");
+            if zst_path.exists()
+                && (!dat_path.exists()
+                    || fs::metadata(&zst_path)
+                        .and_then(|zm| {
+                            fs::metadata(&dat_path).map(|dm| {
+                                zm.modified().unwrap_or(std::time::SystemTime::UNIX_EPOCH)
+                                    > dm.modified().unwrap_or(std::time::SystemTime::UNIX_EPOCH)
+                            })
+                        })
+                        .unwrap_or(false))
+            {
+                let compressed = fs::read(&zst_path).expect("read data.bin.zst");
+                let decompressed =
+                    zstd::decode_all(std::io::Cursor::new(&compressed)).expect("zstd decompress");
+                DataStore::InMemory(decompressed)
+            } else {
+                let dat_file = fs::File::open(&dat_path).expect("open data");
+                DataStore::Mmap(unsafe { memmap2::Mmap::map(&dat_file).expect("mmap data") })
+            }
+        };
+
+        #[cfg(not(feature = "compression"))]
+        let data = {
+            let dat_file = fs::File::open(&dat_path).expect("open data");
+            DataStore::Mmap(unsafe { memmap2::Mmap::map(&dat_file).expect("mmap data") })
+        };
 
         MicroscopeReader {
             headers,
@@ -1817,7 +1928,7 @@ fn verify_merkle(config: &Config) {
     // Read stored merkle root from meta.bin
     let meta = fs::read(&meta_path).expect("read meta.bin");
     let magic = &meta[0..4];
-    if magic != b"MSC2" {
+    if magic != b"MSC2" && magic != b"MSC3" {
         println!(
             "  {} meta.bin is v1 (MSCM) — no merkle root stored. Rebuild first.",
             "WARN".yellow()
@@ -1955,7 +2066,10 @@ struct Cli {
 #[derive(Subcommand)]
 enum Cmd {
     /// Build binary from raw layer files
-    Build,
+    Build {
+        #[arg(long)]
+        force: bool,
+    },
     /// Store a new memory
     Store {
         text: String,
@@ -2064,7 +2178,7 @@ fn main() {
     });
 
     match cli.cmd {
-        Cmd::Build => build(&config),
+        Cmd::Build { force } => build(&config, force),
         Cmd::Store {
             text,
             layer,
@@ -2184,7 +2298,7 @@ fn main() {
         }
         Cmd::Rebuild => {
             println!("{}", "Rebuilding with append log...".cyan());
-            build(&config);
+            build(&config, true);
             let append_path = Path::new(&config.paths.output_dir).join("append.bin");
             let _ = fs::remove_file(append_path);
             println!("  Append log cleared.");

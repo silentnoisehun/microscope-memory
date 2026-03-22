@@ -22,6 +22,8 @@ A memory indexing system that treats data like looking through a microscope — 
 - **Fixed viewport**: 256 bytes per block at every zoom level
 - **Parallel build**: Rayon-based multi-threaded index construction
 - **SSE4/AVX2 SIMD**: Hardware-accelerated L2 distance and cosine similarity
+- **Zstd compression**: Optional data.bin compression with transparent decompression
+- **Incremental build**: SHA-256 content hash skips rebuild when layers unchanged
 - **GPU compute**: Optional wgpu-based acceleration
 - **WASM support**: Compiles to WebAssembly
 - **Python bindings**: PyO3-based Python integration
@@ -80,9 +82,14 @@ Edit `config.toml` to set your `layers_dir` and `output_dir`.
 # Build binary index from memory layer JSON files
 microscope-memory build
 
+# Force rebuild even if layers are unchanged
+microscope-memory build --force
+
 # Rebuild — merges append log into main index
 microscope-memory rebuild
 ```
+
+Builds are **incremental** — if the layer source files haven't changed (verified via SHA-256 content hash in MSC3 meta format), the build is skipped. Use `--force` to override.
 
 ### Recall — natural language query
 
@@ -249,14 +256,16 @@ microscope.bin  — Block headers (32 bytes each, mmap'd)
 └── crc16: [u8; 2]         (CRC16-CCITT integrity check)
 
 data.bin        — Raw UTF-8 text content
+data.bin.zst    — Zstd-compressed data (optional, --features compression)
 
-meta.bin        — Index metadata (MSC2 format)
-├── magic: "MSC2"          (4 bytes)
+meta.bin        — Index metadata (MSC3 format)
+├── magic: "MSC3"          (4 bytes)
 ├── version: u32
 ├── block_count: u32
 ├── depth_count: u32
 ├── depth_ranges: 9 x (start: u32, count: u32)
-└── merkle_root: [u8; 32]  (SHA-256 root hash)
+├── merkle_root: [u8; 32]  (SHA-256 root hash)
+└── layers_hash: [u8; 32]  (SHA-256 of source layer files — for incremental build)
 
 merkle.bin      — Full Merkle tree (SHA-256)
 
@@ -311,6 +320,8 @@ D8: Raw bytes         — hex representation (atomic limit)
 7. **Hybrid ranking**: Vector distance + keyword boosting + semantic similarity
 8. **Append log**: New memories stored instantly via binary append, merged on rebuild
 9. **Merkle integrity**: SHA-256 tree for tamper detection and per-block proofs
+10. **Incremental build**: SHA-256 hash of layer sources stored in MSC3 meta — skips rebuild when unchanged
+11. **Optional compression**: Zstd-compressed `data.bin.zst` with transparent decompression at read time
 
 ## Source Structure
 
@@ -338,7 +349,7 @@ cargo build --release
 # Real BERT embeddings (downloads model from HuggingFace)
 cargo build --release --features embeddings
 
-# Zstd compression support
+# Zstd compression (compresses data.bin → data.bin.zst during build)
 cargo build --release --features compression
 
 # GPU acceleration (wgpu compute shaders)
@@ -383,7 +394,7 @@ use_mmap = true
 cache_size = 64
 build_workers = 4
 use_gpu = false
-compression = false
+compression = false              # Enable zstd compression (requires --features compression)
 
 [embedding]
 provider = "mock"           # "mock" or "candle"
@@ -406,7 +417,7 @@ file = "microscope.log"
 microscope-memory <COMMAND>
 
 Commands:
-  build          Build binary index from raw layer files
+  build          Build binary index from raw layer files [--force]
   rebuild        Rebuild index (merges append log)
   store          Store a new memory
   recall         Natural language query with auto-zoom

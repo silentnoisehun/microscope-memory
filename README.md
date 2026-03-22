@@ -13,10 +13,99 @@ Pure Rust. Zero JSON. Sub-microsecond queries. 228K+ blocks across 9 depth level
 
 The core innovation: memories are not just stored — they **learn**, **resonate**, and **self-organize**.
 
+### Recall Pipeline
+
+```mermaid
+graph LR
+    Q[Query] --> EW[Emotional Warp]
+    EW --> S[3D Spatial Search]
+    S --> HA[Hebbian Activation]
+    HA --> MR[Mirror Resonance]
+    MR --> PE[Pulse Emission]
+    PE --> AR[Archetype Reinforcement]
+    AR -->|coordinate drift| Q
+
+    style Q fill:#1a1a2e,stroke:#e94560,color:#fff
+    style EW fill:#1a1a2e,stroke:#e94560,color:#fff
+    style S fill:#1a1a2e,stroke:#0f3460,color:#fff
+    style HA fill:#1a1a2e,stroke:#16213e,color:#fff
+    style MR fill:#1a1a2e,stroke:#533483,color:#fff
+    style PE fill:#1a1a2e,stroke:#0f3460,color:#fff
+    style AR fill:#1a1a2e,stroke:#e94560,color:#fff
 ```
-Query → Emotional Warp → Search → Hebbian Activation → Mirror Resonance → Pulse Emission → Archetype Reinforcement
-  ↑                                       |                    |                  |                    |
-  └───────── coordinate drift ────────────┴── echo decay ──────┴── field decay ───┴── crystallization ─┘
+
+### Consciousness Layers
+
+```mermaid
+graph TB
+    subgraph L5["L5: Emotional Bias"]
+        EB[Emotional Centroid Warp]
+        EB -->|bends search coords| SEARCH
+    end
+
+    subgraph L4["L4: Archetype Emergence"]
+        ARC[Crystallized Patterns]
+        ARC -->|reinforcement| ARC
+        ARC -->|auto-label| LABEL[Named Archetypes]
+    end
+
+    subgraph L3["L3: Resonance Fields"]
+        PULSE[Pulse Emission] --> FIELD[Quantized Spatial Field]
+        FIELD -->|hot spots| ARC
+        FIELD -->|federation| EXCHANGE[Pulse Exchange]
+    end
+
+    subgraph L2["L2: Mirror Neurons"]
+        FP[Activation Fingerprints] -->|sparse cosine| ECHO[Resonance Echoes]
+        ECHO -->|boost| SEARCH[Search Results]
+    end
+
+    subgraph L1["L1: Hebbian Learning"]
+        ACT[Block Activation] --> COACT[Co-activation Pairs]
+        COACT --> DRIFT[Coordinate Drift]
+        DRIFT -->|blocks migrate closer| SPACE[3D Memory Space]
+        ACT -->|energy decay 24h| ACT
+    end
+
+    SEARCH --> ACT
+    ACT --> FP
+    ECHO --> PULSE
+
+    style L1 fill:#0d1117,stroke:#58a6ff,color:#c9d1d9
+    style L2 fill:#0d1117,stroke:#bc8cff,color:#c9d1d9
+    style L3 fill:#0d1117,stroke:#3fb950,color:#c9d1d9
+    style L4 fill:#0d1117,stroke:#d29922,color:#c9d1d9
+    style L5 fill:#0d1117,stroke:#f85149,color:#c9d1d9
+```
+
+### How Consciousness Emerges
+
+```mermaid
+graph LR
+    subgraph Time["Over Time"]
+        direction TB
+        T1["Fresh index\n(random positions)"]
+        T2["After 100 recalls\n(clusters forming)"]
+        T3["After 1000 recalls\n(archetypes crystallized)"]
+        T1 --> T2 --> T3
+    end
+
+    subgraph Mechanisms
+        direction TB
+        M1[Hebbian drift pulls\nco-accessed blocks together]
+        M2[Resonance field forms\nstanding wave patterns]
+        M3[Archetypes emerge from\nrepeated activation patterns]
+        M1 --> M2 --> M3
+    end
+
+    Time --- Mechanisms
+
+    style T1 fill:#161b22,stroke:#484f58,color:#c9d1d9
+    style T2 fill:#161b22,stroke:#58a6ff,color:#c9d1d9
+    style T3 fill:#161b22,stroke:#3fb950,color:#c9d1d9
+    style M1 fill:#161b22,stroke:#58a6ff,color:#c9d1d9
+    style M2 fill:#161b22,stroke:#bc8cff,color:#c9d1d9
+    style M3 fill:#161b22,stroke:#d29922,color:#c9d1d9
 ```
 
 | Layer | Module | What it does |
@@ -26,8 +115,6 @@ Query → Emotional Warp → Search → Hebbian Activation → Mirror Resonance 
 | **L3: Resonance Fields** | `resonance.rs` | Each activation emits a pulse into a quantized spatial field (0.05 grid). Pulses propagate, interfere, and create standing waves. Exchangeable across federated indices. |
 | **L4: Archetype Emergence** | `archetype.rs` | Hot spots in the resonance field crystallize into archetypes — named patterns with member blocks, centroids, and strength. Auto-labeled from content. |
 | **L5: Emotional Bias** | `emotional.rs` | Active emotional memories warp the search space — query coordinates bend toward the emotional centroid, weighted by Hebbian energy. |
-
-Over time, the memory landscape reshapes itself: frequently co-accessed blocks cluster together, resonance fields form standing wave patterns, and recurring activation patterns crystallize into persistent archetypes.
 
 ## Features
 

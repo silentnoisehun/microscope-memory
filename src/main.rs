@@ -1189,6 +1189,65 @@ fn main() {
                 );
             }
         }
+        Cmd::Viz { output } => {
+            let reader = open_reader(&config);
+            let output_dir = Path::new(&config.paths.output_dir);
+            let hebb = microscope_memory::hebbian::HebbianState::load_or_init(
+                output_dir,
+                reader.block_count,
+            );
+            let mirror = microscope_memory::mirror::MirrorState::load_or_init(output_dir);
+            let resonance = microscope_memory::resonance::ResonanceState::load_or_init(output_dir);
+            let archetypes = microscope_memory::archetype::ArchetypeState::load_or_init(output_dir);
+
+            let dest = Path::new(&output);
+            microscope_memory::viz::export_to_file(
+                output_dir,
+                &reader,
+                &hebb,
+                &mirror,
+                &resonance,
+                &archetypes,
+                dest,
+            )
+            .expect("export viz");
+
+            let hebb_stats = hebb.stats();
+            let arc_stats = archetypes.stats();
+            println!(
+                "{} {} blocks, {} edges, {} archetypes -> {}",
+                "VIZ".cyan().bold(),
+                reader.block_count,
+                hebb_stats.coactivation_pairs,
+                arc_stats.archetype_count,
+                output
+            );
+        }
+        Cmd::Density { output, grid } => {
+            let reader = open_reader(&config);
+            let output_dir = Path::new(&config.paths.output_dir);
+            let hebb = microscope_memory::hebbian::HebbianState::load_or_init(
+                output_dir,
+                reader.block_count,
+            );
+
+            let headers: Vec<(f32, f32, f32)> = (0..reader.block_count)
+                .map(|i| {
+                    let h = reader.header(i);
+                    (h.x, h.y, h.z)
+                })
+                .collect();
+
+            let data = microscope_memory::viz::export_density_map(&hebb, &headers, grid);
+            fs::write(&output, &data).expect("write density map");
+            println!(
+                "{} {}³ grid ({} bytes) -> {}",
+                "DENSITY".cyan().bold(),
+                grid,
+                data.len(),
+                output
+            );
+        }
         Cmd::Mcp => {
             microscope_memory::mcp::run(config);
         }

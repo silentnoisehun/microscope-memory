@@ -151,6 +151,21 @@ pub enum Cmd {
         #[arg(default_value = "10")]
         k: usize,
     },
+    /// Export 3D visualization snapshot (JSON)
+    Viz {
+        /// Output file path (default: viz.json)
+        #[arg(default_value = "viz.json")]
+        output: String,
+    },
+    /// Export binary density map for fast rendering
+    Density {
+        /// Output file path
+        #[arg(default_value = "density.bin")]
+        output: String,
+        /// Grid resolution (default: 32)
+        #[arg(short, long, default_value = "32")]
+        grid: u16,
+    },
     /// Start native MCP server (JSON-RPC 2.0 over stdio)
     Mcp,
 }

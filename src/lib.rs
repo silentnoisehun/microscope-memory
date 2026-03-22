@@ -22,6 +22,8 @@ pub mod snapshot;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod streaming;
 
+pub mod viz;
+
 #[cfg(target_arch = "wasm32")]
 pub mod wasm;
 

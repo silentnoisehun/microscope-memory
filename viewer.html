@@ -1,0 +1,767 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Microscope Memory — Cognitive Map</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #0a0a0f; color: #ccc; font-family: 'Courier New', monospace; overflow: hidden; }
+canvas { display: block; }
+
+/* ── Sidebar ── */
+#sidebar {
+  position: fixed; top: 0; left: 0; width: 260px; height: 100vh; z-index: 20;
+  background: rgba(8,8,16,0.95); border-right: 1px solid #222;
+  overflow-y: auto; padding: 0; display: flex; flex-direction: column;
+  scrollbar-width: thin; scrollbar-color: #333 #111;
+}
+#sidebar::-webkit-scrollbar { width: 4px; }
+#sidebar::-webkit-scrollbar-track { background: #111; }
+#sidebar::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
+
+#sidebar .logo {
+  padding: 14px 16px 10px; border-bottom: 1px solid #222;
+  font-size: 13px; color: #0ff; font-weight: bold; letter-spacing: 1px;
+}
+#sidebar .logo span { color: #666; font-weight: normal; font-size: 11px; display: block; margin-top: 2px; }
+
+/* Section */
+.section { border-bottom: 1px solid #1a1a2a; }
+.section-header {
+  padding: 8px 16px; font-size: 11px; color: #555; text-transform: uppercase;
+  letter-spacing: 1px; user-select: none; cursor: pointer;
+}
+.section-header:hover { color: #888; }
+.section-body { padding: 2px 12px 8px; }
+
+/* Toggle row */
+.toggle-row {
+  display: flex; align-items: center; padding: 3px 4px; border-radius: 4px; cursor: pointer;
+  user-select: none; font-size: 11px;
+}
+.toggle-row:hover { background: rgba(255,255,255,0.04); }
+.toggle-check {
+  width: 14px; height: 14px; border: 1px solid #444; border-radius: 3px;
+  margin-right: 8px; display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; font-size: 10px; color: #0ff;
+}
+.toggle-row.on .toggle-check { background: rgba(0,255,255,0.15); border-color: #0ff; }
+.toggle-row.off .toggle-check { background: transparent; border-color: #333; }
+.toggle-row.off { opacity: 0.45; }
+.toggle-swatch {
+  width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; flex-shrink: 0;
+}
+.toggle-label { flex: 1; }
+
+/* Stats */
+.stat-row { display: flex; justify-content: space-between; padding: 1px 4px; font-size: 11px; }
+.stat-row .k { color: #555; }
+.stat-row .v { color: #0f0; }
+
+/* Attention bars */
+.att-row { display: flex; align-items: center; padding: 1px 4px; font-size: 10px; }
+.att-name { width: 80px; color: #666; flex-shrink: 0; }
+.att-bar-bg { flex: 1; height: 6px; background: #1a1a2a; border-radius: 3px; margin: 0 6px; }
+.att-bar-fg { height: 6px; border-radius: 3px; background: #ff0; }
+.att-val { width: 40px; text-align: right; color: #ff0; font-size: 9px; }
+
+/* Emotional */
+.emo-valence-bar {
+  height: 6px; border-radius: 3px; margin-top: 4px;
+  background: linear-gradient(to right, #f00, #888 50%, #0f0);
+  position: relative;
+}
+.emo-valence-marker {
+  position: absolute; top: -3px; width: 4px; height: 12px;
+  background: #fff; border-radius: 2px;
+}
+
+/* Loading overlay */
+#loading {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 100;
+  background: #0a0a0f; display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+}
+#loading h1 { color: #0ff; font-size: 18px; letter-spacing: 2px; }
+#loading .sub { color: #444; margin-top: 8px; font-size: 12px; }
+#loading .spinner {
+  margin-top: 24px; width: 30px; height: 30px; border: 2px solid #222;
+  border-top-color: #0ff; border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+#loading .error { color: #f44; margin-top: 16px; font-size: 12px; display: none; }
+#loading .fallback { margin-top: 12px; display: none; }
+#loading .fallback input { font-family: inherit; }
+</style>
+</head>
+<body>
+
+<div id="loading">
+  <h1>MICROSCOPE MEMORY</h1>
+  <div class="sub">13-Layer Consciousness Viewer</div>
+  <div class="spinner"></div>
+  <div class="error" id="loadError"></div>
+  <div class="fallback" id="loadFallback">
+    <input type="file" id="fileInput" accept=".json">
+  </div>
+</div>
+
+<div id="sidebar" style="display:none">
+  <div class="logo">MICROSCOPE MEMORY<span id="versionLabel">v0.6.0</span></div>
+
+  <!-- Features -->
+  <div class="section" id="sec-features">
+    <div class="section-header">Features</div>
+    <div class="section-body" id="feature-toggles"></div>
+  </div>
+
+  <!-- Layers -->
+  <div class="section" id="sec-layers">
+    <div class="section-header">Layers</div>
+    <div class="section-body" id="layer-toggles"></div>
+  </div>
+
+  <!-- Stats -->
+  <div class="section">
+    <div class="section-header">Stats</div>
+    <div class="section-body" id="stats-body"></div>
+  </div>
+
+  <!-- Attention -->
+  <div class="section">
+    <div class="section-header">Attention Weights</div>
+    <div class="section-body" id="attention-body"></div>
+  </div>
+
+  <!-- Emotional -->
+  <div class="section">
+    <div class="section-header">Emotional Field</div>
+    <div class="section-body" id="emotional-body"></div>
+  </div>
+
+  <!-- Predictions -->
+  <div class="section">
+    <div class="section-header">Predictive Cache</div>
+    <div class="section-body" id="predictions-body"></div>
+  </div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.164.1/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.164.1/examples/jsm/"
+  }
+}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+// ─── State ─────────────────────────────────────────
+let scene, camera, renderer, controls, clock;
+let data = null;
+let fieldPoints = null;
+
+// Feature groups — each is a THREE.Group toggled independently
+const groups = {};
+
+// Feature definitions: key, label, default on
+const FEATURES = [
+  { key: 'blocks',     label: 'Memory Blocks',       on: true  },
+  { key: 'edges',      label: 'Co-activation Edges',  on: true  },
+  { key: 'wave',       label: 'Resonance Wave Field',  on: false },
+  { key: 'paths',      label: 'Thought Paths',        on: false },
+  { key: 'archetypes', label: 'Archetypes',            on: false },
+  { key: 'dreams',     label: 'Dream Cycles',          on: false },
+  { key: 'echoes',     label: 'Mirror Echoes',         on: false },
+  { key: 'emotional',  label: 'Emotional Centroid',    on: false },
+];
+
+// Layer definitions: name, hex color
+const LAYER_DEFS = [
+  { name: 'emotional',   color: 0xff3366 },
+  { name: 'episodic',    color: 0x33ff66 },
+  { name: 'semantic',    color: 0x3366ff },
+  { name: 'procedural',  color: 0xff9933 },
+  { name: 'sensory',     color: 0xff33ff },
+  { name: 'working',     color: 0xffff33 },
+  { name: 'long_term',   color: 0x33ffff },
+  { name: 'associative', color: 0x9966ff },
+  { name: 'echo_cache',  color: 0x66ff99 },
+  { name: 'rust_state',  color: 0xff6633 },
+];
+const LAYER_COLOR_MAP = {};
+LAYER_DEFS.forEach(l => { LAYER_COLOR_MAP[l.name] = l.color; });
+
+// Per-layer visibility
+const layerVisible = {};
+LAYER_DEFS.forEach(l => { layerVisible[l.name] = true; });
+
+// Per-block layer name (for filtering)
+let blockLayerNames = [];
+
+// ─── Auto-load ─────────────────────────────────────
+async function autoLoad() {
+  try {
+    const resp = await fetch('cognitive_map.json');
+    if (!resp.ok) throw new Error(resp.statusText);
+    data = await resp.json();
+    boot();
+  } catch (e) {
+    document.getElementById('loadError').textContent = 'Auto-load failed: ' + e.message;
+    document.getElementById('loadError').style.display = 'block';
+    document.getElementById('loadFallback').style.display = 'block';
+  }
+}
+autoLoad();
+
+document.getElementById('fileInput').addEventListener('change', (ev) => {
+  const file = ev.target.files[0];
+  if (!file) return;
+  const fr = new FileReader();
+  fr.onload = (e) => { data = JSON.parse(e.target.result); boot(); };
+  fr.readAsText(file);
+});
+
+// ─── Boot ──────────────────────────────────────────
+function boot() {
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('sidebar').style.display = 'flex';
+
+  document.getElementById('versionLabel').textContent = data.version || '';
+
+  initThree();
+  buildAll();
+  buildSidebar();
+  animate();
+}
+
+function initThree() {
+  clock = new THREE.Clock();
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x0a0a0f);
+  scene.fog = new THREE.FogExp2(0x0a0a0f, 0.3);
+
+  camera = new THREE.PerspectiveCamera(60, (window.innerWidth - 260) / window.innerHeight, 0.01, 100);
+  camera.position.set(1.2, 1.0, 1.5);
+
+  renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setSize(window.innerWidth - 260, window.innerHeight);
+  renderer.setPixelRatio(window.devicePixelRatio);
+  renderer.domElement.style.marginLeft = '260px';
+  document.body.appendChild(renderer.domElement);
+
+  controls = new OrbitControls(camera, renderer.domElement);
+  controls.target.set(0.5, 0.5, 0.5);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.05;
+  controls.update();
+
+  scene.add(new THREE.AmbientLight(0x333344, 1));
+
+  const grid = new THREE.GridHelper(2, 20, 0x222244, 0x111122);
+  grid.position.set(0.5, 0, 0.5);
+  scene.add(grid);
+
+  const axMat = new THREE.LineBasicMaterial({ color: 0x444466 });
+  for (const [a, b] of [[[0,0,0],[1,0,0]],[[0,0,0],[0,1,0]],[[0,0,0],[0,0,1]]]) {
+    const g = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(...a), new THREE.Vector3(...b)]);
+    scene.add(new THREE.Line(g, axMat));
+  }
+
+  window.addEventListener('resize', () => {
+    camera.aspect = (window.innerWidth - 260) / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth - 260, window.innerHeight);
+  });
+}
+
+// ─── Build all 3D groups ───────────────────────────
+function buildAll() {
+  buildBlocks();
+  buildEdges();
+  buildWaveField();
+  buildPaths();
+  buildArchetypes();
+  buildDreams();
+  buildEchoes();
+  buildEmotionalCentroid();
+
+  // Apply default visibility
+  FEATURES.forEach(f => {
+    if (groups[f.key]) groups[f.key].visible = f.on;
+  });
+}
+
+function getBlockMap() {
+  const m = {};
+  (data.blocks || []).forEach(b => { m[b.i] = b; });
+  return m;
+}
+
+function buildBlocks() {
+  const blocks = data.blocks || [];
+  if (!blocks.length) return;
+
+  groups.blocks = new THREE.Group();
+  blockLayerNames = [];
+
+  // One Points object per layer for independent toggling
+  const byLayer = {};
+  for (const b of blocks) {
+    const ln = b.l || '?';
+    if (!byLayer[ln]) byLayer[ln] = [];
+    byLayer[ln].push(b);
+  }
+
+  for (const [layerName, layerBlocks] of Object.entries(byLayer)) {
+    const count = layerBlocks.length;
+    const positions = new Float32Array(count * 3);
+    const colors = new Float32Array(count * 3);
+
+    const baseColor = new THREE.Color(LAYER_COLOR_MAP[layerName] || 0x666666);
+
+    for (let i = 0; i < count; i++) {
+      const b = layerBlocks[i];
+      positions[i*3]   = b.x + (b.dx || 0);
+      positions[i*3+1] = b.y + (b.dy || 0);
+      positions[i*3+2] = b.z + (b.dz || 0);
+
+      const col = baseColor.clone();
+      col.multiplyScalar(0.3 + Math.min(0.7, (b.e || 0) * 2));
+      colors[i*3]   = col.r;
+      colors[i*3+1] = col.g;
+      colors[i*3+2] = col.b;
+    }
+
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+    const pts = new THREE.Points(geo, new THREE.PointsMaterial({
+      vertexColors: true, sizeAttenuation: true, size: 0.008,
+      transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false
+    }));
+    pts.userData.layerName = layerName;
+    groups.blocks.add(pts);
+  }
+
+  scene.add(groups.blocks);
+}
+
+function buildEdges() {
+  const edges = data.edges || [];
+  const blocks = data.blocks || [];
+  if (!edges.length || !blocks.length) return;
+
+  groups.edges = new THREE.Group();
+  const bm = getBlockMap();
+  const positions = [];
+  const colors = [];
+  const maxC = edges.reduce((m, e) => Math.max(m, e.c), 1);
+
+  for (const edge of edges) {
+    const ba = bm[edge.a], bb = bm[edge.b];
+    if (!ba || !bb) continue;
+    const intensity = edge.c / maxC;
+    positions.push(
+      ba.x+(ba.dx||0), ba.y+(ba.dy||0), ba.z+(ba.dz||0),
+      bb.x+(bb.dx||0), bb.y+(bb.dy||0), bb.z+(bb.dz||0)
+    );
+    const c = new THREE.Color().setHSL(0.55, 0.8, 0.2 + intensity * 0.6);
+    colors.push(c.r, c.g, c.b, c.r, c.g, c.b);
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  groups.edges.add(new THREE.LineSegments(geo, new THREE.LineBasicMaterial({
+    vertexColors: true, transparent: true, opacity: 0.3, blending: THREE.AdditiveBlending, depthWrite: false
+  })));
+
+  scene.add(groups.edges);
+}
+
+function buildWaveField() {
+  const field = data.field || [];
+  if (!field.length) return;
+
+  groups.wave = new THREE.Group();
+  const count = field.length;
+  const positions = new Float32Array(count * 3);
+  const colors = new Float32Array(count * 3);
+  const maxV = field.reduce((m, f) => Math.max(m, Math.abs(f.v)), 0.001);
+
+  for (let i = 0; i < count; i++) {
+    const f = field[i];
+    positions[i*3] = f.x; positions[i*3+1] = f.y; positions[i*3+2] = f.z;
+    const norm = f.v / maxV;
+    const c = new THREE.Color().setHSL(0.6 - norm * 0.6, 0.9, 0.3 + Math.abs(norm) * 0.4);
+    colors[i*3] = c.r; colors[i*3+1] = c.g; colors[i*3+2] = c.b;
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+  fieldPoints = new THREE.Points(geo, new THREE.PointsMaterial({
+    vertexColors: true, size: 0.015, transparent: true, opacity: 0.6,
+    blending: THREE.AdditiveBlending, depthWrite: false, sizeAttenuation: true
+  }));
+  groups.wave.add(fieldPoints);
+  scene.add(groups.wave);
+}
+
+function buildPaths() {
+  const paths = data.thought_paths || [];
+  if (!paths.length) return;
+
+  groups.paths = new THREE.Group();
+
+  for (let si = 0; si < paths.length; si++) {
+    const session = paths[si];
+    if (session.length < 2) continue;
+    const hue = si / paths.length;
+    const c = new THREE.Color().setHSL(hue, 0.7, 0.5);
+
+    const pos = [];
+    for (let ni = 0; ni < session.length; ni++) {
+      pos.push(ni / session.length, (session[ni].l || 0) / 10, si / paths.length);
+    }
+
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    groups.paths.add(new THREE.Line(geo, new THREE.LineBasicMaterial({ color: c, transparent: true, opacity: 0.7 })));
+
+    for (let ni = 0; ni < session.length; ni++) {
+      const s = new THREE.Mesh(new THREE.SphereGeometry(0.006, 6, 6), new THREE.MeshBasicMaterial({ color: c }));
+      s.position.set(ni / session.length, (session[ni].l || 0) / 10, si / paths.length);
+      groups.paths.add(s);
+    }
+  }
+
+  scene.add(groups.paths);
+}
+
+function buildArchetypes() {
+  const archs = data.archetypes || [];
+  if (!archs.length) return;
+
+  groups.archetypes = new THREE.Group();
+  const bm = getBlockMap();
+
+  for (const a of archs) {
+    const size = 0.015 + Math.min(0.04, a.str * 0.02);
+    const sphere = new THREE.Mesh(
+      new THREE.SphereGeometry(size, 12, 12),
+      new THREE.MeshBasicMaterial({ color: 0xff9900, transparent: true, opacity: 0.6, wireframe: true })
+    );
+    sphere.position.set(a.cx, a.cy, a.cz);
+    groups.archetypes.add(sphere);
+
+    // Label
+    const canvas = document.createElement('canvas');
+    canvas.width = 256; canvas.height = 48;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#ff9900'; ctx.font = '18px monospace';
+    ctx.fillText(a.label.substring(0, 20), 4, 22);
+    ctx.fillStyle = '#666'; ctx.font = '12px monospace';
+    ctx.fillText('str:' + a.str.toFixed(2) + ' r:' + a.r, 4, 40);
+    const tex = new THREE.CanvasTexture(canvas);
+    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true }));
+    sprite.position.set(a.cx, a.cy + size + 0.02, a.cz);
+    sprite.scale.set(0.12, 0.025, 1);
+    groups.archetypes.add(sprite);
+
+    // Temporal ring
+    if (a.temporal && a.temporal.length > 0) {
+      const ring = new THREE.Mesh(
+        new THREE.RingGeometry(size + 0.005, size + 0.012, Math.max(8, a.temporal.length)),
+        new THREE.MeshBasicMaterial({ color: a.dom_window < 128 ? 0x00ffff : 0xff00ff, transparent: true, opacity: 0.4, side: THREE.DoubleSide })
+      );
+      ring.position.set(a.cx, a.cy, a.cz);
+      groups.archetypes.add(ring);
+    }
+
+    // Member lines
+    for (const mid of (a.members || [])) {
+      const mb = bm[mid];
+      if (!mb) continue;
+      const lg = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(a.cx, a.cy, a.cz),
+        new THREE.Vector3(mb.x+(mb.dx||0), mb.y+(mb.dy||0), mb.z+(mb.dz||0))
+      ]);
+      groups.archetypes.add(new THREE.Line(lg, new THREE.LineBasicMaterial({ color: 0xff9900, transparent: true, opacity: 0.12 })));
+    }
+  }
+
+  scene.add(groups.archetypes);
+}
+
+function buildDreams() {
+  const dreams = data.dreams || [];
+  if (!dreams.length) return;
+
+  groups.dreams = new THREE.Group();
+
+  for (let i = 0; i < dreams.length; i++) {
+    const d = dreams[i];
+    const x = 0.1 + (i / dreams.length) * 0.8;
+    const delta = d.e_after - d.e_before;
+    const y = 0.5 + delta * 0.5;
+
+    const mesh = new THREE.Mesh(
+      new THREE.SphereGeometry(0.01 + d.replayed * 0.001, 8, 8),
+      new THREE.MeshBasicMaterial({ color: delta > 0 ? 0x00ff88 : 0xff4444, transparent: true, opacity: 0.6 })
+    );
+    mesh.position.set(x, y, 0.5);
+    groups.dreams.add(mesh);
+
+    if (d.pruned_p > 0 || d.pruned_a > 0) {
+      const ring = new THREE.Mesh(
+        new THREE.RingGeometry(0.012, 0.018, 8),
+        new THREE.MeshBasicMaterial({ color: 0xff0000, transparent: true, opacity: 0.3, side: THREE.DoubleSide })
+      );
+      ring.position.set(x, y, 0.5);
+      groups.dreams.add(ring);
+    }
+  }
+
+  scene.add(groups.dreams);
+}
+
+function buildEchoes() {
+  const echoes = data.echoes || [];
+  const bm = getBlockMap();
+  if (!echoes.length) return;
+
+  groups.echoes = new THREE.Group();
+
+  for (const echo of echoes) {
+    if (echo.shared.length < 2) continue;
+    const pts = [];
+    for (const bid of echo.shared) {
+      const b = bm[bid];
+      if (b) pts.push(new THREE.Vector3(b.x+(b.dx||0), b.y+(b.dy||0), b.z+(b.dz||0)));
+    }
+    if (pts.length < 2) continue;
+
+    const hue = 0.3 + echo.sim * 0.4;
+    const geo = new THREE.BufferGeometry().setFromPoints(pts);
+    groups.echoes.add(new THREE.Line(geo, new THREE.LineBasicMaterial({
+      color: new THREE.Color().setHSL(hue, 0.8, 0.4), transparent: true, opacity: 0.3 + echo.sim * 0.4
+    })));
+  }
+
+  scene.add(groups.echoes);
+}
+
+function buildEmotionalCentroid() {
+  const emo = data.emotional || {};
+  const local = emo.local;
+  if (!local) return;
+
+  groups.emotional = new THREE.Group();
+
+  // Centroid marker
+  const sphere = new THREE.Mesh(
+    new THREE.SphereGeometry(0.025, 16, 16),
+    new THREE.MeshBasicMaterial({ color: local.valence > 0 ? 0x00ff66 : 0xff3366, transparent: true, opacity: 0.7 })
+  );
+  sphere.position.set(local.cx, local.cy, local.cz);
+  groups.emotional.add(sphere);
+
+  // Pulsing ring
+  const ring = new THREE.Mesh(
+    new THREE.RingGeometry(0.03, 0.04, 32),
+    new THREE.MeshBasicMaterial({ color: 0xff66aa, transparent: true, opacity: 0.3, side: THREE.DoubleSide })
+  );
+  ring.position.set(local.cx, local.cy, local.cz);
+  groups.emotional.add(ring);
+
+  // Remote centroids
+  for (const r of (emo.remote || [])) {
+    const rs = new THREE.Mesh(
+      new THREE.SphereGeometry(0.015, 8, 8),
+      new THREE.MeshBasicMaterial({ color: 0x9966ff, transparent: true, opacity: 0.5, wireframe: true })
+    );
+    rs.position.set(r.cx, r.cy, r.cz);
+    groups.emotional.add(rs);
+  }
+
+  scene.add(groups.emotional);
+}
+
+// ─── Sidebar ───────────────────────────────────────
+function buildSidebar() {
+  buildFeatureToggles();
+  buildLayerToggles();
+  buildStats();
+  buildAttention();
+  buildEmotionalPanel();
+  buildPredictions();
+}
+
+function buildFeatureToggles() {
+  const container = document.getElementById('feature-toggles');
+  container.innerHTML = '';
+  for (const f of FEATURES) {
+    const row = document.createElement('div');
+    row.className = 'toggle-row ' + (f.on ? 'on' : 'off');
+    row.innerHTML = `<div class="toggle-check">${f.on ? '\u2713' : ''}</div><span class="toggle-label">${f.label}</span>`;
+    row.addEventListener('click', () => {
+      f.on = !f.on;
+      row.className = 'toggle-row ' + (f.on ? 'on' : 'off');
+      row.querySelector('.toggle-check').textContent = f.on ? '\u2713' : '';
+      if (groups[f.key]) groups[f.key].visible = f.on;
+    });
+    container.appendChild(row);
+  }
+}
+
+function buildLayerToggles() {
+  const container = document.getElementById('layer-toggles');
+  container.innerHTML = '';
+  for (const l of LAYER_DEFS) {
+    const hex = '#' + l.color.toString(16).padStart(6, '0');
+    const row = document.createElement('div');
+    row.className = 'toggle-row on';
+    row.innerHTML = `<div class="toggle-check">\u2713</div><div class="toggle-swatch" style="background:${hex}"></div><span class="toggle-label">${l.name}</span>`;
+    row.addEventListener('click', () => {
+      layerVisible[l.name] = !layerVisible[l.name];
+      row.className = 'toggle-row ' + (layerVisible[l.name] ? 'on' : 'off');
+      row.querySelector('.toggle-check').textContent = layerVisible[l.name] ? '\u2713' : '';
+      applyLayerVisibility();
+    });
+    container.appendChild(row);
+  }
+}
+
+function applyLayerVisibility() {
+  if (!groups.blocks) return;
+  for (const child of groups.blocks.children) {
+    if (child.userData.layerName) {
+      child.visible = layerVisible[child.userData.layerName] !== false;
+    }
+  }
+}
+
+function buildStats() {
+  const s = data.stats || {};
+  const el = document.getElementById('stats-body');
+  const rows = [
+    ['Blocks', data.block_count || 0],
+    ['Active', s.active_blocks || 0],
+    ['Hot', s.hot_blocks || 0],
+    ['Co-act pairs', s.coactivation_pairs || 0],
+    ['Archetypes', s.archetypes || 0],
+    ['Members', s.archetype_members || 0],
+    ['Thought nodes', s.thought_nodes || 0],
+    ['Thought edges', s.thought_edges || 0],
+    ['Patterns', s.crystallized_patterns || 0],
+    ['Field cells', s.field_cells || 0],
+    ['Field energy', (s.field_energy || 0).toFixed(2)],
+    ['Echoes', s.echoes || 0],
+    ['Dream cycles', s.dream_cycles || 0],
+    ['Total pruned', s.total_pruned || 0],
+    ['Valence', (s.emotional_valence || 0).toFixed(3)],
+    ['Remote fields', s.remote_emotional_fields || 0],
+    ['Instance', (data.instance_id || '').substring(0, 10)],
+  ];
+  el.innerHTML = rows.map(([k, v]) => `<div class="stat-row"><span class="k">${k}</span><span class="v">${v}</span></div>`).join('');
+}
+
+function buildAttention() {
+  const att = data.attention || {};
+  const weights = att.weights || [];
+  const names = att.layer_names || [];
+  const el = document.getElementById('attention-body');
+  if (!weights.length) { el.innerHTML = '<div style="color:#444;font-size:10px">No data</div>'; return; }
+  const maxW = Math.max(...weights, 0.01);
+  let html = `<div style="color:#555;font-size:9px;margin-bottom:4px">${att.total_recalls || 0} total recalls</div>`;
+  for (let i = 0; i < weights.length; i++) {
+    const pct = (weights[i] / maxW * 100).toFixed(0);
+    html += `<div class="att-row"><span class="att-name">${names[i] || i}</span><div class="att-bar-bg"><div class="att-bar-fg" style="width:${pct}%"></div></div><span class="att-val">${weights[i].toFixed(3)}</span></div>`;
+  }
+  el.innerHTML = html;
+}
+
+function buildEmotionalPanel() {
+  const emo = data.emotional || {};
+  const local = emo.local;
+  const el = document.getElementById('emotional-body');
+  if (!local) { el.innerHTML = '<div style="color:#444;font-size:10px">No snapshot</div>'; return; }
+  const v = local.valence || 0;
+  const vColor = v > 0 ? '#0f0' : v < 0 ? '#f00' : '#888';
+  const markerPos = ((v + 1) / 2 * 100).toFixed(1);
+  el.innerHTML = `
+    <div class="stat-row"><span class="k">Energy</span><span class="v" style="color:#0ff">${local.energy.toFixed(2)}</span></div>
+    <div class="stat-row"><span class="k">Valence</span><span class="v" style="color:${vColor}">${v.toFixed(3)}</span></div>
+    <div class="stat-row"><span class="k">Active blocks</span><span class="v">${local.blocks}</span></div>
+    <div class="stat-row"><span class="k">Remote fields</span><span class="v">${(emo.remote||[]).length}</span></div>
+    <div class="emo-valence-bar"><div class="emo-valence-marker" style="left:${markerPos}%"></div></div>
+  `;
+}
+
+function buildPredictions() {
+  const pred = data.predictions || {};
+  const el = document.getElementById('predictions-body');
+  const rows = [
+    ['Total', pred.total || 0],
+    ['Hits', pred.hits || 0],
+    ['Misses', pred.misses || 0],
+    ['Hit rate', ((pred.hit_rate || 0) * 100).toFixed(1) + '%'],
+    ['Active', pred.active || 0],
+  ];
+  el.innerHTML = rows.map(([k, v]) => `<div class="stat-row"><span class="k">${k}</span><span class="v">${v}</span></div>`).join('');
+}
+
+// ─── Section collapse ──────────────────────────────
+document.querySelectorAll('.section-header').forEach(header => {
+  header.addEventListener('click', () => {
+    const body = header.nextElementSibling;
+    if (body) body.style.display = body.style.display === 'none' ? 'block' : 'none';
+  });
+});
+
+// ─── Animate ───────────────────────────────────────
+function animate() {
+  requestAnimationFrame(animate);
+  const t = clock.getElapsedTime();
+
+  // Wave field pulse
+  if (groups.wave && groups.wave.visible && fieldPoints) {
+    const pos = fieldPoints.geometry.attributes.position.array;
+    const field = data.field || [];
+    for (let i = 0; i < field.length; i++) {
+      const f = field[i];
+      pos[i*3+1] = f.y + Math.sin(t * 2 + f.x * 10 + f.z * 10) * 0.01 * f.v;
+    }
+    fieldPoints.geometry.attributes.position.needsUpdate = true;
+    fieldPoints.material.size = 0.012 + Math.sin(t * 1.5) * 0.003;
+  }
+
+  // Dream sphere pulse
+  if (groups.dreams && groups.dreams.visible) {
+    groups.dreams.children.forEach((child, i) => {
+      if (child.isMesh) child.scale.setScalar(1 + Math.sin(t * 3 + i) * 0.2);
+    });
+  }
+
+  // Emotional centroid ring pulse
+  if (groups.emotional && groups.emotional.visible) {
+    groups.emotional.children.forEach(child => {
+      if (child.isSprite || (child.geometry && child.geometry.type === 'RingGeometry')) {
+        child.scale.setScalar(1 + Math.sin(t * 2) * 0.15);
+      }
+    });
+  }
+
+  controls.update();
+  renderer.render(scene, camera);
+}
+</script>
+</body>
+</html>

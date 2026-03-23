@@ -225,6 +225,12 @@ pub enum Cmd {
     EmotionalExchange,
     /// Show multimodal index statistics
     Modalities,
+    /// Export full cognitive map (all 13 layers) as JSON for Three.js viewer
+    CognitiveMap {
+        /// Output file path (default: cognitive_map.json)
+        #[arg(default_value = "cognitive_map.json")]
+        output: String,
+    },
     /// Store structured data (key=value pairs)
     StoreData {
         /// Key-value pairs: key1=val1 key2=val2

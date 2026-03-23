@@ -1890,6 +1890,95 @@ fn main() {
             println!("  Audio:         {}", stats.audio_count);
             println!("  Structured:    {}", stats.structured_count);
         }
+        Cmd::CognitiveMap { output } => {
+            let reader = open_reader(&config);
+            let output_dir = Path::new(&config.paths.output_dir);
+            let hebb = microscope_memory::hebbian::HebbianState::load_or_init(
+                output_dir,
+                reader.block_count,
+            );
+            let mirror = microscope_memory::mirror::MirrorState::load_or_init(output_dir);
+            let resonance = microscope_memory::resonance::ResonanceState::load_or_init(output_dir);
+            let archetypes = microscope_memory::archetype::ArchetypeState::load_or_init(output_dir);
+            let thought_graph =
+                microscope_memory::thought_graph::ThoughtGraphState::load_or_init(output_dir);
+            let pred_cache =
+                microscope_memory::predictive_cache::PredictiveCache::load_or_init(output_dir);
+            let temporal =
+                microscope_memory::temporal_archetype::TemporalArchetypeState::load_or_init(
+                    output_dir,
+                );
+            let attention =
+                microscope_memory::attention::AttentionState::load_or_init(output_dir);
+            let dream = microscope_memory::dream::DreamState::load_or_init(output_dir);
+            let emotional =
+                microscope_memory::emotional_contagion::EmotionalContagionState::load_or_init(
+                    output_dir,
+                );
+            let modalities =
+                microscope_memory::multimodal::ModalityIndex::load_or_init(output_dir);
+
+            let dest = Path::new(&output);
+            microscope_memory::viz::export_cognitive_map_to_file(
+                output_dir,
+                &reader,
+                &hebb,
+                &mirror,
+                &resonance,
+                &archetypes,
+                &thought_graph,
+                &pred_cache,
+                &temporal,
+                &attention,
+                &dream,
+                &emotional,
+                &modalities,
+                dest,
+            )
+            .expect("export cognitive map");
+
+            let file_size = std::fs::metadata(dest)
+                .map(|m| m.len())
+                .unwrap_or(0);
+            println!(
+                "{} 13-layer cognitive map → {} ({} bytes)",
+                "COGNITIVE MAP".cyan().bold(),
+                output,
+                file_size
+            );
+
+            // Copy viewer.html next to the JSON and open in browser
+            let json_dir = dest.parent().unwrap_or(Path::new("."));
+            let viewer_src = Path::new(env!("CARGO_MANIFEST_DIR")).join("viewer.html");
+            let viewer_dst = json_dir.join("viewer.html");
+            if viewer_src.exists() {
+                let _ = std::fs::copy(&viewer_src, &viewer_dst);
+            }
+            if viewer_dst.exists() {
+                println!(
+                    "{}",
+                    "Opening viewer in browser...".green()
+                );
+                #[cfg(target_os = "windows")]
+                {
+                    let _ = std::process::Command::new("cmd")
+                        .args(["/C", "start", "", &viewer_dst.display().to_string()])
+                        .spawn();
+                }
+                #[cfg(target_os = "macos")]
+                {
+                    let _ = std::process::Command::new("open")
+                        .arg(&viewer_dst)
+                        .spawn();
+                }
+                #[cfg(target_os = "linux")]
+                {
+                    let _ = std::process::Command::new("xdg-open")
+                        .arg(&viewer_dst)
+                        .spawn();
+                }
+            }
+        }
         Cmd::StoreData { pairs, importance } => {
             let output_dir = Path::new(&config.paths.output_dir);
             let mut fields = Vec::new();

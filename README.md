@@ -3,11 +3,11 @@
 [![CI](https://github.com/silentnoisehun/microscope-memory/actions/workflows/ci.yml/badge.svg)](https://github.com/silentnoisehun/microscope-memory/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-**Consciousness architecture for machine memory — Hebbian learning, mirror neurons, resonance fields, archetype emergence**
+**Consciousness architecture for machine memory — Hebbian learning, mirror neurons, resonance fields, archetype emergence, attention mechanism**
 
-A binary memory system where memories self-organize through use. Every recall strengthens neural pathways (Hebbian learning), activates mirror neurons across similar memories, emits resonance pulses into a spatial field, and crystallizes recurring patterns into archetypes. The system treats data like looking through a microscope — zoom level determines what you see, from identity down to raw bytes.
+A binary memory system where memories self-organize through use. Every recall strengthens neural pathways (Hebbian learning), activates mirror neurons across similar memories, emits resonance pulses into a spatial field, crystallizes recurring patterns into archetypes, tracks thought paths that pre-fetch future blocks, adapts layer weights through an attention mechanism, learns time-of-day patterns via temporal archetypes, and shares knowledge across federated instances. The system treats data like looking through a microscope — zoom level determines what you see, from identity down to raw bytes.
 
-Pure Rust. Zero JSON. Sub-microsecond queries. 228K+ blocks across 9 depth levels.
+Pure Rust. Zero JSON. Sub-microsecond queries. 228K+ blocks across 9 depth levels. 10-layer consciousness stack.
 
 ## Consciousness Architecture
 
@@ -17,7 +17,8 @@ The core innovation: memories are not just stored — they **learn**, **resonate
 
 ```mermaid
 graph LR
-    Q[Query] --> PC[Predictive Cache Check]
+    Q[Query] --> ATT[Attention Weights]
+    ATT --> PC[Predictive Cache Check]
     PC --> EW[Emotional Warp]
     EW --> S[3D Spatial Search]
     S --> TG[ThoughtGraph Pattern Boost]
@@ -25,11 +26,14 @@ graph LR
     HA --> MR[Mirror Resonance]
     MR --> PE[Pulse Emission]
     PE --> AR[Archetype Reinforcement]
-    AR --> EV[Evaluate Prediction]
+    AR --> TA[Temporal Archetype Track]
+    TA --> EV[Evaluate Prediction]
     EV --> PN[Predict Next]
-    PN -->|coordinate drift| Q
+    PN --> QL[Quality Inference]
+    QL -->|coordinate drift| Q
 
     style Q fill:#1a1a2e,stroke:#e94560,color:#fff
+    style ATT fill:#1a1a2e,stroke:#ff6b6b,color:#fff
     style PC fill:#1a1a2e,stroke:#3fb950,color:#fff
     style EW fill:#1a1a2e,stroke:#e94560,color:#fff
     style S fill:#1a1a2e,stroke:#0f3460,color:#fff
@@ -38,14 +42,32 @@ graph LR
     style MR fill:#1a1a2e,stroke:#533483,color:#fff
     style PE fill:#1a1a2e,stroke:#0f3460,color:#fff
     style AR fill:#1a1a2e,stroke:#e94560,color:#fff
+    style TA fill:#1a1a2e,stroke:#f0883e,color:#fff
     style EV fill:#1a1a2e,stroke:#3fb950,color:#fff
     style PN fill:#1a1a2e,stroke:#3fb950,color:#fff
+    style QL fill:#1a1a2e,stroke:#ff6b6b,color:#fff
 ```
 
 ### Consciousness Layers
 
 ```mermaid
 graph TB
+    subgraph L10["L10: Cross-Instance Learning"]
+        EXPORT[Export Patterns + Stats] -->|federation| IMPORT[Import from Peers]
+        IMPORT -->|trust-weighted| MERGE[Merge Knowledge]
+    end
+
+    subgraph L9["L9: Attention Mechanism"]
+        SIG[Query Signals] --> WEIGHTS[Dynamic Layer Weights]
+        WEIGHTS -->|scale each layer| ALL[All Layers]
+        QUAL[Quality Inference] -->|EMA learning| WEIGHTS
+    end
+
+    subgraph L8["L8: Temporal Archetypes"]
+        WINDOW[6x4h Time Windows] --> PROFILE[Activation Profiles]
+        PROFILE -->|time-aware boost| SEARCH
+    end
+
     subgraph L7["L7: Predictive Cache"]
         PRED[Predict Next Blocks] -->|pre-fetch| CACHE[Block Cache]
         CACHE -->|hit/miss| REWARD[Reward / Penalize Pattern]
@@ -91,6 +113,8 @@ graph TB
     ECHO --> PULSE
     PAT --> PRED
     REWARD --> PAT
+    EXPORT --> IMPORT
+    QUAL --> WEIGHTS
 
     style L1 fill:#0d1117,stroke:#58a6ff,color:#c9d1d9
     style L2 fill:#0d1117,stroke:#bc8cff,color:#c9d1d9
@@ -99,6 +123,9 @@ graph TB
     style L5 fill:#0d1117,stroke:#f85149,color:#c9d1d9
     style L6 fill:#0d1117,stroke:#f0883e,color:#c9d1d9
     style L7 fill:#0d1117,stroke:#a5d6ff,color:#c9d1d9
+    style L8 fill:#0d1117,stroke:#da3633,color:#c9d1d9
+    style L9 fill:#0d1117,stroke:#ff6b6b,color:#c9d1d9
+    style L10 fill:#0d1117,stroke:#8b949e,color:#c9d1d9
 ```
 
 ### How Consciousness Emerges
@@ -110,7 +137,8 @@ graph LR
         T1["Fresh index\n(random positions)"]
         T2["After 100 recalls\n(clusters forming)"]
         T3["After 1000 recalls\n(archetypes crystallized)"]
-        T1 --> T2 --> T3
+        T4["After 5000 recalls\n(attention self-tuned)"]
+        T1 --> T2 --> T3 --> T4
     end
 
     subgraph Mechanisms
@@ -118,7 +146,8 @@ graph LR
         M1[Hebbian drift pulls\nco-accessed blocks together]
         M2[Resonance field forms\nstanding wave patterns]
         M3[Archetypes emerge from\nrepeated activation patterns]
-        M1 --> M2 --> M3
+        M4[Thought patterns predict\ntemporal archetypes tune\nattention weights converge]
+        M1 --> M2 --> M3 --> M4
     end
 
     Time --- Mechanisms
@@ -126,9 +155,11 @@ graph LR
     style T1 fill:#161b22,stroke:#484f58,color:#c9d1d9
     style T2 fill:#161b22,stroke:#58a6ff,color:#c9d1d9
     style T3 fill:#161b22,stroke:#3fb950,color:#c9d1d9
+    style T4 fill:#161b22,stroke:#ff6b6b,color:#c9d1d9
     style M1 fill:#161b22,stroke:#58a6ff,color:#c9d1d9
     style M2 fill:#161b22,stroke:#bc8cff,color:#c9d1d9
     style M3 fill:#161b22,stroke:#d29922,color:#c9d1d9
+    style M4 fill:#161b22,stroke:#ff6b6b,color:#c9d1d9
 ```
 
 | Layer | Module | What it does |
@@ -140,6 +171,9 @@ graph LR
 | **L5: Emotional Bias** | `emotional.rs` | Active emotional memories warp the search space — query coordinates bend toward the emotional centroid, weighted by Hebbian energy. |
 | **L6: ThoughtGraph** | `thought_graph.rs` | Tracks sequential recall paths as a directed graph. Recurring sequences (A→B→C) crystallize into patterns that boost future searches matching the same thought path. |
 | **L7: Predictive Cache** | `predictive_cache.rs` | Pre-fetches likely next blocks based on ThoughtGraph patterns. Hits reward the source pattern (+0.3), misses penalize (-0.05) — a reinforcement loop that makes accurate predictions stronger over time. |
+| **L8: Temporal Archetypes** | `temporal_archetype.rs` | Tracks activation patterns across 6 time windows (4h each). Learns when specific archetypes are most active. Applies time-aware boost — peak-window matches score higher than off-peak. |
+| **L9: Attention Mechanism** | `attention.rs` | Dynamically weights all consciousness layers based on query signals (length, emotion, session depth, pattern confidence, cache hit rate, archetype match). Learns from outcomes via EMA — satisfied recalls reinforce the weights that produced them. |
+| **L10: Cross-Instance Learning** | `federation.rs` | Exports ThoughtGraph patterns and PredictiveCache stats across federated indices. Trust-weighted import: source hit rate × federation weight. Enables collective thought path learning across instances. |
 
 ## Features
 
@@ -372,6 +406,15 @@ microscope-memory archetypes
 
 # Detect new archetypes from resonance field and Hebbian state
 microscope-memory emerge
+
+# Show temporal archetype patterns (time-of-day activation profiles)
+microscope-memory temporal-patterns
+
+# Show attention mechanism state (learned weights, quality history)
+microscope-memory attention
+
+# Exchange thought patterns across federated indices
+microscope-memory pattern-exchange
 ```
 
 ### Visualization
@@ -552,6 +595,13 @@ thought_patterns.bin — Crystallized thought patterns (PTN1)
 predictive_cache.bin — Predictive block cache (PRC1)
 ├── predictions: query_hash, blocks, confidence, pattern_id
 └── stats: total_predictions, hits, misses, partial_hits
+
+temporal_archetypes.bin — Temporal activation profiles (TAR1)
+└── archetype_id, window_counts[6], window_weights[6], total_activations
+
+attention.bin — Attention layer state (ATT1)
+├── learned_weights[7], total_recalls, last_recall_ms
+└── history: weights[7], timestamp, quality (200 cap)
 ```
 
 ### Memory Layers
@@ -601,9 +651,12 @@ D8: Raw bytes         — hex representation (atomic limit)
 12. **Archetype emergence**: Resonance hot spots crystallize into named activation patterns
 13. **Thought path tracking**: Sequential recalls form a directed graph; recurring paths crystallize into patterns
 14. **Predictive caching**: Recognized patterns pre-fetch likely next blocks; hits reward patterns, misses penalize
-15. **Coordinate drift**: Co-activated blocks gradually migrate closer in 3D space over time
-16. **Append log**: New memories stored instantly via binary append, merged on rebuild
-15. **Merkle integrity**: SHA-256 tree for tamper detection and per-block proofs
+15. **Temporal archetype tracking**: Activation profiles per time window — the system learns when you think about what
+16. **Attention weighting**: Dynamic per-layer weights based on query signals; quality inference from inter-recall timing
+17. **Cross-instance learning**: ThoughtGraph patterns and cache stats exchanged across federated indices with trust weighting
+18. **Coordinate drift**: Co-activated blocks gradually migrate closer in 3D space over time
+19. **Append log**: New memories stored instantly via binary append, merged on rebuild
+20. **Merkle integrity**: SHA-256 tree for tamper detection and per-block proofs
 
 ## Source Structure
 
@@ -632,6 +685,8 @@ src/
 ├── fingerprint.rs       — Structural fingerprinting: entropy, histograms, wormhole links
 ├── thought_graph.rs     — ThoughtGraph (L6): recall path tracking, pattern crystallization
 ├── predictive_cache.rs  — Predictive Cache (L7): pre-fetch blocks, hit/miss reinforcement
+├── temporal_archetype.rs — Temporal Archetypes (L8): time-windowed activation profiles
+├── attention.rs         — Attention Mechanism (L9): dynamic layer weighting, quality learning
 ├── viz.rs               — Visualization: JSON snapshot + binary density map export
 ├── gpu.rs               — Optional wgpu GPU acceleration
 ├── wasm.rs              — WASM target support
@@ -755,6 +810,9 @@ Commands:
   patterns           Show thought graph patterns (crystallized recall sequences)
   paths              Show recent thought paths (recall sessions)
   predictions        Show predictive cache stats and active predictions
+  temporal-patterns  Show temporal archetype activation profiles
+  attention          Show attention mechanism state and learned weights
+  pattern-exchange   Exchange thought patterns across federated indices
   viz                Export 3D visualization snapshot (JSON)
   density            Export binary density map for rendering
   stats              Index statistics

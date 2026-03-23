@@ -2,7 +2,7 @@
 
 **Author:** Mate Robert (Silent)
 
-**Version:** 0.4.0
+**Version:** 0.5.0
 
 **Date:** March 2026
 
@@ -10,7 +10,7 @@
 
 ## Abstract
 
-This paper presents Microscope Memory, a hierarchical memory system implemented in Rust that models information retrieval as an act of magnification — and memory itself as a living, self-organizing structure. The system organizes data into nine depth levels (D0--D8), from identity summaries to raw bytes, with every block constrained to a 256-byte viewport. Beyond the core indexing engine, Microscope Memory implements a seven-layer consciousness architecture: Hebbian learning (block-level activation and coordinate drift), mirror neurons (activation fingerprint resonance), resonance fields (spatial pulse propagation), archetype emergence (crystallized activation patterns), emotional bias (search space warping), thought graph (recall path tracking and pattern recognition), and predictive caching (pre-fetching blocks with reinforcement feedback). The system achieves sub-microsecond query latencies at shallow depths while maintaining a reinforcement loop where accurate predictions strengthen their source patterns and inaccurate ones decay. Pure binary, zero JSON, under 5,000 lines of Rust.
+This paper presents Microscope Memory, a hierarchical memory system implemented in Rust that models information retrieval as an act of magnification — and memory itself as a living, self-organizing structure. The system organizes data into nine depth levels (D0--D8), from identity summaries to raw bytes, with every block constrained to a 256-byte viewport. Beyond the core indexing engine, Microscope Memory implements a ten-layer consciousness architecture: Hebbian learning (block-level activation and coordinate drift), mirror neurons (activation fingerprint resonance), resonance fields (spatial pulse propagation), archetype emergence (crystallized activation patterns), emotional bias (search space warping), thought graph (recall path tracking and pattern recognition), predictive caching (pre-fetching blocks with reinforcement feedback), temporal archetypes (time-windowed activation profiles), attention mechanism (dynamic layer weighting with quality learning), and cross-instance learning (federated pattern exchange). The system achieves sub-microsecond query latencies at shallow depths while maintaining reinforcement loops at multiple levels — predictions, attention weights, and temporal profiles all self-tune through use. Pure binary, zero JSON, under 6,000 lines of Rust.
 
 ---
 
@@ -20,7 +20,7 @@ The dominant paradigm in AI memory systems relies on embedding vectors and appro
 
 Biological memory works differently. Every act of recall modifies the memory itself: neural pathways strengthen through use (Hebbian learning), similar patterns resonate across brain regions (mirror neurons), and recurring activation patterns crystallize into abstract concepts (archetypes). Memory is not a database — it is a living structure that self-organizes through use.
 
-Microscope Memory implements this principle in a pure binary system. The zoom metaphor provides efficient hierarchical access (37ns at D0 to 500us at D8), while seven consciousness layers transform every recall into a learning event that reshapes the memory landscape.
+Microscope Memory implements this principle in a pure binary system. The zoom metaphor provides efficient hierarchical access (37ns at D0 to 500us at D8), while ten consciousness layers transform every recall into a learning event that reshapes the memory landscape.
 
 ---
 
@@ -75,7 +75,7 @@ Builds are incremental — SHA-256 content hash of layer sources is stored in MS
 
 ## 3. Consciousness Architecture
 
-The core innovation: seven layers that transform every recall from a passive read into an active learning event.
+The core innovation: ten layers that transform every recall from a passive read into an active learning event.
 
 ### 3.1 Layer 1: Hebbian Learning (`hebbian.rs`)
 
@@ -177,6 +177,65 @@ Over time, only reliably predictive patterns survive. The system tracks total pr
 
 Binary format: `predictive_cache.bin` (PRC1).
 
+### 3.8 Layer 8: Temporal Archetypes (`temporal_archetype.rs`)
+
+Time introduces a dimension that spatial clustering alone cannot capture. Temporal Archetypes track when each archetype is most active across six 4-hour windows (00--04, 04--08, 08--12, 12--16, 16--20, 20--24).
+
+Each archetype maintains a `TemporalProfile`:
+- **Window counts** (6 values): raw activation count per time window
+- **Window weights** (6 values): normalized activation density per window
+- **Total activations**: lifetime activation count
+
+When an archetype is activated during recall, its current time window's count increments. The system computes a **temporal boost** for search results:
+- A **dominant window** is identified (the window with the highest weight, requiring ≥5 total activations)
+- If the current query falls within the dominant window: boost = 1.0
+- Otherwise: boost scales down proportionally to the off-peak window's weight
+
+This allows the system to learn circadian patterns — for example, that "work" archetypes activate during 08--12 and "creative" archetypes during 20--24.
+
+Profiles decay over time (factor 0.99 per cycle), ensuring recent temporal patterns take precedence over historical ones.
+
+Binary format: `temporal_archetypes.bin` (TAR1), 56 bytes per record.
+
+### 3.9 Layer 9: Attention Mechanism (`attention.rs`)
+
+Layers L1--L8 each contribute to the recall pipeline, but their relative importance varies with context. The Attention Mechanism dynamically weights each layer based on the current query.
+
+**Input signals** (computed per query):
+- `query_length`: normalized query complexity (0.0--1.0)
+- `emotional_energy`: total Hebbian energy in emotional blocks (0.0--1.0)
+- `session_depth`: how deep into a session the user is (recall count / 50, capped)
+- `pattern_confidence`: strongest ThoughtGraph pattern match (0.0--1.0)
+- `cache_hit_rate`: PredictiveCache running hit rate (0.0--1.0)
+- `archetype_match_score`: best archetype match score (0.0--1.0)
+
+**Attention computation**: Each signal maps to a 7-dimensional weight vector via fixed rules (e.g., long queries boost spatial search, high emotion boosts emotional bias). These raw weights are blended 80/20 with **learned weights** — persistent per-layer multipliers that adapt over time.
+
+**Quality inference**: The system infers whether the previous recall was "good" or "bad" from the time gap to the current recall:
+- **>60 seconds**: satisfied (quality = 1.0) — the user found what they needed
+- **<5 seconds**: unsatisfied (quality = 0.2) — immediate re-query suggests failure
+- **5--60 seconds**: linear interpolation
+
+**Weight learning**: Good outcomes' attention vectors are averaged per layer. Bad outcomes' vectors are averaged. The learned weight for each layer shifts toward what worked and away from what didn't, via exponential moving average (rate = 0.05). Weights are clamped to [0.1, 3.0].
+
+Binary format: `attention.bin` (ATT1), header 48 bytes + 40 bytes per outcome (200 cap).
+
+### 3.10 Layer 10: Cross-Instance Learning (`federation.rs`)
+
+While L3 already exchanges resonance pulses across federated indices, L10 extends this to higher-order knowledge: **ThoughtGraph patterns** and **PredictiveCache statistics**.
+
+**Pattern exchange**:
+1. Export local ThoughtGraph's crystallized patterns
+2. For each federated index, import their patterns with trust weighting
+3. Trust = source's PredictiveCache hit rate × federation weight
+4. Low-trust patterns are imported at reduced strength, preventing unreliable peers from polluting local knowledge
+
+**Stats aggregation**:
+- Total predictions, hits, and misses are merged bidirectionally
+- This allows each instance to benefit from the collective prediction accuracy of the federation
+
+The exchange is triggered explicitly via the `pattern-exchange` CLI command, giving operators control over when cross-pollination occurs.
+
 ---
 
 ## 4. The Complete Recall Pipeline
@@ -184,23 +243,28 @@ Binary format: `predictive_cache.bin` (PRC1).
 Every `recall` command triggers the full consciousness stack:
 
 ```
-1. Compute query coordinates (content hash + semantic blend)
-2. Check predictive cache — instant boost if prediction exists
-3. Apply emotional bias warp (bend coordinates toward emotional centroid)
-4. Search across zoom-appropriate depths (L2 distance + keyword boost)
-5. Apply ThoughtGraph pattern boost (recognized thought paths)
-6. Sort and display results
-7. Record Hebbian activation and co-activations (L1)
-8. Detect mirror neuron resonance (L2)
-9. Emit resonance pulse into spatial field (L3)
-10. Reinforce matching archetypes (L4)
-11. Record thought graph node and edges (L6)
-12. Evaluate prediction accuracy — hit/miss/partial (L7)
-13. Predict next: pre-fetch blocks for likely next query (L7)
-14. Save all state
+ 1. Load consciousness state (Hebbian, mirror, resonance, archetypes, thoughts, cache, temporal, attention)
+ 2. Compute attention weights from query signals (L9)
+ 3. Infer quality of previous recall from inter-recall timing (L9)
+ 4. Compute query coordinates (content hash + semantic blend)
+ 5. Check predictive cache — instant boost if prediction exists, scaled by attention weight (L7)
+ 6. Apply emotional bias warp, scaled by attention weight (L5)
+ 7. Search across zoom-appropriate depths (L2 distance + keyword boost)
+ 8. Apply ThoughtGraph pattern boost, scaled by attention weight (L6)
+ 9. Sort and display results
+10. Record Hebbian activation and co-activations (L1)
+11. Detect mirror neuron resonance (L2)
+12. Emit resonance pulse into spatial field (L3)
+13. Reinforce matching archetypes (L4)
+14. Track temporal archetype activation (L8)
+15. Record thought graph node and edges (L6)
+16. Evaluate prediction accuracy — hit/miss/partial (L7)
+17. Predict next: pre-fetch blocks for likely next query (L7)
+18. Mark recall in attention history (L9)
+19. Save all state
 ```
 
-Steps 2--5 happen **before** display (affecting result ranking). Steps 7--13 happen **after** display (learning from the recall).
+Steps 2--8 happen **before** display (affecting result ranking). Steps 10--18 happen **after** display (learning from the recall).
 
 ---
 
@@ -275,6 +339,8 @@ The predictive cache, when warmed, provides effectively **zero-cost** result boo
 | `thought_graph.bin` | THG1 | Recall path graph (nodes + edges) |
 | `thought_patterns.bin` | PTN1 | Crystallized thought patterns |
 | `predictive_cache.bin` | PRC1 | Predictive block cache + stats |
+| `temporal_archetypes.bin` | TAR1 | Temporal activation profiles (56B each) |
+| `attention.bin` | ATT1 | Attention weights + quality history |
 
 All binary formats use safe manual byte-level serialization (no unsafe pointer casts), little-endian encoding, and 4-byte magic headers for format identification.
 
@@ -282,7 +348,7 @@ All binary formats use safe manual byte-level serialization (no unsafe pointer c
 
 ## 8. Test Coverage
 
-118 tests across all modules:
+125 tests across all modules:
 
 | Module | Tests | Coverage |
 |--------|-------|----------|
@@ -294,7 +360,9 @@ All binary formats use safe manual byte-level serialization (no unsafe pointer c
 | Fingerprint | 12 | Entropy, histograms, similarity, links, wormholes |
 | ThoughtGraph | 10 | Nodes, edges, sessions, patterns, boost, ring buffer |
 | PredictiveCache | 9 | Check, evaluate, hit/miss, predict, decay, roundtrip |
-| Core + others | 44 | CRC, MQL, cache, merkle, snapshot, embedding index |
+| TemporalArchetype | 7 | Time windows, activation, decay, boost, dominant window, roundtrip |
+| Attention | 10 | Signals, normalization, quality inference, learning, history cap, roundtrip |
+| Core + others | 34 | CRC, MQL, cache, merkle, snapshot, embedding index |
 
 All tests use safe binary I/O roundtrip verification.
 
@@ -302,23 +370,23 @@ All tests use safe binary I/O roundtrip verification.
 
 ## 9. Future Work
 
-**Temporal Archetypes.** Archetypes currently form from spatial hot spots. Adding time-windowed archetype detection would capture patterns that emerge only during specific periods (morning vs. evening thinking patterns).
+**Real-Time 3D Visualization.** Rendering the memory landscape in real time — blocks migrating via Hebbian drift, resonance field standing waves, archetype crystallization events, attention weight heatmaps — would provide intuitive observability into the consciousness state.
 
-**Cross-Instance Learning.** Federation currently exchanges resonance pulses. Extending this to share ThoughtGraph patterns and predictive cache state would enable collective thought path learning across multiple memory instances.
+**Dream Consolidation.** An offline process that replays the day's recall patterns during idle time, strengthening important pathways and pruning weak ones — analogous to how biological sleep consolidates memories.
 
-**Attention Mechanism.** A soft attention layer over the consciousness state could dynamically weight the contribution of each layer (Hebbian, mirror, resonance, patterns, predictions) based on the current query context.
+**Emotional Contagion.** Extending the emotional bias layer to propagate emotional state across federated indices, creating shared emotional context between instances.
 
-**Visualization.** Real-time 3D rendering of the memory landscape — blocks migrating via Hebbian drift, resonance field standing waves, archetype crystallization events — would provide intuitive observability into the consciousness state.
+**Multi-Modal Memory.** Extending beyond text to store and recall images, audio fingerprints, and structured data within the same spatial framework.
 
 ---
 
 ## 10. Conclusion
 
-Microscope Memory demonstrates that machine memory can be more than storage. By layering seven consciousness mechanisms on top of a high-performance binary indexing engine, the system transforms every recall into a learning event. Hebbian coordinate drift reshapes the spatial landscape. Mirror neurons create resonance between similar thought patterns. Resonance fields propagate activation energy across the memory space. Archetypes crystallize from recurring patterns. Emotional bias bends the search space. Thought paths capture sequential reasoning patterns. And predictive caching closes the loop with reinforcement learning that makes the system progressively more accurate.
+Microscope Memory demonstrates that machine memory can be more than storage. By layering ten consciousness mechanisms on top of a high-performance binary indexing engine, the system transforms every recall into a learning event. Hebbian coordinate drift reshapes the spatial landscape. Mirror neurons create resonance between similar thought patterns. Resonance fields propagate activation energy across the memory space. Archetypes crystallize from recurring patterns. Emotional bias bends the search space. Thought paths capture sequential reasoning patterns. Predictive caching closes the loop with reinforcement learning. Temporal archetypes learn circadian patterns. The attention mechanism self-tunes layer weights from outcome quality. And cross-instance learning enables collective intelligence across federated indices.
 
 The result is a memory system that doesn't just remember — it **thinks**.
 
-Pure Rust. Zero JSON. Sub-microsecond queries. 118 tests. Under 5,000 lines.
+Pure Rust. Zero JSON. Sub-microsecond queries. 125 tests. Under 6,000 lines.
 
 Microscope Memory is released under the MIT License at [https://github.com/silentnoisehun/microscope-memory](https://github.com/silentnoisehun/microscope-memory).
 

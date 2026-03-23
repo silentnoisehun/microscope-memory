@@ -1784,8 +1784,148 @@ fn main() {
                     println!("{} {}", "ERROR:".red(), e);
                 }
             }
-            // Also save any updated state
             let _ = output_dir;
+        }
+        Cmd::Dream => {
+            let output_dir = Path::new(&config.paths.output_dir);
+            let reader = open_reader(&config);
+            println!("{}", "DREAM CONSOLIDATION".cyan().bold());
+            match microscope_memory::dream::dream_consolidate(output_dir, reader.block_count) {
+                Ok(cycle) => {
+                    let mut dream_state = microscope_memory::dream::DreamState::load_or_init(output_dir);
+                    dream_state.last_dream_ms = cycle.timestamp_ms;
+                    dream_state.cycles.push(cycle.clone());
+                    if dream_state.cycles.len() > 200 {
+                        dream_state.cycles.drain(0..dream_state.cycles.len() - 200);
+                    }
+                    let _ = dream_state.save(output_dir);
+                    println!("  Duration:      {} ms", cycle.duration_ms);
+                    println!("  Replayed:      {} fingerprints", cycle.replayed_fingerprints);
+                    println!("  Strengthened:  {} pairs", cycle.strengthened_pairs);
+                    println!("  Pruned pairs:  {}", cycle.pruned_pairs);
+                    println!("  Pruned blocks: {}", cycle.pruned_activations);
+                    println!("  Patterns:      +{}", cycle.consolidated_patterns);
+                    println!("  Energy:        {:.1} → {:.1}", cycle.energy_before, cycle.energy_after);
+                }
+                Err(e) => println!("{} {}", "ERROR:".red(), e),
+            }
+        }
+        Cmd::DreamLog { k } => {
+            let output_dir = Path::new(&config.paths.output_dir);
+            let state = microscope_memory::dream::DreamState::load_or_init(output_dir);
+            let stats = state.stats();
+            println!("{}", "DREAM LOG".cyan().bold());
+            println!("  Total cycles:  {}", stats.total_cycles);
+            println!("  Total pruned:  {} pairs, {} activations", stats.total_pruned_pairs, stats.total_pruned_activations);
+            println!("  Total strengthened: {} pairs", stats.total_strengthened);
+            println!("  Total replayed: {} fingerprints", stats.total_replayed);
+            if !state.cycles.is_empty() {
+                println!("\n  Recent cycles:");
+                let start = if state.cycles.len() > k { state.cycles.len() - k } else { 0 };
+                for cycle in &state.cycles[start..] {
+                    println!("    {} — {}ms, replayed={}, strengthened={}, pruned={}+{}, patterns=+{}",
+                        cycle.timestamp_ms, cycle.duration_ms,
+                        cycle.replayed_fingerprints, cycle.strengthened_pairs,
+                        cycle.pruned_pairs, cycle.pruned_activations, cycle.consolidated_patterns);
+                }
+            }
+        }
+        Cmd::EmotionalField => {
+            let output_dir = Path::new(&config.paths.output_dir);
+            let state = microscope_memory::emotional_contagion::EmotionalContagionState::load_or_init(output_dir);
+            let stats = state.stats();
+            println!("{}", "EMOTIONAL FIELD".cyan().bold());
+            println!("  Instance ID:  {:016x}", stats.instance_id);
+            println!("  Local field:  {}", if stats.has_local { "active" } else { "inactive" });
+            println!("  Local energy: {:.2}", stats.local_energy);
+            println!("  Local valence: {:.2}", stats.local_valence);
+            println!("  Remote fields: {}", stats.remote_count);
+            println!("  Blended valence: {:.2}", stats.blended_valence);
+            if let Some((cx, cy, cz)) = state.blended_centroid(0.7) {
+                println!("  Blended centroid: ({:.3}, {:.3}, {:.3})", cx, cy, cz);
+            }
+        }
+        Cmd::EmotionalExchange => {
+            let output_dir = Path::new(&config.paths.output_dir);
+            let reader = open_reader(&config);
+            let hebb = microscope_memory::hebbian::HebbianState::load_or_init(output_dir, reader.block_count);
+            let mut local = microscope_memory::emotional_contagion::EmotionalContagionState::load_or_init(output_dir);
+            local.capture_local(&reader, &hebb);
+
+            let mut exchanged = 0usize;
+            for idx_config in &config.federation.indices {
+                if let Ok(idx_cfg) = microscope_memory::config::Config::load(&idx_config.config_path) {
+                    let idx_dir = Path::new(&idx_cfg.paths.output_dir);
+                    let mut remote = microscope_memory::emotional_contagion::EmotionalContagionState::load_or_init(idx_dir);
+
+                    // Send ours to them
+                    let our_wire = local.export_snapshot();
+                    if let Some(snap) = microscope_memory::emotional_contagion::EmotionalContagionState::import_snapshot(&our_wire) {
+                        remote.receive_remote(snap);
+                        exchanged += 1;
+                    }
+
+                    // Receive theirs
+                    let their_wire = remote.export_snapshot();
+                    if let Some(snap) = microscope_memory::emotional_contagion::EmotionalContagionState::import_snapshot(&their_wire) {
+                        local.receive_remote(snap);
+                        exchanged += 1;
+                    }
+
+                    let _ = remote.save(idx_dir);
+                }
+            }
+
+            let _ = local.save(output_dir);
+            println!("{} exchanged {} emotional snapshots", "EMOTIONAL EXCHANGE".cyan().bold(), exchanged);
+        }
+        Cmd::Modalities => {
+            let output_dir = Path::new(&config.paths.output_dir);
+            let index = microscope_memory::multimodal::ModalityIndex::load_or_init(output_dir);
+            let stats = index.stats();
+            println!("{}", "MULTIMODAL INDEX".cyan().bold());
+            println!("  Total entries: {}", stats.total_entries);
+            println!("  Text:          {}", stats.text_count);
+            println!("  Image:         {}", stats.image_count);
+            println!("  Audio:         {}", stats.audio_count);
+            println!("  Structured:    {}", stats.structured_count);
+        }
+        Cmd::StoreData { pairs, importance } => {
+            let output_dir = Path::new(&config.paths.output_dir);
+            let mut fields = Vec::new();
+            for pair in &pairs {
+                if let Some((k, v)) = pair.split_once('=') {
+                    let value = if let Ok(i) = v.parse::<i64>() {
+                        microscope_memory::multimodal::FieldValue::Int(i)
+                    } else if let Ok(f) = v.parse::<f64>() {
+                        microscope_memory::multimodal::FieldValue::Float(f)
+                    } else if v == "true" || v == "false" {
+                        microscope_memory::multimodal::FieldValue::Bool(v == "true")
+                    } else {
+                        microscope_memory::multimodal::FieldValue::Str(v.to_string())
+                    };
+                    fields.push((k.to_string(), value));
+                }
+            }
+            if fields.is_empty() {
+                println!("{} no valid key=value pairs", "ERROR:".red());
+                return;
+            }
+
+            // Create text representation and store as memory
+            let text_repr: String = fields.iter().map(|(k, v)| format!("DAT:{}={:?}", k, v)).collect::<Vec<_>>().join(" ");
+            let text_short = if text_repr.len() > 200 { &text_repr[..200] } else { &text_repr };
+            let _ = store_memory(&config, text_short, "rust_state", importance);
+
+            // Register in multimodal index
+            let mut index = microscope_memory::multimodal::ModalityIndex::load_or_init(output_dir);
+            let block_idx = index.entries.len() as u32 + 1_000_000; // virtual idx for append entries
+            index.register(block_idx, microscope_memory::multimodal::Modality::Structured(
+                microscope_memory::multimodal::StructuredMeta { fields: fields.clone() }
+            ));
+            let _ = index.save(output_dir);
+
+            println!("{} stored {} fields as structured data", "STORE-DATA".green().bold(), fields.len());
         }
     }
 }

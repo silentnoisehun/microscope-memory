@@ -281,6 +281,12 @@ impl PredictiveCache {
         self.stats.total_misses += remote_misses;
     }
 
+    /// Dream cleanup: remove predictions with very low confidence.
+    pub fn dream_cleanup(&mut self) {
+        self.predictions.retain(|p| p.confidence > 0.1);
+        self.stats.current_predictions = self.predictions.len();
+    }
+
     /// Save to binary.
     pub fn save(&self, output_dir: &Path) -> Result<(), String> {
         save_cache(&output_dir.join("predictive_cache.bin"), self)

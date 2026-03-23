@@ -212,4 +212,24 @@ pub enum Cmd {
     Attention,
     /// Exchange thought patterns across federated indices
     PatternExchange,
+    /// Run dream consolidation (offline memory replay and pruning)
+    Dream,
+    /// Show dream consolidation history
+    DreamLog {
+        #[arg(default_value = "10")]
+        k: usize,
+    },
+    /// Show emotional contagion state (local + remote emotional fields)
+    EmotionalField,
+    /// Exchange emotional snapshots across federated indices
+    EmotionalExchange,
+    /// Show multimodal index statistics
+    Modalities,
+    /// Store structured data (key=value pairs)
+    StoreData {
+        /// Key-value pairs: key1=val1 key2=val2
+        pairs: Vec<String>,
+        #[arg(short = 'i', long, default_value = "5")]
+        importance: u8,
+    },
 }

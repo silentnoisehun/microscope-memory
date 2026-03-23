@@ -25,6 +25,9 @@ pub mod snapshot;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod streaming;
 
+pub mod dream;
+pub mod emotional_contagion;
+pub mod multimodal;
 pub mod predictive_cache;
 pub mod temporal_archetype;
 pub mod thought_graph;

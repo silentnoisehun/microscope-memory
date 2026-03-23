@@ -382,3 +382,59 @@ pub fn exchange_pulses(config: &Config) -> Result<usize, String> {
 
     Ok(total_exchanged)
 }
+
+// ─── Cross-Instance Learning ────────────────────────
+
+/// Exchange thought patterns and predictive cache stats across federated indices.
+/// Returns total patterns exchanged.
+pub fn exchange_patterns(config: &Config) -> Result<usize, String> {
+    use crate::predictive_cache::PredictiveCache;
+    use crate::thought_graph::ThoughtGraphState;
+
+    let output_dir = Path::new(&config.paths.output_dir);
+    let mut local_tg = ThoughtGraphState::load_or_init(output_dir);
+    let mut local_pc = PredictiveCache::load_or_init(output_dir);
+
+    let our_patterns: Vec<_> = local_tg.export_patterns().into_iter().cloned().collect();
+    let (_our_preds, _our_hits, _our_misses, our_hit_rate) = local_pc.export_stats();
+
+    let mut total_exchanged = 0usize;
+
+    for idx_config in &config.federation.indices {
+        let idx_cfg =
+            Config::load(&idx_config.config_path).map_err(|e| format!("load config: {}", e))?;
+        let idx_dir = Path::new(&idx_cfg.paths.output_dir);
+
+        let mut other_tg = ThoughtGraphState::load_or_init(idx_dir);
+        let mut other_pc = PredictiveCache::load_or_init(idx_dir);
+
+        let their_patterns: Vec<_> = other_tg.export_patterns().into_iter().cloned().collect();
+        let (their_preds, their_hits, their_misses, their_hit_rate) = other_pc.export_stats();
+
+        // Send our patterns to them (trust = our hit rate * their federation weight)
+        let trust_for_them = our_hit_rate * idx_config.weight;
+        other_tg.import_patterns(&our_patterns, trust_for_them);
+        total_exchanged += our_patterns.len();
+
+        // Receive their patterns (trust = their hit rate * their federation weight)
+        let trust_for_us = their_hit_rate * idx_config.weight;
+        local_tg.import_patterns(&their_patterns, trust_for_us);
+        total_exchanged += their_patterns.len();
+
+        // Merge stats
+        local_pc.merge_stats(their_preds, their_hits, their_misses);
+        other_pc.merge_stats(_our_preds, _our_hits, _our_misses);
+
+        let _ = other_tg.save(idx_dir);
+        let _ = other_pc.save(idx_dir);
+    }
+
+    local_tg
+        .save(output_dir)
+        .map_err(|e| format!("save thought_graph: {}", e))?;
+    local_pc
+        .save(output_dir)
+        .map_err(|e| format!("save predictive_cache: {}", e))?;
+
+    Ok(total_exchanged)
+}

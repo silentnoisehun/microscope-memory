@@ -2,6 +2,7 @@
 //! Re-exports core types and functions for integration tests and external use.
 
 pub mod archetype;
+pub mod attention;
 pub mod build;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod cache;
@@ -25,6 +26,7 @@ pub mod snapshot;
 pub mod streaming;
 
 pub mod predictive_cache;
+pub mod temporal_archetype;
 pub mod thought_graph;
 pub mod viz;
 

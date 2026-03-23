@@ -398,6 +398,42 @@ impl ThoughtGraphState {
             .collect()
     }
 
+    /// Export crystallized patterns for cross-instance exchange.
+    pub fn export_patterns(&self) -> Vec<&ThoughtPattern> {
+        self.patterns
+            .iter()
+            .filter(|p| p.frequency >= PATTERN_MIN_FREQ)
+            .collect()
+    }
+
+    /// Import patterns from a remote instance with trust weighting.
+    pub fn import_patterns(&mut self, patterns: &[ThoughtPattern], trust: f32) {
+        for remote in patterns {
+            if let Some(local) = self.patterns.iter_mut().find(|p| p.sequence == remote.sequence) {
+                // Reinforce existing pattern
+                local.strength = (local.strength + remote.strength * trust * 0.3).min(5.0);
+            } else {
+                // Add new with trust-weighted strength
+                let mut imported = remote.clone();
+                imported.id = self.next_pattern_id;
+                self.next_pattern_id += 1;
+                imported.strength = remote.strength * trust * 0.5;
+                imported.frequency = 1; // starts as candidate
+                self.patterns.push(imported);
+            }
+        }
+
+        // Enforce cap
+        if self.patterns.len() > MAX_PATTERNS {
+            self.patterns.sort_by(|a, b| {
+                let sa = a.strength * a.frequency as f32;
+                let sb = b.strength * b.frequency as f32;
+                sb.partial_cmp(&sa).unwrap()
+            });
+            self.patterns.truncate(MAX_PATTERNS);
+        }
+    }
+
     /// Stats summary.
     pub fn stats(&self) -> ThoughtGraphStats {
         ThoughtGraphStats {

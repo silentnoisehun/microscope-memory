@@ -264,6 +264,23 @@ impl PredictiveCache {
         self.stats.current_predictions = self.predictions.len();
     }
 
+    /// Export stats for cross-instance exchange.
+    pub fn export_stats(&self) -> (u32, u32, u32, f32) {
+        (
+            self.stats.total_predictions,
+            self.stats.total_hits,
+            self.stats.total_misses,
+            self.stats.hit_rate(),
+        )
+    }
+
+    /// Merge remote stats (additive, for reporting).
+    pub fn merge_stats(&mut self, remote_predictions: u32, remote_hits: u32, remote_misses: u32) {
+        self.stats.total_predictions += remote_predictions;
+        self.stats.total_hits += remote_hits;
+        self.stats.total_misses += remote_misses;
+    }
+
     /// Save to binary.
     pub fn save(&self, output_dir: &Path) -> Result<(), String> {
         save_cache(&output_dir.join("predictive_cache.bin"), self)

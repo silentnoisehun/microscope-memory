@@ -206,4 +206,10 @@ pub enum Cmd {
     },
     /// Show predictive cache stats and active predictions
     Predictions,
+    /// Show temporal archetype patterns (time-of-day activation profiles)
+    TemporalPatterns,
+    /// Show attention mechanism state (layer weights, quality history)
+    Attention,
+    /// Exchange thought patterns across federated indices
+    PatternExchange,
 }

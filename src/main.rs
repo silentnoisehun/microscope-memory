@@ -130,15 +130,50 @@ fn recall(config: &Config, query: &str, k: usize) {
 
     let (qx, qy, qz) = content_coords_blended(query, "long_term", config.search.semantic_weight);
 
+    // ─── Attention: compute layer weights from context ──
+    let output_dir_att = Path::new(&config.paths.output_dir);
+    let mut attention =
+        microscope_memory::attention::AttentionState::load_or_init(output_dir_att);
+    let hebb_pre =
+        microscope_memory::hebbian::HebbianState::load_or_init(output_dir_att, reader.block_count);
+    let tg_pre =
+        microscope_memory::thought_graph::ThoughtGraphState::load_or_init(output_dir_att);
+    let pc_pre =
+        microscope_memory::predictive_cache::PredictiveCache::load_or_init(output_dir_att);
+
+    let emotional_energy = microscope_memory::emotional::emotional_field(&reader, &hebb_pre)
+        .map(|f| f.total_energy)
+        .unwrap_or(0.0);
+
+    // Infer quality of previous recall and record outcome
+    if attention.total_recalls > 0 {
+        let quality = attention.infer_quality();
+        if let Some(last) = attention.history.last() {
+            let prev_weights = last.weights;
+            attention.record_outcome(quality, &prev_weights);
+        }
+    }
+
+    let attn_signals = microscope_memory::attention::AttentionSignals {
+        query_length: query.len(),
+        emotional_energy,
+        session_depth: tg_pre.current_path().len(),
+        pattern_confidence: 0.0, // updated below after pattern boost
+        cache_hit_rate: pc_pre.stats.hit_rate(),
+        archetype_match_score: 0.0, // updated below after archetype match
+    };
+    let attn = attention.compute_attention(&attn_signals);
+
     // Emotional bias warp: bend search coordinates toward emotional attractors
     let output_dir_eb = Path::new(&config.paths.output_dir);
     let hebb_eb =
         microscope_memory::hebbian::HebbianState::load_or_init(output_dir_eb, reader.block_count);
+    let emotional_weight = config.search.emotional_bias_weight * attn.weight(4);
     let (qx, qy, qz) = microscope_memory::emotional::apply_emotional_bias(
         qx,
         qy,
         qz,
-        config.search.emotional_bias_weight,
+        emotional_weight,
         &reader,
         &hebb_eb,
     );
@@ -199,9 +234,9 @@ fn recall(config: &Config, query: &str, k: usize) {
         microscope_memory::predictive_cache::PredictiveCache::load_or_init(output_dir_tg);
     let qh_tg = microscope_memory::hebbian::query_hash(query);
 
-    // Check predictive cache — instant boost from pre-fetched blocks
+    // Check predictive cache — instant boost from pre-fetched blocks (scaled by attention)
     if let Some((cached_blocks, confidence)) = pred_cache.check(qh_tg) {
-        let boost = confidence * microscope_memory::thought_graph::PATTERN_BOOST_WEIGHT;
+        let boost = confidence * microscope_memory::thought_graph::PATTERN_BOOST_WEIGHT * attn.weight(6);
         let cached_set: std::collections::HashSet<u32> =
             cached_blocks.iter().copied().collect();
         for (dist, idx, is_main) in &mut all_results {
@@ -223,10 +258,11 @@ fn recall(config: &Config, query: &str, k: usize) {
         .into_iter()
         .collect();
     if !pattern_boosts.is_empty() {
+        let tg_scale = attn.weight(5); // ThoughtGraph attention weight
         for (dist, idx, is_main) in &mut all_results {
             if *is_main {
                 if let Some(&boost) = pattern_boosts.get(&(*idx as u32)) {
-                    *dist = (*dist - boost).max(0.0);
+                    *dist = (*dist - boost * tg_scale).max(0.0);
                 }
             }
         }
@@ -292,16 +328,24 @@ fn recall(config: &Config, query: &str, k: usize) {
             .collect();
         resonance.emit_pulse(&activated, qh, &headers, 1);
 
-        // Archetype: reinforce any matching archetype
+        // Archetype: reinforce + temporal tracking
         let mut archetypes = microscope_memory::archetype::ArchetypeState::load_or_init(output_dir);
+        let mut temporal = microscope_memory::temporal_archetype::TemporalArchetypeState::load_or_init(output_dir);
         if let Some((idx, score)) = archetypes.match_archetype(&activated) {
+            let arch_id = archetypes.archetypes[idx].id;
+            let time_boost = temporal.boost(arch_id);
+            temporal.record_activation(arch_id, microscope_memory::hebbian::now_epoch_ms_pub());
+            let window = microscope_memory::temporal_archetype::current_time_window();
             println!(
-                "  {} '{}' (score={:.3})",
+                "  {} '{}' (score={:.3} temporal={:.2} window={})",
                 "ARCHETYPE:".cyan(),
                 archetypes.archetypes[idx].label,
-                score
+                score,
+                time_boost,
+                microscope_memory::temporal_archetype::WINDOW_LABELS[window]
             );
         }
+        temporal.decay();
         archetypes.reinforce(&activated);
 
         // ThoughtGraph: record recall and detect patterns
@@ -329,12 +373,17 @@ fn recall(config: &Config, query: &str, k: usize) {
         }
         pred_cache.predict_next(&thought_graph);
 
+        // Attention: mark recall and save
+        attention.mark_recall();
+
         let _ = hebb.save(output_dir);
         let _ = mirror.save(output_dir);
         let _ = resonance.save(output_dir);
         let _ = archetypes.save(output_dir);
+        let _ = temporal.save(output_dir);
         let _ = thought_graph.save(output_dir);
         let _ = pred_cache.save(output_dir);
+        let _ = attention.save(output_dir);
     }
 
     let elapsed = t0.elapsed();
@@ -1643,6 +1692,100 @@ fn main() {
                     );
                 }
             }
+        }
+
+        Cmd::TemporalPatterns => {
+            let output_dir = Path::new(&config.paths.output_dir);
+            let temporal =
+                microscope_memory::temporal_archetype::TemporalArchetypeState::load_or_init(
+                    output_dir,
+                );
+            let window = microscope_memory::temporal_archetype::current_time_window();
+            println!(
+                "{} (current window: {})",
+                "TEMPORAL ARCHETYPES".cyan().bold(),
+                microscope_memory::temporal_archetype::WINDOW_LABELS[window]
+            );
+
+            if temporal.profiles.is_empty() {
+                println!("  (no temporal data yet — recall with archetype matches to build profiles)");
+            } else {
+                for p in &temporal.profiles {
+                    let dominant = p
+                        .dominant_window()
+                        .map(|w| microscope_memory::temporal_archetype::WINDOW_LABELS[w])
+                        .unwrap_or("?");
+                    println!(
+                        "\n  Archetype #{} (total={}, dominant={})",
+                        p.archetype_id, p.total_activations, dominant
+                    );
+                    for (i, label) in
+                        microscope_memory::temporal_archetype::WINDOW_LABELS.iter().enumerate()
+                    {
+                        let bar_len = (p.window_weights[i] * 5.0) as usize;
+                        let bar: String = "█".repeat(bar_len);
+                        let marker = if i == window { " ◀" } else { "" };
+                        println!(
+                            "    {} {:>3} {:.1} {}{}",
+                            label, p.window_counts[i], p.window_weights[i], bar, marker
+                        );
+                    }
+                }
+            }
+        }
+
+        Cmd::Attention => {
+            let output_dir = Path::new(&config.paths.output_dir);
+            let attn_state =
+                microscope_memory::attention::AttentionState::load_or_init(output_dir);
+            println!("{}", "ATTENTION".cyan().bold());
+            println!(
+                "  total_recalls={} history={}",
+                attn_state.total_recalls,
+                attn_state.history.len()
+            );
+
+            println!("\n  {}", "Learned layer weights:".yellow());
+            for (i, name) in microscope_memory::attention::LAYER_NAMES.iter().enumerate() {
+                let w = attn_state.learned_weights[i];
+                let bar_len = (w * 10.0) as usize;
+                let bar: String = "█".repeat(bar_len.min(30));
+                println!("    {:<16} {:.3} {}", name, w, bar);
+            }
+
+            if !attn_state.history.is_empty() {
+                let recent: Vec<&microscope_memory::attention::AttentionOutcome> =
+                    attn_state.history.iter().rev().take(5).collect();
+                println!("\n  {}", "Recent outcomes:".yellow());
+                for o in recent {
+                    let symbol = if o.quality >= 0.7 {
+                        "+".green()
+                    } else if o.quality <= 0.3 {
+                        "-".red()
+                    } else {
+                        "~".yellow()
+                    };
+                    println!("    {} quality={:.2}", symbol, o.quality);
+                }
+            }
+        }
+
+        Cmd::PatternExchange => {
+            let output_dir = Path::new(&config.paths.output_dir);
+            match microscope_memory::federation::exchange_patterns(&config) {
+                Ok(count) => {
+                    println!(
+                        "{} exchanged {} patterns",
+                        "PATTERN EXCHANGE".cyan().bold(),
+                        count
+                    );
+                }
+                Err(e) => {
+                    println!("{} {}", "ERROR:".red(), e);
+                }
+            }
+            // Also save any updated state
+            let _ = output_dir;
         }
     }
 }

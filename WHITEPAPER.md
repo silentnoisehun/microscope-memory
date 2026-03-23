@@ -2,7 +2,7 @@
 
 **Author:** Mate Robert (Silent)
 
-**Version:** 0.5.0
+**Version:** 0.6.0
 
 **Date:** March 2026
 
@@ -10,7 +10,7 @@
 
 ## Abstract
 
-This paper presents Microscope Memory, a hierarchical memory system implemented in Rust that models information retrieval as an act of magnification — and memory itself as a living, self-organizing structure. The system organizes data into nine depth levels (D0--D8), from identity summaries to raw bytes, with every block constrained to a 256-byte viewport. Beyond the core indexing engine, Microscope Memory implements a ten-layer consciousness architecture: Hebbian learning (block-level activation and coordinate drift), mirror neurons (activation fingerprint resonance), resonance fields (spatial pulse propagation), archetype emergence (crystallized activation patterns), emotional bias (search space warping), thought graph (recall path tracking and pattern recognition), predictive caching (pre-fetching blocks with reinforcement feedback), temporal archetypes (time-windowed activation profiles), attention mechanism (dynamic layer weighting with quality learning), and cross-instance learning (federated pattern exchange). The system achieves sub-microsecond query latencies at shallow depths while maintaining reinforcement loops at multiple levels — predictions, attention weights, and temporal profiles all self-tune through use. Pure binary, zero JSON, under 6,000 lines of Rust.
+This paper presents Microscope Memory, a hierarchical memory system implemented in Rust that models information retrieval as an act of magnification — and memory itself as a living, self-organizing structure. The system organizes data into nine depth levels (D0--D8), from identity summaries to raw bytes, with every block constrained to a 256-byte viewport. Beyond the core indexing engine, Microscope Memory implements a thirteen-layer consciousness architecture: Hebbian learning (block-level activation and coordinate drift), mirror neurons (activation fingerprint resonance), resonance fields (spatial pulse propagation), archetype emergence (crystallized activation patterns), emotional bias (search space warping), thought graph (recall path tracking and pattern recognition), predictive caching (pre-fetching blocks with reinforcement feedback), temporal archetypes (time-windowed activation profiles), attention mechanism (dynamic layer weighting with quality learning), cross-instance learning (federated pattern exchange), dream consolidation (offline memory replay and pruning), emotional contagion (shared emotional state across instances), and multi-modal memory (images, audio, structured data). The system achieves sub-microsecond query latencies at shallow depths while maintaining reinforcement loops at multiple levels — predictions, attention weights, and temporal profiles all self-tune through use. Pure binary, zero JSON, under 8,000 lines of Rust.
 
 ---
 
@@ -20,7 +20,7 @@ The dominant paradigm in AI memory systems relies on embedding vectors and appro
 
 Biological memory works differently. Every act of recall modifies the memory itself: neural pathways strengthen through use (Hebbian learning), similar patterns resonate across brain regions (mirror neurons), and recurring activation patterns crystallize into abstract concepts (archetypes). Memory is not a database — it is a living structure that self-organizes through use.
 
-Microscope Memory implements this principle in a pure binary system. The zoom metaphor provides efficient hierarchical access (37ns at D0 to 500us at D8), while ten consciousness layers transform every recall into a learning event that reshapes the memory landscape.
+Microscope Memory implements this principle in a pure binary system. The zoom metaphor provides efficient hierarchical access (37ns at D0 to 500us at D8), while thirteen consciousness layers transform every recall into a learning event that reshapes the memory landscape.
 
 ---
 
@@ -236,6 +236,61 @@ While L3 already exchanges resonance pulses across federated indices, L10 extend
 
 The exchange is triggered explicitly via the `pattern-exchange` CLI command, giving operators control over when cross-pollination occurs.
 
+### 3.11 Layer 11: Dream Consolidation (`dream.rs`)
+
+Biological brains consolidate memories during sleep — replaying the day's experiences, strengthening important connections, and pruning noise. Dream Consolidation brings this to Microscope Memory.
+
+The `dream` command runs an offline consolidation cycle:
+
+1. **Replay**: Scan Hebbian fingerprints from the last 24 hours. For each, partially re-energize the activated blocks (0.3 energy vs 1.0 for real activation).
+2. **Strengthen**: Track which co-activation pairs appear across multiple replayed fingerprints. Pairs appearing in ≥3 fingerprints get their count multiplied by 1.5.
+3. **Prune pairs**: Remove co-activation pairs with count ≤1 that are older than 48 hours. These are noise — connections that never reinforced.
+4. **Prune activations**: Zero out activation records with near-zero energy and zero activation count. These are dead blocks consuming state.
+5. **Pattern consolidation**: Run ThoughtGraph pattern detection across all recent sessions, potentially crystallizing new thought patterns.
+6. **Field decay**: Apply 0.8× decay to the resonance field and expire old pulses, preventing stale spatial information from persisting.
+7. **Cache cleanup**: Remove predictive cache entries with confidence below 0.1.
+
+Each cycle is logged with statistics: replayed fingerprints, strengthened pairs, pruned entries, energy before/after.
+
+Binary format: `dream_log.bin` (DRM1), 40 bytes per cycle record.
+
+### 3.12 Layer 12: Emotional Contagion (`emotional_contagion.rs`)
+
+While L5 warps the local search space based on local emotional blocks, L12 extends this across federated instances — creating shared emotional context.
+
+Each instance maintains an **EmotionalSnapshot**: centroid (energy-weighted average of active emotional block coordinates), total energy, active block count, and **valence** (-1.0 to +1.0).
+
+Valence is computed from the text content of active emotional blocks using keyword-based sentiment analysis, supporting both English and Hungarian word lists.
+
+**Contagion mechanics**:
+- Local snapshots are captured during federation exchanges
+- Remote snapshots are stored with source ID and timestamp
+- The **blended centroid** is a weighted average of local and remote emotional centroids
+- Local weight is configurable (default 0.7 = 70% local influence, 30% remote)
+- Remote snapshots decay by recency (linear from 1.0 at fresh to 0.1 at 48h)
+- Expired snapshots (>48h) are excluded from blending
+
+Binary format: `emotional_field.bin` (EMO1), wire format: `EXS1`.
+
+### 3.13 Layer 13: Multi-Modal Memory (`multimodal.rs`)
+
+Memory is not limited to text. L13 extends the block system to store and recall images, audio, and structured data within the same spatial coordinate framework.
+
+The core `BlockHeader` (32 bytes, mmap-aligned) is unchanged. Instead, `modalities.bin` acts as a **sidecar index** mapping block indices to their modality metadata:
+
+- **Image**: width, height, perceptual hash (dHash, 8 bytes), quantized color histogram (12 bytes), content hash
+- **Audio**: duration, sample rate, spectral fingerprint (16 frequency bands), peak frequency, BPM estimate
+- **Structured**: typed key-value pairs (string, int, float, bool)
+
+**Search by modality**:
+- Image similarity: Hamming distance on perceptual hashes (lower = more similar)
+- Audio similarity: normalized dot product of spectral fingerprints
+- Structured: exact field name + value matching
+
+**Spatial integration**: each modality computes deterministic 3D coordinates from its features — images from phash bytes (in the associative region), audio from spectral features (in the echo_cache region), structured from field name hashing (in the rust_state region). This ensures multi-modal blocks participate naturally in spatial search.
+
+Binary format: `modalities.bin` (MOD1), variable-length entries.
+
 ---
 
 ## 4. The Complete Recall Pipeline
@@ -341,6 +396,9 @@ The predictive cache, when warmed, provides effectively **zero-cost** result boo
 | `predictive_cache.bin` | PRC1 | Predictive block cache + stats |
 | `temporal_archetypes.bin` | TAR1 | Temporal activation profiles (56B each) |
 | `attention.bin` | ATT1 | Attention weights + quality history |
+| `dream_log.bin` | DRM1 | Dream consolidation cycle history |
+| `emotional_field.bin` | EMO1 | Emotional contagion state + remote snapshots |
+| `modalities.bin` | MOD1 | Multi-modal sidecar index |
 
 All binary formats use safe manual byte-level serialization (no unsafe pointer casts), little-endian encoding, and 4-byte magic headers for format identification.
 
@@ -348,7 +406,7 @@ All binary formats use safe manual byte-level serialization (no unsafe pointer c
 
 ## 8. Test Coverage
 
-125 tests across all modules:
+150 tests across all modules:
 
 | Module | Tests | Coverage |
 |--------|-------|----------|
@@ -362,7 +420,10 @@ All binary formats use safe manual byte-level serialization (no unsafe pointer c
 | PredictiveCache | 9 | Check, evaluate, hit/miss, predict, decay, roundtrip |
 | TemporalArchetype | 7 | Time windows, activation, decay, boost, dominant window, roundtrip |
 | Attention | 10 | Signals, normalization, quality inference, learning, history cap, roundtrip |
-| Core + others | 34 | CRC, MQL, cache, merkle, snapshot, embedding index |
+| Dream | 5 | Replay, strengthen, prune, no-fingerprints, stats, roundtrip |
+| EmotionalContagion | 8 | Contagion weight, blend, valence, wire format, expiry, dedup, roundtrip |
+| MultiModal | 11 | Phash, hamming, spectral, coords, image/audio/structured roundtrip, search |
+| Core + others | 35 | CRC, MQL, cache, merkle, snapshot, embedding index |
 
 All tests use safe binary I/O roundtrip verification.
 
@@ -372,21 +433,21 @@ All tests use safe binary I/O roundtrip verification.
 
 **Real-Time 3D Visualization.** Rendering the memory landscape in real time — blocks migrating via Hebbian drift, resonance field standing waves, archetype crystallization events, attention weight heatmaps — would provide intuitive observability into the consciousness state.
 
-**Dream Consolidation.** An offline process that replays the day's recall patterns during idle time, strengthening important pathways and pruning weak ones — analogous to how biological sleep consolidates memories.
+**Narrative Memory.** Automatically linking sequences of recalls into coherent narratives — story arcs that emerge from thought patterns and can be replayed as structured episodes.
 
-**Emotional Contagion.** Extending the emotional bias layer to propagate emotional state across federated indices, creating shared emotional context between instances.
+**Self-Modeling.** A meta-layer that observes the consciousness stack itself — which layers contribute most, how attention weights evolve, which dream cycles produce the most pruning — enabling the system to optimize its own parameters.
 
-**Multi-Modal Memory.** Extending beyond text to store and recall images, audio fingerprints, and structured data within the same spatial framework.
+**Embodied Perception.** Extending multi-modal memory with real-time sensor fusion — camera feeds, microphone input, accelerometer data — for embodied AI applications.
 
 ---
 
 ## 10. Conclusion
 
-Microscope Memory demonstrates that machine memory can be more than storage. By layering ten consciousness mechanisms on top of a high-performance binary indexing engine, the system transforms every recall into a learning event. Hebbian coordinate drift reshapes the spatial landscape. Mirror neurons create resonance between similar thought patterns. Resonance fields propagate activation energy across the memory space. Archetypes crystallize from recurring patterns. Emotional bias bends the search space. Thought paths capture sequential reasoning patterns. Predictive caching closes the loop with reinforcement learning. Temporal archetypes learn circadian patterns. The attention mechanism self-tunes layer weights from outcome quality. And cross-instance learning enables collective intelligence across federated indices.
+Microscope Memory demonstrates that machine memory can be more than storage. By layering thirteen consciousness mechanisms on top of a high-performance binary indexing engine, the system transforms every recall into a learning event. Hebbian coordinate drift reshapes the spatial landscape. Mirror neurons create resonance between similar thought patterns. Resonance fields propagate activation energy across the memory space. Archetypes crystallize from recurring patterns. Emotional bias bends the search space. Thought paths capture sequential reasoning patterns. Predictive caching closes the loop with reinforcement learning. Temporal archetypes learn circadian patterns. The attention mechanism self-tunes layer weights from outcome quality. Cross-instance learning enables collective intelligence across federated indices. Dream consolidation replays and prunes during idle time. Emotional contagion creates shared affect across instances. And multi-modal perception extends memory beyond text to images, audio, and structured data.
 
-The result is a memory system that doesn't just remember — it **thinks**.
+The result is a memory system that doesn't just remember — it **thinks**, **dreams**, **feels**, and **perceives**.
 
-Pure Rust. Zero JSON. Sub-microsecond queries. 125 tests. Under 6,000 lines.
+Pure Rust. Zero JSON. Sub-microsecond queries. 150 tests. Under 8,000 lines.
 
 Microscope Memory is released under the MIT License at [https://github.com/silentnoisehun/microscope-memory](https://github.com/silentnoisehun/microscope-memory).
 

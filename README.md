@@ -3,11 +3,11 @@
 [![CI](https://github.com/silentnoisehun/microscope-memory/actions/workflows/ci.yml/badge.svg)](https://github.com/silentnoisehun/microscope-memory/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-**Consciousness architecture for machine memory — Hebbian learning, mirror neurons, resonance fields, archetype emergence, attention mechanism**
+**Consciousness architecture for machine memory — Hebbian learning, mirror neurons, resonance fields, dream consolidation, multi-modal perception**
 
-A binary memory system where memories self-organize through use. Every recall strengthens neural pathways (Hebbian learning), activates mirror neurons across similar memories, emits resonance pulses into a spatial field, crystallizes recurring patterns into archetypes, tracks thought paths that pre-fetch future blocks, adapts layer weights through an attention mechanism, learns time-of-day patterns via temporal archetypes, and shares knowledge across federated instances. The system treats data like looking through a microscope — zoom level determines what you see, from identity down to raw bytes.
+A binary memory system where memories self-organize through use. Every recall strengthens neural pathways (Hebbian learning), activates mirror neurons, emits resonance pulses, crystallizes archetypes, tracks thought paths that pre-fetch future blocks, adapts layer weights through attention, learns circadian patterns, shares knowledge across federated instances, propagates emotional state between peers, consolidates memories during offline "dreams", and perceives images, audio, and structured data alongside text. The system treats data like looking through a microscope — zoom level determines what you see, from identity down to raw bytes.
 
-Pure Rust. Zero JSON. Sub-microsecond queries. 228K+ blocks across 9 depth levels. 10-layer consciousness stack.
+Pure Rust. Zero JSON. Sub-microsecond queries. 228K+ blocks across 9 depth levels. 13-layer consciousness stack.
 
 ## Consciousness Architecture
 
@@ -52,6 +52,24 @@ graph LR
 
 ```mermaid
 graph TB
+    subgraph L13["L13: Multi-Modal Memory"]
+        PHASH[Perceptual Hash] --> MSEARCH[Similarity Search]
+        SPEC[Spectral Fingerprint] --> MSEARCH
+        KV[Structured K/V] --> MSEARCH
+    end
+
+    subgraph L12["L12: Emotional Contagion"]
+        SNAP[Emotional Snapshot] -->|federation| BLEND[Blended Centroid]
+        BLEND -->|shared warp| SEARCH
+        VAL[Valence Detection] --> SNAP
+    end
+
+    subgraph L11["L11: Dream Consolidation"]
+        REPLAY[Replay Fingerprints] --> STRENGTHEN[Strengthen Pairs]
+        STRENGTHEN --> PRUNE[Prune Weak Links]
+        PRUNE --> CONSOLIDATE[Consolidate Patterns]
+    end
+
     subgraph L10["L10: Cross-Instance Learning"]
         EXPORT[Export Patterns + Stats] -->|federation| IMPORT[Import from Peers]
         IMPORT -->|trust-weighted| MERGE[Merge Knowledge]
@@ -126,6 +144,9 @@ graph TB
     style L8 fill:#0d1117,stroke:#da3633,color:#c9d1d9
     style L9 fill:#0d1117,stroke:#ff6b6b,color:#c9d1d9
     style L10 fill:#0d1117,stroke:#8b949e,color:#c9d1d9
+    style L11 fill:#0d1117,stroke:#7ee787,color:#c9d1d9
+    style L12 fill:#0d1117,stroke:#ff7b72,color:#c9d1d9
+    style L13 fill:#0d1117,stroke:#d2a8ff,color:#c9d1d9
 ```
 
 ### How Consciousness Emerges
@@ -174,6 +195,9 @@ graph LR
 | **L8: Temporal Archetypes** | `temporal_archetype.rs` | Tracks activation patterns across 6 time windows (4h each). Learns when specific archetypes are most active. Applies time-aware boost — peak-window matches score higher than off-peak. |
 | **L9: Attention Mechanism** | `attention.rs` | Dynamically weights all consciousness layers based on query signals (length, emotion, session depth, pattern confidence, cache hit rate, archetype match). Learns from outcomes via EMA — satisfied recalls reinforce the weights that produced them. |
 | **L10: Cross-Instance Learning** | `federation.rs` | Exports ThoughtGraph patterns and PredictiveCache stats across federated indices. Trust-weighted import: source hit rate × federation weight. Enables collective thought path learning across instances. |
+| **L11: Dream Consolidation** | `dream.rs` | Offline memory replay: re-activates recent fingerprints, strengthens frequently co-activated pairs (×1.5), prunes weak/cold links, consolidates thought patterns, decays the resonance field. Analogous to biological sleep. |
+| **L12: Emotional Contagion** | `emotional_contagion.rs` | Propagates emotional state across federated instances. Captures local emotional field (centroid, energy, valence), exchanges snapshots, blends local + remote centroids for shared emotional context. Keyword-based sentiment (EN + HU). |
+| **L13: Multi-Modal Memory** | `multimodal.rs` | Extends beyond text: images (perceptual hash + color histogram), audio (spectral fingerprint + BPM), structured data (typed key-value). Hamming distance and spectral similarity search. Modality-aware spatial coordinates. |
 
 ## Features
 
@@ -415,6 +439,24 @@ microscope-memory attention
 
 # Exchange thought patterns across federated indices
 microscope-memory pattern-exchange
+
+# Run dream consolidation (offline memory replay and pruning)
+microscope-memory dream
+
+# Show dream consolidation history
+microscope-memory dream-log
+
+# Show emotional contagion state (local + remote fields)
+microscope-memory emotional-field
+
+# Exchange emotional snapshots across federated indices
+microscope-memory emotional-exchange
+
+# Show multimodal index statistics
+microscope-memory modalities
+
+# Store structured data
+microscope-memory store-data key1=value1 key2=42 active=true
 ```
 
 ### Visualization
@@ -602,6 +644,18 @@ temporal_archetypes.bin — Temporal activation profiles (TAR1)
 attention.bin — Attention layer state (ATT1)
 ├── learned_weights[7], total_recalls, last_recall_ms
 └── history: weights[7], timestamp, quality (200 cap)
+
+dream_log.bin — Dream consolidation history (DRM1)
+└── cycles: timestamp, duration, replayed, strengthened, pruned, energy delta
+
+emotional_field.bin — Emotional contagion state (EMO1)
+├── local: centroid, energy, valence
+└── remote: source_id, centroid, energy, valence (50 cap)
+
+modalities.bin — Multi-modal sidecar index (MOD1)
+├── image: width, height, phash[8], color_histogram[12]
+├── audio: duration, sample_rate, spectral_fingerprint[16], peak_freq, bpm
+└── structured: field_count, key-value pairs with type tags
 ```
 
 ### Memory Layers
@@ -654,9 +708,12 @@ D8: Raw bytes         — hex representation (atomic limit)
 15. **Temporal archetype tracking**: Activation profiles per time window — the system learns when you think about what
 16. **Attention weighting**: Dynamic per-layer weights based on query signals; quality inference from inter-recall timing
 17. **Cross-instance learning**: ThoughtGraph patterns and cache stats exchanged across federated indices with trust weighting
-18. **Coordinate drift**: Co-activated blocks gradually migrate closer in 3D space over time
-19. **Append log**: New memories stored instantly via binary append, merged on rebuild
-20. **Merkle integrity**: SHA-256 tree for tamper detection and per-block proofs
+18. **Dream consolidation**: Offline replay strengthens important pathways, prunes weak links, consolidates patterns
+19. **Emotional contagion**: Emotional snapshots exchanged across federated indices, blended centroid influences warp
+20. **Multi-modal perception**: Images, audio, and structured data indexed alongside text with modality-specific search
+21. **Coordinate drift**: Co-activated blocks gradually migrate closer in 3D space over time
+22. **Append log**: New memories stored instantly via binary append, merged on rebuild
+23. **Merkle integrity**: SHA-256 tree for tamper detection and per-block proofs
 
 ## Source Structure
 
@@ -687,6 +744,9 @@ src/
 ├── predictive_cache.rs  — Predictive Cache (L7): pre-fetch blocks, hit/miss reinforcement
 ├── temporal_archetype.rs — Temporal Archetypes (L8): time-windowed activation profiles
 ├── attention.rs         — Attention Mechanism (L9): dynamic layer weighting, quality learning
+├── dream.rs             — Dream Consolidation (L11): offline replay, strengthening, pruning
+├── emotional_contagion.rs — Emotional Contagion (L12): federated emotional state sharing
+├── multimodal.rs        — Multi-Modal Memory (L13): image/audio/structured data sidecar
 ├── viz.rs               — Visualization: JSON snapshot + binary density map export
 ├── gpu.rs               — Optional wgpu GPU acceleration
 ├── wasm.rs              — WASM target support
@@ -813,6 +873,12 @@ Commands:
   temporal-patterns  Show temporal archetype activation profiles
   attention          Show attention mechanism state and learned weights
   pattern-exchange   Exchange thought patterns across federated indices
+  dream              Run dream consolidation (offline memory replay)
+  dream-log          Show dream consolidation history
+  emotional-field    Show emotional contagion state
+  emotional-exchange Exchange emotional snapshots across federated indices
+  modalities         Show multimodal index statistics
+  store-data         Store structured key=value data
   viz                Export 3D visualization snapshot (JSON)
   density            Export binary density map for rendering
   stats              Index statistics

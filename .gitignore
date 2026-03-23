@@ -11,8 +11,16 @@ Thumbs.db
 
 # Microscope Data (binary data should not be in git)
 *.bin
+*.zst
+output/
 layers/*.json
 !layers/.gitkeep
+
+# Generated viz/snapshot files
+cognitive_map.json
+viz.json
+density.bin
+*.mscope
 
 # Config (user specific)
 config.toml

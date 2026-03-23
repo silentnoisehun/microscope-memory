@@ -76,6 +76,54 @@ canvas { display: block; }
   background: #fff; border-radius: 2px;
 }
 
+/* ── Microscope Zoom HUD ── */
+#microscope {
+  position: fixed; right: 20px; top: 50%; transform: translateY(-50%); z-index: 20;
+  display: none; flex-direction: column; align-items: center; gap: 0;
+  user-select: none;
+}
+#microscope .scope-label {
+  color: #0ff; font-size: 10px; letter-spacing: 1px; margin-bottom: 6px;
+}
+#microscope .scope-body {
+  position: relative; width: 52px; height: 280px;
+  background: rgba(8,8,16,0.9); border: 1px solid #333; border-radius: 26px;
+  display: flex; flex-direction: column; align-items: center; padding: 8px 0;
+}
+#microscope .scope-track {
+  position: relative; width: 4px; height: 220px;
+  background: linear-gradient(to bottom, #0ff 0%, #3366ff 25%, #9966ff 50%, #ff3366 75%, #ff6633 100%);
+  border-radius: 2px; margin: 4px 0;
+}
+#microscope .scope-thumb {
+  position: absolute; left: -10px; width: 24px; height: 24px;
+  background: radial-gradient(circle, rgba(0,255,255,0.4) 0%, rgba(0,255,255,0.1) 60%, transparent 70%);
+  border: 2px solid #0ff; border-radius: 50%;
+  transition: top 0.15s ease-out;
+  box-shadow: 0 0 12px rgba(0,255,255,0.3);
+}
+#microscope .scope-tick {
+  position: absolute; left: 12px; width: 18px; height: 1px;
+  background: rgba(255,255,255,0.15);
+}
+#microscope .scope-tick-label {
+  position: absolute; left: 34px; font-size: 8px; color: #555;
+  transform: translateY(-4px); white-space: nowrap;
+}
+#microscope .scope-tick-label.active { color: #0ff; font-weight: bold; font-size: 9px; }
+#depth-display {
+  margin-top: 8px; text-align: center;
+}
+#depth-display .depth-num {
+  font-size: 28px; color: #0ff; font-weight: bold; line-height: 1;
+}
+#depth-display .depth-name {
+  font-size: 9px; color: #888; margin-top: 2px;
+}
+#depth-display .block-count {
+  font-size: 8px; color: #444; margin-top: 1px;
+}
+
 /* Loading overlay */
 #loading {
   position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 100;
@@ -147,6 +195,20 @@ canvas { display: block; }
   </div>
 </div>
 
+<div id="microscope">
+  <div class="scope-label">ZOOM</div>
+  <div class="scope-body">
+    <div class="scope-track" id="scopeTrack">
+      <div class="scope-thumb" id="scopeThumb"></div>
+    </div>
+  </div>
+  <div id="depth-display">
+    <div class="depth-num" id="depthNum">D0</div>
+    <div class="depth-name" id="depthName">Identity</div>
+    <div class="block-count" id="depthBlocks"></div>
+  </div>
+</div>
+
 <script type="importmap">
 {
   "imports": {
@@ -163,6 +225,20 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 let scene, camera, renderer, controls, clock;
 let data = null;
 let fieldPoints = null;
+let currentDepth = 0;
+
+// Depth definitions (D0-D8)
+const DEPTH_DEFS = [
+  { name: 'Identity',       typical: 1 },
+  { name: 'Layer summaries', typical: 9 },
+  { name: 'Clusters',        typical: 108 },
+  { name: 'Items',            typical: 523 },
+  { name: 'Sentences',       typical: 1349 },
+  { name: 'Tokens',          typical: 6070 },
+  { name: 'Syllables',       typical: 26198 },
+  { name: 'Characters',      typical: 96297 },
+  { name: 'Raw bytes',       typical: 96613 },
+];
 
 // Feature groups — each is a THREE.Group toggled independently
 const groups = {};
@@ -235,6 +311,7 @@ function boot() {
   initThree();
   buildAll();
   buildSidebar();
+  initMicroscope();
   animate();
 }
 
@@ -257,6 +334,8 @@ function initThree() {
   controls.target.set(0.5, 0.5, 0.5);
   controls.enableDamping = true;
   controls.dampingFactor = 0.05;
+  controls.minDistance = 0.05;
+  controls.maxDistance = 5.0;
   controls.update();
 
   scene.add(new THREE.AmbientLight(0x333344, 1));
@@ -276,6 +355,79 @@ function initThree() {
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth - 260, window.innerHeight);
   });
+}
+
+// ─── Microscope Zoom ───────────────────────────────
+function initMicroscope() {
+  document.getElementById('microscope').style.display = 'flex';
+
+  // Build tick marks for D0-D8
+  const track = document.getElementById('scopeTrack');
+  for (let d = 0; d <= 8; d++) {
+    const pct = (d / 8) * 100;
+    const tick = document.createElement('div');
+    tick.className = 'scope-tick';
+    tick.style.top = pct + '%';
+    track.appendChild(tick);
+
+    const label = document.createElement('div');
+    label.className = 'scope-tick-label';
+    label.id = 'tick-d' + d;
+    label.style.top = pct + '%';
+    label.textContent = 'D' + d;
+    track.appendChild(label);
+  }
+
+  updateMicroscope();
+}
+
+function updateMicroscope() {
+  if (!camera || !controls) return;
+
+  // Map camera distance to depth (close = deep, far = shallow)
+  const dist = camera.position.distanceTo(controls.target);
+  // dist range: 0.05 (closest) to 5.0 (farthest)
+  // map: 0.05 → D8, 0.15 → D7, 0.3 → D6, 0.5 → D5, 0.7 → D4, 1.0 → D3, 1.5 → D2, 2.5 → D1, 4.0+ → D0
+  const depthThresholds = [4.0, 2.5, 1.5, 1.0, 0.7, 0.5, 0.3, 0.15, 0.05];
+  let depth = 0;
+  for (let d = 0; d < depthThresholds.length; d++) {
+    if (dist < depthThresholds[d]) depth = d;
+  }
+
+  currentDepth = depth;
+
+  // Update thumb position
+  const thumb = document.getElementById('scopeThumb');
+  const pct = (depth / 8) * 100;
+  thumb.style.top = 'calc(' + pct + '% - 12px)';
+
+  // Update depth display
+  document.getElementById('depthNum').textContent = 'D' + depth;
+  document.getElementById('depthName').textContent = DEPTH_DEFS[depth].name;
+  document.getElementById('depthBlocks').textContent = DEPTH_DEFS[depth].typical.toLocaleString() + ' blocks';
+
+  // Highlight active tick
+  for (let d = 0; d <= 8; d++) {
+    const el = document.getElementById('tick-d' + d);
+    if (el) {
+      el.className = 'scope-tick-label' + (d === depth ? ' active' : '');
+    }
+  }
+
+  // Adjust point size based on depth (deeper = larger points, you're "zoomed in")
+  if (groups.blocks) {
+    const pointSize = 0.004 + depth * 0.002;
+    for (const child of groups.blocks.children) {
+      if (child.isPoints) {
+        child.material.size = pointSize;
+      }
+    }
+  }
+
+  // Adjust fog density based on depth (deeper = less fog, you see further detail)
+  if (scene && scene.fog) {
+    scene.fog.density = 0.4 - depth * 0.04;
+  }
 }
 
 // ─── Build all 3D groups ───────────────────────────
@@ -759,6 +911,7 @@ function animate() {
     });
   }
 
+  updateMicroscope();
   controls.update();
   renderer.render(scene, camera);
 }

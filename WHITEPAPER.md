@@ -2,7 +2,7 @@
 
 **Author:** Mate Robert (Silent)
 
-**Version:** 0.6.0
+**Version:** 0.7.0
 
 **Date:** March 2026
 
@@ -10,7 +10,7 @@
 
 ## Abstract
 
-This paper presents Microscope Memory, a hierarchical memory system implemented in Rust that models information retrieval as an act of magnification — and memory itself as a living, self-organizing structure. The system organizes data into nine depth levels (D0--D8), from identity summaries to raw bytes, with every block constrained to a 256-byte viewport. Beyond the core indexing engine, Microscope Memory implements a thirteen-layer consciousness architecture: Hebbian learning (block-level activation and coordinate drift), mirror neurons (activation fingerprint resonance), resonance fields (spatial pulse propagation), archetype emergence (crystallized activation patterns), emotional bias (search space warping), thought graph (recall path tracking and pattern recognition), predictive caching (pre-fetching blocks with reinforcement feedback), temporal archetypes (time-windowed activation profiles), attention mechanism (dynamic layer weighting with quality learning), cross-instance learning (federated pattern exchange), dream consolidation (offline memory replay and pruning), emotional contagion (shared emotional state across instances), and multi-modal memory (images, audio, structured data). The system achieves sub-microsecond query latencies at shallow depths while maintaining reinforcement loops at multiple levels — predictions, attention weights, and temporal profiles all self-tune through use. Pure binary, zero JSON, under 8,000 lines of Rust.
+This paper presents Microscope Memory, a hierarchical memory system implemented in Rust that models information retrieval as an act of magnification — and memory itself as a living, self-organizing structure. The system organizes data into nine depth levels (D0--D8), from identity summaries to raw bytes, with every block constrained to a 256-byte viewport. Beyond the core indexing engine, Microscope Memory implements a thirteen-layer consciousness architecture: Hebbian learning (block-level activation and coordinate drift), mirror neurons (activation fingerprint resonance), resonance fields (spatial pulse propagation), archetype emergence (crystallized activation patterns), emotional bias (search space warping), thought graph (recall path tracking and pattern recognition), predictive caching (pre-fetching blocks with reinforcement feedback), temporal archetypes (time-windowed activation profiles), attention mechanism (dynamic layer weighting with quality learning), cross-instance learning (federated pattern exchange), dream consolidation (offline memory replay and pruning), emotional contagion (shared emotional state across instances), multi-modal memory (images, audio, structured data), and interactive 3D visualization (Three.js cognitive map viewer). The system achieves sub-microsecond query latencies at shallow depths while maintaining reinforcement loops at multiple levels — predictions, attention weights, and temporal profiles all self-tune through use. Pure binary, zero JSON, under 8,000 lines of Rust.
 
 ---
 
@@ -348,7 +348,17 @@ layer:long_term depth:2..5 near:0.2,0.3,0.1,0.05 "Ora" AND "memory" limit:20
 
 ### 5.5 Visualization
 
-JSON snapshot export (blocks, edges, field, archetypes, echoes, stats) and binary density map (DEN1 format) for 3D rendering.
+Three levels of visualization output:
+
+1. **Cognitive Map** (`cognitive-map` command): Full 13-layer export as JSON — blocks with Hebbian drift, co-activation edges, resonance wave field, archetypes with temporal profiles, thought paths, crystallized patterns, predictive cache stats, attention weights, dream cycle history, emotional contagion state, multi-modal stats, and mirror echoes. Ships with an interactive **Three.js viewer** (`viewer.html`) that auto-opens in the browser, featuring:
+   - Per-feature toggles (blocks, edges, wave field, thought paths, archetypes, dreams, echoes, emotional centroid)
+   - Per-layer visibility toggles with color-coded swatches
+   - Collapsible sidebar panels (stats, attention weights, emotional field, predictions)
+   - Animated wave field pulsing, dream cycle energy visualization, archetype temporal rings
+
+2. **Basic Snapshot** (`viz` command): JSON export of blocks, edges, field, archetypes, echoes, and aggregate stats.
+
+3. **Density Map** (`density` command): Binary DEN1 format — quantized 3D grid of Hebbian energy for fast volumetric rendering.
 
 ---
 
@@ -431,8 +441,6 @@ All tests use safe binary I/O roundtrip verification.
 
 ## 9. Future Work
 
-**Real-Time 3D Visualization.** Rendering the memory landscape in real time — blocks migrating via Hebbian drift, resonance field standing waves, archetype crystallization events, attention weight heatmaps — would provide intuitive observability into the consciousness state.
-
 **Narrative Memory.** Automatically linking sequences of recalls into coherent narratives — story arcs that emerge from thought patterns and can be replayed as structured episodes.
 
 **Self-Modeling.** A meta-layer that observes the consciousness stack itself — which layers contribute most, how attention weights evolve, which dream cycles produce the most pruning — enabling the system to optimize its own parameters.
@@ -445,7 +453,7 @@ All tests use safe binary I/O roundtrip verification.
 
 Microscope Memory demonstrates that machine memory can be more than storage. By layering thirteen consciousness mechanisms on top of a high-performance binary indexing engine, the system transforms every recall into a learning event. Hebbian coordinate drift reshapes the spatial landscape. Mirror neurons create resonance between similar thought patterns. Resonance fields propagate activation energy across the memory space. Archetypes crystallize from recurring patterns. Emotional bias bends the search space. Thought paths capture sequential reasoning patterns. Predictive caching closes the loop with reinforcement learning. Temporal archetypes learn circadian patterns. The attention mechanism self-tunes layer weights from outcome quality. Cross-instance learning enables collective intelligence across federated indices. Dream consolidation replays and prunes during idle time. Emotional contagion creates shared affect across instances. And multi-modal perception extends memory beyond text to images, audio, and structured data.
 
-The result is a memory system that doesn't just remember — it **thinks**, **dreams**, **feels**, and **perceives**.
+The result is a memory system that doesn't just remember — it **thinks**, **dreams**, **feels**, **perceives**, and **shows** its inner state through interactive 3D visualization.
 
 Pure Rust. Zero JSON. Sub-microsecond queries. 150 tests. Under 8,000 lines.
 

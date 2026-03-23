@@ -457,19 +457,39 @@ microscope-memory modalities
 
 # Store structured data
 microscope-memory store-data key1=value1 key2=42 active=true
+
+# Export cognitive map and open interactive 3D viewer
+microscope-memory cognitive-map
 ```
 
 ### Visualization
 
 ```bash
-# Export full 3D visualization snapshot (JSON)
+# Export full 13-layer cognitive map and open Three.js viewer in browser
+microscope-memory cognitive-map
+
+# Export to custom path
+microscope-memory cognitive-map my_snapshot.json
+
+# Export basic 3D visualization snapshot (JSON)
 microscope-memory viz viz.json
 
 # Export binary density map for fast rendering
 microscope-memory density density.bin --grid 32
 ```
 
-The viz snapshot includes: blocks with coordinates, edges (co-activations + wormhole links), resonance field values, archetypes with members, mirror echoes, and aggregate stats.
+The `cognitive-map` command exports all 13 consciousness layers as a single JSON and opens an interactive **Three.js viewer** (`viewer.html`) in the browser. The viewer features:
+
+- **Sidebar menu** with per-feature toggles (blocks, edges, wave field, thought paths, archetypes, dreams, echoes, emotional centroid)
+- **Per-layer toggles** with color swatches — show/hide individual memory layers (emotional, episodic, semantic, etc.)
+- **Collapsible info panels**: stats, attention weights, emotional field, predictive cache
+- **Animated wave field**: resonance field cells pulse in 3D
+- **Archetype clusters**: wireframe spheres with labels, temporal rings, member connection lines
+- **Dream cycle spheres**: energy delta coloring (green=consolidation, red=pruning)
+- **Mirror echo lines**: shared block connections with similarity-based opacity
+- **Emotional centroid marker**: pulsing sphere with remote field indicators
+
+The basic `viz` snapshot includes: blocks with coordinates, edges (co-activations + wormhole links), resonance field values, archetypes with members, mirror echoes, and aggregate stats.
 
 ### HTTP Server
 
@@ -747,7 +767,7 @@ src/
 ├── dream.rs             — Dream Consolidation (L11): offline replay, strengthening, pruning
 ├── emotional_contagion.rs — Emotional Contagion (L12): federated emotional state sharing
 ├── multimodal.rs        — Multi-Modal Memory (L13): image/audio/structured data sidecar
-├── viz.rs               — Visualization: JSON snapshot + binary density map export
+├── viz.rs               — Visualization: cognitive map + JSON snapshot + density map export
 ├── gpu.rs               — Optional wgpu GPU acceleration
 ├── wasm.rs              — WASM target support
 └── python.rs            — PyO3 Python bindings
@@ -879,6 +899,7 @@ Commands:
   emotional-exchange Exchange emotional snapshots across federated indices
   modalities         Show multimodal index statistics
   store-data         Store structured key=value data
+  cognitive-map      Export 13-layer cognitive map + open Three.js viewer
   viz                Export 3D visualization snapshot (JSON)
   density            Export binary density map for rendering
   stats              Index statistics

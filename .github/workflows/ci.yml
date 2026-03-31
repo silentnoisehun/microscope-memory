@@ -22,27 +22,16 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: cargo check
       - run: cargo test -- --test-threads=1
-      - run: cargo test --features shp -- --test-threads=1
       - run: cargo build --release
 
-  viz:
-    name: Check Viz Feature
+  features:
+    name: Check Optional Features
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-      - run: cargo check --features viz
-
-  shp:
-    name: Check SHP Feature
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-      - run: cargo check --features shp
-      - run: cargo test --features shp -- --test-threads=1
+      - run: cargo check --features compression
 
   clippy:
     name: Clippy

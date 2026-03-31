@@ -1,42 +1,87 @@
 [package]
 name = "microscope-memory"
-version = "0.1.0"
+version = "0.5.0"
 edition = "2021"
-description = "Pure Rust zoom-based hierarchical memory — 9-depth binary mmap, tiered spatial grid (17x speedup), SHA-256 chain + Merkle tree, store/recall/verify CLI."
+authors = ["Máté Róbert (Silent)"]
+description = "The world's only cognitive memory system — 13 consciousness layers, per-depth mmap cache (40,000x speedup), Hebbian learning, dream consolidation, sub-nanosecond cached recall. Pure Rust, zero dependency."
+readme = "README.md"
+homepage = "https://github.com/silentnoisehun/microscope-memory"
+repository = "https://github.com/silentnoisehun/microscope-memory"
 license = "MIT"
-repository = "https://github.com/mateROBERT/microscope-memory"
-default-run = "microscope-memory"
-
-[features]
-default = []
-viz = ["dep:wgpu", "dep:winit", "dep:egui", "dep:egui-wgpu", "dep:egui-winit", "dep:glam", "dep:bytemuck", "dep:pollster"]
-shp = ["dep:tokio"]
+keywords = ["memory", "cognitive", "mmap", "hebbian", "consciousness"]
+categories = ["data-structures", "algorithms", "memory-management", "science"]
+exclude = ["layers/", "target/", "*.bin"]
 
 [dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
 clap = { version = "4", features = ["derive"] }
 colored = "2"
 memmap2 = "0.9"
+rayon = "1.8"
+toml = "0.8"
+
+# WASM dependencies
+wasm-bindgen = { version = "0.2", optional = true }
+web-sys = { version = "0.3", features = ["console"], optional = true }
+console_error_panic_hook = { version = "0.1", optional = true }
+
+# Python bindings
+pyo3 = { version = "0.24", features = ["extension-module"], optional = true }
+
+# Merkle tree integrity
 sha2 = "0.10"
 
-# SHP server (optional, --features shp)
-tokio = { version = "1", features = ["full"], optional = true }
-
-# Visualization (optional, --features viz)
-wgpu = { version = "27", optional = true }
-winit = { version = "0.30", optional = true }
-egui = { version = "0.33", optional = true }
-egui-wgpu = { version = "0.33", features = ["winit"], optional = true }
-egui-winit = { version = "0.33", default-features = false, optional = true }
-glam = { version = "0.32", optional = true }
+# GPU acceleration
+wgpu = { version = "0.19", optional = true }
 bytemuck = { version = "1", features = ["derive"], optional = true }
 pollster = { version = "0.4", optional = true }
+futures = { version = "0.3", optional = true }
+
+# Real embeddings (candle)
+candle-core = { version = "0.8", optional = true }
+candle-nn = { version = "0.8", optional = true }
+candle-transformers = { version = "0.8", optional = true }
+hf-hub = { version = "0.4", optional = true, features = ["tokio"] }
+tokenizers = { version = "0.21", optional = true }
+
+# ONNX Runtime embeddings
+ort = { version = "2.0.0-rc.12", optional = true }
+ndarray = { version = "0.16", optional = true }
+
+# Compression
+zstd = { version = "0.13", optional = true }
+
+# HTTP server
+tiny_http = "0.12"
+
+[dev-dependencies]
+tempfile = "3"
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[[bench]]
+name = "microscope_bench"
+harness = false
+
+[features]
+default = []
+wasm = ["wasm-bindgen", "web-sys", "console_error_panic_hook"]
+python = ["pyo3"]
+gpu = ["wgpu", "bytemuck", "pollster", "futures"]
+embeddings = ["candle-core", "candle-nn", "candle-transformers", "hf-hub", "tokenizers"]
+onnx = ["ort", "ndarray", "tokenizers"]
+compression = ["zstd"]
 
 [[bin]]
-name = "microscope-viz"
-path = "src/bin/viz.rs"
-required-features = ["viz"]
+name = "liora_import"
+path = "src/bin/liora_import.rs"
+
+[[bin]]
+name = "telegram_import"
+path = "src/bin/telegram_import.rs"
 
 [profile.release]
 opt-level = 3
 lto = true
 strip = true
+codegen-units = 1

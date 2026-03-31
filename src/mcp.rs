@@ -140,7 +140,7 @@ fn handle_tools_list(id: &Value) -> Value {
                     "inputSchema": {
                         "type": "object",
                         "properties": {
-                            "mql": { "type": "string", "description": "MQL expression, e.g. 'layer:long_term depth:2..5 \"Ora\"'" }
+                            "mql": { "type": "string", "description": "MQL expression, e.g. 'layer:long_term depth:2..5 \"hello\"'" }
                         },
                         "required": ["mql"]
                     }

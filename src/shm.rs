@@ -1,10 +1,10 @@
-//! Shared Memory integration — zero-copy IPC with Ora kernel.
+//! Shared Memory integration — zero-copy IPC with external processes.
 //!
-//! Maps to the Ora SHM layout (2048 bytes, mmap, lock-free).
-//! Microscope Memory reads/writes its cognitive state to the shared
-//! region so Ora, Rongyász, and Claude can access it with zero latency.
+//! Uses a 2048-byte mmap'd binary region for lock-free inter-process
+//! communication. Any process can attach and read/write cognitive state
+//! with zero latency.
 //!
-//! Layout within Ora SHM:
+//! Layout:
 //!   [464-512]   MicroscopeSlot (48 bytes) — cognitive state
 //!   [1536-2048] MicroscopeRing (512 bytes) — recall result ring
 //!
@@ -21,16 +21,16 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 // ─── Constants ──────────────────────────────────────
 
-/// Default SHM file path (same as Ora kernel)
-pub const DEFAULT_SHM_PATH: &str = "D:/Temp/ora-state.bin";
+/// Default SHM file path
+pub const DEFAULT_SHM_PATH: &str = "microscope-shm.bin";
 
-/// Ora SHM total size
+/// SHM total size
 const SHM_SIZE: usize = 2048;
 
-/// Ora magic number for validation
-const ORA_MAGIC: u64 = 0x4F52415F4B45524E; // "ORA_KERN"
+/// Magic number for validation
+const SHM_MAGIC: u64 = 0x4D53435053484D30; // "MSCPSHM0"
 
-/// Microscope slot offset within Ora SHM (48 bytes, offset 464)
+/// Microscope slot offset (48 bytes, offset 464)
 const MICROSCOPE_OFFSET: usize = 464;
 
 /// Microscope slot size
@@ -117,7 +117,7 @@ impl Default for RingEntry {
 
 // ─── ShmBridge ──────────────────────────────────────
 
-/// Bridge between Microscope Memory and Ora SHM.
+/// Bridge between Microscope Memory and SHM.
 pub struct ShmBridge {
     _file: File,
     mmap: MmapMut,
@@ -149,13 +149,13 @@ impl ShmBridge {
         Self::open(DEFAULT_SHM_PATH)
     }
 
-    /// Check if this is a valid Ora SHM region.
+    /// Check if this is a valid SHM region.
     pub fn is_valid(&self) -> bool {
         if self.mmap.len() < SHM_SIZE {
             return false;
         }
         let magic = u64::from_le_bytes(self.mmap[0..8].try_into().unwrap_or([0; 8]));
-        magic == ORA_MAGIC
+        magic == SHM_MAGIC
     }
 
     // ─── Read ───────────────────────────────────────
@@ -209,7 +209,7 @@ impl ShmBridge {
         self.mmap[MICROSCOPE_OFFSET..MICROSCOPE_OFFSET + MICROSCOPE_SLOT_SIZE]
             .copy_from_slice(bytes);
 
-        // Increment Ora write_seq to notify readers
+        // Increment write_seq to notify readers
         let seq_offset = 16;
         let seq = u64::from_le_bytes(
             self.mmap[seq_offset..seq_offset + 8]

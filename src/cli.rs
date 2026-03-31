@@ -116,7 +116,7 @@ pub enum Cmd {
     },
     /// MQL query (Microscope Query Language)
     Query {
-        /// MQL expression, e.g. 'layer:long_term depth:2..5 "Ora"'
+        /// MQL expression, e.g. 'layer:long_term depth:2..5 "hello"'
         mql: String,
     },
     /// Export index to .mscope archive
@@ -280,12 +280,12 @@ pub enum Cmd {
         output: Option<String>,
     },
 
-    // ─── Shared Memory (Ora IPC) ────────────────────
+    // ─── Shared Memory (IPC) ────────────────────────
 
-    /// Write current cognitive state to Ora SHM (zero-copy IPC)
+    /// Write current cognitive state to shared memory (zero-copy IPC)
     ShmWrite,
 
-    /// Read Microscope state from Ora SHM
+    /// Read Microscope state from shared memory
     ShmRead,
 
     /// Show SHM connection status
@@ -309,10 +309,10 @@ pub enum Cmd {
     /// Benchmark: cached recall vs normal recall
     CacheBench,
 
-    /// Continuous SHM sync daemon — updates Ora after every recall
+    /// Continuous SHM sync daemon — updates shared memory after every recall
     ShmDaemon {
-        /// SHM file path (default: D:/Temp/ora-state.bin)
-        #[arg(long, default_value = "D:/Temp/ora-state.bin")]
+        /// SHM file path
+        #[arg(long, default_value = "microscope-shm.bin")]
         shm_path: String,
         /// Sync interval in milliseconds
         #[arg(long, default_value = "100")]

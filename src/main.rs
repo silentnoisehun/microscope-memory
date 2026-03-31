@@ -13,7 +13,7 @@
 //!   microscope-mem look 0.25 0.25 0.25 3    # x y z zoom
 //!   microscope-mem bench                    # speed test
 //!   microscope-mem stats                    # structure info
-//!   microscope-mem find "Ora"               # text search
+//!   microscope-mem find "hello"              # text search
 //!   microscope-mem embed "query"            # semantic search with embeddings
 //!   microscope-mem serve                    # Start the unified endpoint server (TCP/HTTP)
 
@@ -2460,7 +2460,7 @@ fn main() {
             println!("{}", "=".repeat(60));
         }
 
-        // ─── Shared Memory (Ora IPC) ────────────────────
+        // ─── Shared Memory (IPC) ────────────────────────
 
         Cmd::ShmWrite => {
             let reader = open_reader(&config);
@@ -2533,7 +2533,7 @@ fn main() {
                     println!("\n{}", "SHM STATUS".cyan().bold());
                     println!("  Path:     {}", microscope_memory::shm::DEFAULT_SHM_PATH);
                     println!("  Valid:    {}", if st.valid { "YES" } else { "NO" });
-                    println!("  Ora seq:  {}", st.ora_write_seq);
+                    println!("  SHM seq:  {}", st.ora_write_seq);
                     println!("  Micro:    seq={} blocks={}", st.microscope_slot.write_seq, st.microscope_slot.total_blocks);
                     println!("  Ring:     {} entries", st.ring_entries);
                 }

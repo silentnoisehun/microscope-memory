@@ -1,8 +1,8 @@
 # Microscope Memory Configuration
 [paths]
-layers_dir = "D:/Claude Memory/layers"
-output_dir = "D:/Claude Memory/microscope"
-temp_dir = "tmp/microscope"
+layers_dir = "layers"
+output_dir = "output"
+temp_dir = "tmp"
 
 [index]
 block_size = 256
@@ -23,17 +23,12 @@ layers = [
     "emotional",
     "relational",
     "reflections",
-    "crypto_chain",
-    "echo_cache",
-    "rust_state",
-    "telegram",
-    "claude_history"
 ]
 
 [performance]
 use_mmap = true
 cache_size = 64
-build_workers = 8
+build_workers = 4
 
 [logging]
 level = "info"

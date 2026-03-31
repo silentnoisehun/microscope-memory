@@ -164,8 +164,8 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             paths: Paths {
-                layers_dir: "D:/Claude Memory/layers".to_string(),
-                output_dir: "D:/Claude Memory/microscope".to_string(),
+                layers_dir: "layers".to_string(),
+                output_dir: "output".to_string(),
                 temp_dir: "tmp/microscope".to_string(),
             },
             index: Index {

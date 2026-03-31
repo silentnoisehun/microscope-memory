@@ -72,13 +72,6 @@ embeddings = ["candle-core", "candle-nn", "candle-transformers", "hf-hub", "toke
 onnx = ["ort", "ndarray", "tokenizers"]
 compression = ["zstd"]
 
-[[bin]]
-name = "liora_import"
-path = "src/bin/liora_import.rs"
-
-[[bin]]
-name = "telegram_import"
-path = "src/bin/telegram_import.rs"
 
 [profile.release]
 opt-level = 3

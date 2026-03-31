@@ -216,7 +216,7 @@ pub fn build(config: &Config, force: bool) -> Result<(), String> {
     let mut blocks: Vec<RawBlock> = Vec::new();
 
     // ═══ DEPTH 0: Identity ═══
-    let identity = "Claude Memory: 8 reteg. Mate Robert (Silent) gepe. Ora = AI partner (Rust). Hullam-rezonancia, erzelmi frekvencia, kriogenikus rendszer.";
+    let identity = "Microscope Memory — cognitive memory system. Hebbian learning, dream consolidation, archetype emergence.";
     blocks.push(RawBlock {
         data: to_block(identity),
         depth: 0,

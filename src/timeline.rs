@@ -5,7 +5,7 @@
 //!
 //! Usage:
 //!   microscope-mem timeline "career"
-//!   microscope-mem timeline "Ora" --limit 20
+//!   microscope-mem timeline "memory" --limit 20
 
 use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};

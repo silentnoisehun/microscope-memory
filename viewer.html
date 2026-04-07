@@ -152,6 +152,7 @@ canvas { display: block; }
   <div class="error" id="loadError"></div>
   <div class="fallback" id="loadFallback">
     <input type="file" id="fileInput" accept=".bin,.json">
+    <button onclick="loadSampleData()">Load Sample Data</button>
   </div>
 </div>
 
@@ -291,6 +292,29 @@ canvas { display: block; }
     // Users can manually select files using the file input
     console.log('Auto-load skipped - use file input to load cognitive_map.bin');
   }
+  function loadSampleData() {
+    console.log('Loading sample data...');
+    // Create sample data for testing
+    data = {
+      block_count: 100,
+      blocks: Array.from({length: 100}, (_, i) => ({
+        x: Math.sin(i * 0.1) * 0.5,
+        y: Math.cos(i * 0.1) * 0.5,
+        z: (i / 100) * 2 - 1,
+        dx: 0, dy: 0, dz: 0, e: 1.0,
+        lid: i % 9, d: i % 8, f: 0
+      })),
+      edges: Array.from({length: 50}, (_, i) => [i * 2, i * 2 + 1, Math.random()]),
+      thought_paths: [[]],
+      patterns: [],
+      stats: { active_blocks: 100 },
+      instance_id: 'SAMPLE-DATA',
+      version: '0.4.0'
+    };
+    console.log('Sample data loaded, booting...');
+    boot();
+  }
+
   autoLoad();
 
   document.getElementById('fileInput').addEventListener('change', (ev) => {

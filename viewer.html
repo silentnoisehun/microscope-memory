@@ -287,17 +287,9 @@ canvas { display: block; }
   }
 
   async function autoLoad() {
-    try {
-      const resp = await fetch('cognitive_map.bin');
-      if (!resp.ok) throw new Error(resp.statusText);
-      const buffer = await resp.arrayBuffer();
-      data = parseViz1(buffer);
-      boot();
-    } catch (e) {
-      console.error(e);
-      document.getElementById('loadError').textContent = 'Binary VIZ1 Load Failed: ' + e.message;
-      document.getElementById('loadError').style.display = 'block';
-    }
+    // Skip auto-loading to avoid CORS issues with file:// protocol
+    // Users can manually select files using the file input
+    console.log('Auto-load skipped - use file input to load cognitive_map.bin');
   }
   autoLoad();
 

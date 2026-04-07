@@ -109,11 +109,14 @@ pub enum Cmd {
         #[arg(help = "Block index")]
         block_index: usize,
     },
-    /// Start the HTTP server
-    Serve {
-        #[arg(short, long, default_value_t = 6060)]
-        port: u16,
+    /// Sequential Thinking — Chain-of-Thought memory sequence
+    Think {
+        query: String,
+        #[arg(default_value = "5")]
+        max_steps: usize,
     },
+    /// Start the Binary Spine IPC listener (Zero JSON)
+    Spine,
     /// MQL query (Microscope Query Language)
     Query {
         /// MQL expression, e.g. 'layer:long_term depth:2..5 "Ora"'
@@ -177,10 +180,10 @@ pub enum Cmd {
         #[arg(default_value = "10")]
         k: usize,
     },
-    /// Export 3D visualization snapshot (JSON)
+    /// Export 3D visualization snapshot (Binary)
     Viz {
-        /// Output file path (default: viz.json)
-        #[arg(default_value = "viz.json")]
+        /// Output file path (default: viz.bin)
+        #[arg(default_value = "viz.bin")]
         output: String,
     },
     /// Export binary density map for fast rendering
@@ -192,8 +195,7 @@ pub enum Cmd {
         #[arg(short, long, default_value = "32")]
         grid: u16,
     },
-    /// Start native MCP server (JSON-RPC 2.0 over stdio)
-    Mcp,
+
     /// Show thought patterns (crystallized recall sequences)
     Patterns {
         #[arg(default_value = "10")]
@@ -227,8 +229,8 @@ pub enum Cmd {
     Modalities,
     /// Export full cognitive map (all 13 layers) as JSON for Three.js viewer
     CognitiveMap {
-        /// Output file path (default: cognitive_map.json)
-        #[arg(default_value = "cognitive_map.json")]
+        /// Output file path (default: cognitive_map.bin)
+        #[arg(default_value = "cognitive_map.bin")]
         output: String,
     },
     /// Store structured data (key=value pairs)
@@ -237,5 +239,16 @@ pub enum Cmd {
         pairs: Vec<String>,
         #[arg(short = 'i', long, default_value = "5")]
         importance: u8,
+    },
+    /// Initialize a demo dataset and configuration for quickstart
+    InitDemo {
+        /// Force overwrite existing layers/demo.txt
+        #[arg(long)]
+        force: bool,
+    },
+    /// Start a local HTTP server for the 3D Viewer (viewer.html)
+    Serve {
+        #[arg(short, long, default_value = "8080")]
+        port: u16,
     },
 }

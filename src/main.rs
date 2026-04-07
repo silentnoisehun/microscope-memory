@@ -1,4 +1,4 @@
-﻿//! Microscope Memory â€” zoom-based hierarchical memory
+//! Microscope Memory â€” zoom-based hierarchical memory
 //!
 //! ZERO JSON. Pure binary. mmap. Sub-microsecond.
 //!
@@ -13,7 +13,7 @@
 //!   microscope-mem look 0.25 0.25 0.25 3    # x y z zoom
 //!   microscope-mem bench                    # speed test
 //!   microscope-mem stats                    # structure info
-//!   microscope-mem find "Ora"               # text search
+//!   microscope-mem find "memory"             # text search
 //!   microscope-mem embed "query"            # semantic search with embeddings
 //!   microscope-mem serve                    # Start the unified endpoint server (TCP/HTTP)
 
@@ -132,14 +132,11 @@ fn recall(config: &Config, query: &str, k: usize) {
 
     // â”€â”€â”€ Attention: compute layer weights from context â”€â”€
     let output_dir_att = Path::new(&config.paths.output_dir);
-    let mut attention =
-        microscope_memory::attention::AttentionState::load_or_init(output_dir_att);
+    let mut attention = microscope_memory::attention::AttentionState::load_or_init(output_dir_att);
     let hebb_pre =
         microscope_memory::hebbian::HebbianState::load_or_init(output_dir_att, reader.block_count);
-    let tg_pre =
-        microscope_memory::thought_graph::ThoughtGraphState::load_or_init(output_dir_att);
-    let pc_pre =
-        microscope_memory::predictive_cache::PredictiveCache::load_or_init(output_dir_att);
+    let tg_pre = microscope_memory::thought_graph::ThoughtGraphState::load_or_init(output_dir_att);
+    let pc_pre = microscope_memory::predictive_cache::PredictiveCache::load_or_init(output_dir_att);
 
     let emotional_energy = microscope_memory::emotional::emotional_field(&reader, &hebb_pre)
         .map(|f| f.total_energy)
@@ -236,9 +233,9 @@ fn recall(config: &Config, query: &str, k: usize) {
 
     // Check predictive cache â€” instant boost from pre-fetched blocks (scaled by attention)
     if let Some((cached_blocks, confidence)) = pred_cache.check(qh_tg) {
-        let boost = confidence * microscope_memory::thought_graph::PATTERN_BOOST_WEIGHT * attn.weight(6);
-        let cached_set: std::collections::HashSet<u32> =
-            cached_blocks.iter().copied().collect();
+        let boost =
+            confidence * microscope_memory::thought_graph::PATTERN_BOOST_WEIGHT * attn.weight(6);
+        let cached_set: std::collections::HashSet<u32> = cached_blocks.iter().copied().collect();
         for (dist, idx, is_main) in &mut all_results {
             if *is_main && cached_set.contains(&(*idx as u32)) {
                 *dist = (*dist - boost).max(0.0);
@@ -253,10 +250,8 @@ fn recall(config: &Config, query: &str, k: usize) {
     }
 
     // Pattern boost from ThoughtGraph
-    let pattern_boosts: std::collections::HashMap<u32, f32> = thought_graph
-        .pattern_boost(qh_tg)
-        .into_iter()
-        .collect();
+    let pattern_boosts: std::collections::HashMap<u32, f32> =
+        thought_graph.pattern_boost(qh_tg).into_iter().collect();
     if !pattern_boosts.is_empty() {
         let tg_scale = attn.weight(5); // ThoughtGraph attention weight
         for (dist, idx, is_main) in &mut all_results {
@@ -330,7 +325,8 @@ fn recall(config: &Config, query: &str, k: usize) {
 
         // Archetype: reinforce + temporal tracking
         let mut archetypes = microscope_memory::archetype::ArchetypeState::load_or_init(output_dir);
-        let mut temporal = microscope_memory::temporal_archetype::TemporalArchetypeState::load_or_init(output_dir);
+        let mut temporal =
+            microscope_memory::temporal_archetype::TemporalArchetypeState::load_or_init(output_dir);
         if let Some((idx, score)) = archetypes.match_archetype(&activated) {
             let arch_id = archetypes.archetypes[idx].id;
             let time_boost = temporal.boost(arch_id);
@@ -366,10 +362,7 @@ fn recall(config: &Config, query: &str, k: usize) {
                 "partial" => "~".yellow(),
                 _ => "-".red(),
             };
-            println!(
-                "  {} prediction {} (overlap={})",
-                symbol, hit_type, overlap
-            );
+            println!("  {} prediction {} (overlap={})", symbol, hit_type, overlap);
         }
         pred_cache.predict_next(&thought_graph);
 
@@ -810,7 +803,76 @@ fn merkle_proof(config: &Config, block_index: usize) {
     }
 }
 
+fn serve_viewer(port: u16) {
+    use std::net::TcpListener;
+    use std::io::{BufRead, Write};
+
+    let addr = format!("127.0.0.1:{}", port);
+    let listener = match TcpListener::bind(&addr) {
+        Ok(l) => l,
+        Err(e) => { eprintln!("  {} Cannot bind to {}: {}", "ERROR:".red(), addr, e); return; }
+    };
+
+    println!("{} http://{}", "SERVE".cyan().bold(), addr);
+    println!("  Open your browser: {}", format!("http://localhost:{}/viewer.html", port).green());
+    println!("  Press Ctrl+C to stop.\n");
+
+    let html_path = std::env::current_dir().unwrap().join("viewer.html");
+    let bin_path  = std::env::current_dir().unwrap().join("cognitive_map.bin");
+
+    for stream in listener.incoming() {
+        let mut stream = match stream { Ok(s) => s, Err(_) => continue };
+        let mut reader = std::io::BufReader::new(&stream);
+        let mut request_line = String::new();
+        let _ = reader.read_line(&mut request_line);
+
+        let path = request_line.split_whitespace().nth(1).unwrap_or("/").to_string();
+
+        let (status, content_type, body): (&str, &str, Vec<u8>) = if path == "/viewer.html" || path == "/" {
+            match fs::read(&html_path) {
+                Ok(b) => ("200 OK", "text/html; charset=utf-8", b),
+                Err(_) => ("404 Not Found", "text/plain", b"viewer.html not found. Run 'cognitive-map' first.".to_vec()),
+            }
+        } else if path == "/cognitive_map.bin" {
+            match fs::read(&bin_path) {
+                Ok(b) => ("200 OK", "application/octet-stream", b),
+                Err(_) => ("404 Not Found", "text/plain", b"cognitive_map.bin not found. Run 'cognitive-map' first.".to_vec()),
+            }
+        } else {
+            ("404 Not Found", "text/plain", b"Not found".to_vec())
+        };
+
+        let header = format!("HTTP/1.1 {}\r\nContent-Type: {}\r\nContent-Length: {}\r\nAccess-Control-Allow-Origin: *\r\n\r\n", status, content_type, body.len());
+        let _ = stream.write_all(header.as_bytes());
+        let _ = stream.write_all(&body);
+    }
+}
+
 // â”€â”€â”€ MAIN â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+fn init_demo(config: &Config, force: bool) -> Result<(), String> {
+    let layers_dir = Path::new(&config.paths.layers_dir);
+    if !layers_dir.exists() {
+        fs::create_dir_all(layers_dir).map_err(|e| e.to_string())?;
+    }
+
+    let demo_path = layers_dir.join("demo.txt");
+    if demo_path.exists() && !force {
+        return Err("layers/demo.txt already exists. Use --force to overwrite.".to_string());
+    }
+
+    let demo_content = include_str!("../layers/demo.txt");
+    fs::write(&demo_path, demo_content).map_err(|e| e.to_string())?;
+
+    println!("{}", "Demo dataset initialized.".green().bold());
+    println!("  -> Created {}", demo_path.display());
+    println!("\nNext steps:");
+    println!("  1. {} build        # Build the binary index", "microscope-mem".cyan());
+    println!("  2. {} cognitive-map # Export 3D visualization", "microscope-mem".cyan());
+    println!("  3. {} serve         # Open 3D viewer in browser", "microscope-mem".cyan());
+    
+    Ok(())
+}
 
 fn main() {
     let cli = Cli::parse();
@@ -821,6 +883,14 @@ fn main() {
     });
 
     match cli.cmd {
+        Cmd::Serve { port } => {
+            serve_viewer(port);
+        }
+        Cmd::InitDemo { force } => {
+            if let Err(e) = init_demo(&config, force) {
+                eprintln!("  {} {}", "ERROR:".red(), e);
+            }
+        }
         Cmd::Build { force } => {
             microscope_memory::build::build(&config, force).expect("build failed");
         }
@@ -1150,8 +1220,19 @@ fn main() {
         Cmd::Proof { block_index } => {
             merkle_proof(&config, block_index);
         }
-        Cmd::Serve { port } => {
-            microscope_memory::streaming::start_endpoint_server(config, port);
+        Cmd::Think { query, max_steps } => {
+            let reader = open_reader(&config);
+            let mut chain = microscope_memory::sequential_thinking::ThinkingChain::new(max_steps);
+            chain.brainstorm(&reader, &config, &query);
+            println!("\n{}", "SEQUENTIAL THINKING RESULT:".cyan().bold());
+            chain.display();
+        }
+        Cmd::Spine => {
+            println!("{}", "SPINE IPC LISTENER (Zero JSON)".magenta().bold());
+            println!("  Status: ACTIVE (Waiting for AtomicSpine mmap signals)");
+            println!("  Protocol: Pure Binary / C-Struct");
+            // Placeholder: Here we would loop and watch the mmap ring buffer
+            std::thread::park();
         }
         Cmd::Query { mql } => {
             let t0 = Instant::now();
@@ -1537,10 +1618,18 @@ fn main() {
             let mirror = microscope_memory::mirror::MirrorState::load_or_init(output_dir);
             let _resonance = microscope_memory::resonance::ResonanceState::load_or_init(output_dir);
             let archetypes = microscope_memory::archetype::ArchetypeState::load_or_init(output_dir);
-            let thought_graph = microscope_memory::thought_graph::ThoughtGraphState::load_or_init(output_dir);
+            let thought_graph =
+                microscope_memory::thought_graph::ThoughtGraphState::load_or_init(output_dir);
 
             let dest = Path::new(&output);
-            microscope_memory::viz::export_to_file(output_dir, &reader, &hebb, &mirror, &thought_graph, dest)
+            microscope_memory::viz::export_to_file(
+                output_dir,
+                &reader,
+                &hebb,
+                &mirror,
+                &thought_graph,
+                dest,
+            )
             .expect("export viz");
 
             let hebb_stats = hebb.stats();
@@ -1578,9 +1667,6 @@ fn main() {
                 data.len(),
                 output
             );
-        }
-        Cmd::Mcp => {
-            microscope_memory::mcp::run(config);
         }
 
         Cmd::Patterns { k } => {
@@ -1701,7 +1787,9 @@ fn main() {
             );
 
             if temporal.profiles.is_empty() {
-                println!("  (no temporal data yet â€” recall with archetype matches to build profiles)");
+                println!(
+                    "  (no temporal data yet â€” recall with archetype matches to build profiles)"
+                );
             } else {
                 for p in &temporal.profiles {
                     let dominant = p
@@ -1712,8 +1800,9 @@ fn main() {
                         "\n  Archetype #{} (total={}, dominant={})",
                         p.archetype_id, p.total_activations, dominant
                     );
-                    for (i, label) in
-                        microscope_memory::temporal_archetype::WINDOW_LABELS.iter().enumerate()
+                    for (i, label) in microscope_memory::temporal_archetype::WINDOW_LABELS
+                        .iter()
+                        .enumerate()
                     {
                         let bar_len = (p.window_weights[i] * 5.0) as usize;
                         let bar: String = "â–".repeat(bar_len);
@@ -1729,8 +1818,7 @@ fn main() {
 
         Cmd::Attention => {
             let output_dir = Path::new(&config.paths.output_dir);
-            let attn_state =
-                microscope_memory::attention::AttentionState::load_or_init(output_dir);
+            let attn_state = microscope_memory::attention::AttentionState::load_or_init(output_dir);
             println!("{}", "ATTENTION".cyan().bold());
             println!(
                 "  total_recalls={} history={}",
@@ -1785,7 +1873,8 @@ fn main() {
             println!("{}", "DREAM CONSOLIDATION".cyan().bold());
             match microscope_memory::dream::dream_consolidate(output_dir, reader.block_count) {
                 Ok(cycle) => {
-                    let mut dream_state = microscope_memory::dream::DreamState::load_or_init(output_dir);
+                    let mut dream_state =
+                        microscope_memory::dream::DreamState::load_or_init(output_dir);
                     dream_state.last_dream_ms = cycle.timestamp_ms;
                     dream_state.cycles.push(cycle.clone());
                     if dream_state.cycles.len() > 200 {
@@ -1793,12 +1882,18 @@ fn main() {
                     }
                     let _ = dream_state.save(output_dir);
                     println!("  Duration:      {} ms", cycle.duration_ms);
-                    println!("  Replayed:      {} fingerprints", cycle.replayed_fingerprints);
+                    println!(
+                        "  Replayed:      {} fingerprints",
+                        cycle.replayed_fingerprints
+                    );
                     println!("  Strengthened:  {} pairs", cycle.strengthened_pairs);
                     println!("  Pruned pairs:  {}", cycle.pruned_pairs);
                     println!("  Pruned blocks: {}", cycle.pruned_activations);
                     println!("  Patterns:      +{}", cycle.consolidated_patterns);
-                    println!("  Energy:        {:.1} â†’ {:.1}", cycle.energy_before, cycle.energy_after);
+                    println!(
+                        "  Energy:        {:.1} â†’ {:.1}",
+                        cycle.energy_before, cycle.energy_after
+                    );
                 }
                 Err(e) => println!("{} {}", "ERROR:".red(), e),
             }
@@ -1809,27 +1904,50 @@ fn main() {
             let stats = state.stats();
             println!("{}", "DREAM LOG".cyan().bold());
             println!("  Total cycles:  {}", stats.total_cycles);
-            println!("  Total pruned:  {} pairs, {} activations", stats.total_pruned_pairs, stats.total_pruned_activations);
+            println!(
+                "  Total pruned:  {} pairs, {} activations",
+                stats.total_pruned_pairs, stats.total_pruned_activations
+            );
             println!("  Total strengthened: {} pairs", stats.total_strengthened);
             println!("  Total replayed: {} fingerprints", stats.total_replayed);
             if !state.cycles.is_empty() {
                 println!("\n  Recent cycles:");
-                let start = if state.cycles.len() > k { state.cycles.len() - k } else { 0 };
+                let start = if state.cycles.len() > k {
+                    state.cycles.len() - k
+                } else {
+                    0
+                };
                 for cycle in &state.cycles[start..] {
-                    println!("    {} â€” {}ms, replayed={}, strengthened={}, pruned={}+{}, patterns=+{}",
-                        cycle.timestamp_ms, cycle.duration_ms,
-                        cycle.replayed_fingerprints, cycle.strengthened_pairs,
-                        cycle.pruned_pairs, cycle.pruned_activations, cycle.consolidated_patterns);
+                    println!(
+                        "    {} â€” {}ms, replayed={}, strengthened={}, pruned={}+{}, patterns=+{}",
+                        cycle.timestamp_ms,
+                        cycle.duration_ms,
+                        cycle.replayed_fingerprints,
+                        cycle.strengthened_pairs,
+                        cycle.pruned_pairs,
+                        cycle.pruned_activations,
+                        cycle.consolidated_patterns
+                    );
                 }
             }
         }
         Cmd::EmotionalField => {
             let output_dir = Path::new(&config.paths.output_dir);
-            let state = microscope_memory::emotional_contagion::EmotionalContagionState::load_or_init(output_dir);
+            let state =
+                microscope_memory::emotional_contagion::EmotionalContagionState::load_or_init(
+                    output_dir,
+                );
             let stats = state.stats();
             println!("{}", "EMOTIONAL FIELD".cyan().bold());
             println!("  Instance ID:  {:016x}", stats.instance_id);
-            println!("  Local field:  {}", if stats.has_local { "active" } else { "inactive" });
+            println!(
+                "  Local field:  {}",
+                if stats.has_local {
+                    "active"
+                } else {
+                    "inactive"
+                }
+            );
             println!("  Local energy: {:.2}", stats.local_energy);
             println!("  Local valence: {:.2}", stats.local_valence);
             println!("  Remote fields: {}", stats.remote_count);
@@ -1841,13 +1959,21 @@ fn main() {
         Cmd::EmotionalExchange => {
             let output_dir = Path::new(&config.paths.output_dir);
             let reader = open_reader(&config);
-            let hebb = microscope_memory::hebbian::HebbianState::load_or_init(output_dir, reader.block_count);
-            let mut local = microscope_memory::emotional_contagion::EmotionalContagionState::load_or_init(output_dir);
+            let hebb = microscope_memory::hebbian::HebbianState::load_or_init(
+                output_dir,
+                reader.block_count,
+            );
+            let mut local =
+                microscope_memory::emotional_contagion::EmotionalContagionState::load_or_init(
+                    output_dir,
+                );
             local.capture_local(&reader, &hebb);
 
             let mut exchanged = 0usize;
             for idx_config in &config.federation.indices {
-                if let Ok(idx_cfg) = microscope_memory::config::Config::load(&idx_config.config_path) {
+                if let Ok(idx_cfg) =
+                    microscope_memory::config::Config::load(&idx_config.config_path)
+                {
                     let idx_dir = Path::new(&idx_cfg.paths.output_dir);
                     let mut remote = microscope_memory::emotional_contagion::EmotionalContagionState::load_or_init(idx_dir);
 
@@ -1870,7 +1996,11 @@ fn main() {
             }
 
             let _ = local.save(output_dir);
-            println!("{} exchanged {} emotional snapshots", "EMOTIONAL EXCHANGE".cyan().bold(), exchanged);
+            println!(
+                "{} exchanged {} emotional snapshots",
+                "EMOTIONAL EXCHANGE".cyan().bold(),
+                exchanged
+            );
         }
         Cmd::Modalities => {
             let output_dir = Path::new(&config.paths.output_dir);
@@ -1892,8 +2022,10 @@ fn main() {
             );
             let mirror = microscope_memory::mirror::MirrorState::load_or_init(output_dir);
             let _resonance = microscope_memory::resonance::ResonanceState::load_or_init(output_dir);
-            let _archetypes = microscope_memory::archetype::ArchetypeState::load_or_init(output_dir);
-            let _thought_graph = microscope_memory::thought_graph::ThoughtGraphState::load_or_init(output_dir);
+            let _archetypes =
+                microscope_memory::archetype::ArchetypeState::load_or_init(output_dir);
+            let _thought_graph =
+                microscope_memory::thought_graph::ThoughtGraphState::load_or_init(output_dir);
             let thought_graph =
                 microscope_memory::thought_graph::ThoughtGraphState::load_or_init(output_dir);
             let _pred_cache =
@@ -1902,8 +2034,7 @@ fn main() {
                 microscope_memory::temporal_archetype::TemporalArchetypeState::load_or_init(
                     output_dir,
                 );
-            let _attention =
-                microscope_memory::attention::AttentionState::load_or_init(output_dir);
+            let _attention = microscope_memory::attention::AttentionState::load_or_init(output_dir);
             let _dream = microscope_memory::dream::DreamState::load_or_init(output_dir);
             let _emotional =
                 microscope_memory::emotional_contagion::EmotionalContagionState::load_or_init(
@@ -1913,12 +2044,17 @@ fn main() {
                 microscope_memory::multimodal::ModalityIndex::load_or_init(output_dir);
 
             let dest = Path::new(&output);
-            microscope_memory::viz::export_to_file(output_dir, &reader, &hebb, &mirror, &thought_graph, dest)
+            microscope_memory::viz::export_to_file(
+                output_dir,
+                &reader,
+                &hebb,
+                &mirror,
+                &thought_graph,
+                dest,
+            )
             .expect("export BINARY VIZ");
 
-            let file_size = std::fs::metadata(dest)
-                .map(|m| m.len())
-                .unwrap_or(0);
+            let file_size = std::fs::metadata(dest).map(|m| m.len()).unwrap_or(0);
             println!(
                 "{} 13-layer BINARY VIZ â†’ {} ({} bytes)",
                 "BINARY VIZ".cyan().bold(),
@@ -1926,36 +2062,27 @@ fn main() {
                 file_size
             );
 
-            // Copy viewer.html next to the JSON and open in browser
-            let json_dir = dest.parent().unwrap_or(Path::new("."));
+            // Copy viewer.html and cognitive_map.bin to current dir and start HTTP server
             let viewer_src = Path::new(env!("CARGO_MANIFEST_DIR")).join("viewer.html");
-            let viewer_dst = json_dir.join("viewer.html");
+            let current_dir =
+                std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
+            let viewer_dst = current_dir.join("viewer.html");
+            let bin_dst = current_dir.join("cognitive_map.bin");
+
+            // Copy files to current dir
             if viewer_src.exists() {
                 let _ = std::fs::copy(&viewer_src, &viewer_dst);
             }
-            if viewer_dst.exists() {
+            if dest.exists() {
+                let _ = std::fs::copy(dest, &bin_dst);
+            }
+
+            if viewer_dst.exists() && bin_dst.exists() {
+                // Start HTTP server from the current directory
                 println!(
-                    "{}",
-                    "Opening viewer in browser...".green()
+                    "{} Binary visualization exported. (Zero JSON: No web server started)",
+                    "INFO".cyan().bold()
                 );
-                #[cfg(target_os = "windows")]
-                {
-                    let _ = std::process::Command::new("cmd")
-                        .args(["/C", "start", "", &viewer_dst.display().to_string()])
-                        .spawn();
-                }
-                #[cfg(target_os = "macos")]
-                {
-                    let _ = std::process::Command::new("open")
-                        .arg(&viewer_dst)
-                        .spawn();
-                }
-                #[cfg(target_os = "linux")]
-                {
-                    let _ = std::process::Command::new("xdg-open")
-                        .arg(&viewer_dst)
-                        .spawn();
-                }
             }
         }
         Cmd::StoreData { pairs, importance } => {
@@ -1981,21 +2108,36 @@ fn main() {
             }
 
             // Create text representation and store as memory
-            let text_repr: String = fields.iter().map(|(k, v)| format!("DAT:{}={:?}", k, v)).collect::<Vec<_>>().join(" ");
-            let text_short = if text_repr.len() > 200 { &text_repr[..200] } else { &text_repr };
+            let text_repr: String = fields
+                .iter()
+                .map(|(k, v)| format!("DAT:{}={:?}", k, v))
+                .collect::<Vec<_>>()
+                .join(" ");
+            let text_short = if text_repr.len() > 200 {
+                &text_repr[..200]
+            } else {
+                &text_repr
+            };
             let _ = store_memory(&config, text_short, "rust_state", importance);
 
             // Register in multimodal index
             let mut index = microscope_memory::multimodal::ModalityIndex::load_or_init(output_dir);
             let block_idx = index.entries.len() as u32 + 1_000_000; // virtual idx for append entries
-            index.register(block_idx, microscope_memory::multimodal::Modality::Structured(
-                microscope_memory::multimodal::StructuredMeta { fields: fields.clone() }
-            ));
+            index.register(
+                block_idx,
+                microscope_memory::multimodal::Modality::Structured(
+                    microscope_memory::multimodal::StructuredMeta {
+                        fields: fields.clone(),
+                    },
+                ),
+            );
             let _ = index.save(output_dir);
 
-            println!("{} stored {} fields as structured data", "STORE-DATA".green().bold(), fields.len());
+            println!(
+                "{} stored {} fields as structured data",
+                "STORE-DATA".green().bold(),
+                fields.len()
+            );
         }
     }
 }
-
-

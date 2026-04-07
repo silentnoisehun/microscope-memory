@@ -371,11 +371,8 @@ pub fn compute_spectral_fingerprint(samples: &[f32], _sample_rate: u32) -> [u8; 
     for (i, fp_byte) in fingerprint.iter_mut().enumerate() {
         let start = i * band_size;
         let end = ((i + 1) * band_size).min(samples.len());
-        let energy: f32 = samples[start..end]
-            .iter()
-            .map(|s| s * s)
-            .sum::<f32>()
-            / (end - start) as f32;
+        let energy: f32 =
+            samples[start..end].iter().map(|s| s * s).sum::<f32>() / (end - start) as f32;
         *fp_byte = (energy.sqrt() * 255.0).clamp(0.0, 255.0) as u8;
     }
     fingerprint
@@ -391,9 +388,21 @@ pub fn hamming_distance(a: &[u8], b: &[u8]) -> u32 {
 
 /// Spectral similarity: normalized dot product of fingerprints.
 fn spectral_similarity(a: &[u8; 16], b: &[u8; 16]) -> f32 {
-    let dot: u32 = a.iter().zip(b.iter()).map(|(&x, &y)| x as u32 * y as u32).sum();
-    let mag_a: f32 = a.iter().map(|&x| (x as f32) * (x as f32)).sum::<f32>().sqrt();
-    let mag_b: f32 = b.iter().map(|&x| (x as f32) * (x as f32)).sum::<f32>().sqrt();
+    let dot: u32 = a
+        .iter()
+        .zip(b.iter())
+        .map(|(&x, &y)| x as u32 * y as u32)
+        .sum();
+    let mag_a: f32 = a
+        .iter()
+        .map(|&x| (x as f32) * (x as f32))
+        .sum::<f32>()
+        .sqrt();
+    let mag_b: f32 = b
+        .iter()
+        .map(|&x| (x as f32) * (x as f32))
+        .sum::<f32>()
+        .sqrt();
     if mag_a < 0.001 || mag_b < 0.001 {
         return 0.0;
     }

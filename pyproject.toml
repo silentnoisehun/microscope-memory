@@ -1,0 +1,25 @@
+[build-system]
+requires = ["maturin>=1.5,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "microscope-memory"
+version = "0.6.0"
+description = "Pure binary cognitive memory engine. Zero-JSON, mmap-based, hierarchical memory architecture."
+authors = [{name = "Microscope Contributors"}]
+readme = "README.md"
+requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Rust",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Programming Language :: Python :: Implementation :: PyPy",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+[project.urls]
+Homepage = "https://github.com/silentnoisehun/microscope-memory"
+Repository = "https://github.com/silentnoisehun/microscope-memory"
+
+[tool.maturin]
+features = ["python"]
+module-name = "microscope_memory"

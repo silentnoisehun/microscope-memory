@@ -153,10 +153,25 @@ fn default_weight() -> f32 {
 }
 
 impl Config {
+    /// Zero-JSON/Zero-TOML loader: reads config.bin via mmap or returns Default.
     pub fn load<P: AsRef<Path>>(path: P) -> Result<Self, Box<dyn std::error::Error>> {
-        let content = fs::read_to_string(path)?;
-        let config: Config = toml::from_str(&content)?;
+        if !path.as_ref().exists() {
+            return Ok(Self::default());
+        }
+
+        let file = fs::File::open(path)?;
+        // Safety: config.bin is read-only and mapped for the duration of this call
+        let mmap = unsafe { memmap2::Mmap::map(&file)? };
+
+        let config: Config = bincode::deserialize(&mmap)?;
         Ok(config)
+    }
+
+    /// Saves the current config to a binary mmap-ready format.
+    pub fn save<P: AsRef<Path>>(&self, path: P) -> Result<(), Box<dyn std::error::Error>> {
+        let bytes = bincode::serialize(self)?;
+        fs::write(path, bytes)?;
+        Ok(())
     }
 }
 
@@ -164,9 +179,9 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             paths: Paths {
-                layers_dir: "D:/Claude Memory/layers".to_string(),
-                output_dir: "D:/Claude Memory/microscope".to_string(),
-                temp_dir: "tmp/microscope".to_string(),
+                layers_dir: "./layers".to_string(),
+                output_dir: "./data".to_string(),
+                temp_dir: "./tmp".to_string(),
             },
             index: Index {
                 block_size: 256,

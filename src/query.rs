@@ -10,7 +10,7 @@
 //!   "foo" OR "bar"                → either keyword matches
 //!   limit:20                      → override default k
 //!
-//! Filters compose: `layer:long_term depth:3..5 "Ora" AND "memory"`
+//! Filters compose: `layer:long_term depth:3..5 "memory" AND "high_level"`
 
 use crate::{AppendEntry, MicroscopeReader, LAYER_NAMES};
 
@@ -278,10 +278,10 @@ mod tests {
 
     #[test]
     fn test_parse_filters() {
-        let q = parse("layer:long_term depth:2..5 \"Ora\"");
+        let q = parse("layer:long_term depth:2..5 \"memory\"");
         assert_eq!(q.layer_filter, Some(1)); // long_term = index 1
         assert_eq!(q.depth_filter, Some((2, 5)));
-        assert_eq!(q.keywords, vec!["ora"]);
+        assert_eq!(q.keywords, vec!["memory"]);
     }
 
     #[test]

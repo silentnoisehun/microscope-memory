@@ -1,6 +1,4 @@
-//! Build pipeline: layers/ → binary microscope format.
-//!
-//! Extracts text from JSON layer files, constructs a 9-depth block hierarchy
+//! Extracts text from RAW TEXT layer files, constructs a 9-depth block hierarchy
 //! (identity → layers → clusters → items → sentences → tokens → syllables → chars → bytes),
 //! and writes the binary output files (microscope.bin, data.bin, meta.bin, merkle.bin, embeddings.bin).
 
@@ -15,7 +13,7 @@ use colored::Colorize;
 use rayon::prelude::*;
 use sha2::{Digest, Sha256};
 use std::fs;
-use std::io::{BufRead, BufReader, BufWriter, Seek, Write};
+use std::io::{BufWriter, Seek, Write};
 use std::path::Path;
 
 // ─── Internal block for building ─────────────────────
@@ -30,107 +28,38 @@ struct RawBlock {
     child_count: u16,
 }
 
-// ─── Extract text values from minimal JSON parsing ───
-// Zero serde_json dependency for layer reading.
-// Layers are simple enough: arrays of objects or objects of objects.
-// We do line-by-line key extraction instead of full parse.
+// ─── Extract text values from RAW files ───────────────────
+// Zero JSON dependency. Standard UTF-8 text files.
+// Files are read and split into blocks by default.
 
 fn extract_texts_from_file(path: &Path) -> Vec<String> {
     let mut texts = Vec::new();
-    let file = match fs::File::open(path) {
-        Ok(f) => f,
+    let raw = match fs::read_to_string(path) {
+        Ok(s) => s,
         Err(_) => return texts,
     };
-    let reader = BufReader::new(file);
-    let _current_text = String::new();
-    let _in_content = false;
 
-    for line in reader.lines() {
-        let line = match line {
-            Ok(l) => l,
-            Err(_) => continue,
-        };
-        let trimmed = line.trim();
-
-        // Look for content-bearing keys
-        for key in &[
-            "\"content\":",
-            "\"text\":",
-            "\"content_summary\":",
-            "\"pattern\":",
-            "\"label\":",
-            "\"name\":",
-        ] {
-            if let Some(pos) = trimmed.find(key) {
-                let after = &trimmed[pos + key.len()..].trim_start();
-                if after.starts_with('"') {
-                    // Extract string value
-                    let val = extract_json_string(after);
-                    if val.len() > 3 {
-                        texts.push(val);
-                    }
-                }
-            }
-        }
-
-        // For response fields in echo_cache
-        if let Some(pos) = trimmed.find("\"response\":") {
-            let after = &trimmed[pos + 11..].trim_start();
-            if after.starts_with('"') {
-                let val = extract_json_string(after);
-                if val.len() > 3 {
-                    texts.push(val);
-                }
-            }
+    // Split by double newline or chunking
+    for chunk in raw.split("\n\n") {
+        let trimmed = chunk.trim();
+        if trimmed.len() > 3 {
+            texts.push(trimmed.to_string());
         }
     }
 
-    // If no structured content found, read raw and chunk
-    if texts.is_empty() {
-        if let Ok(raw) = fs::read_to_string(path) {
-            // Chunk the raw content
-            let chars: Vec<char> = raw.chars().collect();
-            for chunk in chars.chunks(BLOCK_DATA_SIZE) {
-                let s: String = chunk.iter().collect();
-                if s.trim().len() > 5 {
-                    texts.push(s);
-                }
+    // Fallback if no doubles: chunk by size
+    if texts.len() < 2 {
+        texts.clear();
+        let chars: Vec<char> = raw.chars().collect();
+        for chunk in chars.chunks(BLOCK_DATA_SIZE) {
+            let s: String = chunk.iter().collect();
+            if s.trim().len() > 5 {
+                texts.push(s);
             }
         }
     }
 
     texts
-}
-
-fn extract_json_string(s: &str) -> String {
-    // s starts with "
-    if !s.starts_with('"') {
-        return String::new();
-    }
-    let mut result = String::new();
-    let mut escape = false;
-    for ch in s[1..].chars() {
-        if escape {
-            match ch {
-                'n' => result.push('\n'),
-                't' => result.push('\t'),
-                '\\' => result.push('\\'),
-                '"' => result.push('"'),
-                _ => {
-                    result.push('\\');
-                    result.push(ch);
-                }
-            }
-            escape = false;
-        } else if ch == '\\' {
-            escape = true;
-        } else if ch == '"' {
-            break;
-        } else {
-            result.push(ch);
-        }
-    }
-    result
 }
 
 // ─── Split text into sentences ───────────────────────
@@ -158,7 +87,7 @@ pub fn compute_layers_hash(config: &Config) -> [u8; 32] {
     sorted_names.sort();
     let mut hasher = Sha256::new();
     for name in &sorted_names {
-        let path = layers_dir.join(format!("{}.json", name));
+        let path = layers_dir.join(format!("{}.txt", name));
         if let Ok(contents) = fs::read(&path) {
             hasher.update(&contents);
         }
@@ -207,7 +136,7 @@ pub fn build(config: &Config, force: bool) -> Result<(), String> {
     // Collect all raw texts per layer
     let mut layer_texts: Vec<(String, Vec<String>)> = Vec::new();
     for name in layer_files {
-        let path = layers_dir.join(format!("{}.json", name));
+        let path = layers_dir.join(format!("{}.txt", name));
         let texts = extract_texts_from_file(&path);
         println!("  {} {}: {} items", ">".green(), name, texts.len());
         layer_texts.push((name.clone(), texts));
@@ -216,7 +145,7 @@ pub fn build(config: &Config, force: bool) -> Result<(), String> {
     let mut blocks: Vec<RawBlock> = Vec::new();
 
     // ═══ DEPTH 0: Identity ═══
-    let identity = "Claude Memory: 8 reteg. Mate Robert (Silent) gepe. Ora = AI partner (Rust). Hullam-rezonancia, erzelmi frekvencia, kriogenikus rendszer.";
+    let identity = "Microscope Memory: 9-depth hierarchical cognitive engine. Binary mmap, sub-microsecond spatial search, Hebbian learning, Merkle integrity.";
     blocks.push(RawBlock {
         data: to_block(identity),
         depth: 0,

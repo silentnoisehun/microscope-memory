@@ -9,11 +9,12 @@ target/
 .DS_Store
 Thumbs.db
 
-# Microscope Data (binary data should not be in git)
+# Microscope Data (binary data and local indices should not be in git)
 *.bin
 *.zst
-output/
-layers/*.json
+*.idx
+data/
+layers/*
 !layers/.gitkeep
 
 # Generated viz/snapshot files
@@ -24,15 +25,16 @@ density.bin
 
 # Config (user specific)
 config.toml
+config.bin
 !config.example.toml
 
 # Logs and temp files
 *.log
-*.txt
 tmp/
 build_error*
 check_error*
 error_dump*
+bench_results/
 
 # Claude Code
 .claude/

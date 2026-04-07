@@ -1,14 +1,14 @@
-﻿//! Visualization export for Microscope Memory.
+//! Visualization export for Microscope Memory.
 //!
 //! ZERO JSON. Pure binary. mmap-ready.
 //! Format: VIZ1 + block_count:u32 + blocks:[VizBlock] + edge_count:u32 + edges:[u32;3]
 
-use std::path::Path;
-use std::io::Write;
 use crate::hebbian::HebbianState;
 use crate::mirror::MirrorState;
 use crate::reader::MicroscopeReader;
 use crate::thought_graph::ThoughtGraphState;
+use std::io::Write;
+use std::path::Path;
 
 /// Packed visualization block (32 bytes).
 #[repr(C, packed)]
@@ -36,7 +36,7 @@ pub fn export_binary_snapshot(
 ) -> Vec<u8> {
     let block_count = reader.block_count;
     let mut buf = Vec::with_capacity(12 + block_count * 32 + 200 * 12 + 5000);
-    
+
     // Header (4 bytes magic + 4 bytes block_count)
     buf.extend_from_slice(b"VIZ1");
     buf.extend_from_slice(&(block_count as u32).to_le_bytes());
@@ -51,20 +51,24 @@ pub fn export_binary_snapshot(
         } else {
             (0.0, 0.0, 0.0)
         };
-        
+
         let mirror_boost = mirror.boost_for(i as u32);
         let flags = if mirror_boost > 0.5 { 1 } else { 0 };
 
         let vb = VizBlock {
-            x: h.x, y: h.y, z: h.z,
-            dx, dy, dz,
+            x: h.x,
+            y: h.y,
+            z: h.z,
+            dx,
+            dy,
+            dz,
             energy,
             layer_id: h.layer_id,
             depth: h.depth,
             flags,
             padding: 0,
         };
-        
+
         let bytes: [u8; 32] = unsafe { std::mem::transmute(vb) };
         buf.extend_from_slice(&bytes);
     }
@@ -89,8 +93,8 @@ pub fn export_binary_snapshot(
     let top_patterns = thought_graph.top_patterns(20);
     buf.extend_from_slice(&(top_patterns.len() as u32).to_le_bytes());
     for p in top_patterns {
-        buf.extend_from_slice(&(p.id as u32).to_le_bytes());
-        buf.extend_from_slice(&(p.frequency as u32).to_le_bytes());
+        buf.extend_from_slice(&p.id.to_le_bytes());
+        buf.extend_from_slice(&p.frequency.to_le_bytes());
         buf.extend_from_slice(&p.strength.to_le_bytes());
         buf.extend_from_slice(&(p.sequence.len() as u8).to_le_bytes());
         for &h in p.sequence.iter().take(5) {
@@ -105,7 +109,7 @@ pub fn export_binary_snapshot(
     let mut pairs: Vec<_> = hebb.coactivations.values().collect();
     pairs.sort_by(|a, b| b.count.cmp(&a.count));
     pairs.truncate(200);
-    
+
     buf.extend_from_slice(&(pairs.len() as u32).to_le_bytes());
     for p in pairs {
         buf.extend_from_slice(&p.block_a.to_le_bytes());
@@ -126,7 +130,19 @@ pub fn export_to_file(
 ) -> Result<(), String> {
     let buf = export_binary_snapshot(reader, hebb, mirror, thought_graph);
     let mut file = std::fs::File::create(dest).map_err(|e| format!("create viz file: {}", e))?;
-    file.write_all(&buf).map_err(|e| format!("write viz file: {}", e))
+    file.write_all(&buf)
+        .map_err(|e| format!("write viz file: {}", e))
 }
-pub fn export_density_map(_hebb: &HebbianState, _headers: &[(f32, f32, f32)], _grid: u16) -> Vec<u8> { vec![] }
-pub fn layer_heatmap(_hebb: &HebbianState, _reader: &MicroscopeReader) -> std::collections::HashMap<String, f32> { std::collections::HashMap::new() }
+pub fn export_density_map(
+    _hebb: &HebbianState,
+    _headers: &[(f32, f32, f32)],
+    _grid: u16,
+) -> Vec<u8> {
+    vec![]
+}
+pub fn layer_heatmap(
+    _hebb: &HebbianState,
+    _reader: &MicroscopeReader,
+) -> std::collections::HashMap<String, f32> {
+    std::collections::HashMap::new()
+}

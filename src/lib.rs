@@ -14,16 +14,14 @@ pub mod emotional;
 pub mod federation;
 pub mod fingerprint;
 pub mod hebbian;
-#[cfg(not(target_arch = "wasm32"))]
-pub mod mcp;
+
 pub mod merkle;
 pub mod mirror;
 pub mod query;
 pub mod reader;
 pub mod resonance;
+pub mod sequential_thinking;
 pub mod snapshot;
-#[cfg(not(target_arch = "wasm32"))]
-pub mod streaming;
 
 pub mod dream;
 pub mod emotional_contagion;

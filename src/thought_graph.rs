@@ -123,7 +123,8 @@ impl ThoughtGraphState {
         let centroid_hash = if results.is_empty() {
             0u8
         } else {
-            let avg_idx = results.iter().map(|&(i, _)| i as u64).sum::<u64>() / results.len() as u64;
+            let avg_idx =
+                results.iter().map(|&(i, _)| i as u64).sum::<u64>() / results.len() as u64;
             (avg_idx & 0xFF) as u8
         };
 
@@ -200,11 +201,9 @@ impl ThoughtGraphState {
                 .collect();
 
             // Check if edges support this sequence (all transitions seen >= 2 times)
-            let edges_ok = seq.windows(2).all(|w| {
-                self.edges
-                    .get(&(w[0], w[1]))
-                    .is_some_and(|e| e.count >= 2)
-            });
+            let edges_ok = seq
+                .windows(2)
+                .all(|w| self.edges.get(&(w[0], w[1])).is_some_and(|e| e.count >= 2));
 
             if !edges_ok {
                 continue;
@@ -231,14 +230,14 @@ impl ThoughtGraphState {
         }
 
         // Evict weak patterns and enforce limit
-        self.patterns.retain(|p| p.strength >= 0.05 || p.frequency >= PATTERN_MIN_FREQ);
+        self.patterns
+            .retain(|p| p.strength >= 0.05 || p.frequency >= PATTERN_MIN_FREQ);
         if self.patterns.len() > MAX_PATTERNS {
-            self.patterns
-                .sort_by(|a, b| {
-                    let sa = a.strength * a.frequency as f32;
-                    let sb = b.strength * b.frequency as f32;
-                    sb.partial_cmp(&sa).unwrap()
-                });
+            self.patterns.sort_by(|a, b| {
+                let sa = a.strength * a.frequency as f32;
+                let sb = b.strength * b.frequency as f32;
+                sb.partial_cmp(&sa).unwrap()
+            });
             self.patterns.truncate(MAX_PATTERNS);
         }
     }
@@ -343,10 +342,7 @@ impl ThoughtGraphState {
             self.last_node_ts,
             self.next_pattern_id,
         )?;
-        save_patterns(
-            &output_dir.join("thought_patterns.bin"),
-            &self.patterns,
-        )?;
+        save_patterns(&output_dir.join("thought_patterns.bin"), &self.patterns)?;
         Ok(())
     }
 
@@ -382,10 +378,7 @@ impl ThoughtGraphState {
     pub fn recent_sessions(&self, n: usize) -> Vec<Vec<&ThoughtNode>> {
         let mut session_map: HashMap<u32, Vec<&ThoughtNode>> = HashMap::new();
         for node in &self.nodes {
-            session_map
-                .entry(node.session_id)
-                .or_default()
-                .push(node);
+            session_map.entry(node.session_id).or_default().push(node);
         }
 
         let mut session_ids: Vec<u32> = session_map.keys().cloned().collect();
@@ -409,7 +402,11 @@ impl ThoughtGraphState {
     /// Import patterns from a remote instance with trust weighting.
     pub fn import_patterns(&mut self, patterns: &[ThoughtPattern], trust: f32) {
         for remote in patterns {
-            if let Some(local) = self.patterns.iter_mut().find(|p| p.sequence == remote.sequence) {
+            if let Some(local) = self
+                .patterns
+                .iter_mut()
+                .find(|p| p.sequence == remote.sequence)
+            {
                 // Reinforce existing pattern
                 local.strength = (local.strength + remote.strength * trust * 0.3).min(5.0);
             } else {
@@ -478,25 +475,39 @@ fn save_graph(
     let mut buf = Vec::with_capacity(capacity);
 
     buf.write_all(b"THG1").map_err(|e| e.to_string())?;
-    buf.write_all(&session_id.to_le_bytes()).map_err(|e| e.to_string())?;
-    buf.write_all(&last_ts.to_le_bytes()).map_err(|e| e.to_string())?;
-    buf.write_all(&next_pid.to_le_bytes()).map_err(|e| e.to_string())?;
-    buf.write_all(&(nodes.len() as u32).to_le_bytes()).map_err(|e| e.to_string())?;
-    buf.write_all(&(edge_vec.len() as u32).to_le_bytes()).map_err(|e| e.to_string())?;
+    buf.write_all(&session_id.to_le_bytes())
+        .map_err(|e| e.to_string())?;
+    buf.write_all(&last_ts.to_le_bytes())
+        .map_err(|e| e.to_string())?;
+    buf.write_all(&next_pid.to_le_bytes())
+        .map_err(|e| e.to_string())?;
+    buf.write_all(&(nodes.len() as u32).to_le_bytes())
+        .map_err(|e| e.to_string())?;
+    buf.write_all(&(edge_vec.len() as u32).to_le_bytes())
+        .map_err(|e| e.to_string())?;
 
     for n in nodes {
-        buf.write_all(&n.timestamp_ms.to_le_bytes()).map_err(|e| e.to_string())?;
-        buf.write_all(&n.query_hash.to_le_bytes()).map_err(|e| e.to_string())?;
-        buf.write_all(&n.session_id.to_le_bytes()).map_err(|e| e.to_string())?;
-        buf.write_all(&n.result_count.to_le_bytes()).map_err(|e| e.to_string())?;
-        buf.write_all(&[n.dominant_layer, n.centroid_hash]).map_err(|e| e.to_string())?;
+        buf.write_all(&n.timestamp_ms.to_le_bytes())
+            .map_err(|e| e.to_string())?;
+        buf.write_all(&n.query_hash.to_le_bytes())
+            .map_err(|e| e.to_string())?;
+        buf.write_all(&n.session_id.to_le_bytes())
+            .map_err(|e| e.to_string())?;
+        buf.write_all(&n.result_count.to_le_bytes())
+            .map_err(|e| e.to_string())?;
+        buf.write_all(&[n.dominant_layer, n.centroid_hash])
+            .map_err(|e| e.to_string())?;
     }
 
     for e in &edge_vec {
-        buf.write_all(&e.from_hash.to_le_bytes()).map_err(|e| e.to_string())?;
-        buf.write_all(&e.to_hash.to_le_bytes()).map_err(|e| e.to_string())?;
-        buf.write_all(&e.count.to_le_bytes()).map_err(|e| e.to_string())?;
-        buf.write_all(&e.last_ms.to_le_bytes()).map_err(|e| e.to_string())?;
+        buf.write_all(&e.from_hash.to_le_bytes())
+            .map_err(|e| e.to_string())?;
+        buf.write_all(&e.to_hash.to_le_bytes())
+            .map_err(|e| e.to_string())?;
+        buf.write_all(&e.count.to_le_bytes())
+            .map_err(|e| e.to_string())?;
+        buf.write_all(&e.last_ms.to_le_bytes())
+            .map_err(|e| e.to_string())?;
     }
 
     fs::write(path, &buf).map_err(|e| e.to_string())
@@ -637,15 +648,19 @@ fn save_patterns(path: &Path, patterns: &[ThoughtPattern]) -> Result<(), String>
         .map_err(|e| e.to_string())?;
 
     for p in patterns {
-        buf.write_all(&p.id.to_le_bytes()).map_err(|e| e.to_string())?;
+        buf.write_all(&p.id.to_le_bytes())
+            .map_err(|e| e.to_string())?;
         buf.write_all(&(p.sequence.len() as u16).to_le_bytes())
             .map_err(|e| e.to_string())?;
         for &h in &p.sequence {
             buf.write_all(&h.to_le_bytes()).map_err(|e| e.to_string())?;
         }
-        buf.write_all(&p.frequency.to_le_bytes()).map_err(|e| e.to_string())?;
-        buf.write_all(&p.strength.to_le_bytes()).map_err(|e| e.to_string())?;
-        buf.write_all(&p.last_seen_ms.to_le_bytes()).map_err(|e| e.to_string())?;
+        buf.write_all(&p.frequency.to_le_bytes())
+            .map_err(|e| e.to_string())?;
+        buf.write_all(&p.strength.to_le_bytes())
+            .map_err(|e| e.to_string())?;
+        buf.write_all(&p.last_seen_ms.to_le_bytes())
+            .map_err(|e| e.to_string())?;
         buf.write_all(&(p.result_blocks.len() as u16).to_le_bytes())
             .map_err(|e| e.to_string())?;
         for &b in &p.result_blocks {

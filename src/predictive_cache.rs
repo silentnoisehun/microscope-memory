@@ -226,7 +226,8 @@ impl PredictiveCache {
                         continue;
                     }
 
-                    let confidence = pattern.strength * PATTERN_BOOST_WEIGHT
+                    let confidence = pattern.strength
+                        * PATTERN_BOOST_WEIGHT
                         * (prefix_len as f32 / seq.len() as f32);
 
                     let blocks: Vec<u32> = pattern

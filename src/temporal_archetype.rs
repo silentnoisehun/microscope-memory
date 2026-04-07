@@ -22,9 +22,8 @@ const MIN_ACTIVATIONS: u32 = 5;
 const PROFILE_BYTES: usize = 56; // 4 + 24 + 24 + 4
 
 /// Time window labels.
-pub const WINDOW_LABELS: [&str; TIME_WINDOWS] = [
-    "00-04", "04-08", "08-12", "12-16", "16-20", "20-24",
-];
+pub const WINDOW_LABELS: [&str; TIME_WINDOWS] =
+    ["00-04", "04-08", "08-12", "12-16", "16-20", "20-24"];
 
 // ─── TemporalProfile ────────────────────────────────
 
@@ -64,11 +63,7 @@ impl TemporalProfile {
         if self.total_activations < MIN_ACTIVATIONS {
             return 1.0; // neutral boost
         }
-        let max_weight = self
-            .window_weights
-            .iter()
-            .cloned()
-            .fold(0.0f32, f32::max);
+        let max_weight = self.window_weights.iter().cloned().fold(0.0f32, f32::max);
         if max_weight < 0.01 {
             return 1.0;
         }
@@ -136,10 +131,7 @@ impl TemporalArchetypeState {
 
     /// Save to binary.
     pub fn save(&self, output_dir: &Path) -> Result<(), String> {
-        save_temporal(
-            &output_dir.join("temporal_archetypes.bin"),
-            &self.profiles,
-        )
+        save_temporal(&output_dir.join("temporal_archetypes.bin"), &self.profiles)
     }
 }
 

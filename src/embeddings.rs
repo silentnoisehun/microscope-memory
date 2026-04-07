@@ -238,15 +238,23 @@ impl CandleEmbeddingProvider {
         }
         .map_err(|e| EmbeddingError::ApiError(format!("varbuilder: {}", e)))?;
 
-        // Load config
-        let config_path = repo
-            .get("config.json")
-            .map_err(|e| EmbeddingError::ApiError(format!("config download: {}", e)))?;
-        let config_str = std::fs::read_to_string(config_path)
-            .map_err(|e| EmbeddingError::ApiError(format!("config read: {}", e)))?;
-        let config: candle_transformers::models::bert::Config =
-            serde_json::from_str(&config_str)
-                .map_err(|e| EmbeddingError::ApiError(format!("config parse: {}", e)))?;
+        // Load config (Zero-JSON: hardcoded BERT-base-uncased defaults)
+        let config = candle_transformers::models::bert::Config {
+            vocab_size: 30522,
+            hidden_size: 768,
+            num_hidden_layers: 12,
+            num_attention_heads: 12,
+            intermediate_size: 3072,
+            hidden_act: candle_transformers::models::bert::Activation::Gelu,
+            hidden_dropout_prob: 0.1,
+            attention_probs_dropout_prob: 0.1,
+            max_position_embeddings: 512,
+            type_vocab_size: 2,
+            initializer_range: 0.02,
+            layer_norm_eps: 1e-12,
+            pad_token_id: 0,
+            model_type: Some("bert".to_string()),
+        };
         let dim = config.hidden_size;
 
         let model = candle_transformers::models::bert::BertModel::load(vb, &config)
@@ -311,113 +319,6 @@ impl CandleEmbeddingProvider {
 
 #[cfg(feature = "embeddings")]
 impl EmbeddingProvider for CandleEmbeddingProvider {
-    fn embed(&self, text: &str) -> Result<Vec<f32>, EmbeddingError> {
-        self.embed_inner(text)
-    }
-
-    fn embed_batch(&self, texts: &[String]) -> Result<Vec<Vec<f32>>, EmbeddingError> {
-        texts.iter().map(|t| self.embed_inner(t)).collect()
-    }
-
-    fn dimension(&self) -> usize {
-        self.dim
-    }
-}
-
-// ─── ONNX Runtime embedding provider ─────────────────
-#[cfg(feature = "onnx")]
-pub struct OnnxEmbeddingProvider {
-    session: ort::Session,
-    tokenizer: tokenizers::Tokenizer,
-    dim: usize,
-}
-
-#[cfg(feature = "onnx")]
-impl OnnxEmbeddingProvider {
-    pub fn new(model_path: &str, tokenizer_path: &str, dim: usize) -> Result<Self, EmbeddingError> {
-        let session = ort::Session::builder()
-            .and_then(|b| b.with_intra_threads(1))
-            .and_then(|b| b.commit_from_file(model_path))
-            .map_err(|e| EmbeddingError::ApiError(format!("ONNX session init: {}", e)))?;
-
-        let tokenizer = tokenizers::Tokenizer::from_file(tokenizer_path)
-            .map_err(|e| EmbeddingError::ApiError(format!("tokenizer load: {}", e)))?;
-
-        Ok(Self {
-            session,
-            tokenizer,
-            dim,
-        })
-    }
-
-    fn embed_inner(&self, text: &str) -> Result<Vec<f32>, EmbeddingError> {
-        let encoding = self
-            .tokenizer
-            .encode(text, true)
-            .map_err(|e| EmbeddingError::ApiError(format!("tokenize: {}", e)))?;
-
-        let ids: Vec<i64> = encoding.get_ids().iter().map(|&id| id as i64).collect();
-        let attention: Vec<i64> = encoding
-            .get_attention_mask()
-            .iter()
-            .map(|&m| m as i64)
-            .collect();
-        let type_ids: Vec<i64> = encoding.get_type_ids().iter().map(|&t| t as i64).collect();
-        let seq_len = ids.len();
-
-        let input_ids = ndarray::Array2::from_shape_vec((1, seq_len), ids)
-            .map_err(|e| EmbeddingError::ApiError(format!("input_ids shape: {}", e)))?;
-        let attention_mask = ndarray::Array2::from_shape_vec((1, seq_len), attention)
-            .map_err(|e| EmbeddingError::ApiError(format!("attention_mask shape: {}", e)))?;
-        let token_type_ids = ndarray::Array2::from_shape_vec((1, seq_len), type_ids)
-            .map_err(|e| EmbeddingError::ApiError(format!("token_type_ids shape: {}", e)))?;
-
-        let outputs = self
-            .session
-            .run(
-                ort::inputs![input_ids, attention_mask, token_type_ids]
-                    .map_err(|e| EmbeddingError::ApiError(format!("inputs: {}", e)))?,
-            )
-            .map_err(|e| EmbeddingError::ApiError(format!("ONNX run: {}", e)))?;
-
-        // Output shape: (1, seq_len, hidden_dim) — mean pool over seq_len
-        let output_tensor = outputs[0]
-            .try_extract_tensor::<f32>()
-            .map_err(|e| EmbeddingError::ApiError(format!("extract tensor: {}", e)))?;
-
-        let shape = output_tensor.shape();
-        let hidden_dim = *shape.last().unwrap_or(&0);
-        let seq_len_out = if shape.len() == 3 { shape[1] } else { 1 };
-
-        let mut embedding = vec![0.0f32; hidden_dim];
-        let data = output_tensor
-            .as_slice()
-            .ok_or_else(|| EmbeddingError::ApiError("tensor not contiguous".to_string()))?;
-
-        // Mean pooling
-        for s in 0..seq_len_out {
-            for d in 0..hidden_dim {
-                embedding[d] += data[s * hidden_dim + d];
-            }
-        }
-        for val in &mut embedding {
-            *val /= seq_len_out as f32;
-        }
-
-        // L2 normalize
-        let norm: f32 = embedding.iter().map(|x| x * x).sum::<f32>().sqrt();
-        if norm > 0.0 {
-            for val in &mut embedding {
-                *val /= norm;
-            }
-        }
-
-        Ok(embedding)
-    }
-}
-
-#[cfg(feature = "onnx")]
-impl EmbeddingProvider for OnnxEmbeddingProvider {
     fn embed(&self, text: &str) -> Result<Vec<f32>, EmbeddingError> {
         self.embed_inner(text)
     }

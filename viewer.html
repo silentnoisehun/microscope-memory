@@ -288,8 +288,52 @@ canvas { display: block; }
   }
 
   async function autoLoad() {
-    // Skip auto-loading to avoid CORS issues with file:// protocol
-    // Users can manually select files using the file input
+    // Try to load from URL parameter (file path for file:// protocol)
+    const urlParams = new URLSearchParams(window.location.search);
+    const fileParam = urlParams.get('file');
+    if (fileParam) {
+      try {
+        // Use fetch with file:// URL or absolute path
+        let fetchUrl = fileParam;
+        // If relative path, make it absolute
+        if (!fileParam.match(/^file:\/\//i) && !fileParam.match(/^[A-Z]:/i)) {
+          // Get current directory from URL
+          const basePath = window.location.href.substring(0, window.location.href.lastIndexOf('/') + 1);
+          fetchUrl = basePath + fileParam;
+        }
+        const response = await fetch(fetchUrl);
+        if (response.ok) {
+          const buffer = await response.arrayBuffer();
+          const data = parseViz1(new DataView(buffer));
+          console.log('Auto-loaded from URL param, booting...');
+          boot(data);
+          return;
+        }
+      } catch (e) {
+        console.log('URL param fetch failed:', e.message);
+      }
+    }
+    
+    // Try HTTP fetch as fallback (for HTTP server mode)
+    try {
+      const response = await fetch('cognitive_map.bin');
+      console.log('Fetch response:', response.status, response.ok);
+      if (response.ok) {
+        const buffer = await response.arrayBuffer();
+        console.log('Buffer type:', buffer.constructor.name, 'byteLength:', buffer.byteLength);
+        if (!buffer || buffer.byteLength === 0) {
+          console.log('Empty buffer, skipping auto-load');
+        } else {
+          const data = parseViz1(new DataView(buffer));
+          console.log('Auto-loaded cognitive_map.bin via HTTP, booting...');
+          boot(data);
+          return;
+        }
+      }
+    } catch (e) {
+      console.log('HTTP fetch failed:', e.message);
+    }
+    
     console.log('Auto-load skipped - use file input to load cognitive_map.bin');
   }
   function loadSampleData() {

@@ -1576,7 +1576,7 @@ dependencies = [
 
 [[package]]
 name = "microscope-memory"
-version = "0.6.3"
+version = "0.6.4"
 dependencies = [
  "bincode",
  "bytemuck",

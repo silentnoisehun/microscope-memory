@@ -297,6 +297,16 @@ canvas { display: block; }
     const file = ev.target.files[0];
     if (!file) return;
     console.log('File selected:', file.name, 'Size:', file.size, 'bytes');
+
+    // Check file size limit (50MB)
+    const MAX_SIZE = 50 * 1024 * 1024; // 50MB
+    if (file.size > MAX_SIZE) {
+      console.error('File too large:', file.size, 'bytes (max: 50MB)');
+      document.getElementById('loadError').textContent = `File too large: ${(file.size / (1024*1024)).toFixed(1)}MB (max: 50MB). Try generating a smaller visualization.`;
+      document.getElementById('loadError').style.display = 'block';
+      return;
+    }
+
     const fr = new FileReader();
     fr.onload = (e) => {
       console.log('File loaded, parsing...');

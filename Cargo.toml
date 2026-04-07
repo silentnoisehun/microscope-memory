@@ -8,7 +8,7 @@ readme = "README.md"
 homepage = "https://github.com/silentnoisehun/microscope-memory"
 repository = "https://github.com/silentnoisehun/microscope-memory"
 license = "MIT"
-keywords = ["memory", "indexing", "mmap", "vector-search", "simd", "rayon"]
+keywords = ["memory", "indexing", "mmap", "vector-search", "simd"]
 categories = ["data-structures", "algorithms", "memory-management", "science"]
 exclude = [
     "layers/*",

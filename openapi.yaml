@@ -1,0 +1,318 @@
+openapi: "3.1.0"
+
+info:
+  title: Microscope Memory — Spine Bridge API
+  description: |
+    AI-native cognitive memory interface for ChatGPT, Claude, and other LLMs.
+
+    Microscope Memory is a **sub-microsecond**, zoom-based hierarchical memory engine.
+    This API lets AI models **store** and **recall** memories using natural language.
+
+    ## How it works
+    - Memories are stored in a 3D coordinate space using semantic hashing
+    - Recall uses SIMD-accelerated radial search at the correct depth layer
+    - Layers: identity, long_term, short_term, associative, emotional, relational,
+      reflections, crypto_chain, echo_cache, rust_state
+
+    ## Usage tips
+    - Use `recall` before answering to check if relevant context exists
+    - Use `remember` to commit important facts for future sessions
+    - Set `layer` to `associative` for links between concepts
+    - Set `layer` to `emotional` for emotional context
+    - Higher `importance` (1–10) = prioritized in future recall
+  version: "0.6.4"
+  contact:
+    name: Microscope Memory
+    url: https://github.com/silentnoisehun/microscope-memory
+
+servers:
+  - url: http://localhost:6060
+    description: Local Spine Bridge (default)
+  - url: https://your-deployment.railway.app
+    description: Cloud deployment (configure your URL)
+
+paths:
+  /status:
+    get:
+      operationId: getMemoryStatus
+      summary: Get memory engine status
+      description: |
+        Returns the current state of the Microscope Memory engine,
+        including block count, append log size, and available layers.
+        Call this first to verify the engine is running.
+      responses:
+        "200":
+          description: Engine status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StatusResponse"
+              example:
+                version: "0.6.4"
+                blocks: 1024
+                append_log: 12
+                layers:
+                  - identity
+                  - long_term
+                  - short_term
+                  - associative
+                  - emotional
+                  - relational
+                  - reflections
+                  - crypto_chain
+                  - echo_cache
+                  - rust_state
+        "500":
+          description: Engine error (index not built — run `microscope-mem build` first)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /recall:
+    get:
+      operationId: recallMemory
+      summary: Recall relevant memories by natural language query
+      description: |
+        Searches the memory engine using a natural language query.
+        Returns the most relevant memory blocks ordered by spatial proximity.
+
+        The engine automatically determines the search depth and semantic weight.
+        Results include the memory text, its layer, depth, and distance score.
+
+        **Use this before answering any question** to check if relevant context exists.
+      parameters:
+        - name: q
+          in: query
+          required: true
+          description: Natural language query to search for
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 500
+          example: "What did we discuss about the Rust architecture?"
+        - name: k
+          in: query
+          required: false
+          description: Maximum number of results to return (default 10, max 50)
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 10
+          example: 5
+      responses:
+        "200":
+          description: List of relevant memory blocks, ordered by relevance
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MemoryResult"
+              example:
+                - text: "The Spine Bridge API runs on Axum with CORS enabled"
+                  depth: 4
+                  layer: "long_term"
+                  distance: 0.042
+                - text: "Tokio runtime is used for async operation"
+                  depth: 5
+                  layer: "associative"
+                  distance: 0.087
+        "400":
+          description: Missing or invalid query parameter
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Engine error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /remember:
+    post:
+      operationId: rememberMemory
+      summary: Store a new memory
+      description: |
+        Commits a new memory to the append log for permanent storage.
+        The memory is immediately available for recall.
+
+        Choose the appropriate `layer`:
+        - `long_term` — facts, knowledge, decisions (default)
+        - `short_term` — temporary context, current session
+        - `associative` — links between concepts
+        - `emotional` — emotional context, preferences
+        - `relational` — relationships between entities
+        - `reflections` — meta-thoughts, evaluations
+
+        Set `importance` (1–10) to control weighting in future recalls.
+        Higher importance memories are surfaced more prominently.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RememberRequest"
+            examples:
+              basicFact:
+                summary: Storing a basic fact
+                value:
+                  text: "The Spine Bridge API is a REST interface for Microscope Memory"
+                  layer: "long_term"
+                  importance: 8
+              emotionalContext:
+                summary: Storing emotional context
+                value:
+                  text: "User prefers concise technical explanations, dislikes verbosity"
+                  layer: "emotional"
+                  importance: 7
+              shortTermNote:
+                summary: Temporary session note
+                value:
+                  text: "Currently working on Docker deployment for Railway"
+                  layer: "short_term"
+                  importance: 5
+      responses:
+        "200":
+          description: Memory committed successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RememberResponse"
+              example:
+                status: "committed"
+                message: "Memory stored in append log"
+        "400":
+          description: Invalid request body
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Engine error (filesystem write failed)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /openapi.json:
+    get:
+      operationId: getOpenApiSpec
+      summary: Get this OpenAPI specification as JSON
+      description: Returns the machine-readable OpenAPI spec for tool registration.
+      responses:
+        "200":
+          description: OpenAPI specification document
+          content:
+            application/json:
+              schema:
+                type: object
+
+components:
+  schemas:
+    StatusResponse:
+      type: object
+      required: [version, blocks, append_log, layers]
+      properties:
+        version:
+          type: string
+          description: Engine version string
+          example: "0.6.4"
+        blocks:
+          type: integer
+          description: Number of indexed memory blocks in the main index
+          example: 1024
+        append_log:
+          type: integer
+          description: Number of uncommitted entries in the append log
+          example: 12
+        layers:
+          type: array
+          items:
+            type: string
+          description: Available memory layers
+          example: ["identity", "long_term", "short_term", "associative"]
+
+    MemoryResult:
+      type: object
+      required: [text, depth, layer, distance]
+      properties:
+        text:
+          type: string
+          description: The memory content text
+          example: "The Spine Bridge API runs on Axum with CORS enabled"
+        depth:
+          type: integer
+          minimum: 0
+          maximum: 8
+          description: |
+            Memory depth level (D0–D8).
+            D0=identity, D3=memories, D5=tokens, D8=raw bytes.
+          example: 4
+        layer:
+          type: string
+          description: The memory layer this block belongs to
+          example: "long_term"
+        distance:
+          type: number
+          format: float
+          description: |
+            Euclidean distance in semantic space (lower = more relevant).
+            Values below 0.1 indicate very strong matches.
+          example: 0.042
+
+    RememberRequest:
+      type: object
+      required: [text]
+      properties:
+        text:
+          type: string
+          minLength: 1
+          maxLength: 256
+          description: The memory content to store (max 256 bytes)
+          example: "The Spine Bridge API is a REST interface for Microscope Memory"
+        layer:
+          type: string
+          default: "long_term"
+          enum:
+            - identity
+            - long_term
+            - short_term
+            - associative
+            - emotional
+            - relational
+            - reflections
+            - crypto_chain
+            - echo_cache
+            - rust_state
+          description: Memory layer (default long_term)
+          example: "long_term"
+        importance:
+          type: integer
+          minimum: 1
+          maximum: 10
+          default: 5
+          description: Importance weight (1=low, 10=critical). Affects recall ranking.
+          example: 8
+
+    RememberResponse:
+      type: object
+      required: [status, message]
+      properties:
+        status:
+          type: string
+          example: "committed"
+        message:
+          type: string
+          example: "Memory stored in append log"
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Error description
+          example: "Index not built — run 'microscope-mem build' first"

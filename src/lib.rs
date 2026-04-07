@@ -24,6 +24,8 @@ pub mod sequential_thinking;
 pub mod snapshot;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod mcp;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod bridge;
 
 pub mod dream;
 pub mod emotional_contagion;

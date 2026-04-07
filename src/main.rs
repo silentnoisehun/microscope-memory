@@ -874,7 +874,8 @@ fn init_demo(config: &Config, force: bool) -> Result<(), String> {
     Ok(())
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let cli = Cli::parse();
 
     let config = Config::load(DEFAULT_CONFIG_PATH).unwrap_or_else(|_| {
@@ -2136,6 +2137,11 @@ fn main() {
                 "STORE-DATA".green().bold(),
                 fields.len()
             );
+        }
+        Cmd::Bridge { host, port } => {
+            if let Err(e) = microscope_memory::bridge::run(config, host, port).await {
+                eprintln!("  {} Bridge error: {}", "ERROR:".red(), e);
+            }
         }
     }
 }

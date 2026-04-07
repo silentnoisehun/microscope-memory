@@ -2,7 +2,9 @@
 
 [![Rust](https://img.shields.io/badge/language-Rust-orange.svg)](https://www.rust-lang.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Crates.io](https://img.shields.io/crates/v/microscope-memory.svg)](https://crates.io/crates/microscope-memory)
 [![Zero-JSON](https://img.shields.io/badge/Architecture-Zero--JSON-green.svg)](#core-pillars)
+[![LLM Bridge](https://img.shields.io/badge/LLM-Bridge%20API-purple.svg)](#-spine-bridge-api--llm-integration)
 
 **Microscope Memory** is a high-performance, hierarchical cognitive memory engine built for low-latency AI architectures. It operates on a "Zero-JSON" principle, utilizing memory-mapped binary blocks for sub-microsecond retrieval and associative learning.
 
@@ -58,6 +60,42 @@ cargo build --release
 - 🔗 **Personal Knowledge Management (PKM)**: Associative note-taking and knowledge graph discovery.
 - 🌐 **Federated Knowledge Networks**: Synchronized cognitive states across distributed edge nodes using the Resonance Protocol.
 
+## 🤖 Spine Bridge API — LLM Integration
+
+Microscope Memory includes a **REST API bridge** that connects AI models (ChatGPT, Claude, any OpenAI-compatible agent) directly to the cognitive memory engine.
+
+```bash
+# Start the Bridge API (default port 6060)
+./target/release/microscope-mem bridge
+
+# Custom host/port
+./target/release/microscope-mem bridge --host 0.0.0.0 --port 8888
+```
+
+### Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/status` | Engine health & stats |
+| `GET` | `/recall?q=...&k=10` | Recall by natural language query |
+| `POST` | `/remember` | Store a new memory |
+| `GET` | `/openapi.json` | OpenAPI spec for ChatGPT/Claude import |
+| `GET` | `/` | Interactive API documentation |
+
+### Connect ChatGPT / Claude
+
+1. Start the bridge: `microscope-mem bridge`
+2. **ChatGPT Custom GPT** → Actions → Import from URL: `http://YOUR_IP:6060/openapi.json`
+3. **Claude Projects** → Integrations → Add tool → paste the same URL
+
+```bash
+# Quick test
+curl "http://localhost:6060/recall?q=What+is+Hebbian+learning&k=3"
+curl -X POST http://localhost:6060/remember \
+  -H "Content-Type: application/json" \
+  -d '{"text": "Hebbian learning: neurons that fire together wire together", "layer": "long_term", "importance": 9}'
+```
+
 ## 🐳 Docker Support
 
 Run Microscope Memory in a container:
@@ -66,7 +104,7 @@ Run Microscope Memory in a container:
 docker build -t microscope-mem .
 docker run -it microscope-mem init-demo
 docker run -it microscope-mem build
-docker run -p 6060:6060 microscope-mem spine
+docker run -p 6060:6060 microscope-mem bridge
 ```
 
 ## 📂 Examples

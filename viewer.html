@@ -1,14 +1,14 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Microscope Memory — Cognitive Map</title>
+<title>Microscope Memory â€” Cognitive Map</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { background: #0a0a0f; color: #ccc; font-family: 'Courier New', monospace; overflow: hidden; }
 canvas { display: block; }
 
-/* ── Sidebar ── */
+/* â”€â”€ Sidebar â”€â”€ */
 #sidebar {
   position: fixed; top: 0; left: 0; width: 260px; height: 100vh; z-index: 20;
   background: rgba(8,8,16,0.95); border-right: 1px solid #222;
@@ -76,7 +76,7 @@ canvas { display: block; }
   background: #fff; border-radius: 2px;
 }
 
-/* ── Microscope Zoom HUD ── */
+/* â”€â”€ Microscope Zoom HUD â”€â”€ */
 #microscope {
   position: fixed; right: 20px; top: 50%; transform: translateY(-50%); z-index: 20;
   display: none; flex-direction: column; align-items: center; gap: 0;
@@ -218,91 +218,98 @@ canvas { display: block; }
 }
 </script>
 <script type="module">
-import * as THREE from 'three';
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+  import * as THREE from 'three';
+  import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
-// ─── State ─────────────────────────────────────────
-let scene, camera, renderer, controls, clock;
-let data = null;
-let fieldPoints = null;
-let currentDepth = 0;
+  let scene, camera, renderer, controls, clock;
+  let data = null;
+  let fieldPoints = null;
+  let currentDepth = 0;
 
-// Depth definitions (D0-D8)
-const DEPTH_DEFS = [
-  { name: 'Identity',       typical: 1 },
-  { name: 'Layer summaries', typical: 9 },
-  { name: 'Clusters',        typical: 108 },
-  { name: 'Items',            typical: 523 },
-  { name: 'Sentences',       typical: 1349 },
-  { name: 'Tokens',          typical: 6070 },
-  { name: 'Syllables',       typical: 26198 },
-  { name: 'Characters',      typical: 96297 },
-  { name: 'Raw bytes',       typical: 96613 },
-];
-
-// Feature groups — each is a THREE.Group toggled independently
-const groups = {};
-
-// Feature definitions: key, label, default on
-const FEATURES = [
-  { key: 'blocks',     label: 'Memory Blocks',       on: true  },
-  { key: 'edges',      label: 'Co-activation Edges',  on: true  },
-  { key: 'wave',       label: 'Resonance Wave Field',  on: false },
-  { key: 'paths',      label: 'Thought Paths',        on: false },
-  { key: 'archetypes', label: 'Archetypes',            on: false },
-  { key: 'dreams',     label: 'Dream Cycles',          on: false },
-  { key: 'echoes',     label: 'Mirror Echoes',         on: false },
-  { key: 'emotional',  label: 'Emotional Centroid',    on: false },
-];
-
-// Layer definitions: name, hex color
-const LAYER_DEFS = [
-  { name: 'emotional',   color: 0xff3366 },
-  { name: 'episodic',    color: 0x33ff66 },
-  { name: 'semantic',    color: 0x3366ff },
-  { name: 'procedural',  color: 0xff9933 },
-  { name: 'sensory',     color: 0xff33ff },
-  { name: 'working',     color: 0xffff33 },
-  { name: 'long_term',   color: 0x33ffff },
-  { name: 'associative', color: 0x9966ff },
-  { name: 'echo_cache',  color: 0x66ff99 },
-  { name: 'rust_state',  color: 0xff6633 },
-];
-const LAYER_COLOR_MAP = {};
-LAYER_DEFS.forEach(l => { LAYER_COLOR_MAP[l.name] = l.color; });
-
-// Per-layer visibility
-const layerVisible = {};
-LAYER_DEFS.forEach(l => { layerVisible[l.name] = true; });
-
-// Per-block layer name (for filtering)
-let blockLayerNames = [];
-
-// ─── Auto-load ─────────────────────────────────────
-async function autoLoad() {
-  try {
-    const resp = await fetch('cognitive_map.json');
-    if (!resp.ok) throw new Error(resp.statusText);
-    data = await resp.json();
-    boot();
-  } catch (e) {
-    document.getElementById('loadError').textContent = 'Auto-load failed: ' + e.message;
-    document.getElementById('loadError').style.display = 'block';
-    document.getElementById('loadFallback').style.display = 'block';
+  function parseViz1(buf) {
+    const dv = new DataView(buf);
+    let off = 0;
+    const magic = String.fromCharCode(dv.getUint8(0), dv.getUint8(1), dv.getUint8(2), dv.getUint8(3));
+    if (magic !== 'VIZ1') throw new Error('Invalid Binary Format');
+    off += 4;
+    const blockCount = dv.getUint32(off, true); off += 4;
+    const blocks = [];
+    for (let i = 0; i < blockCount; i++) {
+      const x = dv.getFloat32(off, true);
+      const y = dv.getFloat32(off+4, true);
+      const z = dv.getFloat32(off+8, true);
+      const dx = dv.getFloat32(off+12, true);
+      const dy = dv.getFloat32(off+16, true);
+      const dz = dv.getFloat32(off+20, true);
+      const e = dv.getFloat32(off+24, true);
+      const lid = dv.getUint8(off+28);
+      const d = dv.getUint8(off+29);
+      const f = dv.getUint8(off+30);
+      off += 32;
+      blocks.push({ x, y, z, dx, dy, dz, e, d, l: lid, m: f ? 1 : 0 });
+    }
+    const nodeCount = dv.getUint32(off, true); off += 4;
+    const nodes = [];
+    for (let i = 0; i < nodeCount; i++) {
+      const qh = dv.getBigUint64(off, true);
+      const ts = dv.getBigUint64(off+8, true);
+      const rc = dv.getUint32(off+16, true);
+      const layer = dv.getUint8(off+20);
+      const centroid = dv.getUint8(off+21);
+      off += 24;
+      nodes.push({ query_hash: qh.toString(16), timestamp_ms: Number(ts), result_count: rc, dominant_layer: layer });
+    }
+    const patternCount = dv.getUint32(off, true); off += 4;
+    const patterns = [];
+    for (let i = 0; i < patternCount; i++) {
+      const id = dv.getUint32(off, true);
+      const freq = dv.getUint32(off+4, true);
+      const str = dv.getFloat32(off+8, true);
+      const seqLen = dv.getUint8(off+12);
+      const seq = [];
+      for (let j = 0; j < 5; j++) {
+        const h = dv.getBigUint64(off + 13 + j*8, true);
+        if (j < seqLen) seq.push(h.toString(16));
+      }
+      off += 53;
+      patterns.push({ id, freq, str, seq });
+    }
+    const edgeCount = dv.getUint32(off, true); off += 4;
+    const edges = [];
+    for (let i = 0; i < edgeCount; i++) {
+      const a = dv.getUint32(off, true);
+      const b = dv.getUint32(off+4, true);
+      const c = dv.getUint32(off+8, true);
+      off += 12;
+      edges.push({ a, b, c });
+    }
+    return { block_count: blockCount, blocks, edges, thought_paths: [nodes], patterns, stats: { active_blocks: blockCount }, instance_id: 'BIN-VIZ1' };
   }
-}
-autoLoad();
 
-document.getElementById('fileInput').addEventListener('change', (ev) => {
-  const file = ev.target.files[0];
-  if (!file) return;
-  const fr = new FileReader();
-  fr.onload = (e) => { data = JSON.parse(e.target.result); boot(); };
-  fr.readAsText(file);
-});
+  async function autoLoad() {
+    try {
+      const resp = await fetch('cognitive_map.bin');
+      if (!resp.ok) throw new Error(resp.statusText);
+      const buffer = await resp.arrayBuffer();
+      data = parseViz1(buffer);
+      boot();
+    } catch (e) {
+      console.error(e);
+      document.getElementById('loadError').textContent = 'Binary VIZ1 Load Failed: ' + e.message;
+      document.getElementById('loadError').style.display = 'block';
+    }
+  }
+  autoLoad();
 
-// ─── Boot ──────────────────────────────────────────
-function boot() {
+  document.getElementById('fileInput').addEventListener('change', (ev) => {
+    const file = ev.target.files[0];
+    if (!file) return;
+    const fr = new FileReader();
+    fr.onload = (e) => { data = parseViz1(e.target.result); boot(); };
+    fr.readAsArrayBuffer(file);
+  });
+
+  function boot() {
   document.getElementById('loading').style.display = 'none';
   document.getElementById('sidebar').style.display = 'flex';
 
@@ -357,7 +364,7 @@ function initThree() {
   });
 }
 
-// ─── Microscope Zoom ───────────────────────────────
+// â”€â”€â”€ Microscope Zoom â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function initMicroscope() {
   document.getElementById('microscope').style.display = 'flex';
 
@@ -387,7 +394,7 @@ function updateMicroscope() {
   // Map camera distance to depth (close = deep, far = shallow)
   const dist = camera.position.distanceTo(controls.target);
   // dist range: 0.05 (closest) to 5.0 (farthest)
-  // map: 0.05 → D8, 0.15 → D7, 0.3 → D6, 0.5 → D5, 0.7 → D4, 1.0 → D3, 1.5 → D2, 2.5 → D1, 4.0+ → D0
+  // map: 0.05 â†’ D8, 0.15 â†’ D7, 0.3 â†’ D6, 0.5 â†’ D5, 0.7 â†’ D4, 1.0 â†’ D3, 1.5 â†’ D2, 2.5 â†’ D1, 4.0+ â†’ D0
   const depthThresholds = [4.0, 2.5, 1.5, 1.0, 0.7, 0.5, 0.3, 0.15, 0.05];
   let depth = 0;
   for (let d = 0; d < depthThresholds.length; d++) {
@@ -430,7 +437,7 @@ function updateMicroscope() {
   }
 }
 
-// ─── Build all 3D groups ───────────────────────────
+// â”€â”€â”€ Build all 3D groups â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function buildAll() {
   buildBlocks();
   buildEdges();
@@ -746,7 +753,7 @@ function buildEmotionalCentroid() {
   scene.add(groups.emotional);
 }
 
-// ─── Sidebar ───────────────────────────────────────
+// â”€â”€â”€ Sidebar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function buildSidebar() {
   buildFeatureToggles();
   buildLayerToggles();
@@ -870,7 +877,7 @@ function buildPredictions() {
   el.innerHTML = rows.map(([k, v]) => `<div class="stat-row"><span class="k">${k}</span><span class="v">${v}</span></div>`).join('');
 }
 
-// ─── Section collapse ──────────────────────────────
+// â”€â”€â”€ Section collapse â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 document.querySelectorAll('.section-header').forEach(header => {
   header.addEventListener('click', () => {
     const body = header.nextElementSibling;
@@ -878,7 +885,7 @@ document.querySelectorAll('.section-header').forEach(header => {
   });
 });
 
-// ─── Animate ───────────────────────────────────────
+// â”€â”€â”€ Animate â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function animate() {
   requestAnimationFrame(animate);
   const t = clock.getElapsedTime();
@@ -918,3 +925,10 @@ function animate() {
 </script>
 </body>
 </html>
+
+
+
+
+
+
+

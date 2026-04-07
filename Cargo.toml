@@ -1,9 +1,9 @@
-[package]
+﻿[package]
 name = "microscope-memory"
 version = "0.4.0"
 edition = "2021"
-authors = ["Máté Róbert (Silent)"]
-description = "Zoom-based hierarchical memory — SIMD optimized vector L2 + mmap, sub-microsecond queries."
+authors = ["MĂˇtĂ© RĂłbert (Silent)"]
+description = "Zoom-based hierarchical memory â€” SIMD optimized vector L2 + mmap, sub-microsecond queries."
 readme = "README.md"
 homepage = "https://github.com/silentnoisehun/microscope-memory"
 repository = "https://github.com/silentnoisehun/microscope-memory"
@@ -13,11 +13,12 @@ categories = ["data-structures", "algorithms", "memory-management", "science"]
 
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
+
 clap = { version = "4", features = ["derive"] }
 colored = "2"
 memmap2 = "0.9"
 rayon = "1.8"
+serde_json = "1.0"
 toml = "0.8"
 
 # WASM dependencies

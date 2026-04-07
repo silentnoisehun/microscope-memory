@@ -878,7 +878,8 @@ fn main() {
     let cli = Cli::parse();
 
     let config = Config::load(DEFAULT_CONFIG_PATH).unwrap_or_else(|_| {
-        println!("  {} Using default configuration", "WARN:".yellow());
+        // Redir warning to stderr for MCP compatibility
+        eprintln!("  {} Using default configuration", "WARN:".yellow());
         Config::default()
     });
 
@@ -1228,11 +1229,8 @@ fn main() {
             chain.display();
         }
         Cmd::Spine => {
-            println!("{}", "SPINE IPC LISTENER (Zero JSON)".magenta().bold());
-            println!("  Status: ACTIVE (Waiting for AtomicSpine mmap signals)");
-            println!("  Protocol: Pure Binary / C-Struct");
-            // Placeholder: Here we would loop and watch the mmap ring buffer
-            std::thread::park();
+            // Native MCP server replaces the placeholder binary listener
+            microscope_memory::mcp::run(config);
         }
         Cmd::Query { mql } => {
             let t0 = Instant::now();

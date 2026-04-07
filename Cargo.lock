@@ -1576,7 +1576,7 @@ dependencies = [
 
 [[package]]
 name = "microscope-memory"
-version = "0.6.1"
+version = "0.6.3"
 dependencies = [
  "bincode",
  "bytemuck",
@@ -1592,6 +1592,7 @@ dependencies = [
  "rand 0.8.5",
  "rayon",
  "serde",
+ "serde_json",
  "sha2",
  "tempfile",
  "thiserror",

@@ -22,6 +22,8 @@ pub mod reader;
 pub mod resonance;
 pub mod sequential_thinking;
 pub mod snapshot;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod mcp;
 
 pub mod dream;
 pub mod emotional_contagion;

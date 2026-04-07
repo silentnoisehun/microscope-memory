@@ -178,7 +178,7 @@ fn handle_tools_list(id: &Value) -> Value {
 
 fn handle_tools_call(id: &Value, request: &Value, config: &Config) -> Value {
     let params = request.get("params").cloned().unwrap_or(json!({}));
-    let tool_name = params.get("name").and_then(|n| n.as_str()).unwrap_or("");
+    let tool_name = params.get("name").and_then(|n: &Value| n.as_str()).unwrap_or("");
     let args = params.get("arguments").cloned().unwrap_or(json!({}));
 
     let result = match tool_name {
@@ -252,13 +252,13 @@ fn tool_status(config: &Config) -> Result<String, String> {
 fn tool_store(config: &Config, args: &Value) -> Result<String, String> {
     let text = args
         .get("text")
-        .and_then(|v| v.as_str())
+        .and_then(|v: &Value| v.as_str())
         .ok_or("Missing required parameter: text")?;
     let layer = args
         .get("layer")
-        .and_then(|v| v.as_str())
+        .and_then(|v: &Value| v.as_str())
         .unwrap_or("long_term");
-    let importance = args.get("importance").and_then(|v| v.as_u64()).unwrap_or(5) as u8;
+    let importance = args.get("importance").and_then(|v: &Value| v.as_u64()).unwrap_or(5) as u8;
 
     store_memory(config, text, layer, importance)?;
 
@@ -285,9 +285,9 @@ fn tool_store(config: &Config, args: &Value) -> Result<String, String> {
 fn tool_recall(config: &Config, args: &Value) -> Result<String, String> {
     let query = args
         .get("query")
-        .and_then(|v| v.as_str())
+        .and_then(|v: &Value| v.as_str())
         .ok_or("Missing required parameter: query")?;
-    let k = args.get("k").and_then(|v| v.as_u64()).unwrap_or(10) as usize;
+    let k = args.get("k").and_then(|v: &Value| v.as_u64()).unwrap_or(10) as usize;
 
     let reader = MicroscopeReader::open(config)?;
 
@@ -388,9 +388,9 @@ fn tool_recall(config: &Config, args: &Value) -> Result<String, String> {
 fn tool_find(config: &Config, args: &Value) -> Result<String, String> {
     let query = args
         .get("query")
-        .and_then(|v| v.as_str())
+        .and_then(|v: &Value| v.as_str())
         .ok_or("Missing required parameter: query")?;
-    let k = args.get("k").and_then(|v| v.as_u64()).unwrap_or(10) as usize;
+    let k = args.get("k").and_then(|v: &Value| v.as_u64()).unwrap_or(10) as usize;
 
     let reader = MicroscopeReader::open(config)?;
     let results = reader.find_text(query, k);
@@ -418,7 +418,7 @@ fn tool_find(config: &Config, args: &Value) -> Result<String, String> {
 fn tool_mql_query(config: &Config, args: &Value) -> Result<String, String> {
     let mql = args
         .get("mql")
-        .and_then(|v| v.as_str())
+        .and_then(|v: &Value| v.as_str())
         .ok_or("Missing required parameter: mql")?;
 
     let reader = MicroscopeReader::open(config)?;
@@ -460,7 +460,7 @@ fn tool_mql_query(config: &Config, args: &Value) -> Result<String, String> {
 }
 
 fn tool_build(config: &Config, args: &Value) -> Result<String, String> {
-    let force = args.get("force").and_then(|v| v.as_bool()).unwrap_or(false);
+    let force = args.get("force").and_then(|v: &Value| v.as_bool()).unwrap_or(false);
 
     crate::build::build(config, force)?;
 
@@ -479,21 +479,21 @@ fn tool_build(config: &Config, args: &Value) -> Result<String, String> {
 fn tool_look(config: &Config, args: &Value) -> Result<String, String> {
     let x = args
         .get("x")
-        .and_then(|v| v.as_f64())
+        .and_then(|v: &Value| v.as_f64())
         .ok_or("Missing required parameter: x")? as f32;
     let y = args
         .get("y")
-        .and_then(|v| v.as_f64())
+        .and_then(|v: &Value| v.as_f64())
         .ok_or("Missing required parameter: y")? as f32;
     let z = args
         .get("z")
-        .and_then(|v| v.as_f64())
+        .and_then(|v: &Value| v.as_f64())
         .ok_or("Missing required parameter: z")? as f32;
     let zoom = args
         .get("zoom")
-        .and_then(|v| v.as_u64())
+        .and_then(|v: &Value| v.as_u64())
         .ok_or("Missing required parameter: zoom")? as u8;
-    let k = args.get("k").and_then(|v| v.as_u64()).unwrap_or(10) as usize;
+    let k = args.get("k").and_then(|v: &Value| v.as_u64()).unwrap_or(10) as usize;
 
     let reader = MicroscopeReader::open(config)?;
     let config_clone = config.clone();

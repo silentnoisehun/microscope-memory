@@ -1,6 +1,6 @@
 [package]
 name = "microscope-memory"
-version = "0.6.1"
+version = "0.6.2"
 edition = "2021"
 authors = ["Microscope Contributors"]
 description = "Pure binary cognitive memory engine. Zero-JSON, mmap-based, hierarchical memory architecture."

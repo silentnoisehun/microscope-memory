@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "microscope-memory"
-version = "0.6.1"
+version = "0.6.2"
 description = "Pure binary cognitive memory engine. Zero-JSON, mmap-based, hierarchical memory architecture."
 authors = [{name = "Microscope Contributors"}]
 license = {text = "MIT"}

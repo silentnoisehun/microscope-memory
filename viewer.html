@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -157,7 +157,7 @@ canvas { display: block; }
 </div>
 
 <div id="sidebar" style="display:none">
-  <div class="logo">MICROSCOPE MEMORY<span id="versionLabel">v0.6.0</span></div>
+  <div class="logo">MICROSCOPE MEMORY<span id="versionLabel">v0.6.1-DEBUG-FIX</span></div>
 
   <!-- Features -->
   <div class="section" id="sec-features">
@@ -226,9 +226,56 @@ canvas { display: block; }
   let data = null;
   let fieldPoints = null;
   let currentDepth = 0;
+  
+  const groups = {};
+  const layerVisible = {};
+  let blockLayerNames = [];
+
+  const LAYER_COLOR_MAP = {
+    'long_term': 0x00ffff,
+    'short_term': 0x00ff88,
+    'associative': 0xffcc00,
+    'echo_cache': 0xff00ff,
+    'sensory': 0xff3366,
+    'working': 0x3366ff,
+    'procedural': 0x9966ff,
+    'episodic': 0xff6633,
+    'semantic': 0x66ff33,
+    'emotional': 0xff33cc,
+    'attention': 0xffff00,
+    'archetype': 0xff9900,
+    'dream': 0x66ccff,
+    '?': 0x666666
+  };
+
+  const LAYER_DEFS = Object.keys(LAYER_COLOR_MAP).map(name => ({ name, color: LAYER_COLOR_MAP[name] }));
+
+  const DEPTH_DEFS = [
+    { name: 'Identity', typical: 1 },
+    { name: 'Layer Summary', typical: 13 },
+    { name: 'Topic Clusters', typical: 100 },
+    { name: 'Memories', typical: 1000 },
+    { name: 'Sentences', typical: 5000 },
+    { name: 'Tokens', typical: 25000 },
+    { name: 'Syllables', typical: 75000 },
+    { name: 'Characters', typical: 150000 },
+    { name: 'Raw Bytes', typical: 500000 }
+  ];
+
+  const FEATURES = [
+    { key: 'blocks', label: 'Memory Blocks', on: true },
+    { key: 'edges', label: 'Structural Links', on: true },
+    { key: 'wave', label: 'Resonance Field', on: false },
+    { key: 'paths', label: 'Thought Paths', on: true },
+    { key: 'archetypes', label: 'Archetypes', on: true },
+    { key: 'dreams', label: 'Dream Cycles', on: false },
+    { key: 'echoes', label: 'Mirror Echoes', on: false },
+    { key: 'emotional', label: 'Emotional Centroid', on: true }
+  ];
 
   function parseViz1(buf) {
-    const dv = new DataView(buf);
+    console.log('parseViz1 called with:', buf ? buf.constructor.name : 'null');
+    const dv = (buf instanceof DataView) ? buf : new DataView(buf);
     let off = 0;
     const magic = String.fromCharCode(dv.getUint8(0), dv.getUint8(1), dv.getUint8(2), dv.getUint8(3));
     if (magic !== 'VIZ1') throw new Error('Invalid Binary Format');
@@ -304,9 +351,9 @@ canvas { display: block; }
         const response = await fetch(fetchUrl);
         if (response.ok) {
           const buffer = await response.arrayBuffer();
-          const data = parseViz1(new DataView(buffer));
+          data = parseViz1(buffer);
           console.log('Auto-loaded from URL param, booting...');
-          boot(data);
+          boot();
           return;
         }
       } catch (e) {
@@ -324,9 +371,10 @@ canvas { display: block; }
         if (!buffer || buffer.byteLength === 0) {
           console.log('Empty buffer, skipping auto-load');
         } else {
-          const data = parseViz1(new DataView(buffer));
+          console.log('Calling parseViz1 with buffer:', buffer);
+          data = parseViz1(buffer);
           console.log('Auto-loaded cognitive_map.bin via HTTP, booting...');
-          boot(data);
+          boot();
           return;
         }
       }

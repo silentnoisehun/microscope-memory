@@ -296,8 +296,25 @@ canvas { display: block; }
   document.getElementById('fileInput').addEventListener('change', (ev) => {
     const file = ev.target.files[0];
     if (!file) return;
+    console.log('File selected:', file.name, 'Size:', file.size, 'bytes');
     const fr = new FileReader();
-    fr.onload = (e) => { data = parseViz1(e.target.result); boot(); };
+    fr.onload = (e) => {
+      console.log('File loaded, parsing...');
+      try {
+        data = parseViz1(e.target.result);
+        console.log('Parsing successful, booting...');
+        boot();
+      } catch (e) {
+        console.error('Parse error:', e);
+        document.getElementById('loadError').textContent = 'Parse Error: ' + e.message;
+        document.getElementById('loadError').style.display = 'block';
+      }
+    };
+    fr.onerror = (e) => {
+      console.error('File read error:', e);
+      document.getElementById('loadError').textContent = 'File Read Error: ' + e.message;
+      document.getElementById('loadError').style.display = 'block';
+    };
     fr.readAsArrayBuffer(file);
   });
 

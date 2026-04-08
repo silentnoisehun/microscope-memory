@@ -12,6 +12,12 @@
 
 v0.7.0 marks the transition to **Public Beta**, introducing enterprise-grade reliability, automated crash recovery, and a modular architecture.
 
+## Website
+
+- Landing page: `website/index.html`
+- One-click web demo: `viewer.html?file=cognitive_map.bin`
+- One-click local start: `OneClick_Start.bat`
+
 ---
 
 ## ⚡ Core Pillars

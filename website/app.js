@@ -62,11 +62,37 @@ function bindSmoothNav() {
 }
 
 function bindAuth() {
+  const guestBtn = document.getElementById("guestAuthBtn");
   const googleBtn = document.getElementById("googleAuthBtn");
   const appleBtn = document.getElementById("appleAuthBtn");
   const signOutBtn = document.getElementById("signOutBtn");
   const status = document.getElementById("authStatus");
   if (!googleBtn || !appleBtn || !signOutBtn || !status) return;
+
+  const demoKey = "microscope_demo_user_v1";
+  const setDemoUser = (provider) => {
+    const id = Math.random().toString(36).slice(2, 10);
+    const user = {
+      id,
+      provider,
+      name: "Guest-" + id,
+      createdAt: Date.now(),
+    };
+    localStorage.setItem(demoKey, JSON.stringify(user));
+    status.textContent = "Signed in instantly as " + user.name + " (" + provider + " demo).";
+  };
+  const readDemoUser = () => {
+    try {
+      const raw = localStorage.getItem(demoKey);
+      return raw ? JSON.parse(raw) : null;
+    } catch (_error) {
+      return null;
+    }
+  };
+  const clearDemoUser = () => {
+    localStorage.removeItem(demoKey);
+    status.textContent = "Signed out.";
+  };
 
   const authConfig = window.MICROSCOPE_AUTH || {};
   const firebaseConfig = authConfig.firebaseConfig || {};
@@ -74,10 +100,19 @@ function bindAuth() {
   const configured = required.every((key) => typeof firebaseConfig[key] === "string" && firebaseConfig[key].trim() !== "");
 
   if (!authConfig.enabled || !configured || !window.firebase) {
-    status.textContent = "Set window.MICROSCOPE_AUTH and Firebase keys to enable Google/Apple signup.";
-    googleBtn.disabled = true;
-    appleBtn.disabled = true;
-    signOutBtn.disabled = true;
+    const existing = readDemoUser();
+    if (existing) {
+      status.textContent = "Signed in instantly as " + existing.name + " (" + existing.provider + " demo).";
+    } else {
+      status.textContent = "Instant mode active: click any button and continue.";
+    }
+
+    if (guestBtn) {
+      guestBtn.addEventListener("click", () => setDemoUser("instant"));
+    }
+    googleBtn.addEventListener("click", () => setDemoUser("google"));
+    appleBtn.addEventListener("click", () => setDemoUser("apple"));
+    signOutBtn.addEventListener("click", clearDemoUser);
     return;
   }
 
@@ -134,6 +169,12 @@ function bindAuth() {
       status.textContent = "Sign-out failed: " + (error.message || error);
     }
   });
+
+  if (guestBtn) {
+    guestBtn.addEventListener("click", () => {
+      setDemoUser("instant");
+    });
+  }
 }
 
 bindDepthTool();

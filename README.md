@@ -35,41 +35,7 @@ v0.7.0 marks the transition to **Public Beta**, introducing enterprise-grade rel
 
 ## 🏗️ Architecture Design
 
-```mermaid
-graph TD
-    classDef engine fill:#1e1e1e,stroke:#00f2ff,stroke-width:2px,color:#fff;
-    classDef reliability fill:#0e2009,stroke:#2ecc71,stroke-width:2px,color:#fff;
-    classDef stealth fill:#2c3e50,stroke:#e74c3c,stroke-width:2px,color:#fff;
-
-    subgraph Interface["Developer Interface"]
-        API[Spine Bridge API v1]
-        CLI[Command Line Interface]
-    end
-
-    subgraph CogEngine["Microscope Engine (v0.7.0)"]
-        Read[Hierarchical Reader]:::engine
-        Merkle[Merkle Integrity]:::reliability
-        Doctor[Doctor / Repair]:::reliability
-        
-        API --> Read
-        CLI --> Read
-        CLI --> Doctor
-        Read <--> Merkle
-    end
-
-    subgraph Optional["Optional Modules (feature flags)"]
-        Stealth[Stealth / Red Audit]:::stealth
-        GPU[GPU Acceleration]
-        
-        Read -- optional -- Stealth
-        Read -- optional -- GPU
-    end
-
-    subgraph Hardware["Storage Layer"]
-        MMAP[(Memory Mapped Index)]
-        Read --> MMAP
-    end
-```
+![Architecture Design](architecture-diagram.jpg)
 
 ---
 
@@ -100,6 +66,7 @@ The Spine Bridge acts as the "Corpus Callosum" between your LLM and the Microsco
 | `GET` | `/v1/status` | Engine health, version & stats |
 | `GET` | `/v1/recall?q=...&k=10` | Semantic/Spatial recall |
 | `POST` | `/v1/remember` | Store a new cognitive memory |
+| `POST` | `/v1/mobile/chat` | User-scoped persistent mobile chat (Ollama/OpenAI/Gemini) |
 
 ### Integration Example (Python)
 ```python
@@ -109,6 +76,7 @@ res = requests.get("http://localhost:6060/v1/recall", params={"q": "User's favor
 print(res.json())
 ```
 *See `examples/langchain_integration.py` for full LangChain tools.*
+*Mobile quickstart: see `.github/mobile/README.md`.*
 
 ---
 

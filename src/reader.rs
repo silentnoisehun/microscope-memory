@@ -15,12 +15,15 @@ use crate::{
 #[cfg(feature = "stealth")]
 use crate::syscaller::nt_query_virtual_memory;
 
+#[cfg(windows)]
 use windows_sys::Win32::System::Memory::{MEMORY_BASIC_INFORMATION, PAGE_GUARD, PAGE_NOACCESS};
 
+#[cfg(windows)]
 #[cfg(not(feature = "stealth"))]
 use windows_sys::Win32::System::Memory::VirtualQuery;
 
 #[cfg(feature = "stealth")]
+#[cfg(windows)]
 use windows_sys::Win32::Foundation::HANDLE;
 
 /// Block header: 32 bytes, packed, mmap-ready.
@@ -172,6 +175,7 @@ impl MicroscopeReader {
             unsafe { memmap2::Mmap::map(&hdr_file).map_err(|e| format!("mmap headers: {}", e))? };
 
         // Red Audit: Stability check for headers mmap
+        #[cfg(windows)]
         if let Err(e) = Self::verify_mmap_protection(headers.as_ptr(), headers.len()) {
             return Err(format!("Stability check failed (headers): {}", e));
         }
@@ -228,6 +232,7 @@ impl MicroscopeReader {
     }
 
     /// Red Audit: Verifies that the mmap'ed memory is indeed readable and not guarded.
+    #[cfg(windows)]
     fn verify_mmap_protection(ptr: *const u8, _len: usize) -> Result<(), String> {
         let mut info: MEMORY_BASIC_INFORMATION = unsafe { std::mem::zeroed() };
         let mut _return_len: usize = 0;

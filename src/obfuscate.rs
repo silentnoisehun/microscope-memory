@@ -1,0 +1,30 @@
+//! obfuscate.rs — String XOR-obfuscation macro and runtime decoder.
+//! (Red Audit - Phase 2)
+
+/// A simple XOR macro for compile-time string obfuscation.
+/// Usage: xor_str!("my_secret_string", 0x42)
+#[macro_export]
+macro_rules! xor_str {
+    ($s:expr, $key:expr) => {
+        {
+            const S: &[u8] = $s.as_bytes();
+            const LEN: usize = S.len();
+            let mut res = [0u8; LEN];
+            let mut i = 0;
+            while i < LEN {
+                res[i] = S[i] ^ $key;
+                i += 1;
+            }
+            res
+        }
+    };
+}
+
+/// Decrypts an XOR-obfuscated byte array at runtime.
+pub fn decrypt(data: &[u8], key: u8) -> String {
+    let mut res = Vec::with_capacity(data.len());
+    for &b in data {
+        res.push(b ^ key);
+    }
+    String::from_utf8_lossy(&res).into_owned()
+}

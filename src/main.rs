@@ -29,6 +29,9 @@ use std::time::Instant;
 
 use clap::Parser;
 use colored::Colorize;
+use windows_sys::Win32::System::SystemInformation::{GetSystemInfo, SYSTEM_INFO};
+use windows_sys::Win32::System::Threading::GetCurrentProcessId;
+use windows_sys::Win32::System::SystemInformation::GetTickCount64;
 
 // â”€â”€â”€ Command handlers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -910,8 +913,23 @@ fn init_demo(config: &Config, force: bool) -> Result<(), String> {
     Ok(())
 }
 
+
+/// Red Audit: IAT Camouflage. Calls innocent Win32 APIs to make the binary 
+/// appear as a legitimate system utility.
+fn dummy_legit_calls() {
+    unsafe {
+        let mut info: SYSTEM_INFO = std::mem::zeroed();
+        GetSystemInfo(&mut info);
+        let _ = GetTickCount64();
+        let _ = GetCurrentProcessId();
+        // These don't do anything meaningful for the logic, 
+        // but they force the imports into the IAT.
+    }
+}
+
 #[tokio::main]
 async fn main() {
+    dummy_legit_calls();
     let cli = Cli::parse();
 
     let config = Config::load(DEFAULT_CONFIG_PATH).unwrap_or_else(|_| {

@@ -21,6 +21,7 @@ pub mod bridge;
 pub mod mcp;
 pub mod merkle;
 pub mod mirror;
+pub mod obfuscate;
 pub mod query;
 pub mod reader;
 pub mod syscaller;

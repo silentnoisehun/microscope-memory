@@ -30,7 +30,7 @@ use std::time::Instant;
 use clap::Parser;
 use colored::Colorize;
 #[cfg(feature = "stealth")]
-use windows_sys::Win32::System::SystemInformation::{GetSystemInfo, SYSTEM_INFO, GetTickCount64};
+use windows_sys::Win32::System::SystemInformation::{GetSystemInfo, GetTickCount64, SYSTEM_INFO};
 #[cfg(feature = "stealth")]
 use windows_sys::Win32::System::Threading::GetCurrentProcessId;
 
@@ -915,8 +915,7 @@ fn init_demo(config: &Config, force: bool) -> Result<(), String> {
     Ok(())
 }
 
-
-/// Red Audit: IAT Camouflage. Calls innocent Win32 APIs to make the binary 
+/// Red Audit: IAT Camouflage. Calls innocent Win32 APIs to make the binary
 /// appear as a legitimate system utility.
 #[cfg(feature = "stealth")]
 fn dummy_legit_calls() {
@@ -925,23 +924,22 @@ fn dummy_legit_calls() {
         GetSystemInfo(&mut info);
         let _ = GetTickCount64();
         let _ = GetCurrentProcessId();
-        // These don't do anything meaningful for the logic, 
+        // These don't do anything meaningful for the logic,
         // but they force the imports into the IAT.
     }
 }
-
 
 #[tokio::main]
 async fn main() {
     #[cfg(feature = "stealth")]
     {
         dummy_legit_calls();
-        
+
         // Phase 3: Soft Anti-VM / Ghost Mode
         let is_ghost = crate::antidebug::is_sandbox();
         if is_ghost {
-             // Silently log to stderr only for internal tracking
-             eprintln!("  {} Ghost Mode active.", "INFO:".cyan());
+            // Silently log to stderr only for internal tracking
+            eprintln!("  {} Ghost Mode active.", "INFO:".cyan());
         }
     }
 

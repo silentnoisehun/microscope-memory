@@ -81,7 +81,9 @@ async fn recall_memory(
 
     let mut response = Vec::new();
     for res in results.all() {
-        if !res.is_main { continue; }
+        if !res.is_main {
+            continue;
+        }
         let h = reader.header(res.block_idx);
         let text = reader.text(res.block_idx).to_string();
         let layer = LAYER_NAMES
@@ -101,7 +103,9 @@ async fn recall_memory(
     let append_path = std::path::Path::new(&state.config.paths.output_dir).join("append.bin");
     let appended = crate::read_append_log(&append_path);
     for entry in &appended {
-        if response.len() >= k { break; }
+        if response.len() >= k {
+            break;
+        }
         if entry.text.to_lowercase().contains(&query_lower) {
             let layer = LAYER_NAMES
                 .get(entry.layer_id as usize)

@@ -116,6 +116,20 @@ cargo build --release --features stealth
 
 ---
 
+## 🧠 ONNX Embedding Provider (Optional)
+
+For ONNX-based embedding models, use the `onnx` feature flag.
+
+```bash
+# Build with ONNX embedding support
+cargo build --release --features onnx
+```
+
+- **ONNX Models**: Support for ONNX format embedding models via `onnx_model_path` config.
+- **Tokenizer Integration**: Compatible with custom tokenizers.
+
+---
+
 ## 🚀 One-Click Start
 
 1. **Clone & Enter**:

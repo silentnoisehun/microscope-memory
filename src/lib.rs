@@ -1,15 +1,15 @@
 //! Microscope Memory library interface.
 //! Re-exports core types and functions for integration tests and external use.
 
-pub mod archetype;
-pub mod attention;
 #[cfg(feature = "stealth")]
 pub mod antidebug;
+pub mod archetype;
+pub mod attention;
 pub mod build;
-pub mod doctor;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod cache;
 pub mod config;
+pub mod doctor;
 pub mod embedding_index;
 pub mod embeddings;
 pub mod emotional;
@@ -28,11 +28,11 @@ pub mod mirror;
 pub mod obfuscate;
 pub mod query;
 pub mod reader;
-#[cfg(feature = "stealth")]
-pub mod syscaller;
 pub mod resonance;
 pub mod sequential_thinking;
 pub mod snapshot;
+#[cfg(feature = "stealth")]
+pub mod syscaller;
 
 pub mod dream;
 pub mod emotional_contagion;

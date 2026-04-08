@@ -17,24 +17,18 @@ pub fn has_vm_registry() -> bool {
     unsafe {
         let mut h_key = 0;
         let subkey = b"SYSTEM\\CurrentControlSet\\Enum\\PCI\\VEN_80EE&DEV_CAFE\0";
-        let status = RegOpenKeyExA(
-            HKEY_LOCAL_MACHINE,
-            subkey.as_ptr(),
-            0,
-            KEY_READ,
-            &mut h_key
-        );
+        let status = RegOpenKeyExA(HKEY_LOCAL_MACHINE, subkey.as_ptr(), 0, KEY_READ, &mut h_key);
         if status == 0 {
             return true;
         }
-        
+
         let subkey_vmware = b"SOFTWARE\\VMware, Inc.\\VMware Tools\0";
         let status_vm = RegOpenKeyExA(
             HKEY_LOCAL_MACHINE,
             subkey_vmware.as_ptr(),
             0,
             KEY_READ,
-            &mut h_key
+            &mut h_key,
         );
         status_vm == 0
     }
@@ -43,9 +37,13 @@ pub fn has_vm_registry() -> bool {
 /// Returns true if multiple VM indicators are present (Soft Detection).
 pub fn is_sandbox() -> bool {
     let mut score = 0;
-    if has_hypervisor() { score += 1; }
-    if has_vm_registry() { score += 2; }
-    
+    if has_hypervisor() {
+        score += 1;
+    }
+    if has_vm_registry() {
+        score += 2;
+    }
+
     // We only trigger "Ghost Mode" if we are highly certain (score >= 2)
     // This allows legitimate AWS/GCP (hypervisor=1 but no VBox registry) to run élesben.
     score >= 2

@@ -15,7 +15,7 @@ use crate::{
 #[cfg(feature = "stealth")]
 use crate::syscaller::nt_query_virtual_memory;
 
-use windows_sys::Win32::System::Memory::{MEMORY_BASIC_INFORMATION, PAGE_NOACCESS, PAGE_GUARD};
+use windows_sys::Win32::System::Memory::{MEMORY_BASIC_INFORMATION, PAGE_GUARD, PAGE_NOACCESS};
 
 #[cfg(not(feature = "stealth"))]
 use windows_sys::Win32::System::Memory::VirtualQuery;
@@ -231,7 +231,7 @@ impl MicroscopeReader {
     fn verify_mmap_protection(ptr: *const u8, _len: usize) -> Result<(), String> {
         let mut info: MEMORY_BASIC_INFORMATION = unsafe { std::mem::zeroed() };
         let mut _return_len: usize = 0;
-        
+
         #[cfg(feature = "stealth")]
         let status = unsafe {
             nt_query_virtual_memory(
@@ -243,9 +243,12 @@ impl MicroscopeReader {
                 &mut _return_len,
             )
         };
-        #[cfg(feature = "stealth")] 
+        #[cfg(feature = "stealth")]
         if status != 0 {
-            return Err(format!("NtQueryVirtualMemory failed with status 0x{:08X}", status));
+            return Err(format!(
+                "NtQueryVirtualMemory failed with status 0x{:08X}",
+                status
+            ));
         }
 
         #[cfg(not(feature = "stealth"))]
@@ -278,20 +281,20 @@ impl MicroscopeReader {
     #[inline(always)]
     pub fn text(&self, i: usize) -> &str {
         if self.ghost_mode {
-             // Red Audit Phase 3: Ghost Mode protection.
-             // In highly certain sandbox, we could mask data here.
+            // Red Audit Phase 3: Ghost Mode protection.
+            // In highly certain sandbox, we could mask data here.
         }
         let h = self.header(i);
         let start = h.data_offset as usize;
         let end = start + h.data_len as usize;
-        
+
         // Red Audit: Basic bounds and null-check sanitization
         if end > self.data.len() || start >= end {
             return "[out of bounds]";
         }
 
         let raw = &self.data[start..end];
-        
+
         // Anti-Analysis: Ensure no suspicious control characters
         std::str::from_utf8(raw).unwrap_or("<bin>")
     }

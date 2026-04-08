@@ -73,7 +73,7 @@ fn test_store_and_recall() {
     assert!(append_path.exists());
 
     let entries = microscope_memory::read_append_log(&append_path);
-    assert!(entries.len() >= 1);
+    assert!(!entries.is_empty());
 }
 
 #[test]
@@ -155,7 +155,11 @@ fn test_mql_complex_query() {
     assert!(!results.is_empty(), "Spatial 'near:' filter failed");
 }
 
-fn execute_query(q: &microscope_memory::query::Query, reader: &microscope_memory::reader::MicroscopeReader, appended: &[microscope_memory::AppendEntry]) -> Vec<microscope_memory::query::QueryResult> {
+fn execute_query(
+    q: &microscope_memory::query::Query,
+    reader: &microscope_memory::reader::MicroscopeReader,
+    appended: &[microscope_memory::AppendEntry],
+) -> Vec<microscope_memory::query::QueryResult> {
     microscope_memory::query::execute(q, reader, appended)
 }
 

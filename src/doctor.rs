@@ -1,16 +1,19 @@
 //! doctor.rs — Integrity diagnostics and automatic repair for Microscope Memory.
 //! (v0.7.0 Public Beta - Reliability Phase)
 
+use crate::config::Config;
+use crate::merkle::MerkleTree;
+use crate::reader::MicroscopeReader;
+use colored::Colorize;
 use std::fs;
 use std::path::Path;
-use colored::Colorize;
-use crate::config::Config;
-use crate::reader::{MicroscopeReader};
-use crate::merkle::MerkleTree;
 
 pub fn run_doctor(config: &Config, fix: bool) -> Result<(), String> {
     println!("{}", "=".repeat(60));
-    println!("  {}", "MICROSCOPE MEMORY DOCTOR — Integrity Scan".cyan().bold());
+    println!(
+        "  {}",
+        "MICROSCOPE MEMORY DOCTOR — Integrity Scan".cyan().bold()
+    );
     println!("{}", "=".repeat(60));
 
     let output_dir = Path::new(&config.paths.output_dir);
@@ -24,28 +27,40 @@ pub fn run_doctor(config: &Config, fix: bool) -> Result<(), String> {
             println!("  [{}] {} is missing", "ERR".red(), file);
             artifacts_missing = true;
         } else {
-            println!("  [{}] {} present ({:.1} KB)", 
-                "OK".green(), 
-                file, 
-                fs::metadata(&p).map(|m| m.len() as f64 / 1024.0).unwrap_or(0.0)
+            println!(
+                "  [{}] {} present ({:.1} KB)",
+                "OK".green(),
+                file,
+                fs::metadata(&p)
+                    .map(|m| m.len() as f64 / 1024.0)
+                    .unwrap_or(0.0)
             );
         }
     }
 
     if artifacts_missing {
-        println!("\n  {} Core artifacts are missing. Run 'build' to regenerate.", "WARN:".yellow());
+        println!(
+            "\n  {} Core artifacts are missing. Run 'build' to regenerate.",
+            "WARN:".yellow()
+        );
         return Ok(());
     }
 
     // 2. Comprehensive Integrity Scan
     let reader = MicroscopeReader::open(config)?;
-    println!("\n  {} scanning {} blocks...", "INTEGRITY:".yellow(), reader.block_count);
-    
+    println!(
+        "\n  {} scanning {} blocks...",
+        "INTEGRITY:".yellow(),
+        reader.block_count
+    );
+
     let mut bad_crc = 0;
     for i in 0..reader.block_count {
         let h = reader.header(i);
         let stored_crc = u16::from_le_bytes(h.crc16);
-        if stored_crc == 0 { continue; }
+        if stored_crc == 0 {
+            continue;
+        }
 
         let start = h.data_offset as usize;
         let end = start + h.data_len as usize;
@@ -63,7 +78,11 @@ pub fn run_doctor(config: &Config, fix: bool) -> Result<(), String> {
     if bad_crc == 0 {
         println!("  [{}] All block CRCs verified.", "OK".green());
     } else {
-        println!("  [{}] {} block(s) have CRC mismatches!", "FAIL".red(), bad_crc);
+        println!(
+            "  [{}] {} block(s) have CRC mismatches!",
+            "FAIL".red(),
+            bad_crc
+        );
     }
 
     // 3. Merkle Root Check
@@ -71,7 +90,11 @@ pub fn run_doctor(config: &Config, fix: bool) -> Result<(), String> {
     if merkle_path.exists() {
         if let Ok(merkle_data) = fs::read(&merkle_path) {
             if let Some(tree) = MerkleTree::from_bytes(&merkle_data) {
-                println!("  [{}] Merkle tree loaded (Root: {})", "OK".green(), crate::hex_str(&tree.root));
+                println!(
+                    "  [{}] Merkle tree loaded (Root: {})",
+                    "OK".green(),
+                    crate::hex_str(&tree.root)
+                );
             }
         }
     }
@@ -86,9 +109,11 @@ pub fn run_doctor(config: &Config, fix: bool) -> Result<(), String> {
         } else {
             let mut pos = 0;
             let is_v2 = data.len() >= 4 && &data[0..4] == b"APv2";
-            if is_v2 { pos = 4; }
+            if is_v2 {
+                pos = 4;
+            }
             let header_size = if is_v2 { 19 } else { 18 };
-            
+
             let mut valid_pos = pos;
             let mut count = 0;
             let mut corrupted = false;
@@ -109,17 +134,35 @@ pub fn run_doctor(config: &Config, fix: bool) -> Result<(), String> {
             }
 
             if corrupted {
-                println!("  [{}] Found corrupted data at tail. Valid entries: {}", "WARN".yellow(), count);
+                println!(
+                    "  [{}] Found corrupted data at tail. Valid entries: {}",
+                    "WARN".yellow(),
+                    count
+                );
                 if fix {
-                    println!("  [{}] Truncating append.bin to last valid position ({} bytes)...", "FIX".green(), valid_pos);
-                    let f = fs::OpenOptions::new().write(true).open(&append_path).map_err(|e| e.to_string())?;
+                    println!(
+                        "  [{}] Truncating append.bin to last valid position ({} bytes)...",
+                        "FIX".green(),
+                        valid_pos
+                    );
+                    let f = fs::OpenOptions::new()
+                        .write(true)
+                        .open(&append_path)
+                        .map_err(|e| e.to_string())?;
                     f.set_len(valid_pos as u64).map_err(|e| e.to_string())?;
                     println!("  [{}] Truncation successful.", "DONE".green());
                 } else {
-                    println!("  [{}] Run with --fix to truncate and recover the log.", "INFO".cyan());
+                    println!(
+                        "  [{}] Run with --fix to truncate and recover the log.",
+                        "INFO".cyan()
+                    );
                 }
             } else {
-                println!("  [{}] Append log is healthy. Entries: {}", "OK".green(), count);
+                println!(
+                    "  [{}] Append log is healthy. Entries: {}",
+                    "OK".green(),
+                    count
+                );
             }
         }
     } else {

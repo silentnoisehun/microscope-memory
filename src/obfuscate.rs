@@ -7,19 +7,17 @@ include!(concat!(env!("OUT_DIR"), "/const_gen.rs"));
 /// Usage: xor_str!("my_secret_string", 0x42)
 #[macro_export]
 macro_rules! xor_str {
-    ($s:expr, $key:expr) => {
-        {
-            const S: &[u8] = $s.as_bytes();
-            const LEN: usize = S.len();
-            let mut res = [0u8; LEN];
-            let mut i = 0;
-            while i < LEN {
-                res[i] = S[i] ^ $key;
-                i += 1;
-            }
-            res
+    ($s:expr, $key:expr) => {{
+        const S: &[u8] = $s.as_bytes();
+        const LEN: usize = S.len();
+        let mut res = [0u8; LEN];
+        let mut i = 0;
+        while i < LEN {
+            res[i] = S[i] ^ $key;
+            i += 1;
         }
-    };
+        res
+    }};
 }
 
 /// Decrypts an XOR-obfuscated byte array at runtime.

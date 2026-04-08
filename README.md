@@ -6,6 +6,8 @@
 [![API v1](https://img.shields.io/badge/API-v1.0-cyan.svg)](#-spine-bridge-api-v1)
 [![Doctor](https://img.shields.io/badge/Reliability-Doctor--Cmd-green.svg)](#-reliability--doctor-command)
 
+![Microscope Memory Viewer](unnamed.png)
+
 **Microscope Memory** is a high-performance, hierarchical cognitive memory engine designed for AI agents and LLM architectures. It specializes in **sub-microsecond retrieval** of long-term context, bypassing the overhead of traditional Vector DBs.
 
 v0.7.0 marks the transition to **Public Beta**, introducing enterprise-grade reliability, automated crash recovery, and a modular architecture.

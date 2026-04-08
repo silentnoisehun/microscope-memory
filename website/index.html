@@ -18,36 +18,11 @@
   <header class="topbar reveal">
     <div class="brand">Microscope Memory</div>
     <nav>
-      <a href="#microscope">Microscope</a>
-      <a href="#palace">Palace</a>
-      <a href="#integrations">Integrations</a>
-      <a href="#orchestration">Orchestration</a>
-      <a href="#launch">Launch</a>
+      <a href="#microscope">Microscope Scroll</a>
     </nav>
   </header>
 
   <main>
-    <section class="hero">
-      <div class="hero-copy reveal" style="--delay: 0.05s;">
-        <p class="kicker">Digital Memory Palace</p>
-        <h1>Your AI remembers like a place, not a log.</h1>
-        <p class="lead">
-          Persistent memory for Claude, ChatGPT, Ollama, and mobile apps.
-          Local-first speed when you need it. Cloud deployment when you scale.
-        </p>
-        <div class="hero-actions">
-          <a class="btn btn-primary" href="../viewer.html?file=cognitive_map.bin">Use It Now (1 Click)</a>
-          <a class="btn btn-primary" href="../scripts/start_agent_stack.bat" download>Start MCP + Delegation</a>
-          <a class="btn btn-ghost" href="../OneClick_Start.bat" download>Download OneClick Start</a>
-          <a class="btn btn-primary" href="#launch">Start In One Click</a>
-          <a class="btn btn-ghost" href="../viewer.html">Open 3D Viewer</a>
-        </div>
-      </div>
-      <figure class="hero-visual reveal" style="--delay: 0.14s;">
-        <img src="../unnamed.png" alt="Microscope Memory 3D visualization">
-      </figure>
-    </section>
-
     <section id="microscope" class="panel microscope-stack reveal" style="--delay: 0.02s;">
       <div class="panel-head">
         <p class="kicker">Microscope Scroll</p>
@@ -57,13 +32,13 @@
         <aside class="lens-column">
           <div class="lens-core" id="lensCore">
             <p class="lens-label">ACTIVE LAYER</p>
-            <p class="lens-depth" id="lensDepth">D0</p>
-            <p class="lens-name" id="lensName">Identity</p>
-            <p class="lens-hint" id="lensHint">Root identity and intent layer</p>
+            <p class="lens-depth" id="lensDepth">D8</p>
+            <p class="lens-name" id="lensName">Raw Bytes</p>
+            <p class="lens-hint" id="lensHint">Atomic binary floor</p>
           </div>
         </aside>
         <div class="layer-track">
-          <article class="layer-step is-active" data-depth="0">
+          <article class="layer-step" data-depth="0">
             <div class="layer-media">
               <div class="layer-art layer-art-0" aria-hidden="true"></div>
               <p class="layer-caption">Identity Beacon</p>
@@ -151,7 +126,7 @@
               <p>Character-space alignment for exact reconstruction paths.</p>
             </div>
           </article>
-          <article class="layer-step" data-depth="8">
+          <article class="layer-step is-active image-live" data-depth="8">
             <div class="layer-media">
               <div class="layer-art layer-art-8" aria-hidden="true"></div>
               <p class="layer-caption">Byte Lattice</p>
@@ -165,207 +140,12 @@
         </div>
       </div>
     </section>
-
-    <section class="panel quick-use reveal" style="--delay: 0.02s;">
-      <div class="panel-head">
-        <p class="kicker">One Click Use</p>
-        <h2>People can try it instantly</h2>
-      </div>
-      <div class="quick-grid">
-        <article class="quick-card">
-          <h3>Instant Palace Demo</h3>
-          <p>Open the 3D memory palace with the current cognitive map in one click.</p>
-          <a class="btn btn-primary" href="../viewer.html?file=cognitive_map.bin">Open Demo</a>
-        </article>
-        <article class="quick-card">
-          <h3>Local One-Click Runtime</h3>
-          <p>Download and run the packaged startup script for local usage.</p>
-          <a class="btn btn-ghost" href="../OneClick_Start.bat" download>Get Start Script</a>
-        </article>
-        <article class="quick-card">
-          <h3>Public API Entry</h3>
-          <p>Plug your client quickly through the published OpenAPI contract.</p>
-          <a class="btn btn-ghost" href="../openapi.yaml">Open API Spec</a>
-        </article>
-      </div>
-    </section>
-
-    <section id="auth" class="panel auth-panel reveal" style="--delay: 0.02s;">
-      <div class="panel-head">
-        <p class="kicker">Registration</p>
-        <h2>Sign up in one click with Google or Apple</h2>
-      </div>
-      <div class="auth-grid">
-        <article class="auth-card">
-          <p>Create your account quickly and keep your Memory Palace profile synced.</p>
-          <div class="auth-meta">
-            <label for="memoryBackendSelect">Memory Backend</label>
-            <select id="memoryBackendSelect">
-              <option value="cloud">Cloud (hosted profile)</option>
-              <option value="local">Local (device-first)</option>
-            </select>
-            <label for="memoryScopeSelect">Memory Scope</label>
-            <select id="memoryScopeSelect">
-              <option value="both">Both (personal + shared)</option>
-              <option value="personal">Personal only</option>
-              <option value="shared">Shared only</option>
-            </select>
-          </div>
-          <div class="auth-actions">
-            <button id="guestAuthBtn" class="auth-btn instant" type="button">Continue Instantly</button>
-            <button id="googleAuthBtn" class="auth-btn google" type="button">Continue with Google</button>
-            <button id="appleAuthBtn" class="auth-btn apple" type="button">Continue with Apple</button>
-            <button id="connectMemoryBtn" class="auth-btn cloud" type="button">Connect Memory Space</button>
-            <button id="signOutBtn" class="auth-btn ghost" type="button">Sign out</button>
-          </div>
-          <p id="authStatus" class="auth-status">Instant mode is ready. Click and continue.</p>
-          <p id="sessionStatus" class="session-status">Cloud session not connected yet.</p>
-        </article>
-      </div>
-    </section>
-
-    <section id="palace" class="panel reveal" style="--delay: 0.02s;">
-      <div class="panel-head">
-        <p class="kicker">Memory Palace Model</p>
-        <h2>Navigate knowledge by depth and neighborhood</h2>
-      </div>
-      <div class="depth-tool">
-        <label for="depthRange">Depth</label>
-        <input id="depthRange" type="range" min="0" max="8" value="3">
-        <div class="depth-readout">
-          <span id="depthId">D3</span>
-          <span id="depthName">Memories</span>
-          <span id="depthHint">Room-level concepts</span>
-        </div>
-      </div>
-      <div class="palace-grid">
-        <article class="card reveal" style="--delay: 0.07s;">
-          <h3>Zoom Travel</h3>
-          <p>Move from identity layers down to raw bytes without losing context.</p>
-        </article>
-        <article class="card reveal" style="--delay: 0.11s;">
-          <h3>Radial Recall</h3>
-          <p>Side-step to neighboring rooms with radius-based associative retrieval.</p>
-        </article>
-        <article class="card reveal" style="--delay: 0.15s;">
-          <h3>Persistent Paths</h3>
-          <p>Thought routes and emotional bias keep useful memories close over time.</p>
-        </article>
-      </div>
-    </section>
-
-    <section id="integrations" class="panel reveal" style="--delay: 0.02s;">
-      <div class="panel-head">
-        <p class="kicker">Integrations</p>
-        <h2>One memory layer, multiple AI runtimes</h2>
-      </div>
-      <div class="integration-grid">
-        <article class="integration-card reveal" style="--delay: 0.05s;">
-          <h3>Ollama Local</h3>
-          <p>Fastest path: local model + local memory over socket and tool calls.</p>
-        </article>
-        <article class="integration-card reveal" style="--delay: 0.08s;">
-          <h3>Claude MCP</h3>
-          <p>Expose memory operations as MCP tools in Claude Desktop and coding flows.</p>
-        </article>
-        <article class="integration-card reveal" style="--delay: 0.11s;">
-          <h3>ChatGPT Actions</h3>
-          <p>Serve HTTPS endpoints with OpenAPI so custom GPTs can read and write memory.</p>
-        </article>
-        <article class="integration-card reveal" style="--delay: 0.14s;">
-          <h3>OpenClaw</h3>
-          <p>Add Microscope Memory as an external associative layer for agent orchestration.</p>
-        </article>
-        <article class="integration-card reveal" style="--delay: 0.17s;">
-          <h3>Android + iOS</h3>
-          <p>Use the same API from mobile chat UIs with user-scoped persistent context.</p>
-        </article>
-        <article class="integration-card reveal" style="--delay: 0.20s;">
-          <h3>Cloud Mode</h3>
-          <p>Deploy as a memory server when you need hosted access and shared state.</p>
-        </article>
-      </div>
-    </section>
-
-    <section id="orchestration" class="panel reveal" style="--delay: 0.02s;">
-      <div class="panel-head">
-        <p class="kicker">MCP + Delegation</p>
-        <h2>Run MCP server and delegate agent tasks</h2>
-      </div>
-      <div class="orchestration-grid">
-        <article class="orchestration-card">
-          <h3>MCP Server</h3>
-          <p>Expose Microscope Memory tools to Claude and MCP-compatible clients.</p>
-          <pre><code id="mcpCmd">microscope-mem mcp</code></pre>
-          <div class="mini-actions">
-            <button class="btn btn-ghost copy-btn" type="button" data-copy-target="mcpCmd">Copy Command</button>
-            <a class="btn btn-primary" href="../scripts/start_agent_stack.bat" download>1-Click Start Stack</a>
-          </div>
-        </article>
-        <article class="orchestration-card">
-          <h3>Agent Delegation</h3>
-          <p>Split complex work into parallel tasks with shared memory context via Bridge API.</p>
-          <pre><code id="delegatePrompt">Delegate this goal into 3 executable subtasks.
-Each sub-agent should read memory first, then write outcomes.
-Use /recall and /remember for every critical step.</code></pre>
-          <div class="mini-actions">
-            <button class="btn btn-ghost copy-btn" type="button" data-copy-target="delegatePrompt">Copy Delegation Prompt</button>
-            <a class="btn btn-ghost" href="../openapi.yaml">Open Delegation API Contract</a>
-          </div>
-        </article>
-      </div>
-    </section>
-
-    <section id="launch" class="panel launch reveal" style="--delay: 0.02s;">
-      <div class="panel-head">
-        <p class="kicker">One Click Start</p>
-        <h2>From zero to running memory stack in minutes</h2>
-      </div>
-      <div class="launch-grid">
-        <article class="launch-step reveal" style="--delay: 0.07s;">
-          <h3>1. Clone</h3>
-          <pre><code>git clone https://github.com/silentnoisehun/microscope-memory.git
-cd microscope-memory</code></pre>
-        </article>
-        <article class="launch-step reveal" style="--delay: 0.11s;">
-          <h3>2. Start</h3>
-          <pre><code>OneClick_Start.bat</code></pre>
-        </article>
-        <article class="launch-step reveal" style="--delay: 0.15s;">
-          <h3>3. Connect</h3>
-          <pre><code>Claude MCP | Ollama tools | ChatGPT Actions</code></pre>
-        </article>
-      </div>
-      <div class="launch-actions">
-        <a class="btn btn-primary" href="../README.md">Read Setup Guide</a>
-        <a class="btn btn-ghost" href="../openapi.yaml">OpenAPI Spec</a>
-      </div>
-    </section>
   </main>
 
   <footer class="footer reveal">
-    <p>Microscope Memory</p>
-    <p>Persistent. Spatial. Agent-ready.</p>
+    <p>Microscope Scroll</p>
+    <p>D0-D8 continuous depth narrative</p>
   </footer>
-
-  <script>
-    window.MICROSCOPE_AUTH = {
-      enabled: false,
-      firebaseConfig: {
-        apiKey: "",
-        authDomain: "",
-        projectId: "",
-        appId: ""
-      }
-    };
-    window.MICROSCOPE_API = {
-      // Leave empty to auto-use current website origin.
-      // Example: "https://your-memory-cloud.example.com"
-      baseUrl: ""
-    };
-  </script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
   <script src="./app.js"></script>
 </body>
 </html>

@@ -1,12 +1,12 @@
 const depthModel = [
-  { id: "D0", name: "Identity", hint: "Root identity and intent layer" },
-  { id: "D1", name: "Layer Summaries", hint: "High-level map of memory zones" },
-  { id: "D2", name: "Topic Clusters", hint: "Rooms and neighborhoods of knowledge" },
-  { id: "D3", name: "Memories", hint: "Room-level concepts" },
-  { id: "D4", name: "Sentences", hint: "Detailed content granularity" },
-  { id: "D5", name: "Tokens", hint: "Fine-grained retrieval atoms" },
-  { id: "D6", name: "Syllables", hint: "Microscopic language fragments" },
-  { id: "D7", name: "Characters", hint: "Character-level context" },
+  { id: "D0", name: "Identity", hint: "Core purpose and personality map of the memory space." },
+  { id: "D1", name: "Layer Summaries", hint: "Top-level summary map to orient the full palace quickly." },
+  { id: "D2", name: "Topic Clusters", hint: "Large semantic rooms where related themes gather." },
+  { id: "D3", name: "Memories", hint: "Concrete chunks of user and agent memories." },
+  { id: "D4", name: "Sentences", hint: "Fine detail where meaning can be reconstructed with context." },
+  { id: "D5", name: "Tokens", hint: "Token-level fragments used for precise associative jumps." },
+  { id: "D6", name: "Syllables", hint: "Microscopic language grains for robust low-level linking." },
+  { id: "D7", name: "Characters", hint: "Character-space alignment for exact reconstruction paths." },
   { id: "D8", name: "Raw Bytes", hint: "Atomic binary floor" },
 ];
 
@@ -112,6 +112,14 @@ function bindMicroscopeDive() {
     if (depthId) depthId.textContent = data.id;
     if (depthName) depthName.textContent = data.name;
     if (depthHint) depthHint.textContent = data.hint;
+
+    const t = Math.max(0, Math.min(1, idx / 8));
+    const bgZoom = (1 + t * 0.22).toFixed(3);
+    const lensZoom = (1 + t * 0.1).toFixed(3);
+    const tilt = (-t * 3.5).toFixed(2) + "deg";
+    document.documentElement.style.setProperty("--bg-zoom", bgZoom);
+    document.documentElement.style.setProperty("--lens-zoom", lensZoom);
+    document.documentElement.style.setProperty("--track-tilt", tilt);
   };
 
   const observer = new IntersectionObserver(
@@ -130,7 +138,7 @@ function bindMicroscopeDive() {
   );
 
   steps.forEach((step) => observer.observe(step));
-  setActive(0);
+  setActive(8);
 }
 
 function bindAuth() {

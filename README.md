@@ -35,7 +35,9 @@ v0.7.0 marks the transition to **Public Beta**, introducing enterprise-grade rel
 
 ## 🏗️ Architecture Design
 
-![Architecture Design](architecture-diagram.jpg)
+<p align="center">
+  <img src="architecture-diagram.jpg" alt="Architecture Design">
+</p>
 
 ---
 
@@ -128,4 +130,3 @@ See [BENCHMARKS.md](BENCHMARKS.md) for detailed results.
 
 ---
 *Architected by [Máté Róbert](https://github.com/silentnoisehun) — The Silent Noise Research Series.*
-he Silent Noise Research Series.*

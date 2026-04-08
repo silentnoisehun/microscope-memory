@@ -28,6 +28,9 @@ config.bin
 
 # Logs and temp files
 *.log
+errors.txt
+compile_errors.txt
+test_errors.json
 tmp/
 build_error*
 check_error*

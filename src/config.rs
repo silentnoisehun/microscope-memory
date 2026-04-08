@@ -113,6 +113,10 @@ pub struct Server {
     pub port: u16,
     #[serde(default)]
     pub cors_origin: Option<String>,
+    #[serde(default)]
+    pub openai_api_key: Option<String>,
+    #[serde(default)]
+    pub gemini_api_key: Option<String>,
 }
 
 fn default_port() -> u16 {
@@ -124,6 +128,8 @@ impl Default for Server {
         Self {
             port: default_port(),
             cors_origin: None,
+            openai_api_key: None,
+            gemini_api_key: None,
         }
     }
 }

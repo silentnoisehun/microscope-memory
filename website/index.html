@@ -24,21 +24,46 @@
 
   <main>
     <section id="microscope" class="panel microscope-stack reveal" style="--delay: 0.02s;">
-      <div class="panel-head">
-        <p class="kicker">Microscope Scroll</p>
-        <h2>Scroll down, dive through D0 to D8</h2>
-      </div>
       <div class="microscope-layout">
-        <aside class="lens-column">
+        <aside class="lens-column scope-frame">
+          <p class="scope-top-title">Microscope Scroll</p>
+          <div class="scope-border" aria-hidden="true"></div>
+          <div class="scope-border scope-border-inner" aria-hidden="true"></div>
+          <div class="scope-ui scope-ui-left">
+            <p>REC [●] ACTIVE</p>
+            <p>ISO 100 // F2.8</p>
+          </div>
+          <div class="scope-ui scope-ui-right">
+            <p>X: <span id="hudX">562.9</span></p>
+            <p>Y: <span id="hudY">273.9</span></p>
+          </div>
+          <div class="scope-bars" aria-hidden="true">
+            <span></span><span></span><span></span><span></span><span></span>
+          </div>
+          <div class="scope-status">
+            <span>MICROSCOPE MEMORY // SYSTEM ACTIVE</span>
+            <span>BUFFER: 98%&nbsp;&nbsp;TEMP: 32.4°C</span>
+          </div>
           <div class="lens-core" id="lensCore">
+            <p class="lens-mag" id="lensMag">MAGNIFICATION: 1,000,000X</p>
             <p class="lens-label">ACTIVE LAYER</p>
             <p class="lens-depth" id="lensDepth">D8</p>
             <p class="lens-name" id="lensName">Raw Bytes</p>
             <p class="lens-hint" id="lensHint">Atomic binary floor</p>
+            <div class="lens-cards">
+              <article class="lens-card">
+                <h3 id="lensCardTitleA">Byte Lattice</h3>
+                <p id="lensCardTextA">Atomic binary substrate where every memory can be anchored.</p>
+              </article>
+              <article class="lens-card">
+                <h3 id="lensCardTitleB">Character Mesh</h3>
+                <p id="lensCardTextB">Character-space alignment for exact reconstruction paths.</p>
+              </article>
+            </div>
           </div>
         </aside>
         <div class="layer-track">
-          <article class="layer-step" data-depth="0">
+          <article class="layer-step depth-marker" data-depth="0">
             <div class="layer-media">
               <div class="layer-art layer-art-0" aria-hidden="true"></div>
               <p class="layer-caption">Identity Beacon</p>
@@ -49,7 +74,7 @@
               <p>Core purpose and personality map of the memory space.</p>
             </div>
           </article>
-          <article class="layer-step" data-depth="1">
+          <article class="layer-step depth-marker" data-depth="1">
             <div class="layer-media">
               <div class="layer-art layer-art-1" aria-hidden="true"></div>
               <p class="layer-caption">Hall Map</p>
@@ -60,7 +85,7 @@
               <p>Top-level summary map to orient the full palace quickly.</p>
             </div>
           </article>
-          <article class="layer-step" data-depth="2">
+          <article class="layer-step depth-marker" data-depth="2">
             <div class="layer-media">
               <div class="layer-art layer-art-2" aria-hidden="true"></div>
               <p class="layer-caption">Cluster Rooms</p>
@@ -71,7 +96,7 @@
               <p>Large semantic rooms where related themes gather.</p>
             </div>
           </article>
-          <article class="layer-step" data-depth="3">
+          <article class="layer-step depth-marker" data-depth="3">
             <div class="layer-media">
               <div class="layer-art layer-art-3" aria-hidden="true"></div>
               <p class="layer-caption">Memory Cells</p>
@@ -82,7 +107,7 @@
               <p>Concrete chunks of user and agent memories.</p>
             </div>
           </article>
-          <article class="layer-step" data-depth="4">
+          <article class="layer-step depth-marker" data-depth="4">
             <div class="layer-media">
               <div class="layer-art layer-art-4" aria-hidden="true"></div>
               <p class="layer-caption">Sentence Strands</p>
@@ -93,7 +118,7 @@
               <p>Fine detail where meaning can be reconstructed with context.</p>
             </div>
           </article>
-          <article class="layer-step" data-depth="5">
+          <article class="layer-step depth-marker" data-depth="5">
             <div class="layer-media">
               <div class="layer-art layer-art-5" aria-hidden="true"></div>
               <p class="layer-caption">Token Grid</p>
@@ -104,7 +129,7 @@
               <p>Token-level fragments used for precise associative jumps.</p>
             </div>
           </article>
-          <article class="layer-step" data-depth="6">
+          <article class="layer-step depth-marker" data-depth="6">
             <div class="layer-media">
               <div class="layer-art layer-art-6" aria-hidden="true"></div>
               <p class="layer-caption">Syllable Pulse</p>
@@ -115,7 +140,7 @@
               <p>Microscopic language grains for robust low-level linking.</p>
             </div>
           </article>
-          <article class="layer-step" data-depth="7">
+          <article class="layer-step depth-marker" data-depth="7">
             <div class="layer-media">
               <div class="layer-art layer-art-7" aria-hidden="true"></div>
               <p class="layer-caption">Character Mesh</p>
@@ -126,7 +151,7 @@
               <p>Character-space alignment for exact reconstruction paths.</p>
             </div>
           </article>
-          <article class="layer-step is-active image-live" data-depth="8">
+          <article class="layer-step depth-marker is-active image-live" data-depth="8">
             <div class="layer-media">
               <div class="layer-art layer-art-8" aria-hidden="true"></div>
               <p class="layer-caption">Byte Lattice</p>

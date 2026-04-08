@@ -74,16 +74,17 @@ body {
 }
 
 .topbar {
-  width: min(1120px, calc(100% - 2rem));
-  margin: 1rem auto 0;
+  width: 100%;
+  margin: 0;
   padding: 0.8rem 1rem;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 16px;
-  background: rgba(12, 26, 37, 0.72);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 0;
+  background: rgba(20, 20, 24, 0.88);
   backdrop-filter: blur(7px);
   display: flex;
-  justify-content: space-between;
+  justify-content: center;
   align-items: center;
+  gap: 2rem;
 }
 
 .brand {
@@ -108,8 +109,8 @@ nav a:hover {
 }
 
 main {
-  width: min(1120px, calc(100% - 2rem));
-  margin: 1.5rem auto 3rem;
+  width: 100%;
+  margin: 0;
 }
 
 .hero {
@@ -328,128 +329,230 @@ h3 {
 }
 
 .microscope-stack {
-  overflow: hidden;
+  overflow: clip;
+  margin-top: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
 }
 
 .microscope-layout {
-  margin-top: 1rem;
-  display: grid;
-  grid-template-columns: minmax(220px, 0.85fr) minmax(0, 1.15fr);
-  gap: 1rem;
-  align-items: start;
+  margin-top: 0;
+  display: block;
 }
 
 .lens-column {
   position: sticky;
-  top: 1.2rem;
+  top: 58px;
+  min-height: calc(100vh - 58px);
+  height: calc(100vh - 58px);
   align-self: start;
 }
 
-.lens-core {
-  border: 1px solid rgba(255, 255, 255, 0.22);
+.scope-frame {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  padding: 2rem 2.2rem;
+}
+
+.scope-top-title {
+  position: absolute;
+  top: 0.7rem;
+  left: 50%;
+  transform: translateX(-50%);
+  margin: 0;
+  font-family: "Bricolage Grotesque", sans-serif;
+  color: #ebedf1;
+  letter-spacing: 0.02em;
+}
+
+.scope-border {
+  position: absolute;
+  inset: 4.3rem 2.1rem 3.6rem;
+  border: 1px solid rgba(61, 233, 204, 0.55);
+  pointer-events: none;
+}
+
+.scope-border-inner {
+  inset: 5.4rem 3.2rem 4.7rem;
+  border-color: rgba(200, 252, 243, 0.36);
+}
+
+.scope-ui {
+  position: absolute;
+  z-index: 4;
+  font-family: "IBM Plex Mono", monospace;
+  color: rgba(61, 233, 204, 0.9);
+  font-size: 1.75vh;
+  line-height: 1.6;
+}
+
+.scope-ui p {
+  margin: 0;
+}
+
+.scope-ui-left {
+  left: 6rem;
+  top: 6.7rem;
+}
+
+.scope-ui-right {
+  right: 5.8rem;
+  top: 6.7rem;
+  text-align: right;
+}
+
+.scope-bars {
+  position: absolute;
+  right: 2.9rem;
+  top: 34%;
+  display: grid;
+  gap: 2.2vh;
+  z-index: 4;
+}
+
+.scope-bars span {
+  width: 0.25rem;
+  height: 5.3vh;
   border-radius: 999px;
-  min-height: 280px;
+  background: rgba(61, 233, 204, 0.78);
+  box-shadow: 0 0 10px rgba(61, 233, 204, 0.4);
+}
+
+.scope-status {
+  position: absolute;
+  left: 4.4rem;
+  right: 5.2rem;
+  bottom: 3.15rem;
+  z-index: 4;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-family: "IBM Plex Mono", monospace;
+  color: rgba(61, 233, 204, 0.88);
+  font-size: 1.7vh;
+}
+
+.lens-core {
+  position: absolute;
+  left: 50%;
+  top: 52%;
+  transform: translate(-50%, -50%) scale(var(--lens-zoom));
+  width: min(66vh, 66vw);
+  height: min(66vh, 66vw);
+  border: 10px solid rgba(192, 184, 170, 0.75);
+  border-radius: 999px;
+  min-height: 0;
   padding: 1.25rem;
   background:
-    radial-gradient(80% 65% at 45% 34%, rgba(149, 231, 255, 0.19), rgba(10, 19, 30, 0.74)),
-    radial-gradient(54% 44% at 62% 70%, rgba(255, 190, 85, 0.12), transparent 80%);
+    radial-gradient(58% 55% at 48% 38%, rgba(22, 48, 74, 0.38), rgba(0, 0, 0, 0.93) 70%),
+    #000;
   display: grid;
   align-content: center;
   justify-items: center;
   text-align: center;
-  box-shadow: inset 0 0 0 10px rgba(255, 255, 255, 0.03), var(--shadow);
-  transform: scale(var(--lens-zoom));
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08), var(--shadow);
   transition: transform 0.45s ease;
+  z-index: 2;
+  overflow: hidden;
+}
+
+.lens-core::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(120% 100% at 50% 6%, rgba(255, 255, 255, 0.03), transparent 60%),
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.025), rgba(255, 255, 255, 0.025) 1px, transparent 1px, transparent 3px);
+  pointer-events: none;
 }
 
 .lens-label {
   margin: 0;
   font-family: "IBM Plex Mono", monospace;
-  color: var(--muted);
-  font-size: 0.72rem;
+  color: rgba(76, 235, 206, 0.78);
+  font-size: clamp(0.62rem, 1.45vh, 1rem);
   letter-spacing: 0.11em;
+  z-index: 2;
+}
+
+.lens-mag {
+  margin: 0 0 1.1rem;
+  padding: 0.5rem 1.1rem;
+  border-radius: 999px;
+  background: rgba(75, 115, 128, 0.66);
+  font-family: "IBM Plex Mono", monospace;
+  color: rgba(89, 255, 219, 0.9);
+  font-size: clamp(0.7rem, 2.1vh, 1.02rem);
+  z-index: 2;
 }
 
 .lens-depth {
   margin: 0.45rem 0 0;
   font-family: "IBM Plex Mono", monospace;
-  color: var(--gold);
-  font-size: clamp(2rem, 4.4vw, 3.2rem);
+  color: #ffbe55;
+  font-size: clamp(1.9rem, 5vh, 4rem);
   line-height: 1;
+  z-index: 2;
 }
 
 .lens-name {
   margin: 0.45rem 0 0;
   font-family: "Bricolage Grotesque", sans-serif;
-  font-size: 1.22rem;
+  font-size: clamp(1rem, 3.7vh, 2.6rem);
+  color: #dce4ea;
+  z-index: 2;
 }
 
 .lens-hint {
   margin: 0.5rem 0 0;
-  color: var(--muted);
-  font-size: 0.86rem;
-  max-width: 26ch;
+  color: rgba(188, 198, 207, 0.72);
+  font-size: clamp(0.72rem, 1.8vh, 1.15rem);
+  max-width: 44ch;
+  z-index: 2;
 }
 
 .layer-track {
   position: relative;
+  z-index: 1;
+  width: min(920px, 95vw);
+  margin: 0 auto;
+  padding-top: 15vh;
+  padding-bottom: 22vh;
   display: grid;
-  gap: 0.8rem;
-  transform: perspective(900px) rotateX(var(--track-tilt));
-  transform-origin: 50% 0%;
-  transition: transform 0.45s ease;
+  gap: 28vh;
 }
 
 .layer-track::before {
-  content: "";
-  position: absolute;
-  top: 0.35rem;
-  bottom: 0.35rem;
-  left: 0.95rem;
-  width: 2px;
-  background: linear-gradient(to bottom, rgba(255, 190, 85, 0.9), rgba(82, 173, 255, 0.2));
+  display: none;
 }
 
 .layer-step {
-  position: relative;
-  margin-left: 1.8rem;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 14px;
-  background: rgba(8, 17, 25, 0.7);
-  padding: 0.82rem 0.86rem;
-  display: grid;
-  grid-template-columns: 110px 1fr;
-  gap: 0.75rem;
-  align-items: center;
-  opacity: 0.48;
-  transform: translateY(0);
-  transition: opacity 0.25s ease, transform 0.25s ease, border-color 0.25s ease, background 0.25s ease;
+  min-height: 42vh;
+  opacity: 0;
+  pointer-events: none;
+  border: 0;
+  background: transparent;
+  margin: 0;
+  padding: 0;
 }
 
 .layer-step::before {
-  content: "";
-  position: absolute;
-  left: -1.33rem;
-  top: 1.1rem;
-  width: 0.67rem;
-  height: 0.67rem;
-  border-radius: 50%;
-  border: 2px solid rgba(255, 190, 85, 0.42);
-  background: rgba(12, 24, 36, 0.95);
+  display: none;
 }
 
 .layer-step.is-active {
-  opacity: 1;
-  transform: translateY(-1px) scale(1.015);
-  border-color: rgba(255, 190, 85, 0.56);
-  background:
-    linear-gradient(128deg, rgba(255, 190, 85, 0.12), transparent 50%),
-    rgba(8, 17, 25, 0.84);
+  opacity: 0;
+  transform: none;
+  border-color: transparent;
+  background: transparent;
 }
 
 .layer-step.is-active::before {
-  background: rgba(255, 190, 85, 0.95);
-  box-shadow: 0 0 0 4px rgba(255, 190, 85, 0.16);
+  box-shadow: none;
 }
 
 .layer-id {
@@ -461,10 +564,7 @@ h3 {
 }
 
 .layer-media {
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 12px;
-  background: rgba(5, 11, 18, 0.72);
-  padding: 0.45rem;
+  display: none;
 }
 
 .layer-art {
@@ -517,6 +617,35 @@ h3 {
 .layer-copy p {
   margin: 0.34rem 0 0;
   color: var(--muted);
+}
+
+.lens-cards {
+  z-index: 2;
+  width: min(74%, 650px);
+  margin-top: 1.2rem;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.lens-card {
+  border: 1px solid rgba(74, 223, 194, 0.52);
+  border-radius: 18px;
+  background: rgba(43, 143, 116, 0.9);
+  padding: 1rem 1.05rem;
+  text-align: left;
+}
+
+.lens-card h3 {
+  margin: 0;
+  color: #def3ec;
+  font-size: clamp(0.84rem, 2.2vh, 1.8rem);
+}
+
+.lens-card p {
+  margin: 0.45rem 0 0;
+  color: rgba(204, 231, 222, 0.82);
+  font-size: clamp(0.7rem, 1.75vh, 1.08rem);
 }
 
 .layer-art-0 {
@@ -751,6 +880,13 @@ h3 {
   transform: translateY(0);
 }
 
+.topbar.reveal,
+.microscope-stack.reveal,
+.footer.reveal {
+  opacity: 1;
+  transform: none;
+}
+
 @keyframes glide {
   from { transform: scale(1.06) translateX(-1.2%); }
   to { transform: scale(1.08) translateX(1.2%); }
@@ -762,55 +898,80 @@ h3 {
 }
 
 @media (max-width: 960px) {
-  .hero {
-    grid-template-columns: 1fr;
+  .scope-frame {
+    padding: 1rem;
   }
 
-  .palace-grid,
-  .integration-grid,
-  .quick-grid,
-  .orchestration-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .scope-status,
+  .scope-ui-right {
+    display: none;
   }
 
-  .microscope-layout {
-    grid-template-columns: 1fr;
+  .scope-ui-left {
+    left: 2.2rem;
+    top: 5.1rem;
   }
 
-  .lens-column {
-    position: static;
+  .scope-bars {
+    right: 1.3rem;
   }
 
   .lens-core {
-    min-height: 220px;
-    border-radius: 28px;
+    width: min(77vh, 94vw);
+    height: min(77vh, 94vw);
   }
 
-  .layer-step {
+  .lens-cards {
     grid-template-columns: 1fr;
-  }
-
-  .layer-media {
-    max-width: 220px;
+    width: min(79%, 390px);
+    gap: 0.65rem;
   }
 }
 
 @media (max-width: 700px) {
   .topbar {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.7rem;
+    justify-content: center;
   }
 
-  .palace-grid,
-  .integration-grid,
-  .quick-grid,
-  .orchestration-grid,
-  .launch-grid {
-    grid-template-columns: 1fr;
+  .scope-border {
+    inset: 4.1rem 0.7rem 2.7rem;
+  }
+
+  .scope-border-inner {
+    inset: 5rem 1.4rem 3.3rem;
+  }
+
+  .scope-ui-left {
+    left: 1.45rem;
+    top: 5.6rem;
+    font-size: 0.66rem;
+  }
+
+  .scope-status {
+    left: 1.4rem;
+    right: 1.5rem;
+    bottom: 2.25rem;
+    font-size: 0.58rem;
+    display: flex;
+  }
+
+  .lens-core {
+    top: 53%;
+    width: min(72vh, 95vw);
+    height: min(72vh, 95vw);
+    border-width: 8px;
+    padding: 0.8rem;
+  }
+
+  .lens-mag {
+    font-size: 0.64rem;
+  }
+
+  .lens-cards {
+    width: min(84%, 315px);
   }
 
   .footer {
-    flex-direction: column;
+    display: none;
   }
 }

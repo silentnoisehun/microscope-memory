@@ -1,13 +1,94 @@
 const depthModel = [
-  { id: "D0", name: "Identity", hint: "Core purpose and personality map of the memory space." },
-  { id: "D1", name: "Layer Summaries", hint: "Top-level summary map to orient the full palace quickly." },
-  { id: "D2", name: "Topic Clusters", hint: "Large semantic rooms where related themes gather." },
-  { id: "D3", name: "Memories", hint: "Concrete chunks of user and agent memories." },
-  { id: "D4", name: "Sentences", hint: "Fine detail where meaning can be reconstructed with context." },
-  { id: "D5", name: "Tokens", hint: "Token-level fragments used for precise associative jumps." },
-  { id: "D6", name: "Syllables", hint: "Microscopic language grains for robust low-level linking." },
-  { id: "D7", name: "Characters", hint: "Character-space alignment for exact reconstruction paths." },
-  { id: "D8", name: "Raw Bytes", hint: "Atomic binary floor" },
+  {
+    id: "D0",
+    name: "Identity",
+    hint: "Core purpose and personality map of the memory space.",
+    mag: "10X",
+    cardA: "Identity Beacon",
+    cardAText: "Core purpose and personality map of the memory space.",
+    cardB: "Hall Map",
+    cardBText: "Top-level summary map to orient the full palace quickly.",
+  },
+  {
+    id: "D1",
+    name: "Layer Summaries",
+    hint: "Top-level summary map to orient the full palace quickly.",
+    mag: "100X",
+    cardA: "Hall Map",
+    cardAText: "Top-level summary map to orient the full palace quickly.",
+    cardB: "Cluster Rooms",
+    cardBText: "Large semantic rooms where related themes gather.",
+  },
+  {
+    id: "D2",
+    name: "Topic Clusters",
+    hint: "Large semantic rooms where related themes gather.",
+    mag: "1,000X",
+    cardA: "Cluster Rooms",
+    cardAText: "Large semantic rooms where related themes gather.",
+    cardB: "Memory Cells",
+    cardBText: "Concrete chunks of user and agent memories.",
+  },
+  {
+    id: "D3",
+    name: "Memories",
+    hint: "Concrete chunks of user and agent memories.",
+    mag: "10,000X",
+    cardA: "Memory Cells",
+    cardAText: "Concrete chunks of user and agent memories.",
+    cardB: "Sentence Strands",
+    cardBText: "Fine detail where meaning can be reconstructed with context.",
+  },
+  {
+    id: "D4",
+    name: "Sentences",
+    hint: "Fine detail where meaning can be reconstructed with context.",
+    mag: "100,000X",
+    cardA: "Sentence Strands",
+    cardAText: "Fine detail where meaning can be reconstructed with context.",
+    cardB: "Token Grid",
+    cardBText: "Token-level fragments used for precise associative jumps.",
+  },
+  {
+    id: "D5",
+    name: "Tokens",
+    hint: "Token-level fragments used for precise associative jumps.",
+    mag: "250,000X",
+    cardA: "Token Grid",
+    cardAText: "Token-level fragments used for precise associative jumps.",
+    cardB: "Syllable Pulse",
+    cardBText: "Microscopic language grains for robust low-level linking.",
+  },
+  {
+    id: "D6",
+    name: "Syllables",
+    hint: "Microscopic language grains for robust low-level linking.",
+    mag: "500,000X",
+    cardA: "Syllable Pulse",
+    cardAText: "Microscopic language grains for robust low-level linking.",
+    cardB: "Character Mesh",
+    cardBText: "Character-space alignment for exact reconstruction paths.",
+  },
+  {
+    id: "D7",
+    name: "Characters",
+    hint: "Character-space alignment for exact reconstruction paths.",
+    mag: "750,000X",
+    cardA: "Character Mesh",
+    cardAText: "Character-space alignment for exact reconstruction paths.",
+    cardB: "Byte Lattice",
+    cardBText: "Atomic binary substrate where every memory can be anchored.",
+  },
+  {
+    id: "D8",
+    name: "Raw Bytes",
+    hint: "Atomic binary floor",
+    mag: "1,000,000X",
+    cardA: "Byte Lattice",
+    cardAText: "Atomic binary substrate where every memory can be anchored.",
+    cardB: "Identity Beacon",
+    cardBText: "The loop closes: raw bytes rebuild identity.",
+  },
 ];
 
 function bindDepthTool() {
@@ -92,6 +173,14 @@ function bindMicroscopeDive() {
   const lensDepth = document.getElementById("lensDepth");
   const lensName = document.getElementById("lensName");
   const lensHint = document.getElementById("lensHint");
+  const lensMag = document.getElementById("lensMag");
+  const lensCardTitleA = document.getElementById("lensCardTitleA");
+  const lensCardTextA = document.getElementById("lensCardTextA");
+  const lensCardTitleB = document.getElementById("lensCardTitleB");
+  const lensCardTextB = document.getElementById("lensCardTextB");
+  const hudX = document.getElementById("hudX");
+  const hudY = document.getElementById("hudY");
+  const scopeFrame = document.querySelector(".scope-frame");
   const slider = document.getElementById("depthRange");
   const depthId = document.getElementById("depthId");
   const depthName = document.getElementById("depthName");
@@ -107,6 +196,11 @@ function bindMicroscopeDive() {
     if (lensDepth) lensDepth.textContent = data.id;
     if (lensName) lensName.textContent = data.name;
     if (lensHint) lensHint.textContent = data.hint;
+    if (lensMag) lensMag.textContent = "MAGNIFICATION: " + data.mag;
+    if (lensCardTitleA) lensCardTitleA.textContent = data.cardA;
+    if (lensCardTextA) lensCardTextA.textContent = data.cardAText;
+    if (lensCardTitleB) lensCardTitleB.textContent = data.cardB;
+    if (lensCardTextB) lensCardTextB.textContent = data.cardBText;
 
     if (slider) slider.value = String(idx);
     if (depthId) depthId.textContent = data.id;
@@ -139,6 +233,16 @@ function bindMicroscopeDive() {
 
   steps.forEach((step) => observer.observe(step));
   setActive(8);
+
+  if (scopeFrame && hudX && hudY) {
+    scopeFrame.addEventListener("mousemove", (event) => {
+      const rect = scopeFrame.getBoundingClientRect();
+      const x = ((event.clientX - rect.left) / rect.width) * 1000;
+      const y = ((event.clientY - rect.top) / rect.height) * 1000;
+      hudX.textContent = x.toFixed(1);
+      hudY.textContent = y.toFixed(1);
+    });
+  }
 }
 
 function bindAuth() {

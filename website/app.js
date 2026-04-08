@@ -174,10 +174,9 @@ function bindMicroscopeDive() {
   const lensName = document.getElementById("lensName");
   const lensHint = document.getElementById("lensHint");
   const lensMag = document.getElementById("lensMag");
-  const lensCardTitleA = document.getElementById("lensCardTitleA");
-  const lensCardTextA = document.getElementById("lensCardTextA");
-  const lensCardTitleB = document.getElementById("lensCardTitleB");
-  const lensCardTextB = document.getElementById("lensCardTextB");
+  const lensHeroTitle = document.getElementById("lensHeroTitle");
+  const lensHeroText = document.getElementById("lensHeroText");
+  const lensHeroCta = document.getElementById("lensHeroCta");
   const hudX = document.getElementById("hudX");
   const hudY = document.getElementById("hudY");
   const scopeFrame = document.querySelector(".scope-frame");
@@ -197,10 +196,22 @@ function bindMicroscopeDive() {
     if (lensName) lensName.textContent = data.name;
     if (lensHint) lensHint.textContent = data.hint;
     if (lensMag) lensMag.textContent = "MAGNIFICATION: " + data.mag;
-    if (lensCardTitleA) lensCardTitleA.textContent = data.cardA;
-    if (lensCardTextA) lensCardTextA.textContent = data.cardAText;
-    if (lensCardTitleB) lensCardTitleB.textContent = data.cardB;
-    if (lensCardTextB) lensCardTextB.textContent = data.cardBText;
+    if (lensHeroTitle) {
+      lensHeroTitle.textContent = idx === 8 ? "THE SOURCE CODE" : data.name.toUpperCase();
+    }
+    if (lensHeroText) {
+      lensHeroText.textContent = idx === 8
+        ? "Explore the architecture behind the lens. Open source and ready for your contribution."
+        : data.hint;
+    }
+    if (lensHeroCta) {
+      lensHeroCta.textContent = idx === 8 ? "VIEW ON GITHUB" : "ENTER " + data.id;
+      lensHeroCta.href = idx === 8
+        ? "https://github.com/silentnoisehun/microscope-memory"
+        : "#microscope";
+      lensHeroCta.target = idx === 8 ? "_blank" : "_self";
+      lensHeroCta.rel = idx === 8 ? "noreferrer" : "";
+    }
 
     if (slider) slider.value = String(idx);
     if (depthId) depthId.textContent = data.id;

@@ -480,7 +480,7 @@ h3 {
 }
 
 .lens-mag {
-  margin: 0 0 1.1rem;
+  margin: 0 0 0.55rem;
   padding: 0.5rem 1.1rem;
   border-radius: 999px;
   background: rgba(75, 115, 128, 0.66);
@@ -491,7 +491,7 @@ h3 {
 }
 
 .lens-depth {
-  margin: 0.45rem 0 0;
+  margin: 0.18rem 0 0;
   font-family: "IBM Plex Mono", monospace;
   color: #ffbe55;
   font-size: clamp(1.9rem, 5vh, 4rem);
@@ -500,7 +500,7 @@ h3 {
 }
 
 .lens-name {
-  margin: 0.45rem 0 0;
+  margin: 0.22rem 0 0;
   font-family: "Bricolage Grotesque", sans-serif;
   font-size: clamp(1rem, 3.7vh, 2.6rem);
   color: #dce4ea;
@@ -508,7 +508,7 @@ h3 {
 }
 
 .lens-hint {
-  margin: 0.5rem 0 0;
+  margin: 0.25rem 0 0;
   color: rgba(188, 198, 207, 0.72);
   font-size: clamp(0.72rem, 1.8vh, 1.15rem);
   max-width: 44ch;
@@ -619,33 +619,54 @@ h3 {
   color: var(--muted);
 }
 
-.lens-cards {
+.lens-hero {
   z-index: 2;
-  width: min(74%, 650px);
-  margin-top: 1.2rem;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1rem;
+  width: min(82%, 760px);
+  margin-top: 0.45rem;
+  text-align: center;
 }
 
-.lens-card {
-  border: 1px solid rgba(74, 223, 194, 0.52);
-  border-radius: 18px;
-  background: rgba(43, 143, 116, 0.9);
-  padding: 1rem 1.05rem;
-  text-align: left;
-}
-
-.lens-card h3 {
+.lens-hero h3 {
   margin: 0;
-  color: #def3ec;
-  font-size: clamp(0.84rem, 2.2vh, 1.8rem);
+  font-family: "Bricolage Grotesque", sans-serif;
+  font-size: clamp(1.7rem, 6vh, 4.8rem);
+  letter-spacing: 0.01em;
+  color: #d6dbe0;
+  transform: rotate(5deg);
 }
 
-.lens-card p {
-  margin: 0.45rem 0 0;
-  color: rgba(204, 231, 222, 0.82);
-  font-size: clamp(0.7rem, 1.75vh, 1.08rem);
+.lens-hero p {
+  margin: 0.65rem auto 0;
+  max-width: 30ch;
+  font-size: clamp(0.92rem, 3.2vh, 1.72rem);
+  color: rgba(183, 185, 186, 0.72);
+  line-height: 1.16;
+  transform: rotate(5deg);
+}
+
+.lens-hero a {
+  margin-top: 0.78rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: min(70vw, 380px);
+  padding: 0.95rem 1.8rem;
+  border-radius: 999px;
+  text-decoration: none;
+  background: rgba(14, 18, 25, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #d5d8dc;
+  font-family: "Bricolage Grotesque", sans-serif;
+  font-weight: 700;
+  font-size: clamp(0.82rem, 2.15vh, 1.7rem);
+  letter-spacing: 0.03em;
+  transform: rotate(5deg);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.lens-hero a:hover {
+  transform: rotate(5deg) translateY(-2px);
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.38);
 }
 
 .layer-art-0 {
@@ -921,10 +942,9 @@ h3 {
     height: min(77vh, 94vw);
   }
 
-  .lens-cards {
-    grid-template-columns: 1fr;
-    width: min(79%, 390px);
-    gap: 0.65rem;
+  .lens-hero {
+    width: min(84%, 500px);
+    margin-top: 0.9rem;
   }
 }
 
@@ -967,8 +987,14 @@ h3 {
     font-size: 0.64rem;
   }
 
-  .lens-cards {
-    width: min(84%, 315px);
+  .lens-hero {
+    width: min(88%, 330px);
+  }
+
+  .lens-hero h3,
+  .lens-hero p,
+  .lens-hero a {
+    transform: rotate(3deg);
   }
 
   .footer {

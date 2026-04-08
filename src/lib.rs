@@ -21,6 +21,8 @@ pub mod hebbian;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod bridge;
 #[cfg(not(target_arch = "wasm32"))]
+pub mod ai_adapter;
+#[cfg(not(target_arch = "wasm32"))]
 pub mod mcp;
 pub mod merkle;
 pub mod mirror;

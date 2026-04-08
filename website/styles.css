@@ -321,6 +321,130 @@ h3 {
   font-size: 0.92rem;
 }
 
+.microscope-stack {
+  overflow: hidden;
+}
+
+.microscope-layout {
+  margin-top: 1rem;
+  display: grid;
+  grid-template-columns: minmax(220px, 0.85fr) minmax(0, 1.15fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+.lens-column {
+  position: sticky;
+  top: 1.2rem;
+  align-self: start;
+}
+
+.lens-core {
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 999px;
+  min-height: 280px;
+  padding: 1.25rem;
+  background:
+    radial-gradient(80% 65% at 45% 34%, rgba(149, 231, 255, 0.19), rgba(10, 19, 30, 0.74)),
+    radial-gradient(54% 44% at 62% 70%, rgba(255, 190, 85, 0.12), transparent 80%);
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  text-align: center;
+  box-shadow: inset 0 0 0 10px rgba(255, 255, 255, 0.03), var(--shadow);
+}
+
+.lens-label {
+  margin: 0;
+  font-family: "IBM Plex Mono", monospace;
+  color: var(--muted);
+  font-size: 0.72rem;
+  letter-spacing: 0.11em;
+}
+
+.lens-depth {
+  margin: 0.45rem 0 0;
+  font-family: "IBM Plex Mono", monospace;
+  color: var(--gold);
+  font-size: clamp(2rem, 4.4vw, 3.2rem);
+  line-height: 1;
+}
+
+.lens-name {
+  margin: 0.45rem 0 0;
+  font-family: "Bricolage Grotesque", sans-serif;
+  font-size: 1.22rem;
+}
+
+.lens-hint {
+  margin: 0.5rem 0 0;
+  color: var(--muted);
+  font-size: 0.86rem;
+  max-width: 26ch;
+}
+
+.layer-track {
+  position: relative;
+  display: grid;
+  gap: 0.8rem;
+}
+
+.layer-track::before {
+  content: "";
+  position: absolute;
+  top: 0.35rem;
+  bottom: 0.35rem;
+  left: 0.95rem;
+  width: 2px;
+  background: linear-gradient(to bottom, rgba(255, 190, 85, 0.9), rgba(82, 173, 255, 0.2));
+}
+
+.layer-step {
+  position: relative;
+  margin-left: 1.8rem;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 14px;
+  background: rgba(8, 17, 25, 0.7);
+  padding: 0.82rem 0.86rem;
+  opacity: 0.48;
+  transform: translateY(0);
+  transition: opacity 0.25s ease, transform 0.25s ease, border-color 0.25s ease, background 0.25s ease;
+}
+
+.layer-step::before {
+  content: "";
+  position: absolute;
+  left: -1.33rem;
+  top: 1.1rem;
+  width: 0.67rem;
+  height: 0.67rem;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 190, 85, 0.42);
+  background: rgba(12, 24, 36, 0.95);
+}
+
+.layer-step.is-active {
+  opacity: 1;
+  transform: translateY(-1px) scale(1.015);
+  border-color: rgba(255, 190, 85, 0.56);
+  background:
+    linear-gradient(128deg, rgba(255, 190, 85, 0.12), transparent 50%),
+    rgba(8, 17, 25, 0.84);
+}
+
+.layer-step.is-active::before {
+  background: rgba(255, 190, 85, 0.95);
+  box-shadow: 0 0 0 4px rgba(255, 190, 85, 0.16);
+}
+
+.layer-id {
+  display: inline-block;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.74rem;
+  color: var(--gold);
+  margin-bottom: 0.18rem;
+}
+
 .quick-card .btn {
   margin-top: 0.8rem;
 }
@@ -506,6 +630,19 @@ h3 {
   .quick-grid,
   .orchestration-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .microscope-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .lens-column {
+    position: static;
+  }
+
+  .lens-core {
+    min-height: 220px;
+    border-radius: 28px;
   }
 }
 

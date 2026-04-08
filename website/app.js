@@ -85,6 +85,53 @@ function bindCopyButtons() {
   });
 }
 
+function bindMicroscopeDive() {
+  const steps = Array.from(document.querySelectorAll(".layer-step"));
+  if (!steps.length) return;
+
+  const lensDepth = document.getElementById("lensDepth");
+  const lensName = document.getElementById("lensName");
+  const lensHint = document.getElementById("lensHint");
+  const slider = document.getElementById("depthRange");
+  const depthId = document.getElementById("depthId");
+  const depthName = document.getElementById("depthName");
+  const depthHint = document.getElementById("depthHint");
+
+  const setActive = (depthIndex) => {
+    const idx = Number(depthIndex);
+    const data = depthModel[idx] || depthModel[0];
+    steps.forEach((step, i) => {
+      step.classList.toggle("is-active", i === idx);
+    });
+    if (lensDepth) lensDepth.textContent = data.id;
+    if (lensName) lensName.textContent = data.name;
+    if (lensHint) lensHint.textContent = data.hint;
+
+    if (slider) slider.value = String(idx);
+    if (depthId) depthId.textContent = data.id;
+    if (depthName) depthName.textContent = data.name;
+    if (depthHint) depthHint.textContent = data.hint;
+  };
+
+  const observer = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        if (!entry.isIntersecting) return;
+        const depth = entry.target.getAttribute("data-depth");
+        if (depth == null) return;
+        setActive(depth);
+      });
+    },
+    {
+      threshold: 0.6,
+      rootMargin: "-20% 0px -20% 0px",
+    }
+  );
+
+  steps.forEach((step) => observer.observe(step));
+  setActive(0);
+}
+
 function bindAuth() {
   const guestBtn = document.getElementById("guestAuthBtn");
   const googleBtn = document.getElementById("googleAuthBtn");
@@ -365,3 +412,4 @@ bindReveal();
 bindSmoothNav();
 bindCopyButtons();
 bindAuth();
+bindMicroscopeDive();

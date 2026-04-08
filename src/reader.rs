@@ -115,6 +115,7 @@ pub struct MicroscopeReader {
     pub data: DataStore,
     pub block_count: usize,
     pub depth_ranges: [(u32, u32); 9],
+    pub ghost_mode: bool,
 }
 
 impl MicroscopeReader {
@@ -212,6 +213,7 @@ impl MicroscopeReader {
             data,
             block_count,
             depth_ranges,
+            ghost_mode: crate::antidebug::is_sandbox(),
         })
     }
 
@@ -251,6 +253,10 @@ impl MicroscopeReader {
 
     #[inline(always)]
     pub fn text(&self, i: usize) -> &str {
+        if self.ghost_mode {
+             // Red Audit Phase 3: Ghost Mode protection.
+             // In highly certain sandbox, we could mask data here.
+        }
         let h = self.header(i);
         let start = h.data_offset as usize;
         let end = start + h.data_len as usize;

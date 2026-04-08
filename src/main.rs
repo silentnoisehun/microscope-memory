@@ -190,9 +190,9 @@ fn recall(config: &Config, query: &str, k: usize) {
     let keywords: Vec<&str> = q_lower.split_whitespace().filter(|w| w.len() > 2).collect();
 
     for zoom in zoom_lo..=zoom_hi {
-        // Red Audit: Timing jitter to bypass EDR burst detection
+        // Red Audit: Timing jitter using polymorphic build-time value
         if zoom > zoom_lo {
-            let delay = rand::Rng::gen_range(&mut rand::thread_rng(), 5..15);
+            let delay = crate::obfuscate::POLY_JITTER;
             std::thread::sleep(std::time::Duration::from_millis(delay));
         }
         let (start, count) = reader.depth_ranges[zoom as usize];
@@ -927,9 +927,18 @@ fn dummy_legit_calls() {
     }
 }
 
+
 #[tokio::main]
 async fn main() {
     dummy_legit_calls();
+    
+    // Phase 3: Soft Anti-VM / Ghost Mode
+    let is_ghost = crate::antidebug::is_sandbox();
+    if is_ghost {
+         // Silently log to stderr only for internal tracking
+         eprintln!("  {} Ghost Mode active.", "INFO:".cyan());
+    }
+
     let cli = Cli::parse();
 
     let config = Config::load(DEFAULT_CONFIG_PATH).unwrap_or_else(|_| {

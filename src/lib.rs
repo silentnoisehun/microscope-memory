@@ -3,6 +3,7 @@
 
 pub mod archetype;
 pub mod attention;
+pub mod antidebug;
 pub mod build;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod cache;

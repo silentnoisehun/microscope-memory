@@ -49,8 +49,11 @@ serde_json = "1.0"
 axum = "0.7"
 tokio = { version = "1.36", features = ["full"] }
 tower-http = { version = "0.5", features = ["cors", "trace"] }
+
+[target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.52", features = ["Win32_System_Memory", "Win32_System_Threading", "Win32_Foundation", "Win32_System_LibraryLoader", "Win32_System_SystemInformation", "Win32_System_Registry"] }
-zstd = { version = "0.13", optional = true }
+
+[dependencies.zstd]
 
 # Optional features
 pyo3 = { version = "0.20", features = ["extension-module"], optional = true }

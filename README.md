@@ -16,7 +16,7 @@ v0.7.0 marks the transition to **Public Beta**, introducing enterprise-grade rel
 
 - **Sub-nanosecond Core**: Built on direct memory mapping (`mmap`), achieving ~1.2ns raw read speeds.
 - **Cognitive Hierarchy**: 13 biological-inspired layers (Hebbian, Resonance, Emotional, etc.) mapping memories from raw bytes to abstract concepts.
-- **Zero-JSON Hot Path**: Packed 256-byte binary frames ensure zero parsing latency during retrieval.
+- **Zero-JSON Hot Path**: Packed 256-byte binary frames ensure zero parsing latency during retrieval. *Note: bincode is used for optional consciousness state files (Hebbian activations, resonance fields, etc.) — not the core query path.*
 - **Spine Bridge v1**: A stable, versioned REST API for seamless integration with LangChain, AutoGPT, and Custom GPTs.
 - **Reliability First**: Integrated Merkle Tree integrity and the new `doctor` command for automated repair.
 

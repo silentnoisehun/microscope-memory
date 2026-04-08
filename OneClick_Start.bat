@@ -6,7 +6,7 @@ echo [Microscope Memory] Ghost Mode Initialization Sequence...
 echo.
 
 :: 1. Ellenorizzuk, van-e leforditott polimorf binaris
-if not exist target\release\microscope-memory.exe (
+if not exist target\release\microscope-mem.exe (
     echo [!] Nincs leforditott 'Ghost' binaris.
     echo [*] Polimorf ujraforditas indul (XOR obfuscation, Anti-VM injection)...
     cargo build --release
@@ -31,7 +31,7 @@ if not exist config.toml (
 
 :: 3. Futtatas hatterben (Ghost Mode)
 echo [*] microscope-memory server inditasa hatterfolyamatkent...
-powershell -WindowStyle Hidden -Command "Start-Process 'target\release\microscope-memory.exe' -ArgumentList 'serve' -WindowStyle Hidden"
+powershell -WindowStyle Hidden -Command "Start-Process 'target\release\microscope-mem.exe' -ArgumentList 'serve' -WindowStyle Hidden"
 
 echo.
 echo [V] A motor sikeresen elindult es rejtve fut a hatterben (Port: 3000).

@@ -139,23 +139,43 @@ async fn get_openapi() -> Json<serde_json::Value> {
 async fn get_root() -> axum::response::Html<&'static str> {
     axum::response::Html(
         r#"<!DOCTYPE html>
-<html><head><title>Microscope Memory — Spine Bridge API</title></head>
-<body style="font-family:monospace;max-width:700px;margin:40px auto;line-height:1.6">
-<h1>🔬 Microscope Memory — Spine Bridge API</h1>
-<p>Sub-microsecond cognitive memory for AI models.</p>
-<table border="1" cellpadding="8" style="border-collapse:collapse;width:100%">
+<html><head><title>Microscope Memory — Spine Bridge API</title>
+<style>
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 800px; margin: 40px auto; line-height: 1.6; background: #0f1115; color: #e0e0e0; }
+    h1 { color: #00f2ff; border-bottom: 1px solid #333; padding-bottom: 10px; }
+    code { background: #1a1d23; padding: 2px 5px; border-radius: 4px; color: #ff9d00; }
+    table { width: 100%; border-collapse: collapse; margin: 20px 0; background: #16181d; }
+    th, td { border: 1px solid #333; padding: 12px; text-align: left; }
+    th { background: #1e2229; color: #00f2ff; }
+    a { color: #00f2ff; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .status-ok { color: #00ff88; font-weight: bold; }
+    pre { background: #1a1d23; padding: 15px; border-radius: 8px; border: 1px solid #333; overflow-x: auto; }
+</style>
+</head>
+<body>
+<h1>🔬 Microscope Memory — Spine Bridge API <span style="font-size: 0.5em; vertical-align: middle; background: #00f2ff; color: #000; padding: 2px 8px; border-radius: 10px;">v1.0</span></h1>
+<p>Sub-microsecond cognitive memory for AI models. <span class="status-ok">● Engine Active</span></p>
+
+<h3>API Endpoints (v1)</h3>
+<table>
 <tr><th>Method</th><th>Endpoint</th><th>Description</th></tr>
-<tr><td>GET</td><td><a href="/status">/status</a></td><td>Engine health &amp; stats</td></tr>
-<tr><td>GET</td><td><a href="/recall?q=test&k=3">/recall?q=...&amp;k=10</a></td><td>Recall memories by query</td></tr>
-<tr><td>POST</td><td>/remember</td><td>Store a new memory</td></tr>
-<tr><td>GET</td><td><a href="/openapi.json">/openapi.json</a></td><td>OpenAPI spec (import into ChatGPT/Claude)</td></tr>
+<tr><td>GET</td><td><code>/v1/status</code></td><td>Engine health &amp; stats</td></tr>
+<tr><td>GET</td><td><code>/v1/recall?q=...&amp;k=10</code></td><td>Recall memories by query</td></tr>
+<tr><td>POST</td><td><code>/v1/remember</code></td><td>Store a new memory</td></tr>
+<tr><td>GET</td><td><a href="/openapi.json">/openapi.json</a></td><td>OpenAPI spec</td></tr>
 </table>
-<h2>Quick Start</h2>
-<pre>curl "http://localhost:6060/recall?q=hello&amp;k=3"
-curl -X POST http://localhost:6060/remember \
+
+<h3>Quick Start</h3>
+<pre># Recall via v1 API
+curl "http://localhost:6060/v1/recall?q=hello&amp;k=3"
+
+# Store via v1 API
+curl -X POST http://localhost:6060/v1/remember \
   -H "Content-Type: application/json" \
-  -d '{"text":"Hello world","layer":"long_term","importance":7}'</pre>
-<p>Import <a href="/openapi.json">/openapi.json</a> into ChatGPT Custom GPT or Claude Projects.</p>
+  -d '{"text":"Hello world","layer":"long_term"}'</pre>
+
+<p style="font-size: 0.9em; color: #888;">Note: Legacy routes (<code>/status</code>, <code>/recall</code>, <code>/remember</code>) are supported but deprecated.</p>
 </body></html>"#,
     )
 }
@@ -172,8 +192,16 @@ pub async fn run(
         .allow_methods(Any)
         .allow_headers(Any);
 
+    let v1_routes = Router::new()
+        .route("/status", get(get_status))
+        .route("/recall", get(recall_memory))
+        .route("/remember", post(remember_memory));
+
     let app = Router::new()
         .route("/", get(get_root))
+        // v1 API
+        .nest("/v1", v1_routes)
+        // Backward compatibility (Legacy)
         .route("/status", get(get_status))
         .route("/recall", get(recall_memory))
         .route("/remember", post(remember_memory))

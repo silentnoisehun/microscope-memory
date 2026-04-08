@@ -259,4 +259,10 @@ pub enum Cmd {
         #[arg(short, long, default_value = "6060")]
         port: u16,
     },
+    /// Run integrity diagnostics and attempt automatic repair (Crash Recovery)
+    Doctor {
+        /// Attempt to fix common corruption issues (e.g. malformed append log tail)
+        #[arg(long)]
+        fix: bool,
+    },
 }

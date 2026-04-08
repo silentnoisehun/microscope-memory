@@ -1,23 +1,24 @@
-# Microscope Memory: Cognitive Engine & Red Audit Edition
+# Microscope Memory v0.7.0 "Public Beta"
 
 [![Rust](https://img.shields.io/badge/language-Rust-orange.svg)](https://www.rust-lang.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Zero-JSON](https://img.shields.io/badge/Architecture-Zero--JSON-green.svg)](#core-pillars)
-[![Ghost Mode](https://img.shields.io/badge/Stealth-Ghost%20Mode-black.svg)](#re-advanced-red-team-stealth-features)
-[![LLM Bridge](https://img.shields.io/badge/LLM-Bridge%20API-purple.svg)](#-spine-bridge-api--llm-integration)
+[![API v1](https://img.shields.io/badge/API-v1.0-cyan.svg)](#-spine-bridge-api-v1)
+[![Doctor](https://img.shields.io/badge/Reliability-Doctor--Cmd-green.svg)](#-reliability--doctor-command)
 
-**Microscope Memory** is a high-performance, hierarchical cognitive memory engine built for low-latency AI architectures. It operates on a strict **"Zero-JSON"** principle, utilizing memory-mapped binary blocks for sub-microsecond retrieval. 
+**Microscope Memory** is a high-performance, hierarchical cognitive memory engine designed for AI agents and LLM architectures. It specializes in **sub-microsecond retrieval** of long-term context, bypassing the overhead of traditional Vector DBs.
 
-Following a comprehensive **Red Audit**, the engine has been heavily hardened. It now features military-grade stealth, polymorphic anti-analysis techniques, and direct kernel interactions, rendering it virtually invisible to modern EDR/AV solutions.
+v0.7.0 marks the transition to **Public Beta**, introducing enterprise-grade reliability, automated crash recovery, and a modular architecture.
 
 ---
 
 ## ⚡ Core Pillars
 
-- **Sub-microsecond Latency**: Built on direct memory mapping, achieving ~1.2ns raw read speeds and ~1.7µs complex hierarchical scalar queries.
-- **Zero-JSON Architecture**: Strict prohibition of text-based parsers in the critical path. Data structures are packed into aligned, fixed 256-byte binary frames.
-- **Hebbian Learning Drift**: Implements associative memory dynamics, allowing the hierarchy to reorganize based on AI activation patterns.
-- **Ghost Mode (Stealth)**: Completely polymorphic build system, Soft Anti-VM detection, and Direct Syscall execution (x64) for EDR evasion.
+- **Sub-nanosecond Core**: Built on direct memory mapping (`mmap`), achieving ~1.2ns raw read speeds.
+- **Cognitive Hierarchy**: 13 biological-inspired layers (Hebbian, Resonance, Emotional, etc.) mapping memories from raw bytes to abstract concepts.
+- **Zero-JSON Hot Path**: Packed 256-byte binary frames ensure zero parsing latency during retrieval.
+- **Spine Bridge v1**: A stable, versioned REST API for seamless integration with LangChain, AutoGPT, and Custom GPTs.
+- **Reliability First**: Integrated Merkle Tree integrity and the new `doctor` command for automated repair.
 
 ---
 
@@ -25,146 +26,113 @@ Following a comprehensive **Red Audit**, the engine has been heavily hardened. I
 
 ```mermaid
 graph TD
-    classDef engine fill:#1e1e1e,stroke:#f39c12,stroke-width:2px,color:#fff;
+    classDef engine fill:#1e1e1e,stroke:#00f2ff,stroke-width:2px,color:#fff;
+    classDef reliability fill:#0e2009,stroke:#2ecc71,stroke-width:2px,color:#fff;
     classDef stealth fill:#2c3e50,stroke:#e74c3c,stroke-width:2px,color:#fff;
-    classDef memory fill:#0e2009,stroke:#2ecc71,stroke-width:2px,color:#fff;
 
-    subgraph UserSpace["User Space (AI Agent)"]
-        API[Spine REST API]
-        WASM[WASM Browser Fallback]
+    subgraph Interface["Developer Interface"]
+        API[Spine Bridge API v1]
+        CLI[Command Line Interface]
     end
 
-    subgraph CogEngine["Microscope Engine L1-L3"]
+    subgraph CogEngine["Microscope Engine (v0.7.0)"]
         Read[Hierarchical Reader]:::engine
-        Hebbian[Hebbian Associator]:::engine
-        Jitter[Polymorphic Timing Jitter]:::stealth
+        Merkle[Merkle Integrity]:::reliability
+        Doctor[Doctor / Repair]:::reliability
         
         API --> Read
-        API --> Hebbian
-        Read <--> Jitter
+        CLI --> Read
+        CLI --> Doctor
+        Read <--> Merkle
     end
 
-    subgraph OS_Layer["OS Layer Evasion (L0)"]
-        Camouflage[IAT Camouflage & Obfuscation]:::stealth
-        Syscall[Direct Syscall Engine]:::stealth
-        AntiVM[Soft Anti-VM / Ghost Mode]:::stealth
+    subgraph Optional["Optional Modules (feature flags)"]
+        Stealth[Stealth / Red Audit]:::stealth
+        GPU[GPU Acceleration]
         
-        Read --> Syscall
-        Read --> AntiVM
-        Syscall --> Camouflage
+        Read -- optional -- Stealth
+        Read -- optional -- GPU
     end
 
-    subgraph Hardware["Hardware / Memory"]
-        MMAP[(Memory Mapped Files: headers, data)]:::memory
-        Syscall -- NtReadVirtualMemory --> MMAP
-        AntiVM -- NtQueryVirtualMemory --> MMAP
+    subgraph Hardware["Storage Layer"]
+        MMAP[(Memory Mapped Index)]
+        Read --> MMAP
     end
 ```
 
 ---
 
-## 🕵️ Advanced Red Team Stealth Features
+## 🩺 Reliability & Doctor Command
 
-The **Red Audit** transformation upgraded the engine from a research project into an offensive-grade, stealth-oriented cognitive module.
+Beta v0.7.0 introduces the `doctor` command, ensuring your cognitive data remains uncorrupted even after system crashes.
 
-### The Evasion Pipeline
+```bash
+# Run integrity diagnostics
+microscope-mem doctor
 
-```mermaid
-sequenceDiagram
-    participant Build as Build System (build.rs)
-    participant Disk as Binary on Disk
-    participant OS as OS / Hypervisor
-    participant Engine as Microscope Engine
-
-    Build->>Build: Generate Unique XOR Keys
-    Build->>Build: Generate Polymorphic Jitter Bounds
-    Build->>Disk: Compile heavily obfuscated & stripped .exe
-    
-    Disk->>OS: Execute Target
-    OS->>Engine: Loading...
-    
-    rect rgb(40, 0, 0)
-        Note right of Engine: Anti-Analysis & Ghost Mode
-        Engine-->>OS: CPUID (Hypervisor Check)
-        Engine-->>OS: Query Registry (VBox/VMware Tools)
-        alt Sandbox Detected
-            Engine->>Engine: Enter GHOST MODE (Silent operation)
-        else Bare Metal
-            Engine->>Engine: Enter ACTIVE MODE
-        end
-    end
-
-    rect rgb(0, 40, 0)
-        Note right of Engine: Direct Syscall Execution
-        Engine-->>OS: NtQueryVirtualMemory (Check Integrity)
-        Engine-->>OS: NtReadVirtualMemory (Direct RAM Access)
-    end
+# Automatically repair corrupted append log tails (Crash Recovery)
+microscope-mem doctor --fix
 ```
 
-- **Direct Syscalls (L0)**: Uses raw x64 assembly to invoke `NtReadVirtualMemory` and `NtQueryVirtualMemory`, bypassing `kernel32.dll` and `ntdll.dll` user-mode hooks entirely.
-- **Dynamic API Resolution**: Cleans the Import Address Table (IAT). Uses `GetProcAddress` dynamically to avoid static detection.
-- **Compile-Time Polymorphism**: `build.rs` generates unique XOR keys mapping critical strings to ciphertext, ensuring every single binary build has a completely unique YARA/SHA256 signature.
-- **Timing Jitter**: Introduces build-generated millisecond jitter in memory search loops to break deterministic behavior profiling by EDRs.
+- **Merkle Roots**: Every block is part of a Merkle Tree, verified at runtime.
+- **CRC16 Validation**: Data integrity is checked at the block level.
+- **Atomic Persistence**: Append-log design ensures zero data loss.
 
 ---
 
-## 🚀 One-Click Quickstart
+## 🤖 Spine Bridge API v1
 
-The project comes with a heavily automated, "Zero-Friction" background launcher.
+The Spine Bridge acts as the "Corpus Callosum" between your LLM and the Microscope Engine.
 
-1. **Clone the repository**:
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/v1/status` | Engine health, version & stats |
+| `GET` | `/v1/recall?q=...&k=10` | Semantic/Spatial recall |
+| `POST` | `/v1/remember` | Store a new cognitive memory |
+
+### Integration Example (Python)
+```python
+import requests
+# Recall user preference from hierarchical memory
+res = requests.get("http://localhost:6060/v1/recall", params={"q": "User's favorite OS", "k": 1})
+print(res.json())
+```
+*See `examples/langchain_integration.py` for full LangChain tools.*
+
+---
+
+## 🕵️ Red Audit & Stealth Mode (Optional)
+
+For users requiring advanced evasion or anti-analysis, the **Red Audit** features are now decoupled behind the `stealth` feature flag.
+
+```bash
+# Build with Red Audit / Stealth features active
+cargo build --release --features stealth
+```
+
+- **Ghost Mode**: Soft Anti-VM detection and silent data masking.
+- **Direct Syscalls**: Bypasses user-mode hooks via raw x64 assembly.
+- **Polymorphic Build**: Every binary has a unique signature (SHA256).
+
+---
+
+## 🚀 One-Click Start
+
+1. **Clone & Enter**:
    ```bash
    git clone https://github.com/silentnoisehun/microscope-memory.git
    cd microscope-memory
    ```
 
-2. **Run the One-Click Mod**:
-   Double click the `OneClick_Start.bat` file in the root directory.
-
-**What happens underneath?**
-- Automatically checks if the polymorphic binary exists.
-- If not, triggers `cargo build --release` to generate your unique stealth binary.
-- Seeds a default `config.toml`.
-- Boots the Engine in the background (Windowless PowerShell daemon), acting as an invisible REST API on port `3000`.
+2. **Launch**:
+   Double click `OneClick_Start.bat`. It will build your local engine and start the background API service.
 
 ---
 
-## 📊 Performance Benchmarks
-
-| Operation | Latency | Throughput | Evasion Status |
-|-----------|---------|------------|----------------|
-| Binary Block Read | 1.207 ns | 800M+ ops/s | Direct Syscall |
-| Atomic Spine Write| 1.397 ns | 700M+ ops/s | Silent / Lock-free |
-| Hierarchical Query| 1.742 µs | 500k+ ops/s | Jitter Applied |
-| Ghost Mode Boot   | < 5.0 ms | N/A         | Anti-VM Passed |
+## 📊 Benchmarks
+Microscope outperforms traditional Vector DBs by 100x-1000x in raw retrieval latency. 
+See [BENCHMARKS.md](BENCHMARKS.md) for detailed results.
 
 ---
-
-## 🤖 Spine Bridge API — LLM Integration
-
-When started as a daemon via `OneClick_Start.bat` or by explicitly running `microscope-mem serve`, the engine exposes an OpenAI-compatible REST API.
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/status` | Engine health, total depth chunks |
-| `GET` | `/recall?q=...&k=10` | Semantic/Spatial recall by natural language |
-| `POST` | `/remember` | Store a new cognitive memory |
-
-### Quick API Test
-```bash
-# Retrieve memory trace
-curl "http://localhost:3000/recall?q=Hebbian+logic&k=3"
-
-# Inject new memory
-curl -X POST http://localhost:3000/remember \
-  -H "Content-Type: application/json" \
-  -d '{"text": "The neural pathways have been obfuscated.", "layer": "long_term", "importance": 10}'
-```
-
----
-
-## ⚖️ License
-Distributed under the MIT License. See `LICENSE` for more information.
-
----
-*Architected and hardened by [Máté Róbert](https://github.com/silentnoisehun) — The Silent Noise Research Series.*
+*Architected by [Máté Róbert](https://github.com/silentnoisehun) — The Silent Noise Research Series.*
+he Silent Noise Research Series.*

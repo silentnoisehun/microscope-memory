@@ -12,9 +12,16 @@ use crate::{
     DEPTH_ENTRY_SIZE, HEADER_SIZE, LAYER_NAMES, META_HEADER_SIZE,
 };
 
+#[cfg(feature = "stealth")]
 use crate::syscaller::nt_query_virtual_memory;
-use windows_sys::Win32::Foundation::HANDLE;
+
 use windows_sys::Win32::System::Memory::{MEMORY_BASIC_INFORMATION, PAGE_NOACCESS, PAGE_GUARD};
+
+#[cfg(not(feature = "stealth"))]
+use windows_sys::Win32::System::Memory::VirtualQuery;
+
+#[cfg(feature = "stealth")]
+use windows_sys::Win32::Foundation::HANDLE;
 
 /// Block header: 32 bytes, packed, mmap-ready.
 #[repr(C, packed)]
@@ -213,16 +220,19 @@ impl MicroscopeReader {
             data,
             block_count,
             depth_ranges,
+            #[cfg(feature = "stealth")]
             ghost_mode: crate::antidebug::is_sandbox(),
+            #[cfg(not(feature = "stealth"))]
+            ghost_mode: false,
         })
     }
 
     /// Red Audit: Verifies that the mmap'ed memory is indeed readable and not guarded.
-    /// Bypasses standard Win32 API for stability.
-    fn verify_mmap_protection(ptr: *const u8, len: usize) -> Result<(), String> {
+    fn verify_mmap_protection(ptr: *const u8, _len: usize) -> Result<(), String> {
         let mut info: MEMORY_BASIC_INFORMATION = unsafe { std::mem::zeroed() };
         let mut _return_len: usize = 0;
         
+        #[cfg(feature = "stealth")]
         let status = unsafe {
             nt_query_virtual_memory(
                 -1isize as HANDLE, // Current process
@@ -233,9 +243,23 @@ impl MicroscopeReader {
                 &mut _return_len,
             )
         };
-
+        #[cfg(feature = "stealth")] 
         if status != 0 {
             return Err(format!("NtQueryVirtualMemory failed with status 0x{:08X}", status));
+        }
+
+        #[cfg(not(feature = "stealth"))]
+        {
+            let res = unsafe {
+                VirtualQuery(
+                    ptr as *const _,
+                    &mut info as *mut _ as *mut _,
+                    std::mem::size_of::<MEMORY_BASIC_INFORMATION>(),
+                )
+            };
+            if res == 0 {
+                return Err("VirtualQuery failed".to_string());
+            }
         }
 
         if info.Protect == PAGE_NOACCESS || (info.Protect & PAGE_GUARD) != 0 {

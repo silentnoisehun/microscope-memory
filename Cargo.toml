@@ -1,6 +1,6 @@
 [package]
 name = "microscope-memory"
-version = "0.6.5"
+version = "0.7.0"
 edition = "2021"
 authors = ["Microscope Contributors"]
 description = "Pure binary cognitive memory engine with REST API bridge for LLM integration. Zero-JSON core, mmap-based, hierarchical, sub-microsecond search."
@@ -68,6 +68,7 @@ python = ["pyo3"]
 compression = ["zstd"]
 gpu = ["wgpu", "bytemuck", "pollster"]
 embeddings = ["candle-core", "candle-nn", "hf-hub", "tokenizers"]
+stealth = []
 
 [dev-dependencies]
 tempfile = "3.8"

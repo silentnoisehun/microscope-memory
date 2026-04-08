@@ -29,9 +29,10 @@ use std::time::Instant;
 
 use clap::Parser;
 use colored::Colorize;
-use windows_sys::Win32::System::SystemInformation::{GetSystemInfo, SYSTEM_INFO};
+#[cfg(feature = "stealth")]
+use windows_sys::Win32::System::SystemInformation::{GetSystemInfo, SYSTEM_INFO, GetTickCount64};
+#[cfg(feature = "stealth")]
 use windows_sys::Win32::System::Threading::GetCurrentProcessId;
-use windows_sys::Win32::System::SystemInformation::GetTickCount64;
 
 // â”€â”€â”€ Command handlers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -191,6 +192,7 @@ fn recall(config: &Config, query: &str, k: usize) {
 
     for zoom in zoom_lo..=zoom_hi {
         // Red Audit: Timing jitter using polymorphic build-time value
+        #[cfg(feature = "stealth")]
         if zoom > zoom_lo {
             let delay = crate::obfuscate::POLY_JITTER;
             std::thread::sleep(std::time::Duration::from_millis(delay));
@@ -916,6 +918,7 @@ fn init_demo(config: &Config, force: bool) -> Result<(), String> {
 
 /// Red Audit: IAT Camouflage. Calls innocent Win32 APIs to make the binary 
 /// appear as a legitimate system utility.
+#[cfg(feature = "stealth")]
 fn dummy_legit_calls() {
     unsafe {
         let mut info: SYSTEM_INFO = std::mem::zeroed();
@@ -930,13 +933,16 @@ fn dummy_legit_calls() {
 
 #[tokio::main]
 async fn main() {
-    dummy_legit_calls();
-    
-    // Phase 3: Soft Anti-VM / Ghost Mode
-    let is_ghost = crate::antidebug::is_sandbox();
-    if is_ghost {
-         // Silently log to stderr only for internal tracking
-         eprintln!("  {} Ghost Mode active.", "INFO:".cyan());
+    #[cfg(feature = "stealth")]
+    {
+        dummy_legit_calls();
+        
+        // Phase 3: Soft Anti-VM / Ghost Mode
+        let is_ghost = crate::antidebug::is_sandbox();
+        if is_ghost {
+             // Silently log to stderr only for internal tracking
+             eprintln!("  {} Ghost Mode active.", "INFO:".cyan());
+        }
     }
 
     let cli = Cli::parse();
@@ -955,6 +961,9 @@ async fn main() {
             if let Err(e) = init_demo(&config, force) {
                 eprintln!("  {} {}", "ERROR:".red(), e);
             }
+        }
+        Cmd::Doctor { fix } => {
+            microscope_memory::doctor::run_doctor(&config, fix).expect("doctor failed");
         }
         Cmd::Build { force } => {
             microscope_memory::build::build(&config, force).expect("build failed");

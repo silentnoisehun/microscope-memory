@@ -3,8 +3,10 @@
 
 pub mod archetype;
 pub mod attention;
+#[cfg(feature = "stealth")]
 pub mod antidebug;
 pub mod build;
+pub mod doctor;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod cache;
 pub mod config;
@@ -22,9 +24,11 @@ pub mod bridge;
 pub mod mcp;
 pub mod merkle;
 pub mod mirror;
+#[cfg(feature = "stealth")]
 pub mod obfuscate;
 pub mod query;
 pub mod reader;
+#[cfg(feature = "stealth")]
 pub mod syscaller;
 pub mod resonance;
 pub mod sequential_thinking;

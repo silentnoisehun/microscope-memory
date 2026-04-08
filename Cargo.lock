@@ -1749,7 +1749,7 @@ dependencies = [
 
 [[package]]
 name = "microscope-memory"
-version = "0.6.5"
+version = "0.7.0"
 dependencies = [
  "axum",
  "bincode",

@@ -121,6 +121,45 @@ fn test_mql_query() {
 }
 
 #[test]
+fn test_mql_complex_query() {
+    let (_tmp, config) = setup_test_env();
+    microscope_memory::build::build(&config, true).unwrap();
+
+    let reader = microscope_memory::reader::MicroscopeReader::open(&config).expect("open reader");
+    let appended = vec![];
+
+    // 1. Boolean AND
+    let q = microscope_memory::query::parse("\"Rust\" AND \"safety\"");
+    let results = execute_query(&q, &reader, &appended);
+    assert!(!results.is_empty(), "AND query failed");
+
+    // 2. Boolean OR
+    let q = microscope_memory::query::parse("\"ownership\" OR \"non-existent\"");
+    let results = execute_query(&q, &reader, &appended);
+    assert!(!results.is_empty(), "OR query failed");
+
+    // 3. Layer + Depth Filter
+    let q = microscope_memory::query::parse("layer:long_term depth:3 \"Rust\"");
+    let results = execute_query(&q, &reader, &appended);
+    assert!(!results.is_empty(), "Layer/Depth filter failed");
+
+    // 4. Spatial 'near:' filter
+    // Get coords for 'Rust' item first
+    let rust_h = reader.header(0);
+    let rx = rust_h.x;
+    let ry = rust_h.y;
+    let rz = rust_h.z;
+    let q_str = format!("near:{},{},{},0.5 \"Rust\"", rx, ry, rz);
+    let q = microscope_memory::query::parse(&q_str);
+    let results = execute_query(&q, &reader, &appended);
+    assert!(!results.is_empty(), "Spatial 'near:' filter failed");
+}
+
+fn execute_query(q: &microscope_memory::query::Query, reader: &microscope_memory::reader::MicroscopeReader, appended: &[microscope_memory::AppendEntry]) -> Vec<microscope_memory::query::QueryResult> {
+    microscope_memory::query::execute(q, reader, appended)
+}
+
+#[test]
 fn test_crc_integrity_after_build() {
     let (_tmp, config) = setup_test_env();
     microscope_memory::build::build(&config, true).unwrap();

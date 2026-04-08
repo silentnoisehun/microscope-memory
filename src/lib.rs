@@ -111,7 +111,7 @@ pub fn content_coords(text: &str, layer: &str) -> (f32, f32, f32) {
     let (ox, oy, oz) = match layer {
         "long_term" => (0.0, 0.0, 0.0),
         "associative" => (0.3, 0.0, 0.0),
-        "emotional" => (0.0, 0.3, 0.0),
+        "emotional" => (0.1, 0.3, 0.2),
         "relational" => (0.3, 0.3, 0.0),
         "reflections" => (0.0, 0.0, 0.3),
         "crypto_chain" => (0.3, 0.0, 0.3),

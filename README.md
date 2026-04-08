@@ -107,8 +107,43 @@ docker run -it microscope-mem build
 docker run -p 6060:6060 microscope-mem bridge
 ```
 
-## 📂 Examples
+## 📂 Integration
 
+### Python API (PyO3)
+Microscope Memory provides high-performance Python bindings.
+
+```python
+import microscope_memory as mm
+
+# Initialize in-memory engine
+engine = mm.PyMicroscope()
+engine.add_block("Memory text", x=0.1, y=0.2, z=0.3, depth=3, layer_id=1)
+
+# Hybrid search (semantic + spatial)
+results = engine.hybrid_search("query", x=0.1, y=0.2, z=0.3, 
+                               semantic_weight=0.5, spatial_weight=0.5, k=5)
+```
+*Note: The Python API is currently synchronous. Large index operations should be handled in background threads to avoid GIL contention.*
+
+### WebAssembly (WASM)
+Run the cognitive engine directly in the browser. 
+
+- **mmap Fallback**: Since browsers do not support `mmap`, the WASM module falls back to in-memory `Vec<u8>` buffers (ArrayBuffer).
+- **Efficiency**: Near-native performance for 3D spatial queries on mobile and desktop browsers.
+
+```javascript
+import init, { MicroscopeWasm } from './pkg/microscope_memory.js';
+
+async function run() {
+    await init();
+    const mm = new MicroscopeWasm();
+    // Load binary buffers directly from URL or IndexedDB
+    mm.load_binary(metaBuf, microscopeBuf, dataBuf);
+    const results = mm.recall("What is the Spine?", 5);
+}
+```
+
+## 📂 Examples
 Explore the `examples/` directory for integration patterns:
 - `python_quickstart.py`: Connect to the Binary Spine API using Python.
 

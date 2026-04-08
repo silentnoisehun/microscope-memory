@@ -14,8 +14,9 @@ pub struct Cli {
 
 #[derive(Subcommand)]
 pub enum Cmd {
-    /// Build binary from raw layer files
+    /// Build binary index from raw layer files (from scratch)
     Build {
+        /// Force rebuild even if layer files are unchanged
         #[arg(long)]
         force: bool,
     },
@@ -88,7 +89,7 @@ pub enum Cmd {
         #[arg(default_value = "5")]
         k: usize,
     },
-    /// Rebuild — incorporate append log into main index
+    /// Rebuild — merge pending observations from append log into the main index
     Rebuild,
     /// Semantic search using embeddings
     Embed {

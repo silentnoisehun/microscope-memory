@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Comprehensive MQL integration tests (Boolean AND/OR, Spatial `near:`, Layer/Depth filters)
+- Python API documentation in README
+- WASM browser integration documentation in README
+- Fixed 3D coordinate distribution for emotional memory clusters
+
+### Changed
+- Refined CLI command descriptions for `build` and `rebuild`
+- Improved `config.example.toml` comments on semantic search and embedding depth
+
 ## [0.1.0] - 2026-03-21
 
 ### Added

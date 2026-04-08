@@ -226,10 +226,30 @@ canvas { display: block; }
   let data = null;
   let fieldPoints = null;
   let currentDepth = 0;
+  let smoothedDepth = 0;
+  let zoomFocusUntil = 0;
+  let ambientLight = null;
+  let keyLight = null;
+  let fillLight = null;
+  let rimLight = null;
+  const desiredFocus = new THREE.Vector3(0.5, 0.5, 0.5);
+  const clusterAnchors = [];
   
   const groups = {};
   const layerVisible = {};
   let blockLayerNames = [];
+  const LAYER_ID_TO_NAME = [
+    'identity',
+    'long_term',
+    'short_term',
+    'associative',
+    'emotional',
+    'relational',
+    'reflections',
+    'crypto_chain',
+    'echo_cache',
+    'rust_state',
+  ];
 
   const LAYER_COLOR_MAP = {
     'long_term': 0x00ffff,
@@ -264,6 +284,7 @@ canvas { display: block; }
 
   const FEATURES = [
     { key: 'blocks', label: 'Memory Blocks', on: true },
+    { key: 'rooms', label: 'Room Boundaries', on: true },
     { key: 'edges', label: 'Structural Links', on: true },
     { key: 'wave', label: 'Resonance Field', on: false },
     { key: 'paths', label: 'Thought Paths', on: true },
@@ -294,7 +315,20 @@ canvas { display: block; }
       const d = dv.getUint8(off+29);
       const f = dv.getUint8(off+30);
       off += 32;
-      blocks.push({ x, y, z, dx, dy, dz, e, d, l: lid, m: f ? 1 : 0 });
+      blocks.push({
+        i,
+        x,
+        y,
+        z,
+        dx,
+        dy,
+        dz,
+        e,
+        d,
+        lid,
+        l: LAYER_ID_TO_NAME[lid] || '?',
+        m: f ? 1 : 0,
+      });
     }
     const nodeCount = dv.getUint32(off, true); off += 4;
     const nodes = [];
@@ -394,7 +428,7 @@ canvas { display: block; }
         y: Math.cos(i * 0.1) * 0.5,
         z: (i / 100) * 2 - 1,
         dx: 0, dy: 0, dz: 0, e: 1.0,
-        lid: i % 9, d: i % 8, f: 0
+        lid: i % 9, l: LAYER_ID_TO_NAME[i % 9] || '?', d: i % 8, f: 0
       })),
       edges: Array.from({length: 50}, (_, i) => [i * 2, i * 2 + 1, Math.random()]),
       thought_paths: [[]],
@@ -480,7 +514,17 @@ function initThree() {
   controls.maxDistance = 5.0;
   controls.update();
 
-  scene.add(new THREE.AmbientLight(0x333344, 1));
+  ambientLight = new THREE.AmbientLight(0x223040, 0.65);
+  keyLight = new THREE.DirectionalLight(0x8eb8ff, 0.9);
+  keyLight.position.set(1.3, 1.6, 0.9);
+  fillLight = new THREE.DirectionalLight(0xffa97a, 0.35);
+  fillLight.position.set(-1.2, 0.8, -0.6);
+  rimLight = new THREE.PointLight(0x66ffff, 0.45, 4.5);
+  rimLight.position.set(0.2, 1.1, 1.6);
+  scene.add(ambientLight);
+  scene.add(keyLight);
+  scene.add(fillLight);
+  scene.add(rimLight);
 
   const grid = new THREE.GridHelper(2, 20, 0x222244, 0x111122);
   grid.position.set(0.5, 0, 0.5);
@@ -491,6 +535,11 @@ function initThree() {
     const g = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(...a), new THREE.Vector3(...b)]);
     scene.add(new THREE.Line(g, axMat));
   }
+
+  renderer.domElement.addEventListener('wheel', () => {
+    pickFocusAnchor();
+    zoomFocusUntil = performance.now() + 260;
+  }, { passive: true });
 
   window.addEventListener('resize', () => {
     camera.aspect = (window.innerWidth - 260) / window.innerHeight;
@@ -523,42 +572,72 @@ function initMicroscope() {
   updateMicroscope();
 }
 
+function pickFocusAnchor() {
+  if (!clusterAnchors.length || !controls) return;
+  let best = clusterAnchors[0];
+  let bestDist = controls.target.distanceToSquared(best.center);
+  for (let i = 1; i < clusterAnchors.length; i++) {
+    const c = clusterAnchors[i];
+    const dist = controls.target.distanceToSquared(c.center);
+    if (dist < bestDist) {
+      best = c;
+      bestDist = dist;
+    }
+  }
+  desiredFocus.copy(best.center);
+}
+
+function updateAtmosphere(depthFloat) {
+  if (!scene || !scene.fog) return;
+  const t = THREE.MathUtils.clamp(depthFloat / 8, 0, 1);
+  scene.fog.density = THREE.MathUtils.lerp(0.34, 0.08, t);
+  const hue = THREE.MathUtils.lerp(0.63, 0.53, t);
+  const lightness = THREE.MathUtils.lerp(0.07, 0.12, t);
+  const fogColor = new THREE.Color().setHSL(hue, 0.35, lightness);
+  scene.fog.color.copy(fogColor);
+  renderer.setClearColor(fogColor, 1);
+
+  if (ambientLight) ambientLight.intensity = THREE.MathUtils.lerp(0.55, 0.88, t);
+  if (keyLight) keyLight.intensity = THREE.MathUtils.lerp(0.7, 1.25, t);
+  if (fillLight) fillLight.intensity = THREE.MathUtils.lerp(0.25, 0.55, t);
+  if (rimLight) rimLight.intensity = THREE.MathUtils.lerp(0.35, 0.9, t);
+}
+
 function updateMicroscope() {
   if (!camera || !controls) return;
 
-  // Map camera distance to depth (close = deep, far = shallow)
   const dist = camera.position.distanceTo(controls.target);
-  // dist range: 0.05 (closest) to 5.0 (farthest)
-  // map: 0.05 â†’ D8, 0.15 â†’ D7, 0.3 â†’ D6, 0.5 â†’ D5, 0.7 â†’ D4, 1.0 â†’ D3, 1.5 â†’ D2, 2.5 â†’ D1, 4.0+ â†’ D0
+  const minDist = 0.05;
+  const maxDist = 5.0;
+  const safeDist = THREE.MathUtils.clamp(dist, minDist, maxDist);
+  const logMin = Math.log(minDist);
+  const logMax = Math.log(maxDist);
+  const normalized = (Math.log(safeDist) - logMin) / (logMax - logMin);
+  const depthFloatRaw = (1 - THREE.MathUtils.clamp(normalized, 0, 1)) * 8;
+  smoothedDepth = THREE.MathUtils.lerp(smoothedDepth, depthFloatRaw, 0.16);
+
   const depthThresholds = [4.0, 2.5, 1.5, 1.0, 0.7, 0.5, 0.3, 0.15, 0.05];
-  let depth = 0;
-  for (let d = 0; d < depthThresholds.length; d++) {
-    if (dist < depthThresholds[d]) depth = d;
-  }
+  const snappedDepth = depthThresholds.findIndex(th => safeDist >= th);
+  const stableDepth = snappedDepth === -1 ? 8 : snappedDepth;
+  currentDepth = stableDepth;
 
-  currentDepth = depth;
-
-  // Update thumb position
   const thumb = document.getElementById('scopeThumb');
-  const pct = (depth / 8) * 100;
+  const pct = (smoothedDepth / 8) * 100;
   thumb.style.top = 'calc(' + pct + '% - 12px)';
 
-  // Update depth display
-  document.getElementById('depthNum').textContent = 'D' + depth;
-  document.getElementById('depthName').textContent = DEPTH_DEFS[depth].name;
-  document.getElementById('depthBlocks').textContent = DEPTH_DEFS[depth].typical.toLocaleString() + ' blocks';
+  document.getElementById('depthNum').textContent = 'D' + stableDepth;
+  document.getElementById('depthName').textContent = DEPTH_DEFS[stableDepth].name;
+  document.getElementById('depthBlocks').textContent = DEPTH_DEFS[stableDepth].typical.toLocaleString() + ' blocks';
 
-  // Highlight active tick
   for (let d = 0; d <= 8; d++) {
     const el = document.getElementById('tick-d' + d);
     if (el) {
-      el.className = 'scope-tick-label' + (d === depth ? ' active' : '');
+      el.className = 'scope-tick-label' + (d === stableDepth ? ' active' : '');
     }
   }
 
-  // Adjust point size based on depth (deeper = larger points, you're "zoomed in")
   if (groups.blocks) {
-    const pointSize = 0.004 + depth * 0.002;
+    const pointSize = 0.004 + smoothedDepth * 0.0017;
     for (const child of groups.blocks.children) {
       if (child.isPoints) {
         child.material.size = pointSize;
@@ -566,15 +645,13 @@ function updateMicroscope() {
     }
   }
 
-  // Adjust fog density based on depth (deeper = less fog, you see further detail)
-  if (scene && scene.fog) {
-    scene.fog.density = 0.4 - depth * 0.04;
-  }
+  updateAtmosphere(smoothedDepth);
 }
 
 // â”€â”€â”€ Build all 3D groups â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function buildAll() {
   buildBlocks();
+  buildRoomBoundaries();
   buildEdges();
   buildWaveField();
   buildPaths();
@@ -587,6 +664,8 @@ function buildAll() {
   FEATURES.forEach(f => {
     if (groups[f.key]) groups[f.key].visible = f.on;
   });
+
+  pickFocusAnchor();
 }
 
 function getBlockMap() {
@@ -601,6 +680,7 @@ function buildBlocks() {
 
   groups.blocks = new THREE.Group();
   blockLayerNames = [];
+  clusterAnchors.length = 0;
 
   // One Points object per layer for independent toggling
   const byLayer = {};
@@ -640,9 +720,74 @@ function buildBlocks() {
     }));
     pts.userData.layerName = layerName;
     groups.blocks.add(pts);
+
+    if (layerBlocks.length >= 6) {
+      let cx = 0;
+      let cy = 0;
+      let cz = 0;
+      for (const b of layerBlocks) {
+        cx += b.x + (b.dx || 0);
+        cy += b.y + (b.dy || 0);
+        cz += b.z + (b.dz || 0);
+      }
+      cx /= layerBlocks.length;
+      cy /= layerBlocks.length;
+      cz /= layerBlocks.length;
+
+      let r = 0.02;
+      for (const b of layerBlocks) {
+        const px = b.x + (b.dx || 0);
+        const py = b.y + (b.dy || 0);
+        const pz = b.z + (b.dz || 0);
+        const dx = px - cx;
+        const dy = py - cy;
+        const dz = pz - cz;
+        r = Math.max(r, Math.sqrt(dx * dx + dy * dy + dz * dz));
+      }
+      clusterAnchors.push({
+        center: new THREE.Vector3(cx, cy, cz),
+        radius: Math.min(0.35, r * 1.12),
+        layerName,
+      });
+    }
   }
 
   scene.add(groups.blocks);
+}
+
+function buildRoomBoundaries() {
+  if (!clusterAnchors.length) return;
+  groups.rooms = new THREE.Group();
+
+  for (const anchor of clusterAnchors) {
+    const layerColor = LAYER_COLOR_MAP[anchor.layerName] || 0x4e5f7a;
+    const halo = new THREE.Mesh(
+      new THREE.SphereGeometry(anchor.radius, 18, 18),
+      new THREE.MeshBasicMaterial({
+        color: layerColor,
+        transparent: true,
+        opacity: 0.06,
+        wireframe: true,
+      })
+    );
+    halo.position.copy(anchor.center);
+    groups.rooms.add(halo);
+
+    const ring = new THREE.Mesh(
+      new THREE.RingGeometry(anchor.radius * 0.82, anchor.radius * 0.88, 48),
+      new THREE.MeshBasicMaterial({
+        color: layerColor,
+        transparent: true,
+        opacity: 0.16,
+        side: THREE.DoubleSide,
+      })
+    );
+    ring.position.copy(anchor.center);
+    ring.rotation.x = Math.PI / 2;
+    groups.rooms.add(ring);
+  }
+
+  scene.add(groups.rooms);
 }
 
 function buildEdges() {
@@ -1053,13 +1198,26 @@ function animate() {
     });
   }
 
+  if (groups.rooms && groups.rooms.visible) {
+    groups.rooms.children.forEach((child, i) => {
+      if (child.geometry && child.geometry.type === 'RingGeometry') {
+        child.rotation.z = t * 0.08 + i * 0.13;
+      }
+    });
+  }
+
   updateMicroscope();
+  if (performance.now() < zoomFocusUntil) {
+    controls.target.lerp(desiredFocus, 0.1);
+  }
   controls.update();
   renderer.render(scene, camera);
 }
 </script>
 </body>
 </html>
+
+
 
 
 

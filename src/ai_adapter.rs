@@ -7,7 +7,7 @@
 
 use crate::config::Config;
 use crate::reader::MicroscopeReader;
-use std::io::{self, Read};
+use std::io;
 use std::path::Path;
 use std::sync::Arc;
 
@@ -82,6 +82,8 @@ impl Default for AICommand {
 pub struct AIAdapter {
     config: Arc<Config>,
     reader: Arc<MicroscopeReader>,
+    dirty_blocks: std::collections::HashSet<u64>, // Blocks that need Merkle update
+    command_count: usize, // Commands processed since last Merkle update
 }
 
 impl AIAdapter {
@@ -91,17 +93,28 @@ impl AIAdapter {
         Ok(Self {
             config: Arc::new(config),
             reader: Arc::new(reader),
+            dirty_blocks: std::collections::HashSet::new(),
+            command_count: 0,
         })
     }
 
     /// Process an AI command and return a response.
-    pub fn process_command(&self, cmd: AICommand) -> Result<AICommand, String> {
-        match cmd.op_code {
+    pub fn process_command(&mut self, cmd: AICommand) -> Result<AICommand, String> {
+        self.command_count += 1;
+
+        let result = match cmd.op_code {
             0 => self.handle_read(cmd),
             1 => self.handle_write(cmd),
             2 => self.handle_learn(cmd),
             _ => Err(format!("Unknown op_code: {}", cmd.op_code)),
+        };
+
+        // Lazy Merkle update: batch updates every 100 commands or when explicitly requested
+        if self.command_count % 100 == 0 && !self.dirty_blocks.is_empty() {
+            self.update_merkle_tree()?;
         }
+
+        result
     }
 
     /// Handle read operations.
@@ -122,16 +135,34 @@ impl AIAdapter {
     }
 
     /// Handle write operations.
-    fn handle_write(&self, _cmd: AICommand) -> Result<AICommand, String> {
+    fn handle_write(&mut self, cmd: AICommand) -> Result<AICommand, String> {
+        // Mark block as dirty for Merkle update
+        self.dirty_blocks.insert(cmd.block_id);
+
         // For now, writes go through the append log
         // TODO: Implement direct block writing with Merkle updates
         Err("Direct write not yet implemented".to_string())
     }
 
     /// Handle learning/drift operations.
-    fn handle_learn(&self, _cmd: AICommand) -> Result<AICommand, String> {
-        // TODO: Implement Hebbian learning interface
+    fn handle_learn(&mut self, cmd: AICommand) -> Result<AICommand, String> {
+        // Mark block as dirty for Merkle update
+        self.dirty_blocks.insert(cmd.block_id);
+
+        // TODO: Implement Hebbian learning interface with saturation
         Err("Learning operations not yet implemented".to_string())
+    }
+
+    /// Force immediate Merkle tree update for dirty blocks.
+    pub fn update_merkle_tree(&mut self) -> Result<(), String> {
+        if self.dirty_blocks.is_empty() {
+            return Ok(());
+        }
+
+        // TODO: Implement incremental Merkle tree update for dirty blocks
+        // For now, mark as clean
+        self.dirty_blocks.clear();
+        Ok(())
     }
 
     /// Get current Merkle root for integrity verification.

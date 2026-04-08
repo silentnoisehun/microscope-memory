@@ -101,14 +101,14 @@ impl HebbianState {
     pub fn record_activation(&mut self, results: &[(u32, f32)], query_hash: u64) {
         let now_ms = now_epoch_ms();
 
-        // Update per-block activation records
+        // Update per-block activation records with saturation protection
         for &(block_idx, _score) in results {
             let idx = block_idx as usize;
             if idx < self.activations.len() {
                 let rec = &mut self.activations[idx];
-                rec.activation_count += 1;
+                rec.activation_count = rec.activation_count.saturating_add(1);
                 rec.last_activated_ms = now_ms;
-                rec.energy = 1.0; // fresh activation = max energy
+                rec.energy = 1.0; // fresh activation = max energy (already saturated)
             }
         }
 
@@ -126,7 +126,7 @@ impl HebbianState {
                         count: 0,
                         last_ts_ms: 0,
                     });
-                pair.count += 1;
+                pair.count = pair.count.saturating_add(1);
                 pair.last_ts_ms = now_ms;
             }
         }

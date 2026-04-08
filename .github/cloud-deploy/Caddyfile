@@ -1,0 +1,35 @@
+{
+    log {
+        format json
+        output file /var/log/caddy/access.log
+    }
+}
+
+{$DOMAIN} {
+    encode gzip zstd
+
+    tls {$ACME_EMAIL}
+
+    # Security headers
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Referrer-Policy "no-referrer"
+        -Server
+    }
+
+    # Require auth on all API routes
+    basicauth {
+        {$BASIC_AUTH_USER} {$BASIC_AUTH_HASH}
+    }
+
+    # Only expose API surface
+    @api path /v1/* /openapi.json /openapi.yaml
+    handle @api {
+        reverse_proxy microscope-memory:6060
+    }
+
+    # Block everything else
+    respond "Not Found" 404
+}

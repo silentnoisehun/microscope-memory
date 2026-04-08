@@ -7,9 +7,10 @@
 
 use crate::config::Config;
 use crate::reader::MicroscopeReader;
-use std::io;
 use std::path::Path;
 use std::sync::Arc;
+#[cfg(unix)]
+use std::{io::Read, io::Write};
 
 // ─── Binary Protocol Definition ──────────────────────────
 
@@ -83,7 +84,7 @@ pub struct AIAdapter {
     config: Arc<Config>,
     reader: Arc<MicroscopeReader>,
     dirty_blocks: std::collections::HashSet<u64>, // Blocks that need Merkle update
-    command_count: usize, // Commands processed since last Merkle update
+    command_count: usize,                         // Commands processed since last Merkle update
 }
 
 impl AIAdapter {
@@ -110,7 +111,7 @@ impl AIAdapter {
         };
 
         // Lazy Merkle update: batch updates every 100 commands or when explicitly requested
-        if self.command_count % 100 == 0 && !self.dirty_blocks.is_empty() {
+        if self.command_count.is_multiple_of(100) && !self.dirty_blocks.is_empty() {
             self.update_merkle_tree()?;
         }
 
@@ -125,9 +126,12 @@ impl AIAdapter {
 
         let text = self.reader.text(cmd.block_id as usize);
         let data = text.as_bytes();
-        let mut response = AICommand::default();
-        response.op_code = 0; // Read response
-        response.block_id = cmd.block_id;
+        let mut response = AICommand {
+            op_code: 0, // Read response
+            layer: cmd.layer,
+            block_id: cmd.block_id,
+            ..AICommand::default()
+        };
         let len = data.len().min(242);
         response.payload[..len].copy_from_slice(&data[..len]);
 
@@ -207,7 +211,10 @@ impl AISocketListener {
     }
 
     /// Accept incoming connections and handle commands.
-    pub fn listen(&self, _adapter: &AIAdapter) -> Result<(), String> {
+    pub fn listen(&self, adapter: &AIAdapter) -> Result<(), String> {
+        #[cfg(windows)]
+        let _ = adapter;
+
         #[cfg(unix)]
         {
             for stream in self.listener.incoming() {
@@ -241,9 +248,12 @@ impl AISocketListener {
                     Err(e) => {
                         eprintln!("Command processing error: {}", e);
                         // Send error response
-                        let mut error_response = AICommand::default();
-                        error_response.op_code = 255; // Error
-                        let response_bytes: [u8; 256] = unsafe { std::mem::transmute(error_response) };
+                        let error_response = AICommand {
+                            op_code: 255, // Error
+                            ..AICommand::default()
+                        };
+                        let response_bytes: [u8; 256] =
+                            unsafe { std::mem::transmute(error_response) };
                         let _ = stream.write_all(&response_bytes);
                     }
                 }
@@ -253,9 +263,10 @@ impl AISocketListener {
         #[cfg(windows)]
         {
             // TODO: Implement Windows named pipe listening
-            return Err("Windows support not implemented".to_string());
+            Err("Windows support not implemented".to_string())
         }
 
+        #[cfg(not(windows))]
         Ok(())
     }
 }

@@ -1,0 +1,10 @@
+[Unit]
+Description=Run Microscope Memory backup daily
+
+[Timer]
+OnCalendar=*-*-* 03:30:00
+Persistent=true
+Unit=microscope-memory-backup.service
+
+[Install]
+WantedBy=timers.target

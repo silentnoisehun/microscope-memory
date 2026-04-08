@@ -252,6 +252,8 @@ pub enum Cmd {
         #[arg(short, long, default_value = "8080")]
         port: u16,
     },
+    /// Start the MCP (Model Context Protocol) server for Claude Desktop integration
+    Mcp,
     /// Start the Spine Bridge API (Axum REST / OpenAPI) for LLM integrations
     Bridge {
         #[arg(short, long, default_value = "0.0.0.0")]

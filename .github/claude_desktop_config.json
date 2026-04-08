@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "microscope-memory": {
+      "command": "microscope-mem",
+      "args": ["--mcp-mode"],
+      "env": {
+        "RUST_LOG": "info"
+      }
+    }
+  }
+}

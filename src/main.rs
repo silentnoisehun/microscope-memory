@@ -943,13 +943,20 @@ async fn main() {
         }
     }
 
-    let cli = Cli::parse();
-
     let config = Config::load(DEFAULT_CONFIG_PATH).unwrap_or_else(|_| {
         // Redir warning to stderr for MCP compatibility
         eprintln!("  {} Using default configuration", "WARN:".yellow());
         Config::default()
     });
+
+    // Backward-compatible entrypoint for external MCP launchers
+    // that invoke the binary with `--mcp-mode` instead of the `mcp` subcommand.
+    if std::env::args().any(|arg| arg == "--mcp-mode") {
+        microscope_memory::mcp::run(config);
+        return;
+    }
+
+    let cli = Cli::parse();
 
     match cli.cmd {
         Cmd::Serve { port } => {
@@ -1301,6 +1308,10 @@ async fn main() {
         }
         Cmd::Spine => {
             // Native MCP server replaces the placeholder binary listener
+            microscope_memory::mcp::run(config);
+        }
+        Cmd::Mcp => {
+            // Start MCP server for Claude Desktop integration
             microscope_memory::mcp::run(config);
         }
         Cmd::Query { mql } => {

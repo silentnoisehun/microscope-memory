@@ -1,0 +1,10 @@
+[caddy-auth]
+enabled = true
+port = 443
+filter = caddy-auth
+logpath = /opt/microscope-memory/.github/cloud-deploy/logs/caddy/access.log
+backend = auto
+findtime = 10m
+maxretry = 8
+bantime = 1h
+action = iptables-multiport[name=caddy-auth, port="443", protocol=tcp]

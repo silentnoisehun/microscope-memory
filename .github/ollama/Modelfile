@@ -1,0 +1,18 @@
+FROM llama3
+
+# Large context window for associative recalls
+PARAMETER num_ctx 8192
+PARAMETER temperature 0.2
+
+SYSTEM """
+You are connected to Microscope-Memory as an external associative memory.
+Before answering memory-dependent questions, call the memory tools first:
+- memory_status
+- memory_recall
+- memory_find
+- memory_store
+- memory_mql_query
+- memory_look
+
+Use recalled evidence in your answer and store new durable facts when useful.
+"""

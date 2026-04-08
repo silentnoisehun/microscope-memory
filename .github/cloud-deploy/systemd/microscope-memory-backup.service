@@ -1,0 +1,8 @@
+[Unit]
+Description=Microscope Memory Backup
+After=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/microscope-memory/.github/cloud-deploy
+ExecStart=/usr/bin/bash /opt/microscope-memory/.github/cloud-deploy/backup.sh

@@ -217,10 +217,13 @@ fn test_cross_platform_merkle_consistency() {
     // This ensures deterministic hashing and no endianness issues
     let root = tree.root;
     let expected_root: [u8; 32] = [
-        251, 179, 237, 94, 128, 172, 123, 228, 175, 112, 2, 231, 250, 94, 111, 148,
-        158, 81, 141, 218, 55, 185, 26, 158, 220, 2, 45, 122, 169, 78, 161, 22,
+        251, 179, 237, 94, 128, 172, 123, 228, 175, 112, 2, 231, 250, 94, 111, 148, 158, 81, 141,
+        218, 55, 185, 26, 158, 220, 2, 45, 122, 169, 78, 161, 22,
     ];
-    assert_eq!(root, expected_root, "Merkle root must be consistent across platforms");
+    assert_eq!(
+        root, expected_root,
+        "Merkle root must be consistent across platforms"
+    );
 }
 
 #[test]
@@ -243,7 +246,10 @@ fn test_mcp_protocol_compatibility() {
     assert_eq!(init_response["id"], 1);
     assert!(init_response.get("result").is_some());
     assert_eq!(init_response["result"]["protocolVersion"], "2024-11-05");
-    assert_eq!(init_response["result"]["serverInfo"]["name"], "microscope-memory");
+    assert_eq!(
+        init_response["result"]["serverInfo"]["name"],
+        "microscope-memory"
+    );
 
     // Test tools/list
     let list_request = serde_json::json!({
@@ -259,7 +265,10 @@ fn test_mcp_protocol_compatibility() {
     assert!(!tools.is_empty());
     // Check that memory_status tool exists
     let status_tool = tools.iter().find(|t| t["name"] == "memory_status").unwrap();
-    assert_eq!(status_tool["description"], "Get microscope memory index status: block count, depths, append log size");
+    assert_eq!(
+        status_tool["description"],
+        "Get microscope memory index status: block count, depths, append log size"
+    );
 
     // Test tools/call for memory_status
     let call_request = serde_json::json!({
@@ -274,13 +283,18 @@ fn test_mcp_protocol_compatibility() {
     let call_response = handle_mcp_request(&call_request, &config);
     assert_eq!(call_response["jsonrpc"], "2.0");
     assert_eq!(call_response["id"], 3);
-    let content = call_response["result"]["content"][0]["text"].as_str().unwrap();
+    let content = call_response["result"]["content"][0]["text"]
+        .as_str()
+        .unwrap();
     assert!(content.contains("Microscope Memory Status"));
     assert!(content.contains("Blocks:"));
 }
 
 // Helper function to simulate MCP request handling (extracted from mcp.rs logic)
-fn handle_mcp_request(request: &serde_json::Value, config: &microscope_memory::config::Config) -> serde_json::Value {
+fn handle_mcp_request(
+    request: &serde_json::Value,
+    config: &microscope_memory::config::Config,
+) -> serde_json::Value {
     use serde_json::json;
 
     let id = request.get("id").cloned().unwrap_or(json!(null));
@@ -323,10 +337,12 @@ fn handle_mcp_request(request: &serde_json::Value, config: &microscope_memory::c
             match tool_name {
                 "memory_status" => {
                     let reader = microscope_memory::reader::MicroscopeReader::open(config).unwrap();
-                    let append_path = std::path::Path::new(&config.paths.output_dir).join("append.bin");
+                    let append_path =
+                        std::path::Path::new(&config.paths.output_dir).join("append.bin");
                     let appended = microscope_memory::read_append_log(&append_path);
 
-                    let hdr_kb = (reader.block_count * microscope_memory::HEADER_SIZE) as f64 / 1024.0;
+                    let hdr_kb =
+                        (reader.block_count * microscope_memory::HEADER_SIZE) as f64 / 1024.0;
                     let data_kb = reader.data.len() as f64 / 1024.0;
 
                     let content = format!(
@@ -337,7 +353,11 @@ fn handle_mcp_request(request: &serde_json::Value, config: &microscope_memory::c
                          Data: {:.1} KB\n\
                          Total: {:.1} KB\n\
                          Append log: {} entries",
-                        reader.block_count, hdr_kb, data_kb, hdr_kb + data_kb, appended.len()
+                        reader.block_count,
+                        hdr_kb,
+                        data_kb,
+                        hdr_kb + data_kb,
+                        appended.len()
                     );
 
                     json!({
@@ -347,22 +367,21 @@ fn handle_mcp_request(request: &serde_json::Value, config: &microscope_memory::c
                             "content": [{"type": "text", "text": content}]
                         }
                     })
-                },
+                }
                 _ => json!({
                     "jsonrpc": "2.0",
                     "id": id,
                     "error": {"code": -32601, "message": "Method not found"}
-                })
+                }),
             }
-        },
+        }
         _ => json!({
             "jsonrpc": "2.0",
             "id": id,
             "error": {"code": -32601, "message": "Method not found"}
-        })
+        }),
     }
 }
-
 
 #[test]
 fn test_snapshot_export_import() {

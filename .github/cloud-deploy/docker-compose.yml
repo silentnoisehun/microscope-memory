@@ -1,0 +1,65 @@
+version: "3.9"
+
+services:
+  microscope-memory:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    container_name: microscope-memory
+    restart: unless-stopped
+    command: ["bridge", "--host", "0.0.0.0", "--port", "6060"]
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    pids_limit: 256
+    mem_limit: 2g
+    cpus: "2.0"
+    volumes:
+      - ./data/layers:/app/layers
+      - ./data/output:/app/output
+      - ./config.toml:/app/config.toml:ro
+    expose:
+      - "6060"
+    healthcheck:
+      test: ["CMD", "microscope-mem", "--help"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  caddy:
+    image: caddy:2.8
+    container_name: microscope-caddy
+    restart: unless-stopped
+    depends_on:
+      microscope-memory:
+        condition: service_started
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      - DOMAIN=${DOMAIN}
+      - ACME_EMAIL=${ACME_EMAIL}
+      - BASIC_AUTH_USER=${BASIC_AUTH_USER}
+      - BASIC_AUTH_HASH=${BASIC_AUTH_HASH}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./logs/caddy:/var/log/caddy
+      - caddy_data:/data
+      - caddy_config:/config
+    healthcheck:
+      test: ["CMD", "caddy", "version"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+volumes:
+  caddy_data:
+  caddy_config:

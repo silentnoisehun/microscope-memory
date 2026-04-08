@@ -9,27 +9,32 @@ use crate::config::Config;
 use crate::reader::MicroscopeReader;
 use crate::{read_append_log, store_memory, LAYER_NAMES};
 use serde_json::{json, Value};
-use std::io::{self, BufRead, Write};
+use std::io::{self, BufRead, BufReader, Read, Write};
 use std::path::Path;
 
 /// Run the MCP server on stdio (blocking).
 pub fn run(config: Config) {
     let stdin = io::stdin();
     let stdout = io::stdout();
+    let mut reader = BufReader::new(stdin.lock());
     let mut stdout = stdout.lock();
 
-    for line in stdin.lock().lines() {
-        let line = match line {
-            Ok(l) => l,
-            Err(_) => break,
+    loop {
+        let incoming = match read_message(&mut reader) {
+            Ok(Some(msg)) => msg,
+            Ok(None) => break,
+            Err(e) => {
+                let err = json!({
+                    "jsonrpc": "2.0",
+                    "id": null,
+                    "error": { "code": -32700, "message": format!("Read error: {}", e) }
+                });
+                let _ = write_message(&mut stdout, &err, true);
+                continue;
+            }
         };
 
-        let line = line.trim().to_string();
-        if line.is_empty() {
-            continue;
-        }
-
-        let request: Value = match serde_json::from_str(&line) {
+        let request = match serde_json::from_str::<Value>(&incoming.payload) {
             Ok(v) => v,
             Err(e) => {
                 let err = json!({
@@ -37,8 +42,7 @@ pub fn run(config: Config) {
                     "id": null,
                     "error": { "code": -32700, "message": format!("Parse error: {}", e) }
                 });
-                let _ = writeln!(stdout, "{}", err);
-                let _ = stdout.flush();
+                let _ = write_message(&mut stdout, &err, incoming.framed);
                 continue;
             }
         };
@@ -60,9 +64,95 @@ pub fn run(config: Config) {
             }),
         };
 
-        let _ = writeln!(stdout, "{}", response);
-        let _ = stdout.flush();
+        let _ = write_message(&mut stdout, &response, incoming.framed);
     }
+}
+
+struct IncomingMessage {
+    payload: String,
+    framed: bool,
+}
+
+fn read_message<R: BufRead + Read>(reader: &mut R) -> io::Result<Option<IncomingMessage>> {
+    let mut first_line = String::new();
+    loop {
+        first_line.clear();
+        let bytes = reader.read_line(&mut first_line)?;
+        if bytes == 0 {
+            return Ok(None);
+        }
+        if !first_line.trim().is_empty() {
+            break;
+        }
+    }
+
+    if first_line.trim_start().starts_with('{') {
+        return Ok(Some(IncomingMessage {
+            payload: first_line.trim().to_string(),
+            framed: false,
+        }));
+    }
+
+    let mut content_length: Option<usize> = None;
+    parse_header_line(&first_line, &mut content_length);
+
+    let mut header_line = String::new();
+    loop {
+        header_line.clear();
+        let bytes = reader.read_line(&mut header_line)?;
+        if bytes == 0 {
+            break;
+        }
+        if header_line == "\r\n" || header_line == "\n" {
+            break;
+        }
+        parse_header_line(&header_line, &mut content_length);
+    }
+
+    let len = content_length.ok_or_else(|| {
+        io::Error::new(
+            io::ErrorKind::InvalidData,
+            "Missing Content-Length header in framed MCP message",
+        )
+    })?;
+
+    let mut body = vec![0u8; len];
+    reader.read_exact(&mut body)?;
+    let payload = String::from_utf8(body)
+        .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "Invalid UTF-8 JSON payload"))?;
+
+    Ok(Some(IncomingMessage {
+        payload,
+        framed: true,
+    }))
+}
+
+fn parse_header_line(line: &str, content_length: &mut Option<usize>) {
+    let lower = line.to_ascii_lowercase();
+    if lower.starts_with("content-length:") {
+        let value = line
+            .split_once(':')
+            .map(|(_, v)| v.trim())
+            .and_then(|v| v.parse::<usize>().ok());
+        if let Some(v) = value {
+            *content_length = Some(v);
+        }
+    }
+}
+
+fn write_message<W: Write>(writer: &mut W, response: &Value, framed: bool) -> io::Result<()> {
+    if framed {
+        let payload = response.to_string();
+        write!(
+            writer,
+            "Content-Length: {}\r\n\r\n{}",
+            payload.len(),
+            payload
+        )?;
+    } else {
+        writeln!(writer, "{}", response)?;
+    }
+    writer.flush()
 }
 
 fn handle_initialize(id: &Value) -> Value {

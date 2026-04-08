@@ -463,6 +463,13 @@ h3 {
   border: 1px solid rgba(255, 255, 255, 0.14);
   background-color: #0f2234;
   background-size: cover;
+  opacity: 0.24;
+  transform: scale(0.94);
+  filter: saturate(0.8) blur(0.3px);
+  transition:
+    opacity 0.55s ease,
+    transform 0.55s ease,
+    filter 0.55s ease;
 }
 
 .layer-caption {
@@ -472,6 +479,17 @@ h3 {
   letter-spacing: 0.05em;
   color: var(--muted);
   text-transform: uppercase;
+  transition: color 0.45s ease;
+}
+
+.layer-step.image-live .layer-art {
+  opacity: 1;
+  transform: scale(1);
+  filter: saturate(1.1) blur(0);
+}
+
+.layer-step.image-live .layer-caption {
+  color: #d7edf9;
 }
 
 .layer-copy h3 {

@@ -102,6 +102,7 @@ function bindMicroscopeDive() {
     const data = depthModel[idx] || depthModel[0];
     steps.forEach((step, i) => {
       step.classList.toggle("is-active", i === idx);
+      step.classList.toggle("image-live", i === idx);
     });
     if (lensDepth) lensDepth.textContent = data.id;
     if (lensName) lensName.textContent = data.name;

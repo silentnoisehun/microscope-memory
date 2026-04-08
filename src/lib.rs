@@ -23,6 +23,7 @@ pub mod merkle;
 pub mod mirror;
 pub mod query;
 pub mod reader;
+pub mod syscaller;
 pub mod resonance;
 pub mod sequential_thinking;
 pub mod snapshot;

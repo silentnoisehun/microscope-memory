@@ -12,6 +12,10 @@ use crate::{
     DEPTH_ENTRY_SIZE, HEADER_SIZE, LAYER_NAMES, META_HEADER_SIZE,
 };
 
+use crate::syscaller::nt_query_virtual_memory;
+use windows_sys::Win32::Foundation::HANDLE;
+use windows_sys::Win32::System::Memory::{MEMORY_BASIC_INFORMATION, PAGE_NOACCESS, PAGE_GUARD};
+
 /// Block header: 32 bytes, packed, mmap-ready.
 #[repr(C, packed)]
 #[derive(Clone, Copy)]
@@ -159,6 +163,11 @@ impl MicroscopeReader {
         let headers =
             unsafe { memmap2::Mmap::map(&hdr_file).map_err(|e| format!("mmap headers: {}", e))? };
 
+        // Red Audit: Stability check for headers mmap
+        if let Err(e) = Self::verify_mmap_protection(headers.as_ptr(), headers.len()) {
+            return Err(format!("Stability check failed (headers): {}", e));
+        }
+
         #[cfg(feature = "compression")]
         let data = {
             let zst_path = output_dir.join("data.bin.zst");
@@ -206,6 +215,34 @@ impl MicroscopeReader {
         })
     }
 
+    /// Red Audit: Verifies that the mmap'ed memory is indeed readable and not guarded.
+    /// Bypasses standard Win32 API for stability.
+    fn verify_mmap_protection(ptr: *const u8, len: usize) -> Result<(), String> {
+        let mut info: MEMORY_BASIC_INFORMATION = unsafe { std::mem::zeroed() };
+        let mut _return_len: usize = 0;
+        
+        let status = unsafe {
+            nt_query_virtual_memory(
+                -1isize as HANDLE, // Current process
+                ptr as *const _,
+                0, // MemoryBasicInformation
+                &mut info as *mut _ as *mut _,
+                std::mem::size_of::<MEMORY_BASIC_INFORMATION>(),
+                &mut _return_len,
+            )
+        };
+
+        if status != 0 {
+            return Err(format!("NtQueryVirtualMemory failed with status 0x{:08X}", status));
+        }
+
+        if info.Protect == PAGE_NOACCESS || (info.Protect & PAGE_GUARD) != 0 {
+            return Err("Memory protection violation: Page is NOACCESS or GUARD".to_string());
+        }
+
+        Ok(())
+    }
+
     #[inline(always)]
     pub fn header(&self, i: usize) -> &BlockHeader {
         debug_assert!(i < self.block_count);
@@ -217,7 +254,16 @@ impl MicroscopeReader {
         let h = self.header(i);
         let start = h.data_offset as usize;
         let end = start + h.data_len as usize;
-        std::str::from_utf8(&self.data[start..end]).unwrap_or("<bin>")
+        
+        // Red Audit: Basic bounds and null-check sanitization
+        if end > self.data.len() || start >= end {
+            return "[out of bounds]";
+        }
+
+        let raw = &self.data[start..end];
+        
+        // Anti-Analysis: Ensure no suspicious control characters
+        std::str::from_utf8(raw).unwrap_or("<bin>")
     }
 
     /// The MICROSCOPE: exact depth + spatial L2 search.

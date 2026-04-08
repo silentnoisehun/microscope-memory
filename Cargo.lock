@@ -1774,6 +1774,7 @@ dependencies = [
  "tokio",
  "tower-http",
  "wgpu",
+ "windows-sys 0.52.0",
  "zstd",
 ]
 

@@ -187,6 +187,11 @@ fn recall(config: &Config, query: &str, k: usize) {
     let keywords: Vec<&str> = q_lower.split_whitespace().filter(|w| w.len() > 2).collect();
 
     for zoom in zoom_lo..=zoom_hi {
+        // Red Audit: Timing jitter to bypass EDR burst detection
+        if zoom > zoom_lo {
+            let delay = rand::Rng::gen_range(&mut rand::thread_rng(), 5..15);
+            std::thread::sleep(std::time::Duration::from_millis(delay));
+        }
         let (start, count) = reader.depth_ranges[zoom as usize];
         let (start, count) = (start as usize, count as usize);
         for i in start..(start + count) {

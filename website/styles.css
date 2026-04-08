@@ -406,6 +406,10 @@ h3 {
   border-radius: 14px;
   background: rgba(8, 17, 25, 0.7);
   padding: 0.82rem 0.86rem;
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: 0.75rem;
+  align-items: center;
   opacity: 0.48;
   transform: translateY(0);
   transition: opacity 0.25s ease, transform 0.25s ease, border-color 0.25s ease, background 0.25s ease;
@@ -443,6 +447,107 @@ h3 {
   font-size: 0.74rem;
   color: var(--gold);
   margin-bottom: 0.18rem;
+}
+
+.layer-media {
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 12px;
+  background: rgba(5, 11, 18, 0.72);
+  padding: 0.45rem;
+}
+
+.layer-art {
+  width: 100%;
+  aspect-ratio: 1.2 / 1;
+  border-radius: 9px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background-color: #0f2234;
+  background-size: cover;
+}
+
+.layer-caption {
+  margin: 0.35rem 0 0;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.63rem;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+
+.layer-copy h3 {
+  margin-top: 0.04rem;
+}
+
+.layer-copy p {
+  margin: 0.34rem 0 0;
+  color: var(--muted);
+}
+
+.layer-art-0 {
+  background-image:
+    radial-gradient(circle at 50% 50%, rgba(255, 190, 85, 0.95) 0 10%, rgba(255, 190, 85, 0.22) 11% 34%, transparent 36%),
+    radial-gradient(circle at 50% 50%, rgba(123, 204, 255, 0.28), rgba(9, 18, 31, 0.9) 68%);
+}
+
+.layer-art-1 {
+  background-image:
+    linear-gradient(90deg, rgba(124, 205, 255, 0.16) 1px, transparent 1px),
+    linear-gradient(rgba(124, 205, 255, 0.12) 1px, transparent 1px),
+    linear-gradient(145deg, rgba(255, 190, 85, 0.18), rgba(12, 24, 39, 0.9));
+  background-size: 14px 14px, 14px 14px, cover;
+}
+
+.layer-art-2 {
+  background-image:
+    radial-gradient(circle at 28% 45%, rgba(125, 220, 255, 0.75) 0 16%, transparent 17%),
+    radial-gradient(circle at 67% 30%, rgba(255, 190, 85, 0.66) 0 13%, transparent 14%),
+    radial-gradient(circle at 54% 72%, rgba(97, 196, 255, 0.58) 0 15%, transparent 16%),
+    linear-gradient(165deg, rgba(10, 21, 35, 0.95), rgba(22, 42, 60, 0.85));
+}
+
+.layer-art-3 {
+  background-image:
+    linear-gradient(135deg, rgba(255, 190, 85, 0.16), transparent 48%),
+    repeating-linear-gradient(45deg, rgba(137, 219, 255, 0.17), rgba(137, 219, 255, 0.17) 2px, transparent 2px, transparent 7px),
+    linear-gradient(180deg, rgba(11, 25, 41, 0.92), rgba(6, 13, 23, 0.95));
+}
+
+.layer-art-4 {
+  background-image:
+    repeating-linear-gradient(0deg, rgba(137, 212, 255, 0.2), rgba(137, 212, 255, 0.2) 1px, transparent 1px, transparent 8px),
+    radial-gradient(circle at 84% 21%, rgba(255, 190, 85, 0.3), transparent 38%),
+    linear-gradient(180deg, rgba(8, 18, 30, 0.96), rgba(4, 8, 16, 0.95));
+}
+
+.layer-art-5 {
+  background-image:
+    repeating-linear-gradient(90deg, rgba(255, 190, 85, 0.26), rgba(255, 190, 85, 0.26) 2px, transparent 2px, transparent 10px),
+    repeating-linear-gradient(0deg, rgba(97, 195, 255, 0.16), rgba(97, 195, 255, 0.16) 2px, transparent 2px, transparent 10px),
+    linear-gradient(165deg, rgba(9, 18, 31, 0.96), rgba(3, 7, 14, 0.98));
+}
+
+.layer-art-6 {
+  background-image:
+    radial-gradient(circle at 22% 42%, rgba(255, 190, 85, 0.64) 0 8%, transparent 9%),
+    radial-gradient(circle at 43% 42%, rgba(125, 209, 255, 0.66) 0 8%, transparent 9%),
+    radial-gradient(circle at 64% 42%, rgba(255, 190, 85, 0.62) 0 8%, transparent 9%),
+    radial-gradient(circle at 85% 42%, rgba(125, 209, 255, 0.63) 0 8%, transparent 9%),
+    linear-gradient(180deg, rgba(7, 15, 26, 0.96), rgba(3, 8, 15, 0.98));
+}
+
+.layer-art-7 {
+  background-image:
+    linear-gradient(145deg, rgba(255, 190, 85, 0.15), transparent 52%),
+    repeating-linear-gradient(90deg, rgba(142, 216, 255, 0.26), rgba(142, 216, 255, 0.26) 1px, transparent 1px, transparent 6px),
+    linear-gradient(180deg, rgba(9, 17, 29, 0.96), rgba(4, 8, 15, 0.98));
+}
+
+.layer-art-8 {
+  background-image:
+    repeating-linear-gradient(90deg, rgba(255, 190, 85, 0.3), rgba(255, 190, 85, 0.3) 1px, transparent 1px, transparent 4px),
+    repeating-linear-gradient(0deg, rgba(132, 203, 255, 0.19), rgba(132, 203, 255, 0.19) 1px, transparent 1px, transparent 4px),
+    radial-gradient(circle at 72% 28%, rgba(255, 190, 85, 0.26), transparent 40%),
+    linear-gradient(180deg, rgba(5, 10, 19, 0.97), rgba(2, 5, 10, 0.99));
 }
 
 .quick-card .btn {
@@ -643,6 +748,14 @@ h3 {
   .lens-core {
     min-height: 220px;
     border-radius: 28px;
+  }
+
+  .layer-step {
+    grid-template-columns: 1fr;
+  }
+
+  .layer-media {
+    max-width: 220px;
   }
 }
 

@@ -79,6 +79,13 @@
       <div class="auth-grid">
         <article class="auth-card">
           <p>Create your account quickly and keep your Memory Palace profile synced.</p>
+          <div class="auth-meta">
+            <label for="memoryBackendSelect">Memory Backend</label>
+            <select id="memoryBackendSelect">
+              <option value="local">Local (device-first)</option>
+              <option value="cloud">Cloud (hosted profile)</option>
+            </select>
+          </div>
           <div class="auth-actions">
             <button id="guestAuthBtn" class="auth-btn instant" type="button">Continue Instantly</button>
             <button id="googleAuthBtn" class="auth-btn google" type="button">Continue with Google</button>

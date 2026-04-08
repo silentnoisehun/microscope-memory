@@ -7,7 +7,9 @@ use axum::{
     Router,
 };
 use serde::{Deserialize, Serialize};
+use std::fs;
 use std::net::SocketAddr;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::TraceLayer;
@@ -21,6 +23,8 @@ pub struct AppState {
 pub struct RecallQuery {
     pub q: String,
     pub k: Option<usize>,
+    pub user_id: Option<String>,
+    pub memory_backend: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -36,6 +40,14 @@ pub struct RememberRequest {
     pub text: String,
     pub layer: Option<String>,
     pub importance: Option<u8>,
+    pub user_id: Option<String>,
+    pub memory_backend: Option<String>,
+}
+
+#[derive(Deserialize)]
+pub struct SessionQuery {
+    pub user_id: Option<String>,
+    pub memory_backend: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -44,6 +56,56 @@ pub struct StatusResponse {
     pub blocks: usize,
     pub append_log: usize,
     pub layers: Vec<String>,
+}
+
+#[derive(Serialize)]
+pub struct SessionResponse {
+    pub user_id: String,
+    pub memory_backend: String,
+    pub namespace_dir: String,
+}
+
+fn sanitize_user_id(raw: Option<&str>) -> String {
+    let src = raw.unwrap_or("guest");
+    let cleaned: String = src
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric() || *c == '-' || *c == '_')
+        .take(64)
+        .collect();
+    if cleaned.is_empty() {
+        "guest".to_string()
+    } else {
+        cleaned
+    }
+}
+
+fn sanitize_memory_backend(raw: Option<&str>) -> String {
+    match raw.unwrap_or("local").to_ascii_lowercase().as_str() {
+        "cloud" => "cloud".to_string(),
+        _ => "local".to_string(),
+    }
+}
+
+fn namespace_dir(config: &Config, user_id: &str, memory_backend: &str) -> PathBuf {
+    Path::new(&config.paths.output_dir)
+        .join("namespaces")
+        .join(memory_backend)
+        .join(user_id)
+}
+
+fn scoped_config(
+    config: &Config,
+    user_id: Option<&str>,
+    memory_backend: Option<&str>,
+) -> Result<(Config, String, String, PathBuf), (StatusCode, String)> {
+    let user = sanitize_user_id(user_id);
+    let backend = sanitize_memory_backend(memory_backend);
+    let ns_dir = namespace_dir(config, &user, &backend);
+    fs::create_dir_all(&ns_dir)
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("create namespace dir: {}", e)))?;
+    let mut scoped = config.clone();
+    scoped.paths.output_dir = ns_dir.to_string_lossy().to_string();
+    Ok((scoped, user, backend, ns_dir))
 }
 
 async fn get_status(
@@ -69,6 +131,11 @@ async fn recall_memory(
 ) -> Result<Json<Vec<MemoryResponse>>, (StatusCode, String)> {
     let reader = MicroscopeReader::open(&state.config)
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    let (user_config, _user_id, _memory_backend, _namespace) = scoped_config(
+        &state.config,
+        params.user_id.as_deref(),
+        params.memory_backend.as_deref(),
+    )?;
 
     let k = params.k.unwrap_or(10);
     let query_lower = params.q.to_lowercase();
@@ -100,7 +167,7 @@ async fn recall_memory(
     }
 
     // --- Also search append log (freshly stored memories) ---
-    let append_path = std::path::Path::new(&state.config.paths.output_dir).join("append.bin");
+    let append_path = std::path::Path::new(&user_config.paths.output_dir).join("append.bin");
     let appended = crate::read_append_log(&append_path);
     for entry in &appended {
         if response.len() >= k {
@@ -130,14 +197,38 @@ async fn remember_memory(
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
     let layer = payload.layer.unwrap_or_else(|| "long_term".to_string());
     let importance = payload.importance.unwrap_or(5);
+    let (user_config, user_id, memory_backend, namespace) = scoped_config(
+        &state.config,
+        payload.user_id.as_deref(),
+        payload.memory_backend.as_deref(),
+    )?;
 
-    crate::store_memory(&state.config, &payload.text, &layer, importance)
+    crate::store_memory(&user_config, &payload.text, &layer, importance)
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     Ok(Json(serde_json::json!({
         "status": "committed",
-        "message": "Memory stored in append log"
+        "message": "Memory stored in append log",
+        "user_id": user_id,
+        "memory_backend": memory_backend,
+        "namespace_dir": namespace.to_string_lossy()
     })))
+}
+
+async fn get_session(
+    State(state): State<Arc<AppState>>,
+    Query(params): Query<SessionQuery>,
+) -> Result<Json<SessionResponse>, (StatusCode, String)> {
+    let (_cfg, user_id, memory_backend, namespace) = scoped_config(
+        &state.config,
+        params.user_id.as_deref(),
+        params.memory_backend.as_deref(),
+    )?;
+    Ok(Json(SessionResponse {
+        user_id,
+        memory_backend,
+        namespace_dir: namespace.to_string_lossy().to_string(),
+    }))
 }
 
 async fn get_openapi() -> Json<serde_json::Value> {
@@ -173,6 +264,7 @@ async fn get_root() -> axum::response::Html<&'static str> {
 <table>
 <tr><th>Method</th><th>Endpoint</th><th>Description</th></tr>
 <tr><td>GET</td><td><code>/v1/status</code></td><td>Engine health &amp; stats</td></tr>
+<tr><td>GET</td><td><code>/v1/session?user_id=u1&amp;memory_backend=local</code></td><td>Resolve user namespace</td></tr>
 <tr><td>GET</td><td><code>/v1/recall?q=...&amp;k=10</code></td><td>Recall memories by query</td></tr>
 <tr><td>POST</td><td><code>/v1/remember</code></td><td>Store a new memory</td></tr>
 <tr><td>GET</td><td><a href="/openapi.json">/openapi.json</a></td><td>OpenAPI spec</td></tr>
@@ -180,12 +272,12 @@ async fn get_root() -> axum::response::Html<&'static str> {
 
 <h3>Quick Start</h3>
 <pre># Recall via v1 API
-curl "http://localhost:6060/v1/recall?q=hello&amp;k=3"
+curl "http://localhost:6060/v1/recall?q=hello&amp;k=3&amp;user_id=alice&amp;memory_backend=local"
 
 # Store via v1 API
 curl -X POST http://localhost:6060/v1/remember \
   -H "Content-Type: application/json" \
-  -d '{"text":"Hello world","layer":"long_term"}'</pre>
+  -d '{"text":"Hello world","layer":"long_term","user_id":"alice","memory_backend":"local"}'</pre>
 
 <p style="font-size: 0.9em; color: #888;">Note: Legacy routes (<code>/status</code>, <code>/recall</code>, <code>/remember</code>) are supported but deprecated.</p>
 </body></html>"#,
@@ -206,6 +298,7 @@ pub async fn run(
 
     let v1_routes = Router::new()
         .route("/status", get(get_status))
+        .route("/session", get(get_session))
         .route("/recall", get(recall_memory))
         .route("/remember", post(remember_memory));
 
@@ -215,6 +308,7 @@ pub async fn run(
         .nest("/v1", v1_routes)
         // Backward compatibility (Legacy)
         .route("/status", get(get_status))
+        .route("/session", get(get_session))
         .route("/recall", get(recall_memory))
         .route("/remember", post(remember_memory))
         .route("/openapi.json", get(get_openapi))

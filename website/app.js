@@ -90,20 +90,39 @@ function bindAuth() {
   const googleBtn = document.getElementById("googleAuthBtn");
   const appleBtn = document.getElementById("appleAuthBtn");
   const signOutBtn = document.getElementById("signOutBtn");
+  const backendSelect = document.getElementById("memoryBackendSelect");
   const status = document.getElementById("authStatus");
   if (!googleBtn || !appleBtn || !signOutBtn || !status) return;
 
   const demoKey = "microscope_demo_user_v1";
+  const backendKey = "microscope_memory_backend_v1";
+  const getBackend = () => {
+    if (backendSelect && backendSelect.value) return backendSelect.value;
+    return localStorage.getItem(backendKey) || "local";
+  };
+  const setBackend = (backend) => {
+    localStorage.setItem(backendKey, backend);
+    if (backendSelect) backendSelect.value = backend;
+  };
+  const statusFor = (user, backend) => {
+    return "Signed in as " + user.name + " | own space: " + backend + " memory.";
+  };
   const setDemoUser = (provider) => {
     const id = Math.random().toString(36).slice(2, 10);
+    const backend = getBackend();
     const user = {
       id,
       provider,
       name: "Guest-" + id,
+      backend,
       createdAt: Date.now(),
     };
     localStorage.setItem(demoKey, JSON.stringify(user));
-    status.textContent = "Signed in instantly as " + user.name + " (" + provider + " demo).";
+    window.MICROSCOPE_SESSION = {
+      userId: user.id,
+      backend,
+    };
+    status.textContent = statusFor(user, backend) + " (" + provider + " demo)";
   };
   const readDemoUser = () => {
     try {
@@ -116,7 +135,22 @@ function bindAuth() {
   const clearDemoUser = () => {
     localStorage.removeItem(demoKey);
     status.textContent = "Signed out.";
+    window.MICROSCOPE_SESSION = null;
   };
+
+  setBackend(localStorage.getItem(backendKey) || "local");
+  if (backendSelect) {
+    backendSelect.addEventListener("change", () => {
+      const backend = backendSelect.value === "cloud" ? "cloud" : "local";
+      setBackend(backend);
+      const existing = readDemoUser();
+      if (existing) {
+        existing.backend = backend;
+        localStorage.setItem(demoKey, JSON.stringify(existing));
+        status.textContent = statusFor(existing, backend);
+      }
+    });
+  }
 
   const authConfig = window.MICROSCOPE_AUTH || {};
   const firebaseConfig = authConfig.firebaseConfig || {};
@@ -126,7 +160,13 @@ function bindAuth() {
   if (!authConfig.enabled || !configured || !window.firebase) {
     const existing = readDemoUser();
     if (existing) {
-      status.textContent = "Signed in instantly as " + existing.name + " (" + existing.provider + " demo).";
+      const backend = existing.backend || getBackend();
+      setBackend(backend);
+      window.MICROSCOPE_SESSION = {
+        userId: existing.id,
+        backend,
+      };
+      status.textContent = statusFor(existing, backend) + " (" + existing.provider + " demo)";
     } else {
       status.textContent = "Instant mode active: click any button and continue.";
     }
@@ -159,10 +199,16 @@ function bindAuth() {
   auth.onAuthStateChanged((user) => {
     if (!user) {
       status.textContent = "Signed out.";
+      window.MICROSCOPE_SESSION = null;
       return;
     }
+    const backend = getBackend();
     const name = user.displayName || user.email || user.uid;
-    status.textContent = "Signed in as: " + name;
+    window.MICROSCOPE_SESSION = {
+      userId: user.uid || name,
+      backend,
+    };
+    status.textContent = "Signed in as " + name + " | own space: " + backend + " memory.";
   });
 
   googleBtn.addEventListener("click", async () => {

@@ -334,6 +334,30 @@ h3 {
   flex-wrap: wrap;
 }
 
+.auth-meta {
+  margin-top: 0.75rem;
+}
+
+.auth-meta label {
+  display: block;
+  margin-bottom: 0.3rem;
+  color: var(--muted);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.74rem;
+}
+
+.auth-meta select {
+  width: 100%;
+  max-width: 260px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--ink);
+  padding: 0.55rem 0.75rem;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.78rem;
+}
+
 .auth-btn {
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.18);

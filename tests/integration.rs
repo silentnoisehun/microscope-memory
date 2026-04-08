@@ -205,6 +205,25 @@ fn test_merkle_integrity_after_build() {
 }
 
 #[test]
+fn test_cross_platform_merkle_consistency() {
+    let (_tmp, config) = setup_test_env();
+    microscope_memory::build::build(&config, true).unwrap();
+
+    let output_dir = Path::new(&config.paths.output_dir);
+    let merkle_data = fs::read(output_dir.join("merkle.bin")).unwrap();
+    let tree = microscope_memory::merkle::MerkleTree::from_bytes(&merkle_data).unwrap();
+
+    // Cross-platform consistency check: Merkle root should be identical across platforms
+    // This ensures deterministic hashing and no endianness issues
+    let root = tree.root;
+    let expected_root: [u8; 32] = [
+        251, 179, 237, 94, 128, 172, 123, 228, 175, 112, 2, 231, 250, 94, 111, 148,
+        158, 81, 141, 218, 55, 185, 26, 158, 220, 2, 45, 122, 169, 78, 161, 22,
+    ];
+    assert_eq!(root, expected_root, "Merkle root must be consistent across platforms");
+}
+
+#[test]
 fn test_snapshot_export_import() {
     let (_tmp, config) = setup_test_env();
     microscope_memory::build::build(&config, true).unwrap();

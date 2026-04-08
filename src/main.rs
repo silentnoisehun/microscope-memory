@@ -893,7 +893,7 @@ fn init_demo(config: &Config, force: bool) -> Result<(), String> {
         return Err("layers/demo.txt already exists. Use --force to overwrite.".to_string());
     }
 
-    let demo_content = include_str!("../layers/demo.txt");
+    let demo_content = "Microscope Memory: Hierarchical Cognitive Engine\n\nThis is a demo dataset for the Microscope Memory. It uses a 9-layer hierarchical model (D0-D8) to store and recall information.\n\nKey Concepts:\n- Hebbian Learning: Blocks that fire together, wire together.\n- Binary Spine: Zero-JSON, mmap-backed performance.\n- Resonance: Federated synchronization protocol.\n\nHow to use:\n1. Run 'microscope-mem build' to index this file.\n2. Run 'microscope-mem think \"Tell me about Hebbian learning\"' to see it in action.\n";
     fs::write(&demo_path, demo_content).map_err(|e| e.to_string())?;
 
     println!("{}", "Demo dataset initialized.".green().bold());

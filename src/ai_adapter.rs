@@ -19,10 +19,10 @@ use std::{io::Read, io::Write};
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct AICommand {
-    pub op_code: u8,        // 0: Read, 1: Write, 2: Learn/Drift
-    pub layer: u8,          // Target layer (0-9)
     pub block_id: u64,      // Block identifier (0 for new blocks)
     pub weight_delta: f32,  // Learning weight delta for Hebbian updates
+    pub op_code: u8,        // 0: Read, 1: Write, 2: Learn/Drift
+    pub layer: u8,          // Target layer (0-9)
     pub payload: [u8; 242], // Data payload (fits in 256 bytes total)
 }
 
@@ -76,6 +76,8 @@ impl Default for AICommand {
         }
     }
 }
+
+const _: () = assert!(std::mem::size_of::<AICommand>() == 256);
 
 // ─── AI Adapter Implementation ───────────────────────────
 

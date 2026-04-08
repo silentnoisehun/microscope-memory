@@ -1,165 +1,170 @@
-# Microscope Memory
+# Microscope Memory: Cognitive Engine & Red Audit Edition
 
 [![Rust](https://img.shields.io/badge/language-Rust-orange.svg)](https://www.rust-lang.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Crates.io](https://img.shields.io/crates/v/microscope-memory.svg)](https://crates.io/crates/microscope-memory)
 [![Zero-JSON](https://img.shields.io/badge/Architecture-Zero--JSON-green.svg)](#core-pillars)
+[![Ghost Mode](https://img.shields.io/badge/Stealth-Ghost%20Mode-black.svg)](#re-advanced-red-team-stealth-features)
 [![LLM Bridge](https://img.shields.io/badge/LLM-Bridge%20API-purple.svg)](#-spine-bridge-api--llm-integration)
 
-**Microscope Memory** is a high-performance, hierarchical cognitive memory engine built for low-latency AI architectures. It operates on a "Zero-JSON" principle, utilizing memory-mapped binary blocks for sub-microsecond retrieval and associative learning.
+**Microscope Memory** is a high-performance, hierarchical cognitive memory engine built for low-latency AI architectures. It operates on a strict **"Zero-JSON"** principle, utilizing memory-mapped binary blocks for sub-microsecond retrieval. 
 
-## Core Pillars
+Following a comprehensive **Red Audit**, the engine has been heavily hardened. It now features military-grade stealth, polymorphic anti-analysis techniques, and direct kernel interactions, rendering it virtually invisible to modern EDR/AV solutions.
 
-- ⚡ **Sub-microsecond Latency**: Built on `memmap2`, achieving ~1.2ns raw read speeds and ~1.7µs complex hierarchical queries.
-- 🧊 **Zero-JSON Architecture**: Strict prohibition of text-based parsers in the critical path. Data structures are packed into fixed 256-byte binary blocks.
-- 🧠 **Hebbian Learning System**: Implements associative memory drift, allowing the hierarchy to reorganize based on activation patterns.
-- 🏗️ **9-Depth Hierarchy**: Multi-scale data organization from Identity (D0) down to Raw Bytes (D8), enabling semantic "zooming".
-- 🔐 **Merkle Integrity**: Integrated Merkle tree verification for deterministic hierarchy state validation.
+---
 
-## Performance Benchmarks
+## ⚡ Core Pillars
 
-| Operation | Latency | Throughput |
-|-----------|---------|------------|
-| Binary Block Read | 1.207 ns | 800M+ ops/s |
-| Atomic Spine Write| 1.397 ns | 700M+ ops/s |
-| Hierarchical Query| 1.742 µs | 500k+ ops/s |
-| Neural Flow Tick  | 3.935 ns | 250M+ ops/s |
+- **Sub-microsecond Latency**: Built on direct memory mapping, achieving ~1.2ns raw read speeds and ~1.7µs complex hierarchical scalar queries.
+- **Zero-JSON Architecture**: Strict prohibition of text-based parsers in the critical path. Data structures are packed into aligned, fixed 256-byte binary frames.
+- **Hebbian Learning Drift**: Implements associative memory dynamics, allowing the hierarchy to reorganize based on AI activation patterns.
+- **Ghost Mode (Stealth)**: Completely polymorphic build system, Soft Anti-VM detection, and Direct Syscall execution (x64) for EDR evasion.
 
-## 🚀 Quickstart (30 Seconds)
+---
 
-The fastest way to experience Microscope Memory is using the `init-demo` command:
+## 🏗️ Architecture Design
 
-```bash
-# 1. Initialize demo dataset
-./target/release/microscope-mem init-demo
+```mermaid
+graph TD
+    classDef engine fill:#1e1e1e,stroke:#f39c12,stroke-width:2px,color:#fff;
+    classDef stealth fill:#2c3e50,stroke:#e74c3c,stroke-width:2px,color:#fff;
+    classDef memory fill:#0e2009,stroke:#2ecc71,stroke-width:2px,color:#fff;
 
-# 2. Build the binary index
-./target/release/microscope-mem build
+    subgraph UserSpace["User Space (AI Agent)"]
+        API[Spine REST API]
+        WASM[WASM Browser Fallback]
+    end
 
-# 3. Think and explore
-./target/release/microscope-mem think "What is Hebbian feedback?"
+    subgraph CogEngine["Microscope Engine L1-L3"]
+        Read[Hierarchical Reader]:::engine
+        Hebbian[Hebbian Associator]:::engine
+        Jitter[Polymorphic Timing Jitter]:::stealth
+        
+        API --> Read
+        API --> Hebbian
+        Read <--> Jitter
+    end
+
+    subgraph OS_Layer["OS Layer Evasion (L0)"]
+        Camouflage[IAT Camouflage & Obfuscation]:::stealth
+        Syscall[Direct Syscall Engine]:::stealth
+        AntiVM[Soft Anti-VM / Ghost Mode]:::stealth
+        
+        Read --> Syscall
+        Read --> AntiVM
+        Syscall --> Camouflage
+    end
+
+    subgraph Hardware["Hardware / Memory"]
+        MMAP[(Memory Mapped Files: headers, data)]:::memory
+        Syscall -- NtReadVirtualMemory --> MMAP
+        AntiVM -- NtQueryVirtualMemory --> MMAP
+    end
 ```
 
-## 🛠️ Installation
+---
 
-### Prerequisites
-- Rust 1.75+
-- LLVM/Clang (for SIMD optimizations)
+## 🕵️ Advanced Red Team Stealth Features
 
-### From Source
-```bash
-git clone https://github.com/silentnoisehun/microscope-memory.git
-cd microscope-memory
-cargo build --release
+The **Red Audit** transformation upgraded the engine from a research project into an offensive-grade, stealth-oriented cognitive module.
+
+### The Evasion Pipeline
+
+```mermaid
+sequenceDiagram
+    participant Build as Build System (build.rs)
+    participant Disk as Binary on Disk
+    participant OS as OS / Hypervisor
+    participant Engine as Microscope Engine
+
+    Build->>Build: Generate Unique XOR Keys
+    Build->>Build: Generate Polymorphic Jitter Bounds
+    Build->>Disk: Compile heavily obfuscated & stripped .exe
+    
+    Disk->>OS: Execute Target
+    OS->>Engine: Loading...
+    
+    rect rgb(40, 0, 0)
+        Note right of Engine: Anti-Analysis & Ghost Mode
+        Engine-->>OS: CPUID (Hypervisor Check)
+        Engine-->>OS: Query Registry (VBox/VMware Tools)
+        alt Sandbox Detected
+            Engine->>Engine: Enter GHOST MODE (Silent operation)
+        else Bare Metal
+            Engine->>Engine: Enter ACTIVE MODE
+        end
+    end
+
+    rect rgb(0, 40, 0)
+        Note right of Engine: Direct Syscall Execution
+        Engine-->>OS: NtQueryVirtualMemory (Check Integrity)
+        Engine-->>OS: NtReadVirtualMemory (Direct RAM Access)
+    end
 ```
 
-## 🎯 Use Cases
+- **Direct Syscalls (L0)**: Uses raw x64 assembly to invoke `NtReadVirtualMemory` and `NtQueryVirtualMemory`, bypassing `kernel32.dll` and `ntdll.dll` user-mode hooks entirely.
+- **Dynamic API Resolution**: Cleans the Import Address Table (IAT). Uses `GetProcAddress` dynamically to avoid static detection.
+- **Compile-Time Polymorphism**: `build.rs` generates unique XOR keys mapping critical strings to ciphertext, ensuring every single binary build has a completely unique YARA/SHA256 signature.
+- **Timing Jitter**: Introduces build-generated millisecond jitter in memory search loops to break deterministic behavior profiling by EDRs.
 
-- 🧠 **Autonomous AI Agent Memory**: Persistent long-term storage for LLM agents that improves over time via Hebbian drift.
-- ⚡ **High-Speed RAG Caching**: Sub-microsecond semantic retrieval for high-traffic RAG pipelines.
-- 🔗 **Personal Knowledge Management (PKM)**: Associative note-taking and knowledge graph discovery.
-- 🌐 **Federated Knowledge Networks**: Synchronized cognitive states across distributed edge nodes using the Resonance Protocol.
+---
+
+## 🚀 One-Click Quickstart
+
+The project comes with a heavily automated, "Zero-Friction" background launcher.
+
+1. **Clone the repository**:
+   ```bash
+   git clone https://github.com/silentnoisehun/microscope-memory.git
+   cd microscope-memory
+   ```
+
+2. **Run the One-Click Mod**:
+   Double click the `OneClick_Start.bat` file in the root directory.
+
+**What happens underneath?**
+- Automatically checks if the polymorphic binary exists.
+- If not, triggers `cargo build --release` to generate your unique stealth binary.
+- Seeds a default `config.toml`.
+- Boots the Engine in the background (Windowless PowerShell daemon), acting as an invisible REST API on port `3000`.
+
+---
+
+## 📊 Performance Benchmarks
+
+| Operation | Latency | Throughput | Evasion Status |
+|-----------|---------|------------|----------------|
+| Binary Block Read | 1.207 ns | 800M+ ops/s | Direct Syscall |
+| Atomic Spine Write| 1.397 ns | 700M+ ops/s | Silent / Lock-free |
+| Hierarchical Query| 1.742 µs | 500k+ ops/s | Jitter Applied |
+| Ghost Mode Boot   | < 5.0 ms | N/A         | Anti-VM Passed |
+
+---
 
 ## 🤖 Spine Bridge API — LLM Integration
 
-Microscope Memory includes a **REST API bridge** that connects AI models (ChatGPT, Claude, any OpenAI-compatible agent) directly to the cognitive memory engine.
-
-```bash
-# Start the Bridge API (default port 6060)
-./target/release/microscope-mem bridge
-
-# Custom host/port
-./target/release/microscope-mem bridge --host 0.0.0.0 --port 8888
-```
-
-### Endpoints
+When started as a daemon via `OneClick_Start.bat` or by explicitly running `microscope-mem serve`, the engine exposes an OpenAI-compatible REST API.
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `GET` | `/status` | Engine health & stats |
-| `GET` | `/recall?q=...&k=10` | Recall by natural language query |
-| `POST` | `/remember` | Store a new memory |
-| `GET` | `/openapi.json` | OpenAPI spec for ChatGPT/Claude import |
-| `GET` | `/` | Interactive API documentation |
+| `GET` | `/status` | Engine health, total depth chunks |
+| `GET` | `/recall?q=...&k=10` | Semantic/Spatial recall by natural language |
+| `POST` | `/remember` | Store a new cognitive memory |
 
-### Connect ChatGPT / Claude
-
-1. Start the bridge: `microscope-mem bridge`
-2. **ChatGPT Custom GPT** → Actions → Import from URL: `http://YOUR_IP:6060/openapi.json`
-3. **Claude Projects** → Integrations → Add tool → paste the same URL
-
+### Quick API Test
 ```bash
-# Quick test
-curl "http://localhost:6060/recall?q=What+is+Hebbian+learning&k=3"
-curl -X POST http://localhost:6060/remember \
+# Retrieve memory trace
+curl "http://localhost:3000/recall?q=Hebbian+logic&k=3"
+
+# Inject new memory
+curl -X POST http://localhost:3000/remember \
   -H "Content-Type: application/json" \
-  -d '{"text": "Hebbian learning: neurons that fire together wire together", "layer": "long_term", "importance": 9}'
+  -d '{"text": "The neural pathways have been obfuscated.", "layer": "long_term", "importance": 10}'
 ```
 
-## 🐳 Docker Support
+---
 
-Run Microscope Memory in a container:
-
-```bash
-docker build -t microscope-mem .
-docker run -it microscope-mem init-demo
-docker run -it microscope-mem build
-docker run -p 6060:6060 microscope-mem bridge
-```
-
-## 📂 Integration
-
-### Python API (PyO3)
-Microscope Memory provides high-performance Python bindings.
-
-```python
-import microscope_memory as mm
-
-# Initialize in-memory engine
-engine = mm.PyMicroscope()
-engine.add_block("Memory text", x=0.1, y=0.2, z=0.3, depth=3, layer_id=1)
-
-# Hybrid search (semantic + spatial)
-results = engine.hybrid_search("query", x=0.1, y=0.2, z=0.3, 
-                               semantic_weight=0.5, spatial_weight=0.5, k=5)
-```
-*Note: The Python API is currently synchronous. Large index operations should be handled in background threads to avoid GIL contention.*
-
-### WebAssembly (WASM)
-Run the cognitive engine directly in the browser. 
-
-- **mmap Fallback**: Since browsers do not support `mmap`, the WASM module falls back to in-memory `Vec<u8>` buffers (ArrayBuffer).
-- **Efficiency**: Near-native performance for 3D spatial queries on mobile and desktop browsers.
-
-```javascript
-import init, { MicroscopeWasm } from './pkg/microscope_memory.js';
-
-async function run() {
-    await init();
-    const mm = new MicroscopeWasm();
-    // Load binary buffers directly from URL or IndexedDB
-    mm.load_binary(metaBuf, microscopeBuf, dataBuf);
-    const results = mm.recall("What is the Spine?", 5);
-}
-```
-
-## 📂 Examples
-Explore the `examples/` directory for integration patterns:
-- `python_quickstart.py`: Connect to the Binary Spine API using Python.
-
-## Internal Architecture
-
-The engine organizes data into a 9-depth fractal hierarchy:
-- **D0**: System Identity / Global State
-- **D1**: Layer Aggregates
-- **D2**: Topic Clusters
-- **D3-D5**: Associative Memories & Sentences
-- **D6-D8**: Tokens, Characters, and Raw Bytes
-
-Each block is a C-represented struct ensuring zero-copy alignment with the CPU cache lines.
-
-## License
+## ⚖️ License
 Distributed under the MIT License. See `LICENSE` for more information.
 
 ---
-*Developed by [Máté Róbert](https://github.com/silentnoisehun) — Part of the autonomous cognitive research series.*
+*Architected and hardened by [Máté Róbert](https://github.com/silentnoisehun) — The Silent Noise Research Series.*

@@ -9,11 +9,9 @@ target/
 .DS_Store
 Thumbs.db
 
-# Microscope Data (binary data and local indices should not be in git)
-*.bin
-*.zst
-*.idx
-data/
+# Microscope Data (binary data kept in standalone)
+!data/*.bin
+!data/*.idx
 layers/*
 !layers/.gitkeep
 

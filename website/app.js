@@ -61,6 +61,82 @@ function bindSmoothNav() {
   });
 }
 
+function bindAuth() {
+  const googleBtn = document.getElementById("googleAuthBtn");
+  const appleBtn = document.getElementById("appleAuthBtn");
+  const signOutBtn = document.getElementById("signOutBtn");
+  const status = document.getElementById("authStatus");
+  if (!googleBtn || !appleBtn || !signOutBtn || !status) return;
+
+  const authConfig = window.MICROSCOPE_AUTH || {};
+  const firebaseConfig = authConfig.firebaseConfig || {};
+  const required = ["apiKey", "authDomain", "projectId", "appId"];
+  const configured = required.every((key) => typeof firebaseConfig[key] === "string" && firebaseConfig[key].trim() !== "");
+
+  if (!authConfig.enabled || !configured || !window.firebase) {
+    status.textContent = "Set window.MICROSCOPE_AUTH and Firebase keys to enable Google/Apple signup.";
+    googleBtn.disabled = true;
+    appleBtn.disabled = true;
+    signOutBtn.disabled = true;
+    return;
+  }
+
+  try {
+    if (!window.firebase.apps.length) {
+      window.firebase.initializeApp(firebaseConfig);
+    }
+  } catch (error) {
+    status.textContent = "Firebase init failed: " + (error.message || error);
+    googleBtn.disabled = true;
+    appleBtn.disabled = true;
+    signOutBtn.disabled = true;
+    return;
+  }
+
+  const auth = window.firebase.auth();
+  const googleProvider = new window.firebase.auth.GoogleAuthProvider();
+  const appleProvider = new window.firebase.auth.OAuthProvider("apple.com");
+
+  auth.onAuthStateChanged((user) => {
+    if (!user) {
+      status.textContent = "Signed out.";
+      return;
+    }
+    const name = user.displayName || user.email || user.uid;
+    status.textContent = "Signed in as: " + name;
+  });
+
+  googleBtn.addEventListener("click", async () => {
+    status.textContent = "Opening Google sign-in...";
+    try {
+      await auth.signInWithPopup(googleProvider);
+      status.textContent = "Google sign-in success.";
+    } catch (error) {
+      status.textContent = "Google sign-in failed: " + (error.message || error);
+    }
+  });
+
+  appleBtn.addEventListener("click", async () => {
+    status.textContent = "Opening Apple sign-in...";
+    try {
+      await auth.signInWithPopup(appleProvider);
+      status.textContent = "Apple sign-in success.";
+    } catch (error) {
+      status.textContent = "Apple sign-in failed: " + (error.message || error);
+    }
+  });
+
+  signOutBtn.addEventListener("click", async () => {
+    try {
+      await auth.signOut();
+      status.textContent = "Signed out.";
+    } catch (error) {
+      status.textContent = "Sign-out failed: " + (error.message || error);
+    }
+  });
+}
+
 bindDepthTool();
 bindReveal();
 bindSmoothNav();
+bindAuth();

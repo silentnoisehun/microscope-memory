@@ -294,6 +294,7 @@ h3 {
 .card,
 .integration-card,
 .quick-card,
+.auth-card,
 .launch-step {
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 15px;
@@ -303,7 +304,8 @@ h3 {
 
 .card p,
 .integration-card p,
-.quick-card p {
+.quick-card p,
+.auth-card p {
   color: var(--muted);
   margin: 0.46rem 0 0;
   font-size: 0.92rem;
@@ -311,6 +313,59 @@ h3 {
 
 .quick-card .btn {
   margin-top: 0.8rem;
+}
+
+.auth-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+}
+
+.auth-actions {
+  margin-top: 0.85rem;
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.auth-btn {
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--ink);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.8rem;
+  padding: 0.62rem 0.94rem;
+  cursor: pointer;
+}
+
+.auth-btn.google {
+  background: linear-gradient(90deg, #f9efe2, #ffd9b8);
+  color: #3f2711;
+  border-color: rgba(255, 255, 255, 0.46);
+}
+
+.auth-btn.apple {
+  background: linear-gradient(90deg, #f6f6f6, #cfd6de);
+  color: #11181f;
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.auth-btn.ghost {
+  background: transparent;
+  border-color: var(--line);
+  color: var(--muted);
+}
+
+.auth-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.auth-status {
+  margin-top: 0.7rem;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.8rem;
+  color: var(--gold);
 }
 
 .launch-step pre {

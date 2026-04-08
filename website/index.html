@@ -69,6 +69,24 @@
       </div>
     </section>
 
+    <section id="auth" class="panel auth-panel reveal" style="--delay: 0.02s;">
+      <div class="panel-head">
+        <p class="kicker">Registration</p>
+        <h2>Sign up in one click with Google or Apple</h2>
+      </div>
+      <div class="auth-grid">
+        <article class="auth-card">
+          <p>Create your account quickly and keep your Memory Palace profile synced.</p>
+          <div class="auth-actions">
+            <button id="googleAuthBtn" class="auth-btn google" type="button">Continue with Google</button>
+            <button id="appleAuthBtn" class="auth-btn apple" type="button">Continue with Apple</button>
+            <button id="signOutBtn" class="auth-btn ghost" type="button">Sign out</button>
+          </div>
+          <p id="authStatus" class="auth-status">Auth is not configured yet.</p>
+        </article>
+      </div>
+    </section>
+
     <section id="palace" class="panel reveal" style="--delay: 0.02s;">
       <div class="panel-head">
         <p class="kicker">Memory Palace Model</p>
@@ -164,6 +182,19 @@ cd microscope-memory</code></pre>
     <p>Persistent. Spatial. Agent-ready.</p>
   </footer>
 
+  <script>
+    window.MICROSCOPE_AUTH = {
+      enabled: false,
+      firebaseConfig: {
+        apiKey: "",
+        authDomain: "",
+        projectId: "",
+        appId: ""
+      }
+    };
+  </script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
   <script src="./app.js"></script>
 </body>
 </html>

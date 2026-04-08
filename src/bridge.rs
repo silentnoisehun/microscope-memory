@@ -71,42 +71,50 @@ async fn recall_memory(
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     let k = params.k.unwrap_or(10);
+    let query_lower = params.q.to_lowercase();
 
-    // Determine coordinates for the query
+    // --- Search main index ---
     let (qx, qy, qz) =
         crate::content_coords_blended(&params.q, "long_term", state.config.search.semantic_weight);
-
-    // Depth for recall (default D3-D5 usually)
     let depth = crate::auto_depth(&params.q);
-
-    // Use radial_search which is the correct method name in reader.rs
     let results = reader.radial_search(&state.config, qx, qy, qz, depth, 0.5, k);
 
     let mut response = Vec::new();
     for res in results.all() {
-        let (h, text) = if res.is_main {
-            (
-                reader.header(res.block_idx),
-                reader.text(res.block_idx).to_string(),
-            )
-        } else {
-            // This is simplified, in a real app we'd read from the append log
-            // For now, let's just show placeholder or handle it if we have 'appended' local
-            continue;
-        };
-
+        if !res.is_main { continue; }
+        let h = reader.header(res.block_idx);
+        let text = reader.text(res.block_idx).to_string();
         let layer = LAYER_NAMES
             .get(h.layer_id as usize)
             .copied()
             .unwrap_or("unknown")
             .to_string();
-
         response.push(MemoryResponse {
             text,
             depth: h.depth,
             layer,
-            distance: res.dist_sq.sqrt(), // Result returns dist_sq
+            distance: res.dist_sq.sqrt(),
         });
+    }
+
+    // --- Also search append log (freshly stored memories) ---
+    let append_path = std::path::Path::new(&state.config.paths.output_dir).join("append.bin");
+    let appended = crate::read_append_log(&append_path);
+    for entry in &appended {
+        if response.len() >= k { break; }
+        if entry.text.to_lowercase().contains(&query_lower) {
+            let layer = LAYER_NAMES
+                .get(entry.layer_id as usize)
+                .copied()
+                .unwrap_or("long_term")
+                .to_string();
+            response.push(MemoryResponse {
+                text: entry.text.clone(),
+                depth: 4,
+                layer,
+                distance: 0.1, // Treat append log hits as close matches
+            });
+        }
     }
 
     Ok(Json(response))

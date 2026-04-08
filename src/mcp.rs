@@ -178,7 +178,10 @@ fn handle_tools_list(id: &Value) -> Value {
 
 fn handle_tools_call(id: &Value, request: &Value, config: &Config) -> Value {
     let params = request.get("params").cloned().unwrap_or(json!({}));
-    let tool_name = params.get("name").and_then(|n: &Value| n.as_str()).unwrap_or("");
+    let tool_name = params
+        .get("name")
+        .and_then(|n: &Value| n.as_str())
+        .unwrap_or("");
     let args = params.get("arguments").cloned().unwrap_or(json!({}));
 
     let result = match tool_name {
@@ -258,7 +261,10 @@ fn tool_store(config: &Config, args: &Value) -> Result<String, String> {
         .get("layer")
         .and_then(|v: &Value| v.as_str())
         .unwrap_or("long_term");
-    let importance = args.get("importance").and_then(|v: &Value| v.as_u64()).unwrap_or(5) as u8;
+    let importance = args
+        .get("importance")
+        .and_then(|v: &Value| v.as_u64())
+        .unwrap_or(5) as u8;
 
     store_memory(config, text, layer, importance)?;
 
@@ -460,7 +466,10 @@ fn tool_mql_query(config: &Config, args: &Value) -> Result<String, String> {
 }
 
 fn tool_build(config: &Config, args: &Value) -> Result<String, String> {
-    let force = args.get("force").and_then(|v: &Value| v.as_bool()).unwrap_or(false);
+    let force = args
+        .get("force")
+        .and_then(|v: &Value| v.as_bool())
+        .unwrap_or(false);
 
     crate::build::build(config, force)?;
 

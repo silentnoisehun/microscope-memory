@@ -15,6 +15,10 @@ pub mod federation;
 pub mod fingerprint;
 pub mod hebbian;
 
+#[cfg(not(target_arch = "wasm32"))]
+pub mod bridge;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod mcp;
 pub mod merkle;
 pub mod mirror;
 pub mod query;
@@ -22,10 +26,6 @@ pub mod reader;
 pub mod resonance;
 pub mod sequential_thinking;
 pub mod snapshot;
-#[cfg(not(target_arch = "wasm32"))]
-pub mod mcp;
-#[cfg(not(target_arch = "wasm32"))]
-pub mod bridge;
 
 pub mod dream;
 pub mod emotional_contagion;

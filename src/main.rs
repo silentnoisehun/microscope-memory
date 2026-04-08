@@ -804,43 +804,65 @@ fn merkle_proof(config: &Config, block_index: usize) {
 }
 
 fn serve_viewer(port: u16) {
-    use std::net::TcpListener;
     use std::io::{BufRead, Write};
+    use std::net::TcpListener;
 
     let addr = format!("127.0.0.1:{}", port);
     let listener = match TcpListener::bind(&addr) {
         Ok(l) => l,
-        Err(e) => { eprintln!("  {} Cannot bind to {}: {}", "ERROR:".red(), addr, e); return; }
+        Err(e) => {
+            eprintln!("  {} Cannot bind to {}: {}", "ERROR:".red(), addr, e);
+            return;
+        }
     };
 
     println!("{} http://{}", "SERVE".cyan().bold(), addr);
-    println!("  Open your browser: {}", format!("http://localhost:{}/viewer.html", port).green());
+    println!(
+        "  Open your browser: {}",
+        format!("http://localhost:{}/viewer.html", port).green()
+    );
     println!("  Press Ctrl+C to stop.\n");
 
     let html_path = std::env::current_dir().unwrap().join("viewer.html");
-    let bin_path  = std::env::current_dir().unwrap().join("cognitive_map.bin");
+    let bin_path = std::env::current_dir().unwrap().join("cognitive_map.bin");
 
     for stream in listener.incoming() {
-        let mut stream = match stream { Ok(s) => s, Err(_) => continue };
+        let mut stream = match stream {
+            Ok(s) => s,
+            Err(_) => continue,
+        };
         let mut reader = std::io::BufReader::new(&stream);
         let mut request_line = String::new();
         let _ = reader.read_line(&mut request_line);
 
-        let path = request_line.split_whitespace().nth(1).unwrap_or("/").to_string();
+        let path = request_line
+            .split_whitespace()
+            .nth(1)
+            .unwrap_or("/")
+            .to_string();
 
-        let (status, content_type, body): (&str, &str, Vec<u8>) = if path == "/viewer.html" || path == "/" {
-            match fs::read(&html_path) {
-                Ok(b) => ("200 OK", "text/html; charset=utf-8", b),
-                Err(_) => ("404 Not Found", "text/plain", b"viewer.html not found. Run 'cognitive-map' first.".to_vec()),
-            }
-        } else if path == "/cognitive_map.bin" {
-            match fs::read(&bin_path) {
-                Ok(b) => ("200 OK", "application/octet-stream", b),
-                Err(_) => ("404 Not Found", "text/plain", b"cognitive_map.bin not found. Run 'cognitive-map' first.".to_vec()),
-            }
-        } else {
-            ("404 Not Found", "text/plain", b"Not found".to_vec())
-        };
+        let (status, content_type, body): (&str, &str, Vec<u8>) =
+            if path == "/viewer.html" || path == "/" {
+                match fs::read(&html_path) {
+                    Ok(b) => ("200 OK", "text/html; charset=utf-8", b),
+                    Err(_) => (
+                        "404 Not Found",
+                        "text/plain",
+                        b"viewer.html not found. Run 'cognitive-map' first.".to_vec(),
+                    ),
+                }
+            } else if path == "/cognitive_map.bin" {
+                match fs::read(&bin_path) {
+                    Ok(b) => ("200 OK", "application/octet-stream", b),
+                    Err(_) => (
+                        "404 Not Found",
+                        "text/plain",
+                        b"cognitive_map.bin not found. Run 'cognitive-map' first.".to_vec(),
+                    ),
+                }
+            } else {
+                ("404 Not Found", "text/plain", b"Not found".to_vec())
+            };
 
         let header = format!("HTTP/1.1 {}\r\nContent-Type: {}\r\nContent-Length: {}\r\nAccess-Control-Allow-Origin: *\r\n\r\n", status, content_type, body.len());
         let _ = stream.write_all(header.as_bytes());
@@ -867,10 +889,19 @@ fn init_demo(config: &Config, force: bool) -> Result<(), String> {
     println!("{}", "Demo dataset initialized.".green().bold());
     println!("  -> Created {}", demo_path.display());
     println!("\nNext steps:");
-    println!("  1. {} build        # Build the binary index", "microscope-mem".cyan());
-    println!("  2. {} cognitive-map # Export 3D visualization", "microscope-mem".cyan());
-    println!("  3. {} serve         # Open 3D viewer in browser", "microscope-mem".cyan());
-    
+    println!(
+        "  1. {} build        # Build the binary index",
+        "microscope-mem".cyan()
+    );
+    println!(
+        "  2. {} cognitive-map # Export 3D visualization",
+        "microscope-mem".cyan()
+    );
+    println!(
+        "  3. {} serve         # Open 3D viewer in browser",
+        "microscope-mem".cyan()
+    );
+
     Ok(())
 }
 

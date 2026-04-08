@@ -1,14 +1,14 @@
+use crate::config::Config;
+use crate::{MicroscopeReader, LAYER_NAMES};
 use axum::{
-    routing::{get, post},
-    extract::{Query, Json, State},
-    Router,
+    extract::{Json, Query, State},
     http::StatusCode,
+    routing::{get, post},
+    Router,
 };
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 use std::sync::Arc;
-use crate::config::Config;
-use crate::{MicroscopeReader, LAYER_NAMES};
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::TraceLayer;
 
@@ -46,10 +46,12 @@ pub struct StatusResponse {
     pub layers: Vec<String>,
 }
 
-async fn get_status(State(state): State<Arc<AppState>>) -> Result<Json<StatusResponse>, (StatusCode, String)> {
+async fn get_status(
+    State(state): State<Arc<AppState>>,
+) -> Result<Json<StatusResponse>, (StatusCode, String)> {
     let reader = MicroscopeReader::open(&state.config)
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-    
+
     let append_path = std::path::Path::new(&state.config.paths.output_dir).join("append.bin");
     let appended = crate::read_append_log(&append_path);
 
@@ -63,34 +65,42 @@ async fn get_status(State(state): State<Arc<AppState>>) -> Result<Json<StatusRes
 
 async fn recall_memory(
     State(state): State<Arc<AppState>>,
-    Query(params): Query<RecallQuery>
+    Query(params): Query<RecallQuery>,
 ) -> Result<Json<Vec<MemoryResponse>>, (StatusCode, String)> {
     let reader = MicroscopeReader::open(&state.config)
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-    
+
     let k = params.k.unwrap_or(10);
-    
+
     // Determine coordinates for the query
-    let (qx, qy, qz) = crate::content_coords_blended(&params.q, "long_term", state.config.search.semantic_weight);
-    
+    let (qx, qy, qz) =
+        crate::content_coords_blended(&params.q, "long_term", state.config.search.semantic_weight);
+
     // Depth for recall (default D3-D5 usually)
     let depth = crate::auto_depth(&params.q);
-    
+
     // Use radial_search which is the correct method name in reader.rs
     let results = reader.radial_search(&state.config, qx, qy, qz, depth, 0.5, k);
-    
+
     let mut response = Vec::new();
     for res in results.all() {
         let (h, text) = if res.is_main {
-            (reader.header(res.block_idx), reader.text(res.block_idx).to_string())
+            (
+                reader.header(res.block_idx),
+                reader.text(res.block_idx).to_string(),
+            )
         } else {
             // This is simplified, in a real app we'd read from the append log
             // For now, let's just show placeholder or handle it if we have 'appended' local
-            continue; 
+            continue;
         };
-        
-        let layer = LAYER_NAMES.get(h.layer_id as usize).copied().unwrap_or("unknown").to_string();
-        
+
+        let layer = LAYER_NAMES
+            .get(h.layer_id as usize)
+            .copied()
+            .unwrap_or("unknown")
+            .to_string();
+
         response.push(MemoryResponse {
             text,
             depth: h.depth,
@@ -104,7 +114,7 @@ async fn recall_memory(
 
 async fn remember_memory(
     State(state): State<Arc<AppState>>,
-    Json(payload): Json<RememberRequest>
+    Json(payload): Json<RememberRequest>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
     let layer = payload.layer.unwrap_or_else(|| "long_term".to_string());
     let importance = payload.importance.unwrap_or(5);
@@ -120,11 +130,15 @@ async fn remember_memory(
 
 async fn get_openapi() -> Json<serde_json::Value> {
     static SPEC: &str = include_str!("../openapi.json");
-    Json(serde_json::from_str(SPEC).unwrap_or_else(|_| serde_json::json!({"error": "spec parse failed"})))
+    Json(
+        serde_json::from_str(SPEC)
+            .unwrap_or_else(|_| serde_json::json!({"error": "spec parse failed"})),
+    )
 }
 
 async fn get_root() -> axum::response::Html<&'static str> {
-    axum::response::Html(r#"<!DOCTYPE html>
+    axum::response::Html(
+        r#"<!DOCTYPE html>
 <html><head><title>Microscope Memory — Spine Bridge API</title></head>
 <body style="font-family:monospace;max-width:700px;margin:40px auto;line-height:1.6">
 <h1>🔬 Microscope Memory — Spine Bridge API</h1>
@@ -142,10 +156,15 @@ curl -X POST http://localhost:6060/remember \
   -H "Content-Type: application/json" \
   -d '{"text":"Hello world","layer":"long_term","importance":7}'</pre>
 <p>Import <a href="/openapi.json">/openapi.json</a> into ChatGPT Custom GPT or Claude Projects.</p>
-</body></html>"#)
+</body></html>"#,
+    )
 }
 
-pub async fn run(config: Config, host: String, port: u16) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn run(
+    config: Config,
+    host: String,
+    port: u16,
+) -> Result<(), Box<dyn std::error::Error>> {
     let state = Arc::new(AppState { config });
 
     let cors = CorsLayer::new()
@@ -165,11 +184,14 @@ pub async fn run(config: Config, host: String, port: u16) -> Result<(), Box<dyn 
 
     let addr_str = format!("{}:{}", host, port);
     let addr: SocketAddr = addr_str.parse()?;
-    
-    eprintln!("Microscope Memory Spine Bridge API starting on http://{}", addr);
+
+    eprintln!(
+        "Microscope Memory Spine Bridge API starting on http://{}",
+        addr
+    );
     eprintln!("  OpenAPI spec: http://{}/openapi.json", addr);
     eprintln!("  Import URL into ChatGPT/Claude for tool access.");
-    
+
     let listener = tokio::net::TcpListener::bind(addr).await?;
     axum::serve(listener, app).await?;
 

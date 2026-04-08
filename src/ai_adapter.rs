@@ -211,7 +211,7 @@ impl AISocketListener {
     }
 
     /// Accept incoming connections and handle commands.
-    pub fn listen(&self, adapter: &AIAdapter) -> Result<(), String> {
+    pub fn listen(&self, adapter: &mut AIAdapter) -> Result<(), String> {
         #[cfg(windows)]
         let _ = adapter;
 

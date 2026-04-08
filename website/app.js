@@ -90,39 +90,122 @@ function bindAuth() {
   const googleBtn = document.getElementById("googleAuthBtn");
   const appleBtn = document.getElementById("appleAuthBtn");
   const signOutBtn = document.getElementById("signOutBtn");
+  const connectBtn = document.getElementById("connectMemoryBtn");
   const backendSelect = document.getElementById("memoryBackendSelect");
+  const scopeSelect = document.getElementById("memoryScopeSelect");
   const status = document.getElementById("authStatus");
-  if (!googleBtn || !appleBtn || !signOutBtn || !status) return;
+  const sessionStatus = document.getElementById("sessionStatus");
+  if (!googleBtn || !appleBtn || !signOutBtn || !status || !sessionStatus) return;
 
   const demoKey = "microscope_demo_user_v1";
   const backendKey = "microscope_memory_backend_v1";
+  const scopeKey = "microscope_memory_scope_v1";
+  const baseUrl = (() => {
+    const configured = (window.MICROSCOPE_API && window.MICROSCOPE_API.baseUrl) || "";
+    return configured.trim() || window.location.origin;
+  })();
+
   const getBackend = () => {
     if (backendSelect && backendSelect.value) return backendSelect.value;
-    return localStorage.getItem(backendKey) || "local";
+    return localStorage.getItem(backendKey) || "cloud";
+  };
+  const getScope = () => {
+    if (scopeSelect && scopeSelect.value) return scopeSelect.value;
+    return localStorage.getItem(scopeKey) || "both";
   };
   const setBackend = (backend) => {
     localStorage.setItem(backendKey, backend);
     if (backendSelect) backendSelect.value = backend;
   };
+  const setScope = (scope) => {
+    localStorage.setItem(scopeKey, scope);
+    if (scopeSelect) scopeSelect.value = scope;
+  };
   const statusFor = (user, backend) => {
-    return "Signed in as " + user.name + " | own space: " + backend + " memory.";
+    const scope = user.scope || getScope();
+    return "Signed in as " + user.name + " | own space: " + backend + " / " + scope + ".";
+  };
+  const updateSessionStatus = (text) => {
+    sessionStatus.textContent = text;
+  };
+  const getCurrentUser = () => {
+    if (window.MICROSCOPE_SESSION && window.MICROSCOPE_SESSION.userId) {
+      const sid = window.MICROSCOPE_SESSION.userId;
+      return {
+        id: sid,
+        name: sid,
+      };
+    }
+    const existing = readDemoUser();
+    if (existing) {
+      return {
+        id: existing.id,
+        name: existing.name,
+      };
+    }
+    return null;
+  };
+  const connectNamespace = async () => {
+    const user = getCurrentUser();
+    if (!user) {
+      updateSessionStatus("Sign in first to connect namespace.");
+      return;
+    }
+    const backend = getBackend();
+    const scope = getScope();
+    updateSessionStatus("Connecting " + backend + " / " + scope + " namespace...");
+    try {
+      const url = new URL("/v1/session", baseUrl);
+      url.searchParams.set("user_id", user.id);
+      url.searchParams.set("memory_backend", backend);
+      url.searchParams.set("memory_scope", scope);
+      const response = await fetch(url.toString(), { method: "GET" });
+      if (!response.ok) {
+        throw new Error("HTTP " + response.status);
+      }
+      const session = await response.json();
+      window.MICROSCOPE_SESSION = {
+        userId: session.user_id,
+        backend: session.memory_backend,
+        scope: session.memory_scope,
+        namespaceDir: session.namespace_dir,
+        personalNamespaceDir: session.personal_namespace_dir,
+        sharedNamespaceDir: session.shared_namespace_dir,
+      };
+      updateSessionStatus(
+        "Connected: personal=" +
+          session.personal_namespace_dir +
+          " | shared=" +
+          session.shared_namespace_dir
+      );
+    } catch (error) {
+      updateSessionStatus(
+        "Cloud connection failed (" +
+          (error.message || error) +
+          "). Demo mode still works locally."
+      );
+    }
   };
   const setDemoUser = (provider) => {
     const id = Math.random().toString(36).slice(2, 10);
     const backend = getBackend();
+    const scope = getScope();
     const user = {
       id,
       provider,
       name: "Guest-" + id,
       backend,
+      scope,
       createdAt: Date.now(),
     };
     localStorage.setItem(demoKey, JSON.stringify(user));
     window.MICROSCOPE_SESSION = {
       userId: user.id,
       backend,
+      scope,
     };
     status.textContent = statusFor(user, backend) + " (" + provider + " demo)";
+    connectNamespace();
   };
   const readDemoUser = () => {
     try {
@@ -136,9 +219,11 @@ function bindAuth() {
     localStorage.removeItem(demoKey);
     status.textContent = "Signed out.";
     window.MICROSCOPE_SESSION = null;
+    updateSessionStatus("Cloud session not connected yet.");
   };
 
-  setBackend(localStorage.getItem(backendKey) || "local");
+  setBackend(localStorage.getItem(backendKey) || "cloud");
+  setScope(localStorage.getItem(scopeKey) || "both");
   if (backendSelect) {
     backendSelect.addEventListener("change", () => {
       const backend = backendSelect.value === "cloud" ? "cloud" : "local";
@@ -148,7 +233,28 @@ function bindAuth() {
         existing.backend = backend;
         localStorage.setItem(demoKey, JSON.stringify(existing));
         status.textContent = statusFor(existing, backend);
+        connectNamespace();
       }
+    });
+  }
+  if (scopeSelect) {
+    scopeSelect.addEventListener("change", () => {
+      const scope = scopeSelect.value === "personal" || scopeSelect.value === "shared"
+        ? scopeSelect.value
+        : "both";
+      setScope(scope);
+      const existing = readDemoUser();
+      if (existing) {
+        existing.scope = scope;
+        localStorage.setItem(demoKey, JSON.stringify(existing));
+        status.textContent = statusFor(existing, getBackend());
+        connectNamespace();
+      }
+    });
+  }
+  if (connectBtn) {
+    connectBtn.addEventListener("click", () => {
+      connectNamespace();
     });
   }
 
@@ -165,10 +271,13 @@ function bindAuth() {
       window.MICROSCOPE_SESSION = {
         userId: existing.id,
         backend,
+        scope: existing.scope || getScope(),
       };
       status.textContent = statusFor(existing, backend) + " (" + existing.provider + " demo)";
+      connectNamespace();
     } else {
       status.textContent = "Instant mode active: click any button and continue.";
+      updateSessionStatus("Cloud session not connected yet.");
     }
 
     if (guestBtn) {
@@ -200,15 +309,19 @@ function bindAuth() {
     if (!user) {
       status.textContent = "Signed out.";
       window.MICROSCOPE_SESSION = null;
+      updateSessionStatus("Cloud session not connected yet.");
       return;
     }
     const backend = getBackend();
+    const scope = getScope();
     const name = user.displayName || user.email || user.uid;
     window.MICROSCOPE_SESSION = {
       userId: user.uid || name,
       backend,
+      scope,
     };
-    status.textContent = "Signed in as " + name + " | own space: " + backend + " memory.";
+    status.textContent = "Signed in as " + name + " | own space: " + backend + " / " + scope + ".";
+    connectNamespace();
   });
 
   googleBtn.addEventListener("click", async () => {

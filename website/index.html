@@ -82,17 +82,25 @@
           <div class="auth-meta">
             <label for="memoryBackendSelect">Memory Backend</label>
             <select id="memoryBackendSelect">
-              <option value="local">Local (device-first)</option>
               <option value="cloud">Cloud (hosted profile)</option>
+              <option value="local">Local (device-first)</option>
+            </select>
+            <label for="memoryScopeSelect">Memory Scope</label>
+            <select id="memoryScopeSelect">
+              <option value="both">Both (personal + shared)</option>
+              <option value="personal">Personal only</option>
+              <option value="shared">Shared only</option>
             </select>
           </div>
           <div class="auth-actions">
             <button id="guestAuthBtn" class="auth-btn instant" type="button">Continue Instantly</button>
             <button id="googleAuthBtn" class="auth-btn google" type="button">Continue with Google</button>
             <button id="appleAuthBtn" class="auth-btn apple" type="button">Continue with Apple</button>
+            <button id="connectMemoryBtn" class="auth-btn cloud" type="button">Connect Memory Space</button>
             <button id="signOutBtn" class="auth-btn ghost" type="button">Sign out</button>
           </div>
           <p id="authStatus" class="auth-status">Instant mode is ready. Click and continue.</p>
+          <p id="sessionStatus" class="session-status">Cloud session not connected yet.</p>
         </article>
       </div>
     </section>
@@ -230,6 +238,11 @@ cd microscope-memory</code></pre>
         projectId: "",
         appId: ""
       }
+    };
+    window.MICROSCOPE_API = {
+      // Leave empty to auto-use current website origin.
+      // Example: "https://your-memory-cloud.example.com"
+      baseUrl: ""
     };
   </script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>

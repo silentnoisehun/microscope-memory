@@ -336,6 +336,8 @@ h3 {
 
 .auth-meta {
   margin-top: 0.75rem;
+  display: grid;
+  gap: 0.45rem;
 }
 
 .auth-meta label {
@@ -381,6 +383,12 @@ h3 {
   border-color: rgba(255, 255, 255, 0.46);
 }
 
+.auth-btn.cloud {
+  background: linear-gradient(90deg, #c7fff2, #7debe8);
+  color: #06322f;
+  border-color: rgba(255, 255, 255, 0.46);
+}
+
 .auth-btn.apple {
   background: linear-gradient(90deg, #f6f6f6, #cfd6de);
   color: #11181f;
@@ -403,6 +411,13 @@ h3 {
   font-family: "IBM Plex Mono", monospace;
   font-size: 0.8rem;
   color: var(--gold);
+}
+
+.session-status {
+  margin-top: 0.35rem;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.78rem;
+  color: #8fe3d4;
 }
 
 .orchestration-card pre {

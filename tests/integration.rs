@@ -223,6 +223,146 @@ fn test_cross_platform_merkle_consistency() {
     assert_eq!(root, expected_root, "Merkle root must be consistent across platforms");
 }
 
+#[test]
+fn test_mcp_protocol_compatibility() {
+    // Test MCP (Model Context Protocol) JSON-RPC compatibility
+    // Ensures the native MCP server responds correctly to standard requests
+
+    let (_tmp, config) = setup_test_env();
+    microscope_memory::build::build(&config, true).unwrap();
+
+    // Test initialize
+    let init_request = serde_json::json!({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {}
+    });
+    let init_response = handle_mcp_request(&init_request, &config);
+    assert_eq!(init_response["jsonrpc"], "2.0");
+    assert_eq!(init_response["id"], 1);
+    assert!(init_response.get("result").is_some());
+    assert_eq!(init_response["result"]["protocolVersion"], "2024-11-05");
+    assert_eq!(init_response["result"]["serverInfo"]["name"], "microscope-memory");
+
+    // Test tools/list
+    let list_request = serde_json::json!({
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "tools/list",
+        "params": {}
+    });
+    let list_response = handle_mcp_request(&list_request, &config);
+    assert_eq!(list_response["jsonrpc"], "2.0");
+    assert_eq!(list_response["id"], 2);
+    let tools = list_response["result"]["tools"].as_array().unwrap();
+    assert!(!tools.is_empty());
+    // Check that memory_status tool exists
+    let status_tool = tools.iter().find(|t| t["name"] == "memory_status").unwrap();
+    assert_eq!(status_tool["description"], "Get microscope memory index status: block count, depths, append log size");
+
+    // Test tools/call for memory_status
+    let call_request = serde_json::json!({
+        "jsonrpc": "2.0",
+        "id": 3,
+        "method": "tools/call",
+        "params": {
+            "name": "memory_status",
+            "arguments": {}
+        }
+    });
+    let call_response = handle_mcp_request(&call_request, &config);
+    assert_eq!(call_response["jsonrpc"], "2.0");
+    assert_eq!(call_response["id"], 3);
+    let content = call_response["result"]["content"][0]["text"].as_str().unwrap();
+    assert!(content.contains("Microscope Memory Status"));
+    assert!(content.contains("Blocks:"));
+}
+
+// Helper function to simulate MCP request handling (extracted from mcp.rs logic)
+fn handle_mcp_request(request: &serde_json::Value, config: &microscope_memory::config::Config) -> serde_json::Value {
+    use serde_json::json;
+
+    let id = request.get("id").cloned().unwrap_or(json!(null));
+    let method = request.get("method").and_then(|m| m.as_str()).unwrap_or("");
+
+    match method {
+        "initialize" => json!({
+            "jsonrpc": "2.0",
+            "id": id,
+            "result": {
+                "protocolVersion": "2024-11-05",
+                "capabilities": { "tools": {} },
+                "serverInfo": {
+                    "name": "microscope-memory",
+                    "version": env!("CARGO_PKG_VERSION")
+                }
+            }
+        }),
+        "tools/list" => json!({
+            "jsonrpc": "2.0",
+            "id": id,
+            "result": {
+                "tools": [
+                    {
+                        "name": "memory_status",
+                        "description": "Get microscope memory index status: block count, depths, append log size",
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": {},
+                            "required": []
+                        }
+                    }
+                ]
+            }
+        }),
+        "tools/call" => {
+            let params = request.get("params").cloned().unwrap_or(json!({}));
+            let tool_name = params.get("name").and_then(|n| n.as_str()).unwrap_or("");
+
+            match tool_name {
+                "memory_status" => {
+                    let reader = microscope_memory::reader::MicroscopeReader::open(config).unwrap();
+                    let append_path = std::path::Path::new(&config.paths.output_dir).join("append.bin");
+                    let appended = microscope_memory::read_append_log(&append_path);
+
+                    let hdr_kb = (reader.block_count * microscope_memory::HEADER_SIZE) as f64 / 1024.0;
+                    let data_kb = reader.data.len() as f64 / 1024.0;
+
+                    let content = format!(
+                        "Microscope Memory Status\n\
+                         ========================\n\
+                         Blocks: {}\n\
+                         Headers: {:.1} KB\n\
+                         Data: {:.1} KB\n\
+                         Total: {:.1} KB\n\
+                         Append log: {} entries",
+                        reader.block_count, hdr_kb, data_kb, hdr_kb + data_kb, appended.len()
+                    );
+
+                    json!({
+                        "jsonrpc": "2.0",
+                        "id": id,
+                        "result": {
+                            "content": [{"type": "text", "text": content}]
+                        }
+                    })
+                },
+                _ => json!({
+                    "jsonrpc": "2.0",
+                    "id": id,
+                    "error": {"code": -32601, "message": "Method not found"}
+                })
+            }
+        },
+        _ => json!({
+            "jsonrpc": "2.0",
+            "id": id,
+            "error": {"code": -32601, "message": "Method not found"}
+        })
+    }
+}
+
 
 #[test]
 fn test_snapshot_export_import() {

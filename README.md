@@ -17,6 +17,7 @@ v0.7.0 marks the transition to **Public Beta**, introducing enterprise-grade rel
 - Landing page: `website/index.html`
 - One-click web demo: `viewer.html?file=cognitive_map.bin`
 - One-click local start: `OneClick_Start.bat`
+- MCP + delegation one-click stack: `scripts/start_agent_stack.bat`
 - Website auth: instant fallback works by default; set `window.MICROSCOPE_AUTH` in `website/index.html` for real Firebase Google/Apple signup
 
 ---

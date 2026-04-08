@@ -273,6 +273,7 @@ h3 {
 .palace-grid,
 .integration-grid,
 .quick-grid,
+.orchestration-grid,
 .launch-grid {
   margin-top: 1rem;
   display: grid;
@@ -291,10 +292,15 @@ h3 {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.orchestration-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .card,
 .integration-card,
 .quick-card,
 .auth-card,
+.orchestration-card,
 .launch-step {
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 15px;
@@ -305,7 +311,8 @@ h3 {
 .card p,
 .integration-card p,
 .quick-card p,
-.auth-card p {
+.auth-card p,
+.orchestration-card p {
   color: var(--muted);
   margin: 0.46rem 0 0;
   font-size: 0.92rem;
@@ -374,6 +381,30 @@ h3 {
   color: var(--gold);
 }
 
+.orchestration-card pre {
+  margin: 0.7rem 0 0;
+  background: rgba(0, 0, 0, 0.33);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: auto;
+}
+
+.orchestration-card code {
+  display: block;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.81rem;
+  color: #e7f7ff;
+  padding: 0.75rem;
+  white-space: pre-wrap;
+}
+
+.mini-actions {
+  margin-top: 0.7rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
 .launch-step pre {
   margin: 0.7rem 0 0;
   background: rgba(0, 0, 0, 0.33);
@@ -430,7 +461,8 @@ h3 {
 
   .palace-grid,
   .integration-grid,
-  .quick-grid {
+  .quick-grid,
+  .orchestration-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
@@ -445,6 +477,7 @@ h3 {
   .palace-grid,
   .integration-grid,
   .quick-grid,
+  .orchestration-grid,
   .launch-grid {
     grid-template-columns: 1fr;
   }

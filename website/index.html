@@ -20,6 +20,7 @@
     <nav>
       <a href="#palace">Palace</a>
       <a href="#integrations">Integrations</a>
+      <a href="#orchestration">Orchestration</a>
       <a href="#launch">Launch</a>
     </nav>
   </header>
@@ -35,6 +36,7 @@
         </p>
         <div class="hero-actions">
           <a class="btn btn-primary" href="../viewer.html?file=cognitive_map.bin">Use It Now (1 Click)</a>
+          <a class="btn btn-primary" href="../scripts/start_agent_stack.bat" download>Start MCP + Delegation</a>
           <a class="btn btn-ghost" href="../OneClick_Start.bat" download>Download OneClick Start</a>
           <a class="btn btn-primary" href="#launch">Start In One Click</a>
           <a class="btn btn-ghost" href="../viewer.html">Open 3D Viewer</a>
@@ -147,6 +149,35 @@
         <article class="integration-card reveal" style="--delay: 0.20s;">
           <h3>Cloud Mode</h3>
           <p>Deploy as a memory server when you need hosted access and shared state.</p>
+        </article>
+      </div>
+    </section>
+
+    <section id="orchestration" class="panel reveal" style="--delay: 0.02s;">
+      <div class="panel-head">
+        <p class="kicker">MCP + Delegation</p>
+        <h2>Run MCP server and delegate agent tasks</h2>
+      </div>
+      <div class="orchestration-grid">
+        <article class="orchestration-card">
+          <h3>MCP Server</h3>
+          <p>Expose Microscope Memory tools to Claude and MCP-compatible clients.</p>
+          <pre><code id="mcpCmd">microscope-mem mcp</code></pre>
+          <div class="mini-actions">
+            <button class="btn btn-ghost copy-btn" type="button" data-copy-target="mcpCmd">Copy Command</button>
+            <a class="btn btn-primary" href="../scripts/start_agent_stack.bat" download>1-Click Start Stack</a>
+          </div>
+        </article>
+        <article class="orchestration-card">
+          <h3>Agent Delegation</h3>
+          <p>Split complex work into parallel tasks with shared memory context via Bridge API.</p>
+          <pre><code id="delegatePrompt">Delegate this goal into 3 executable subtasks.
+Each sub-agent should read memory first, then write outcomes.
+Use /recall and /remember for every critical step.</code></pre>
+          <div class="mini-actions">
+            <button class="btn btn-ghost copy-btn" type="button" data-copy-target="delegatePrompt">Copy Delegation Prompt</button>
+            <a class="btn btn-ghost" href="../openapi.yaml">Open Delegation API Contract</a>
+          </div>
         </article>
       </div>
     </section>

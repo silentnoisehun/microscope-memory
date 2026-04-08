@@ -61,6 +61,30 @@ function bindSmoothNav() {
   });
 }
 
+function bindCopyButtons() {
+  const buttons = document.querySelectorAll(".copy-btn");
+  if (!buttons.length) return;
+  buttons.forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const targetId = btn.getAttribute("data-copy-target");
+      if (!targetId) return;
+      const target = document.getElementById(targetId);
+      if (!target) return;
+      const text = target.textContent || "";
+      try {
+        await navigator.clipboard.writeText(text);
+        const old = btn.textContent;
+        btn.textContent = "Copied";
+        setTimeout(() => {
+          btn.textContent = old;
+        }, 1200);
+      } catch (_error) {
+        btn.textContent = "Copy failed";
+      }
+    });
+  });
+}
+
 function bindAuth() {
   const guestBtn = document.getElementById("guestAuthBtn");
   const googleBtn = document.getElementById("googleAuthBtn");
@@ -180,4 +204,5 @@ function bindAuth() {
 bindDepthTool();
 bindReveal();
 bindSmoothNav();
+bindCopyButtons();
 bindAuth();

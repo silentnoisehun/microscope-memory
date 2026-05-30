@@ -236,6 +236,52 @@
   .host-row { display: flex; gap: 8px; align-items: center; }
   .host-row input { font-family: 'Consolas', monospace; font-size: 12px; }
 
+  /* Tabs */
+  .tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--border); margin-bottom: 20px; }
+  .tab-btn {
+    background: none; border: none; color: var(--muted);
+    padding: 9px 18px; font-size: 13px; cursor: pointer;
+    border-bottom: 2px solid transparent; margin-bottom: -1px;
+    transition: color 0.15s, border-color 0.15s;
+    font-family: inherit;
+  }
+  .tab-btn:hover { color: var(--text); }
+  .tab-btn.active { color: var(--cyan); border-bottom-color: var(--cyan); }
+  .tab-pane { display: none; }
+  .tab-pane.active { display: flex; flex-direction: column; gap: 20px; }
+
+  /* Bench table */
+  .bench-header { display: flex; align-items: baseline; gap: 12px; }
+  .bench-header h2 { font-size: 15px; font-weight: 600; }
+  .bench-meta { font-size: 12px; color: var(--muted); }
+  .bench-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .bench-table th {
+    background: var(--bg3); color: var(--muted); font-size: 10px;
+    text-transform: uppercase; letter-spacing: 1px;
+    padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--border);
+  }
+  .bench-table td { padding: 9px 12px; border-bottom: 1px solid #1c2030; }
+  .bench-table tr:last-child td { border-bottom: none; }
+  .bench-table tr:hover td { background: var(--bg3); }
+  .bench-name { font-family: 'Consolas', monospace; color: var(--cyan); }
+  .bench-med { font-weight: 700; color: var(--text); }
+  .bench-range { color: var(--muted); font-size: 12px; }
+  .bench-bar-cell { width: 120px; }
+  .bench-bar-bg { background: var(--bg3); border-radius: 3px; height: 6px; overflow: hidden; }
+  .bench-bar-fill { background: var(--cyan); height: 100%; border-radius: 3px; opacity: 0.7; }
+  .bench-section-row td {
+    background: var(--bg2); color: var(--muted); font-size: 10px;
+    text-transform: uppercase; letter-spacing: 1.2px; padding: 6px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .pill {
+    display: inline-block; padding: 2px 8px; border-radius: 10px;
+    font-size: 11px; font-weight: 600;
+  }
+  .pill-fast { background: #0d2010; color: #40e870; }
+  .pill-mid  { background: #1a1200; color: #e0a020; }
+  .pill-slow { background: #1a0808; color: #e04040; }
+
   @media (max-width: 700px) {
     .layout { grid-template-columns: 1fr; }
     .sidebar { border-right: none; border-bottom: 1px solid var(--border); height: auto; }
@@ -329,21 +375,167 @@
   <!-- MAIN -->
   <div class="main">
 
-    <!-- Search bar -->
-    <div>
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchTab('demo', this)">Live Demo</button>
+      <button class="tab-btn" onclick="switchTab('bench', this)">Benchmarks</button>
+    </div>
+
+    <!-- Demo tab -->
+    <div id="tab-demo" class="tab-pane active">
       <div class="search-row">
         <input type="text" id="search-input" placeholder="Search memory… (e.g. 'cache coherency')"
           onkeydown="if(event.key==='Enter') doSearch()">
         <input type="number" id="search-k" class="k-input" value="10" min="1" max="100" title="Top-K results">
         <button class="primary" id="search-btn" onclick="doSearch()">Search</button>
       </div>
+      <div id="results-area">
+        <div class="empty-state">
+          <div class="icon">🔍</div>
+          <div>Click a demo query or type a search to explore memory</div>
+        </div>
+      </div>
     </div>
 
-    <!-- Results -->
-    <div id="results-area">
-      <div class="empty-state">
-        <div class="icon">🔍</div>
-        <div>Click a demo query or type a search to explore memory</div>
+    <!-- Benchmarks tab -->
+    <div id="tab-bench" class="tab-pane">
+      <div class="bench-header">
+        <h2>cargo bench — Criterion results</h2>
+        <span class="bench-meta">v0.7.0 · 98,925 blocks · 170+60 fixture entries · Windows 11 · Release build</span>
+      </div>
+      <table class="bench-table">
+        <thead>
+          <tr>
+            <th>Benchmark</th>
+            <th>Median</th>
+            <th>Range (low–high)</th>
+            <th class="bench-bar-cell"></th>
+            <th>Rating</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="bench-section-row"><td colspan="5">Spatial Lookup (radial search)</td></tr>
+          <tr>
+            <td class="bench-name">spatial_look/depth_1</td>
+            <td class="bench-med">10.66 µs</td>
+            <td class="bench-range">10.58 – 10.74 µs</td>
+            <td><div class="bench-bar-bg"><div class="bench-bar-fill" style="width:3%"></div></div></td>
+            <td><span class="pill pill-fast">sub-100µs</span></td>
+          </tr>
+          <tr>
+            <td class="bench-name">spatial_look/depth_2</td>
+            <td class="bench-med">10.39 µs</td>
+            <td class="bench-range">10.29 – 10.51 µs</td>
+            <td><div class="bench-bar-bg"><div class="bench-bar-fill" style="width:3%"></div></div></td>
+            <td><span class="pill pill-fast">sub-100µs</span></td>
+          </tr>
+          <tr>
+            <td class="bench-name">spatial_look/depth_3</td>
+            <td class="bench-med">11.61 µs</td>
+            <td class="bench-range">11.54 – 11.68 µs</td>
+            <td><div class="bench-bar-bg"><div class="bench-bar-fill" style="width:3%"></div></div></td>
+            <td><span class="pill pill-fast">sub-100µs</span></td>
+          </tr>
+
+          <tr class="bench-section-row"><td colspan="5">Coordinate Hashing</td></tr>
+          <tr>
+            <td class="bench-name">content_coords/hash_only</td>
+            <td class="bench-med">32.6 ns</td>
+            <td class="bench-range">32.5 – 32.7 ns</td>
+            <td><div class="bench-bar-bg"><div class="bench-bar-fill" style="width:1%"></div></div></td>
+            <td><span class="pill pill-fast">near-zero</span></td>
+          </tr>
+          <tr>
+            <td class="bench-name">content_coords/blended_w0.5</td>
+            <td class="bench-med">320 ns</td>
+            <td class="bench-range">319.6 – 321.4 ns</td>
+            <td><div class="bench-bar-bg"><div class="bench-bar-fill" style="width:2%"></div></div></td>
+            <td><span class="pill pill-fast">sub-µs</span></td>
+          </tr>
+
+          <tr class="bench-section-row"><td colspan="5">Text Search</td></tr>
+          <tr>
+            <td class="bench-name">find_text/existing_term</td>
+            <td class="bench-med">1.064 ms</td>
+            <td class="bench-range">1.060 – 1.069 ms</td>
+            <td><div class="bench-bar-bg"><div class="bench-bar-fill" style="width:28%"></div></div></td>
+            <td><span class="pill pill-mid">linear scan</span></td>
+          </tr>
+          <tr>
+            <td class="bench-name">find_text/missing_term</td>
+            <td class="bench-med">1.027 ms</td>
+            <td class="bench-range">1.020 – 1.036 ms</td>
+            <td><div class="bench-bar-bg"><div class="bench-bar-fill" style="width:27%"></div></div></td>
+            <td><span class="pill pill-mid">linear scan</span></td>
+          </tr>
+
+          <tr class="bench-section-row"><td colspan="5">MQL Query Engine</td></tr>
+          <tr>
+            <td class="bench-name">mql_query/depth_filter</td>
+            <td class="bench-med">103 µs</td>
+            <td class="bench-range">102.8 – 103.9 µs</td>
+            <td><div class="bench-bar-bg"><div class="bench-bar-fill" style="width:5%"></div></div></td>
+            <td><span class="pill pill-fast">fast</span></td>
+          </tr>
+          <tr>
+            <td class="bench-name">mql_query/keyword_search</td>
+            <td class="bench-med">9.14 ms</td>
+            <td class="bench-range">9.09 – 9.20 ms</td>
+            <td><div class="bench-bar-bg"><div class="bench-bar-fill" style="width:100%"></div></div></td>
+            <td><span class="pill pill-mid">full scan</span></td>
+          </tr>
+
+          <tr class="bench-section-row"><td colspan="5">Append Log (persistence)</td></tr>
+          <tr>
+            <td class="bench-name">append_log/read_existing</td>
+            <td class="bench-med">72.0 µs</td>
+            <td class="bench-range">71.7 – 72.5 µs</td>
+            <td><div class="bench-bar-bg"><div class="bench-bar-fill" style="width:4%"></div></div></td>
+            <td><span class="pill pill-fast">fast</span></td>
+          </tr>
+          <tr>
+            <td class="bench-name">append_log/store+read</td>
+            <td class="bench-med">7.84 ms</td>
+            <td class="bench-range">7.69 – 8.00 ms</td>
+            <td><div class="bench-bar-bg"><div class="bench-bar-fill" style="width:86%"></div></div></td>
+            <td><span class="pill pill-mid">disk I/O</span></td>
+          </tr>
+
+          <tr class="bench-section-row"><td colspan="5">CRC-16 CCITT Integrity</td></tr>
+          <tr>
+            <td class="bench-name">crc16/short_11b</td>
+            <td class="bench-med">23.7 ns</td>
+            <td class="bench-range">23.6 – 23.7 ns</td>
+            <td><div class="bench-bar-bg"><div class="bench-bar-fill" style="width:1%"></div></div></td>
+            <td><span class="pill pill-fast">near-zero</span></td>
+          </tr>
+          <tr>
+            <td class="bench-name">crc16/medium_256b</td>
+            <td class="bench-med">540 ns</td>
+            <td class="bench-range">538 – 541 ns</td>
+            <td><div class="bench-bar-bg"><div class="bench-bar-fill" style="width:2%"></div></div></td>
+            <td><span class="pill pill-fast">sub-µs</span></td>
+          </tr>
+          <tr>
+            <td class="bench-name">crc16/long_4096b</td>
+            <td class="bench-med">8.59 µs</td>
+            <td class="bench-range">8.57 – 8.62 µs</td>
+            <td><div class="bench-bar-bg"><div class="bench-bar-fill" style="width:3%"></div></div></td>
+            <td><span class="pill pill-fast">sub-100µs</span></td>
+          </tr>
+
+          <tr class="bench-section-row"><td colspan="5">Pipeline (one-time build cost)</td></tr>
+          <tr>
+            <td class="bench-name">build_pipeline</td>
+            <td class="bench-med">523 ms</td>
+            <td class="bench-range">501 – 548 ms</td>
+            <td><div class="bench-bar-bg"><div class="bench-bar-fill" style="width:57%"></div></div></td>
+            <td><span class="pill pill-slow">one-time</span></td>
+          </tr>
+        </tbody>
+      </table>
+      <div style="font-size:12px;color:var(--muted);padding:4px 0">
+        Measured with <strong style="color:var(--text)">Criterion 0.5</strong> · 100 samples each · reproducible fixtures via <code style="background:var(--bg3);padding:1px 5px;border-radius:3px">tests/fixtures/layers/</code>
       </div>
     </div>
 
@@ -473,6 +665,13 @@
 
   function esc(s) {
     return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function switchTab(name, btn) {
+    document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('tab-' + name).classList.add('active');
+    btn.classList.add('active');
   }
 
   // Init

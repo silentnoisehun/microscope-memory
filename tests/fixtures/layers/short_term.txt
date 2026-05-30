@@ -1,0 +1,399 @@
+Session context entry 0: benchmarking hierarchical retrieval at depth 0
+
+Session context entry 1: benchmarking hierarchical retrieval at depth 1
+
+Session context entry 2: benchmarking hierarchical retrieval at depth 2
+
+Session context entry 3: benchmarking hierarchical retrieval at depth 3
+
+Session context entry 4: benchmarking hierarchical retrieval at depth 4
+
+Session context entry 5: benchmarking hierarchical retrieval at depth 5
+
+Session context entry 6: benchmarking hierarchical retrieval at depth 6
+
+Session context entry 7: benchmarking hierarchical retrieval at depth 7
+
+Session context entry 8: benchmarking hierarchical retrieval at depth 8
+
+Session context entry 9: benchmarking hierarchical retrieval at depth 0
+
+Session context entry 10: benchmarking hierarchical retrieval at depth 1
+
+Session context entry 11: benchmarking hierarchical retrieval at depth 2
+
+Session context entry 12: benchmarking hierarchical retrieval at depth 3
+
+Session context entry 13: benchmarking hierarchical retrieval at depth 4
+
+Session context entry 14: benchmarking hierarchical retrieval at depth 5
+
+Session context entry 15: benchmarking hierarchical retrieval at depth 6
+
+Session context entry 16: benchmarking hierarchical retrieval at depth 7
+
+Session context entry 17: benchmarking hierarchical retrieval at depth 8
+
+Session context entry 18: benchmarking hierarchical retrieval at depth 0
+
+Session context entry 19: benchmarking hierarchical retrieval at depth 1
+
+Session context entry 20: benchmarking hierarchical retrieval at depth 2
+
+Session context entry 21: benchmarking hierarchical retrieval at depth 3
+
+Session context entry 22: benchmarking hierarchical retrieval at depth 4
+
+Session context entry 23: benchmarking hierarchical retrieval at depth 5
+
+Session context entry 24: benchmarking hierarchical retrieval at depth 6
+
+Session context entry 25: benchmarking hierarchical retrieval at depth 7
+
+Session context entry 26: benchmarking hierarchical retrieval at depth 8
+
+Session context entry 27: benchmarking hierarchical retrieval at depth 0
+
+Session context entry 28: benchmarking hierarchical retrieval at depth 1
+
+Session context entry 29: benchmarking hierarchical retrieval at depth 2
+
+Session context entry 30: benchmarking hierarchical retrieval at depth 3
+
+Session context entry 31: benchmarking hierarchical retrieval at depth 4
+
+Session context entry 32: benchmarking hierarchical retrieval at depth 5
+
+Session context entry 33: benchmarking hierarchical retrieval at depth 6
+
+Session context entry 34: benchmarking hierarchical retrieval at depth 7
+
+Session context entry 35: benchmarking hierarchical retrieval at depth 8
+
+Session context entry 36: benchmarking hierarchical retrieval at depth 0
+
+Session context entry 37: benchmarking hierarchical retrieval at depth 1
+
+Session context entry 38: benchmarking hierarchical retrieval at depth 2
+
+Session context entry 39: benchmarking hierarchical retrieval at depth 3
+
+Session context entry 40: benchmarking hierarchical retrieval at depth 4
+
+Session context entry 41: benchmarking hierarchical retrieval at depth 5
+
+Session context entry 42: benchmarking hierarchical retrieval at depth 6
+
+Session context entry 43: benchmarking hierarchical retrieval at depth 7
+
+Session context entry 44: benchmarking hierarchical retrieval at depth 8
+
+Session context entry 45: benchmarking hierarchical retrieval at depth 0
+
+Session context entry 46: benchmarking hierarchical retrieval at depth 1
+
+Session context entry 47: benchmarking hierarchical retrieval at depth 2
+
+Session context entry 48: benchmarking hierarchical retrieval at depth 3
+
+Session context entry 49: benchmarking hierarchical retrieval at depth 4
+
+Session context entry 50: benchmarking hierarchical retrieval at depth 5
+
+Session context entry 51: benchmarking hierarchical retrieval at depth 6
+
+Session context entry 52: benchmarking hierarchical retrieval at depth 7
+
+Session context entry 53: benchmarking hierarchical retrieval at depth 8
+
+Session context entry 54: benchmarking hierarchical retrieval at depth 0
+
+Session context entry 55: benchmarking hierarchical retrieval at depth 1
+
+Session context entry 56: benchmarking hierarchical retrieval at depth 2
+
+Session context entry 57: benchmarking hierarchical retrieval at depth 3
+
+Session context entry 58: benchmarking hierarchical retrieval at depth 4
+
+Session context entry 59: benchmarking hierarchical retrieval at depth 5
+
+Session context entry 60: benchmarking hierarchical retrieval at depth 6
+
+Session context entry 61: benchmarking hierarchical retrieval at depth 7
+
+Session context entry 62: benchmarking hierarchical retrieval at depth 8
+
+Session context entry 63: benchmarking hierarchical retrieval at depth 0
+
+Session context entry 64: benchmarking hierarchical retrieval at depth 1
+
+Session context entry 65: benchmarking hierarchical retrieval at depth 2
+
+Session context entry 66: benchmarking hierarchical retrieval at depth 3
+
+Session context entry 67: benchmarking hierarchical retrieval at depth 4
+
+Session context entry 68: benchmarking hierarchical retrieval at depth 5
+
+Session context entry 69: benchmarking hierarchical retrieval at depth 6
+
+Session context entry 70: benchmarking hierarchical retrieval at depth 7
+
+Session context entry 71: benchmarking hierarchical retrieval at depth 8
+
+Session context entry 72: benchmarking hierarchical retrieval at depth 0
+
+Session context entry 73: benchmarking hierarchical retrieval at depth 1
+
+Session context entry 74: benchmarking hierarchical retrieval at depth 2
+
+Session context entry 75: benchmarking hierarchical retrieval at depth 3
+
+Session context entry 76: benchmarking hierarchical retrieval at depth 4
+
+Session context entry 77: benchmarking hierarchical retrieval at depth 5
+
+Session context entry 78: benchmarking hierarchical retrieval at depth 6
+
+Session context entry 79: benchmarking hierarchical retrieval at depth 7
+
+Session context entry 80: benchmarking hierarchical retrieval at depth 8
+
+Session context entry 81: benchmarking hierarchical retrieval at depth 0
+
+Session context entry 82: benchmarking hierarchical retrieval at depth 1
+
+Session context entry 83: benchmarking hierarchical retrieval at depth 2
+
+Session context entry 84: benchmarking hierarchical retrieval at depth 3
+
+Session context entry 85: benchmarking hierarchical retrieval at depth 4
+
+Session context entry 86: benchmarking hierarchical retrieval at depth 5
+
+Session context entry 87: benchmarking hierarchical retrieval at depth 6
+
+Session context entry 88: benchmarking hierarchical retrieval at depth 7
+
+Session context entry 89: benchmarking hierarchical retrieval at depth 8
+
+Session context entry 90: benchmarking hierarchical retrieval at depth 0
+
+Session context entry 91: benchmarking hierarchical retrieval at depth 1
+
+Session context entry 92: benchmarking hierarchical retrieval at depth 2
+
+Session context entry 93: benchmarking hierarchical retrieval at depth 3
+
+Session context entry 94: benchmarking hierarchical retrieval at depth 4
+
+Session context entry 95: benchmarking hierarchical retrieval at depth 5
+
+Session context entry 96: benchmarking hierarchical retrieval at depth 6
+
+Session context entry 97: benchmarking hierarchical retrieval at depth 7
+
+Session context entry 98: benchmarking hierarchical retrieval at depth 8
+
+Session context entry 99: benchmarking hierarchical retrieval at depth 0
+
+Session context entry 100: benchmarking hierarchical retrieval at depth 1
+
+Session context entry 101: benchmarking hierarchical retrieval at depth 2
+
+Session context entry 102: benchmarking hierarchical retrieval at depth 3
+
+Session context entry 103: benchmarking hierarchical retrieval at depth 4
+
+Session context entry 104: benchmarking hierarchical retrieval at depth 5
+
+Session context entry 105: benchmarking hierarchical retrieval at depth 6
+
+Session context entry 106: benchmarking hierarchical retrieval at depth 7
+
+Session context entry 107: benchmarking hierarchical retrieval at depth 8
+
+Session context entry 108: benchmarking hierarchical retrieval at depth 0
+
+Session context entry 109: benchmarking hierarchical retrieval at depth 1
+
+Session context entry 110: benchmarking hierarchical retrieval at depth 2
+
+Session context entry 111: benchmarking hierarchical retrieval at depth 3
+
+Session context entry 112: benchmarking hierarchical retrieval at depth 4
+
+Session context entry 113: benchmarking hierarchical retrieval at depth 5
+
+Session context entry 114: benchmarking hierarchical retrieval at depth 6
+
+Session context entry 115: benchmarking hierarchical retrieval at depth 7
+
+Session context entry 116: benchmarking hierarchical retrieval at depth 8
+
+Session context entry 117: benchmarking hierarchical retrieval at depth 0
+
+Session context entry 118: benchmarking hierarchical retrieval at depth 1
+
+Session context entry 119: benchmarking hierarchical retrieval at depth 2
+
+Session context entry 120: benchmarking hierarchical retrieval at depth 3
+
+Session context entry 121: benchmarking hierarchical retrieval at depth 4
+
+Session context entry 122: benchmarking hierarchical retrieval at depth 5
+
+Session context entry 123: benchmarking hierarchical retrieval at depth 6
+
+Session context entry 124: benchmarking hierarchical retrieval at depth 7
+
+Session context entry 125: benchmarking hierarchical retrieval at depth 8
+
+Session context entry 126: benchmarking hierarchical retrieval at depth 0
+
+Session context entry 127: benchmarking hierarchical retrieval at depth 1
+
+Session context entry 128: benchmarking hierarchical retrieval at depth 2
+
+Session context entry 129: benchmarking hierarchical retrieval at depth 3
+
+Session context entry 130: benchmarking hierarchical retrieval at depth 4
+
+Session context entry 131: benchmarking hierarchical retrieval at depth 5
+
+Session context entry 132: benchmarking hierarchical retrieval at depth 6
+
+Session context entry 133: benchmarking hierarchical retrieval at depth 7
+
+Session context entry 134: benchmarking hierarchical retrieval at depth 8
+
+Session context entry 135: benchmarking hierarchical retrieval at depth 0
+
+Session context entry 136: benchmarking hierarchical retrieval at depth 1
+
+Session context entry 137: benchmarking hierarchical retrieval at depth 2
+
+Session context entry 138: benchmarking hierarchical retrieval at depth 3
+
+Session context entry 139: benchmarking hierarchical retrieval at depth 4
+
+Session context entry 140: benchmarking hierarchical retrieval at depth 5
+
+Session context entry 141: benchmarking hierarchical retrieval at depth 6
+
+Session context entry 142: benchmarking hierarchical retrieval at depth 7
+
+Session context entry 143: benchmarking hierarchical retrieval at depth 8
+
+Session context entry 144: benchmarking hierarchical retrieval at depth 0
+
+Session context entry 145: benchmarking hierarchical retrieval at depth 1
+
+Session context entry 146: benchmarking hierarchical retrieval at depth 2
+
+Session context entry 147: benchmarking hierarchical retrieval at depth 3
+
+Session context entry 148: benchmarking hierarchical retrieval at depth 4
+
+Session context entry 149: benchmarking hierarchical retrieval at depth 5
+
+Session context entry 150: benchmarking hierarchical retrieval at depth 6
+
+Session context entry 151: benchmarking hierarchical retrieval at depth 7
+
+Session context entry 152: benchmarking hierarchical retrieval at depth 8
+
+Session context entry 153: benchmarking hierarchical retrieval at depth 0
+
+Session context entry 154: benchmarking hierarchical retrieval at depth 1
+
+Session context entry 155: benchmarking hierarchical retrieval at depth 2
+
+Session context entry 156: benchmarking hierarchical retrieval at depth 3
+
+Session context entry 157: benchmarking hierarchical retrieval at depth 4
+
+Session context entry 158: benchmarking hierarchical retrieval at depth 5
+
+Session context entry 159: benchmarking hierarchical retrieval at depth 6
+
+Session context entry 160: benchmarking hierarchical retrieval at depth 7
+
+Session context entry 161: benchmarking hierarchical retrieval at depth 8
+
+Session context entry 162: benchmarking hierarchical retrieval at depth 0
+
+Session context entry 163: benchmarking hierarchical retrieval at depth 1
+
+Session context entry 164: benchmarking hierarchical retrieval at depth 2
+
+Session context entry 165: benchmarking hierarchical retrieval at depth 3
+
+Session context entry 166: benchmarking hierarchical retrieval at depth 4
+
+Session context entry 167: benchmarking hierarchical retrieval at depth 5
+
+Session context entry 168: benchmarking hierarchical retrieval at depth 6
+
+Session context entry 169: benchmarking hierarchical retrieval at depth 7
+
+Session context entry 170: benchmarking hierarchical retrieval at depth 8
+
+Session context entry 171: benchmarking hierarchical retrieval at depth 0
+
+Session context entry 172: benchmarking hierarchical retrieval at depth 1
+
+Session context entry 173: benchmarking hierarchical retrieval at depth 2
+
+Session context entry 174: benchmarking hierarchical retrieval at depth 3
+
+Session context entry 175: benchmarking hierarchical retrieval at depth 4
+
+Session context entry 176: benchmarking hierarchical retrieval at depth 5
+
+Session context entry 177: benchmarking hierarchical retrieval at depth 6
+
+Session context entry 178: benchmarking hierarchical retrieval at depth 7
+
+Session context entry 179: benchmarking hierarchical retrieval at depth 8
+
+Session context entry 180: benchmarking hierarchical retrieval at depth 0
+
+Session context entry 181: benchmarking hierarchical retrieval at depth 1
+
+Session context entry 182: benchmarking hierarchical retrieval at depth 2
+
+Session context entry 183: benchmarking hierarchical retrieval at depth 3
+
+Session context entry 184: benchmarking hierarchical retrieval at depth 4
+
+Session context entry 185: benchmarking hierarchical retrieval at depth 5
+
+Session context entry 186: benchmarking hierarchical retrieval at depth 6
+
+Session context entry 187: benchmarking hierarchical retrieval at depth 7
+
+Session context entry 188: benchmarking hierarchical retrieval at depth 8
+
+Session context entry 189: benchmarking hierarchical retrieval at depth 0
+
+Session context entry 190: benchmarking hierarchical retrieval at depth 1
+
+Session context entry 191: benchmarking hierarchical retrieval at depth 2
+
+Session context entry 192: benchmarking hierarchical retrieval at depth 3
+
+Session context entry 193: benchmarking hierarchical retrieval at depth 4
+
+Session context entry 194: benchmarking hierarchical retrieval at depth 5
+
+Session context entry 195: benchmarking hierarchical retrieval at depth 6
+
+Session context entry 196: benchmarking hierarchical retrieval at depth 7
+
+Session context entry 197: benchmarking hierarchical retrieval at depth 8
+
+Session context entry 198: benchmarking hierarchical retrieval at depth 0
+
+Session context entry 199: benchmarking hierarchical retrieval at depth 1

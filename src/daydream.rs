@@ -54,6 +54,7 @@ pub fn daydream(
     let sw = config.search.semantic_weight;
 
     let mut current_seed = seed.to_string();
+    let mut visited = std::collections::HashSet::new();
     let mut result = DaydreamResult {
         steps: Vec::new(),
         final_narrative: String::new(),
@@ -85,6 +86,7 @@ pub fn daydream(
                 let dz = hdr.z - qz;
                 let dist = dx * dx + dy * dy + dz * dz;
                 if dist < MIN_ASSOC_DIST { continue; } // skip same
+                if visited.contains(&i) { continue; } // skip already visited
                 if dist < best_dist {
                     best_dist = dist;
                     best_idx = i;
@@ -96,6 +98,7 @@ pub fn daydream(
         if best_idx == u32::MAX {
             break; // nothing new to associate
         }
+        visited.insert(best_idx);
 
         // 2. Load emotions.bin for this block
         let emotion_lookup = crate::reader::load_emotion_lookup(output_dir);
@@ -161,7 +164,7 @@ pub fn format_daydream(result: &DaydreamResult, verbose: bool) -> String {
     if verbose {
         for step in &result.steps {
             out.push_str(&format!(
-                "  [{}/{}] \"{}\" → block {} dist={:.3} emo_shift={:.3}\n             \"{}\\n",
+                "  [{}/{}] \"{}\" → block {} dist={:.3} emo_shift={:.3}\n             \"{}\"\n",
                 step.step + 1,
                 result.steps.len(),
                 step.seed_text,

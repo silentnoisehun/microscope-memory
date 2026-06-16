@@ -13,7 +13,6 @@
 //!     layer_id: u8 | block_index: u32
 
 use std::fs;
-use std::io::Write;
 use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -172,7 +171,7 @@ pub fn detect_eureka(
     let query_surprise = emotion.map(|e| e[surprise_idx]).unwrap_or(0.0);
     let query_curiosity = emotion.map(|e| e[curiosity_idx]).unwrap_or(0.0);
 
-    for &(score, idx, is_main) in results {
+    for &(_score, idx, is_main) in results {
         if !is_main { continue; }
         if idx >= reader.block_count { continue; }
 

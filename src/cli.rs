@@ -234,6 +234,12 @@ pub enum Cmd {
     EmotionalExchange,
     /// Run manual reconsolidation on recent recalls (emotion blend + spatial drift)
     Reconsolidate,
+    /// Show the inner narrative — the system's current sense of self
+    Narrative {
+        /// Show detailed breakdown (emotion vector, all context)
+        #[arg(long)]
+        verbose: bool,
+    },
     /// Spaced repetition — Ebbinghaus forgetting curve management (SM-2)
     Spaced {
         /// Show only due blocks

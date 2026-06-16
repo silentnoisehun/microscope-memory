@@ -43,6 +43,8 @@ pub mod emotional_contagion;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod eureka;
 #[cfg(not(target_arch = "wasm32"))]
+pub mod narrative;
+#[cfg(not(target_arch = "wasm32"))]
 pub mod reconsolidation;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod spaced_repetition;

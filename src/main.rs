@@ -151,6 +151,12 @@ fn recall(config: &Config, query: &str, k: usize, emotion: Option<[f32; 21]>) {
         }
     });
 
+    // Narrative prime: the system's inner voice as additional context
+    let narrative_state = microscope_memory::narrative::NarrativeState::load_or_init(Path::new(&config.paths.output_dir));
+    if narrative_state.session_count > 0 {
+        println!("  {} \"{}\"", "SELF".cyan().bold(), safe_truncate(&narrative_state.narrative, 50));
+    }
+
     let (qx, qy, qz) = content_coords_blended(query, "long_term", config.search.semantic_weight);
 
     // â”€â”€â”€ Attention: compute layer weights from context â”€â”€
@@ -479,6 +485,27 @@ fn recall(config: &Config, query: &str, k: usize, emotion: Option<[f32; 21]>) {
         if !rc_text.is_empty() {
             println!("{}", rc_text);
         }
+    }
+
+    // ═══ Narrative update: the system tells itself what happened ═══
+    let narrative_output_dir = Path::new(&config.paths.output_dir);
+    let mut narrative_state = microscope_memory::narrative::NarrativeState::load_or_init(narrative_output_dir);
+    // Gather context
+    let wm_state = microscope_memory::working_memory::WorkingMemory::load_or_init(narrative_output_dir);
+    let wm_texts: Vec<String> = wm_state.items.iter().map(|i| i.text.clone()).collect();
+    let sr_state = microscope_memory::spaced_repetition::SpacedRepetition::load_or_init(narrative_output_dir);
+    let tg_state = microscope_memory::thought_graph::ThoughtGraphState::load_or_init(narrative_output_dir);
+    let ring = microscope_memory::EmotionalStateRing::load_or_init(narrative_output_dir);
+    let _ = narrative_state.update(
+        narrative_output_dir,
+        Some(&ring),
+        Some(&wm_texts),
+        Some(sr_state.due_count()),
+        Some(tg_state.nodes.len()),
+        Some(query),
+    );
+    if narrative_state.session_count <= 3 {
+        println!("  {} \"{}\"", "SELF".cyan().bold(), safe_truncate(&narrative_state.narrative, 60));
     }
 
     let elapsed = t0.elapsed();
@@ -1084,6 +1111,13 @@ async fn main() {
             let mut wm = microscope_memory::working_memory::WorkingMemory::load_or_init(output_dir);
             wm.push(&text, importance as f32, &layer, microscope_memory::working_memory::MemoryType::Episodic);
             let _ = wm.save(output_dir);
+            // Narrative update
+            let mut narr = microscope_memory::narrative::NarrativeState::load_or_init(output_dir);
+            let ring = microscope_memory::EmotionalStateRing::load_or_init(output_dir);
+            let wm_texts: Vec<String> = wm.items.iter().map(|i| i.text.clone()).collect();
+            let sr = microscope_memory::spaced_repetition::SpacedRepetition::load_or_init(output_dir);
+            let tg = microscope_memory::thought_graph::ThoughtGraphState::load_or_init(output_dir);
+            let _ = narr.update(output_dir, Some(&ring), Some(&wm_texts), Some(sr.due_count()), Some(tg.nodes.len()), Some(&text));
         }
         Cmd::Recall { query, k, emotion } => {
             let emo: Option<[f32; 21]> = emotion.map(|v| {
@@ -2314,6 +2348,35 @@ async fn main() {
                 spatial,
                 activated.len(),
             );
+        }
+        Cmd::Narrative { verbose } => {
+            let output_dir = Path::new(&config.paths.output_dir);
+            let state = microscope_memory::narrative::NarrativeState::load_or_init(output_dir);
+            println!("{}", "INNER NARRATIVE".cyan().bold());
+            if state.session_count == 0 {
+                println!("  (silent — no interactions yet)");
+            } else {
+                println!("  \"{}\"", state.narrative);
+                println!("  Session count: {}", state.session_count);
+                if verbose {
+                    print!("  Emotion: [");
+                    for (i, v) in state.emotion.iter().enumerate() {
+                        if *v > 0.05 {
+                            let name = microscope_memory::EMOTION_DIMS.get(i).unwrap_or(&"?");
+                            print!(" {}:{:.2}", name, v);
+                        }
+                    }
+                    println!(" ]");
+                    // Show working memory context
+                    let wm = microscope_memory::working_memory::WorkingMemory::load_or_init(output_dir);
+                    if !wm.items.is_empty() {
+                        println!("  Focus:");
+                        for item in &wm.items {
+                            println!("    - {} (imp={:.1})", crate::safe_truncate(&item.text, 40), item.importance);
+                        }
+                    }
+                }
+            }
         }
         Cmd::Spaced { due, k } => {
             let output_dir = Path::new(&config.paths.output_dir);

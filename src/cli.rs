@@ -232,6 +232,14 @@ pub enum Cmd {
     EmotionalField,
     /// Exchange emotional snapshots across federated indices
     EmotionalExchange,
+    /// Show eureka/insight events (unexpected but emotionally relevant connections)
+    Eureka {
+        #[arg(default_value = "10")]
+        k: usize,
+        /// Show detailed insight scores
+        #[arg(long)]
+        verbose: bool,
+    },
     /// Show multimodal index statistics
     Modalities,
     /// Export full cognitive map (all 13 layers) as JSON for Three.js viewer

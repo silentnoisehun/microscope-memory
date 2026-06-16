@@ -425,6 +425,29 @@ fn recall(config: &Config, query: &str, k: usize, emotion: Option<[f32; 21]>) {
         let _ = thought_graph.save(output_dir);
         let _ = pred_cache.save(output_dir);
         let _ = attention.save(output_dir);
+
+        // ═══ Eureka detection ═══
+        let eureka_events = microscope_memory::eureka::detect_eureka(
+            config,
+            &reader,
+            query,
+            emotion.as_ref(),
+            &all_results,
+        );
+        if !eureka_events.is_empty() {
+            let mut eureka_log = microscope_memory::eureka::EurekaLog::load_or_init(output_dir);
+            for ev in eureka_events {
+                if let Ok(()) = eureka_log.record(output_dir, ev) {
+                    // stored
+                }
+            }
+            if eureka_log.events.len() > 0 {
+                let last = &eureka_log.events[eureka_log.events.len() - 1];
+                if last.insight_score() > 1.0 {
+                    println!("  {} insight! score={:.1} \"{}\"", "💡 EUREKA".magenta().bold(), last.insight_score(), safe_truncate(&last.text, 40));
+                }
+            }
+        }
     }
 
     let elapsed = t0.elapsed();
@@ -2222,6 +2245,23 @@ async fn main() {
             println!("  Image:         {}", stats.image_count);
             println!("  Audio:         {}", stats.audio_count);
             println!("  Structured:    {}", stats.structured_count);
+        }
+        Cmd::Eureka { k, verbose } => {
+            let output_dir = Path::new(&config.paths.output_dir);
+            let log = microscope_memory::eureka::EurekaLog::load_or_init(output_dir);
+            let count = log.events.len().min(k);
+            if count == 0 {
+                println!("{}", "No eureka events found".yellow());
+            } else {
+                println!("{} ({} total, showing {})", "EUREKA MOMENTS".cyan().bold(), log.events.len(), count);
+                for ev in log.events.iter().rev().take(count).rev() {
+                    println!("{}", microscope_memory::eureka::format_eureka(ev));
+                    if verbose {
+                        println!("         score breakdown: surprise={:.2} × curiosity={:.2} × emo_sim={:.2} / dist={:.3} = {:.1}",
+                            ev.surprise_score, ev.curiosity_score, ev.emotional_sim, ev.spatial_dist, ev.insight_score());
+                    }
+                }
+            }
         }
         Cmd::CognitiveMap { output } => {
             let reader = open_reader(&config);

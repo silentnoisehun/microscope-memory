@@ -40,6 +40,8 @@ pub mod syscaller;
 
 pub mod dream;
 pub mod emotional_contagion;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod working_memory;
 pub mod multimodal;
 pub mod predictive_cache;
 pub mod temporal_archetype;

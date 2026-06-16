@@ -219,6 +219,11 @@ fn recall(config: &Config, query: &str, k: usize, emotion: Option<[f32; 21]>) {
         load_emotion_lookup(Path::new(&config.paths.output_dir))
     });
 
+    // Load spaced repetition state for Ebbinghaus boost
+    let spaced = microscope_memory::spaced_repetition::SpacedRepetition::load_or_init(
+        Path::new(&config.paths.output_dir)
+    );
+
     for zoom in zoom_lo..=zoom_hi {
         // Red Audit: Timing jitter using polymorphic build-time value
         #[cfg(feature = "stealth")]
@@ -243,11 +248,14 @@ fn recall(config: &Config, query: &str, k: usize, emotion: Option<[f32; 21]>) {
                     emotion_lookup.as_ref().and_then(|lookup| lookup(i))
                         .map(|be| emotional_similarity(qe, &be) * emotional_recall_weight)
                 }).unwrap_or(0.0);
-                let combined = (spatial_dist - boost - emo_boost).max(0.0);
+                // Spaced repetition boost: due blocks surface more easily
+                let sr_boost = spaced.spacing_boost(i as u32);
+                let combined = (spatial_dist - boost - emo_boost - sr_boost).max(0.0);
                 all_results.push((combined, i, true));
             }
         }
     }
+
 
     let append_path = Path::new(&config.paths.output_dir).join("append.bin");
     let appended = read_append_log(&append_path);
@@ -359,6 +367,14 @@ fn recall(config: &Config, query: &str, k: usize, emotion: Option<[f32; 21]>) {
             );
         }
         hebb.record_activation(&activated, qh);
+
+        // Spaced repetition: record each activated block (quality 4 = seen and relevant)
+        let mut spaced_writer = microscope_memory::spaced_repetition::SpacedRepetition::load_or_init(output_dir);
+        for &(idx, _) in &activated {
+            let importance = (config.search.semantic_weight * 10.0) as u8; // approximate
+            spaced_writer.record_recall(idx, importance, 4);
+        }
+        let _ = spaced_writer.save(output_dir);
 
         // Resonance: emit pulse with spatial coordinates
         let mut resonance = microscope_memory::resonance::ResonanceState::load_or_init(output_dir);
@@ -2260,6 +2276,38 @@ async fn main() {
                         println!("         score breakdown: surprise={:.2} × curiosity={:.2} × emo_sim={:.2} / dist={:.3} = {:.1}",
                             ev.surprise_score, ev.curiosity_score, ev.emotional_sim, ev.spatial_dist, ev.insight_score());
                     }
+                }
+            }
+        }
+        Cmd::Spaced { due, k } => {
+            let output_dir = Path::new(&config.paths.output_dir);
+            let sr = microscope_memory::spaced_repetition::SpacedRepetition::load_or_init(output_dir);
+            let stats = sr.stats();
+            println!("{}", "SPACED REPETITION".cyan().bold());
+            println!("  Tracked:   {} blocks", stats.total_blocks);
+            println!("  Due:       {} (need review)", stats.due);
+            println!("  Fresh:     {} (< 7d)", stats.fresh);
+            println!("  Mastered:  {} (≥{} recalls)", stats.mastered, 15);
+            println!("  Avg ease:  {:.2}", stats.avg_ease);
+            println!("  Avg int.:  {:.1}d", stats.avg_interval);
+            if due && stats.total_blocks > 0 {
+                let due_list = sr.due_blocks();
+                let count = due_list.len().min(k);
+                println!("\n  {} due blocks:", count);
+                let reader = match MicroscopeReader::open(&config) {
+                    Ok(r) => Some(r),
+                    Err(_) => None,
+                };
+                for &idx in due_list.iter().take(count) {
+                    let block_info = sr.find(idx);
+                    let days = block_info.map(|b| {
+                        let now = std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_millis() as u64;
+                        (now.saturating_sub(b.last_recall_ms)) as f32 / 86_400_000.0
+                    }).unwrap_or(0.0);
+                    let text = reader.as_ref().map(|r| safe_truncate(r.text(idx as usize), 50)).unwrap_or_default();
+                    println!("  [{:>6}] recall={} last={:.1}d ago {}",
+                        idx, block_info.map(|b| b.recall_count).unwrap_or(0), days, text);
                 }
             }
         }

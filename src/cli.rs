@@ -232,6 +232,15 @@ pub enum Cmd {
     EmotionalField,
     /// Exchange emotional snapshots across federated indices
     EmotionalExchange,
+    /// Spaced repetition — Ebbinghaus forgetting curve management (SM-2)
+    Spaced {
+        /// Show only due blocks
+        #[arg(long)]
+        due: bool,
+        /// Number of results to show
+        #[arg(default_value = "20")]
+        k: usize,
+    },
     /// Show eureka/insight events (unexpected but emotionally relevant connections)
     Eureka {
         #[arg(default_value = "10")]

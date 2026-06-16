@@ -1025,6 +1025,11 @@ async fn main() {
                 arr
             });
             store_memory(&config, &text, &layer, importance, emo).expect("store failed");
+            // Auto-push to working memory
+            let output_dir = Path::new(&config.paths.output_dir);
+            let mut wm = microscope_memory::working_memory::WorkingMemory::load_or_init(output_dir);
+            wm.push(&text, importance as f32, &layer, microscope_memory::working_memory::MemoryType::Episodic);
+            let _ = wm.save(output_dir);
         }
         Cmd::Recall { query, k, emotion } => {
             let emo: Option<[f32; 21]> = emotion.map(|v| {
@@ -1035,6 +1040,11 @@ async fn main() {
                 arr
             });
             recall(&config, &query, k, emo);
+            // Auto-push query to working memory (as semantic type)
+            let output_dir = Path::new(&config.paths.output_dir);
+            let mut wm = microscope_memory::working_memory::WorkingMemory::load_or_init(output_dir);
+            wm.push(&query, 3.0, "short_term", microscope_memory::working_memory::MemoryType::Semantic);
+            let _ = wm.save(output_dir);
         }
         Cmd::Radial {
             x,
@@ -1415,6 +1425,71 @@ async fn main() {
             match microscope_memory::snapshot::diff(Path::new(&a), Path::new(&b)) {
                 Ok(()) => {}
                 Err(e) => eprintln!("  {} {}", "ERROR:".red(), e),
+            }
+        }
+        Cmd::Wm { action } => {
+            let output_dir = Path::new(&config.paths.output_dir);
+            match action {
+                microscope_memory::cli::WmAction::Show => {
+                    let wm = microscope_memory::working_memory::WorkingMemory::load_or_init(output_dir);
+                    let stats = wm.stats();
+                    println!("{}", "WORKING MEMORY".cyan().bold());
+                    println!("  Items:     {}/{}", stats.item_count, stats.capacity);
+                    println!("  Hot:       {}", stats.hot_items);
+                    println!("  Decay:     {}ms", stats.decay_ms);
+                    println!("  Cons. candidates: {}", stats.consolidation_candidates);
+                    if wm.items.is_empty() {
+                        println!("  (empty)");
+                    } else {
+                        for (i, item) in wm.items.iter().enumerate() {
+                            let mem_type = match item.memory_type {
+                                microscope_memory::working_memory::MemoryType::Episodic => "episodic",
+                                microscope_memory::working_memory::MemoryType::Semantic => "semantic",
+                            };
+                            println!(
+                                "  [{:2}] imp={:.1} acc={} {:8} {}",
+                                i, item.importance, item.access_count, mem_type,
+                                crate::safe_truncate(&item.text, 60)
+                            );
+                        }
+                    }
+                }
+                microscope_memory::cli::WmAction::Push { text, importance, layer, memory_type } => {
+                    let mut wm = microscope_memory::working_memory::WorkingMemory::load_or_init(output_dir);
+                    let mem_type = match memory_type.to_lowercase().as_str() {
+                        "semantic" => microscope_memory::working_memory::MemoryType::Semantic,
+                        _ => microscope_memory::working_memory::MemoryType::Episodic,
+                    };
+                    wm.push(&text, importance, &layer, mem_type);
+                    wm.save(output_dir).unwrap_or_else(|e| eprintln!("  {} save: {}", "WARN".yellow(), e));
+                    println!("  {} WM: '{}'", "PUSHED".green().bold(), crate::safe_truncate(&text, 60));
+                }
+                microscope_memory::cli::WmAction::Decay => {
+                    let mut wm = microscope_memory::working_memory::WorkingMemory::load_or_init(output_dir);
+                    let before = wm.items.len();
+                    wm.decay();
+                    let after = wm.items.len();
+                    wm.save(output_dir).unwrap_or_else(|e| eprintln!("  {} save: {}", "WARN".yellow(), e));
+                    println!("  {} WM: {} → {} items", "DECAY".yellow().bold(), before, after);
+                }
+                microscope_memory::cli::WmAction::Consolidate => {
+                    let mut wm = microscope_memory::working_memory::WorkingMemory::load_or_init(output_dir);
+                    let items = wm.consolidate();
+                    if items.is_empty() {
+                        println!("  {} WM: no items to consolidate", "CONSOLIDATE".yellow().bold());
+                    } else {
+                        for item in &items {
+                            let text = &item.text;
+                            let layer = &item.layer;
+                            let imp = (item.importance as u8).max(1).min(10);
+                            store_memory(&config, &format!("[WM] {}", text), layer, imp, None)
+                                .unwrap_or_else(|e| eprintln!("  {} store: {}", "ERR".red(), e));
+                            println!("  {} '{}' → long_term", "CONSOLIDATED".magenta().bold(), safe_truncate(text, 60));
+                        }
+                        wm.save(output_dir).unwrap_or_else(|e| eprintln!("  {} save: {}", "WARN".yellow(), e));
+                        println!("  {} WM: {} items consolidated", "DONE".green().bold(), items.len());
+                    }
+                }
             }
         }
         Cmd::Hebbian => {

@@ -273,4 +273,29 @@ pub enum Cmd {
         #[arg(long)]
         fix: bool,
     },
+    /// Working memory operations (7±2 buffer, 30s decay)
+    Wm {
+        #[command(subcommand)]
+        action: WmAction,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum WmAction {
+    /// Show working memory contents and stats
+    Show,
+    /// Push an item into working memory
+    Push {
+        text: String,
+        #[arg(short = 'i', long, default_value = "5.0")]
+        importance: f32,
+        #[arg(short = 'l', long, default_value = "short_term")]
+        layer: String,
+        #[arg(short = 't', long, default_value = "episodic")]
+        memory_type: String,
+    },
+    /// Apply time decay (evicts old items)
+    Decay,
+    /// Consolidate high-access items into long-term storage
+    Consolidate,
 }

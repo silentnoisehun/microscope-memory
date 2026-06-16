@@ -1,0 +1,2 @@
+# Daily backup at 03:30
+30 3 * * * /usr/bin/bash /opt/microscope-memory/.github/cloud-deploy/backup.sh >> /var/log/microscope-memory-backup.log 2>&1

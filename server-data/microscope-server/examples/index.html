@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Microscope Memory - WebAssembly Demo</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            font-size: 3rem;
+            margin-bottom: 10px;
+            text-align: center;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .subtitle {
+            text-align: center;
+            font-size: 1.2rem;
+            opacity: 0.9;
+            margin-bottom: 40px;
+        }
+
+        .demo-section {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+        }
+
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        label {
+            margin-bottom: 5px;
+            font-weight: 500;
+        }
+
+        input, select, button {
+            padding: 10px 15px;
+            border-radius: 10px;
+            border: none;
+            font-size: 1rem;
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            backdrop-filter: blur(5px);
+        }
+
+        input::placeholder {
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        button {
+            background: linear-gradient(45deg, #f093fb 0%, #f5576c 100%);
+            cursor: pointer;
+            font-weight: 600;
+            transition: transform 0.2s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+        }
+
+        .results {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 10px;
+            padding: 20px;
+            min-height: 200px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .result-item {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .stat-card {
+            background: rgba(255, 255, 255, 0.15);
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            font-size: 0.9rem;
+            opacity: 0.8;
+        }
+
+        .visualization {
+            width: 100%;
+            height: 400px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        #canvas3d {
+            width: 100%;
+            height: 100%;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 50px;
+            font-size: 1.5rem;
+        }
+
+        .error {
+            background: rgba(255, 0, 0, 0.2);
+            color: #ff6b6b;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+
+        /* Animations */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .demo-section {
+            animation: fadeIn 0.5s ease-out;
+        }
+
+        /* Custom scrollbar */
+        .results::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .results::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+        }
+
+        .results::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔬 Microscope Memory</h1>
+        <p class="subtitle">WebAssembly-Powered Hierarchical Memory System</p>
+
+        <!-- Add Blocks Section -->
+        <div class="demo-section">
+            <h2>📦 Add Memory Blocks</h2>
+            <div class="controls">
+                <div class="control-group">
+                    <label for="blockText">Text Content</label>
+                    <input type="text" id="blockText" placeholder="Enter memory content...">
+                </div>
+                <div class="control-group">
+                    <label for="blockX">X Position (0-1)</label>
+                    <input type="number" id="blockX" value="0.5" min="0" max="1" step="0.1">
+                </div>
+                <div class="control-group">
+                    <label for="blockY">Y Position (0-1)</label>
+                    <input type="number" id="blockY" value="0.5" min="0" max="1" step="0.1">
+                </div>
+                <div class="control-group">
+                    <label for="blockZ">Z Position (0-1)</label>
+                    <input type="number" id="blockZ" value="0.5" min="0" max="1" step="0.1">
+                </div>
+                <div class="control-group">
+                    <label for="blockDepth">Depth (0-8)</label>
+                    <input type="number" id="blockDepth" value="3" min="0" max="8">
+                </div>
+                <div class="control-group">
+                    <label>&nbsp;</label>
+                    <button onclick="addBlock()">Add Block</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Search Section -->
+        <div class="demo-section">
+            <h2>🔍 Search</h2>
+            <div class="controls">
+                <div class="control-group">
+                    <label for="searchQuery">Search Query</label>
+                    <input type="text" id="searchQuery" placeholder="Enter search terms...">
+                </div>
+                <div class="control-group">
+                    <label for="searchType">Search Type</label>
+                    <select id="searchType">
+                        <option value="semantic">Semantic Search</option>
+                        <option value="spatial">Spatial Search</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <label for="searchK">Results Count</label>
+                    <input type="number" id="searchK" value="5" min="1" max="20">
+                </div>
+                <div class="control-group">
+                    <label>&nbsp;</label>
+                    <button onclick="performSearch()">Search</button>
+                </div>
+            </div>
+
+            <div class="results" id="searchResults">
+                <p style="opacity: 0.7;">Search results will appear here...</p>
+            </div>
+        </div>
+
+        <!-- Visualization Section -->
+        <div class="demo-section">
+            <h2>📊 3D Visualization</h2>
+            <div class="visualization">
+                <canvas id="canvas3d"></canvas>
+            </div>
+        </div>
+
+        <!-- Statistics Section -->
+        <div class="demo-section">
+            <h2>📈 Statistics</h2>
+            <div class="stats">
+                <div class="stat-card">
+                    <div class="stat-value" id="blockCount">0</div>
+                    <div class="stat-label">Total Blocks</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="searchTime">0ms</div>
+                    <div class="stat-label">Last Search</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="memoryUsage">0KB</div>
+                    <div class="stat-label">Memory Usage</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="performance">0</div>
+                    <div class="stat-label">Queries/sec</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Controls -->
+        <div class="demo-section">
+            <h2>⚙️ Controls</h2>
+            <div class="controls">
+                <button onclick="loadSampleData()">Load Sample Data</button>
+                <button onclick="clearAll()">Clear All</button>
+                <button onclick="runBenchmark()">Run Benchmark</button>
+                <button onclick="exportData()">Export JSON</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import init, { MicroscopeWasm } from '../pkg/microscope_memory.js';
+
+        let microscope = null;
+
+        // Initialize WASM
+        async function initWasm() {
+            try {
+                await init();
+                microscope = new MicroscopeWasm();
+                console.log('✅ WASM initialized');
+                updateStats();
+            } catch (error) {
+                console.error('Failed to initialize WASM:', error);
+                showError('Failed to initialize WebAssembly module');
+            }
+        }
+
+        // Add block
+        window.addBlock = function() {
+            if (!microscope) return;
+
+            const text = document.getElementById('blockText').value;
+            const x = parseFloat(document.getElementById('blockX').value);
+            const y = parseFloat(document.getElementById('blockY').value);
+            const z = parseFloat(document.getElementById('blockZ').value);
+            const depth = parseInt(document.getElementById('blockDepth').value);
+
+            if (!text) {
+                alert('Please enter text content');
+                return;
+            }
+
+            microscope.add_block(text, x, y, z, depth);
+            updateStats();
+            document.getElementById('blockText').value = '';
+            showMessage('Block added successfully');
+        };
+
+        // Perform search
+        window.performSearch = function() {
+            if (!microscope) return;
+
+            const query = document.getElementById('searchQuery').value;
+            const type = document.getElementById('searchType').value;
+            const k = parseInt(document.getElementById('searchK').value);
+
+            if (!query && type === 'semantic') {
+                alert('Please enter a search query');
+                return;
+            }
+
+            const startTime = performance.now();
+            let results;
+
+            if (type === 'semantic') {
+                results = microscope.semantic_search(query, k);
+            } else {
+                const x = 0.5, y = 0.5, z = 0.5, radius = 0.3;
+                results = microscope.spatial_search(x, y, z, radius);
+            }
+
+            const searchTime = performance.now() - startTime;
+            displayResults(results, searchTime);
+        };
+
+        // Display search results
+        function displayResults(results, time) {
+            const container = document.getElementById('searchResults');
+            container.innerHTML = '';
+
+            if (results.length === 0) {
+                container.innerHTML = '<p style="opacity: 0.7;">No results found</p>';
+                return;
+            }
+
+            results.forEach((block, i) => {
+                const item = document.createElement('div');
+                item.className = 'result-item';
+                item.innerHTML = `
+                    <span>${i + 1}. ${block.text}</span>
+                    <span style="opacity: 0.7;">Sim: ${block.similarity.toFixed(3)}</span>
+                `;
+                container.appendChild(item);
+            });
+
+            document.getElementById('searchTime').textContent = `${time.toFixed(1)}ms`;
+        }
+
+        // Load sample data
+        window.loadSampleData = function() {
+            if (!microscope) return;
+
+            const samples = [
+                "Artificial intelligence and machine learning",
+                "Neural network architecture",
+                "Deep learning frameworks",
+                "Natural language processing",
+                "Computer vision algorithms",
+                "Reinforcement learning",
+                "Transformer models",
+                "Attention mechanisms",
+                "Gradient descent optimization",
+                "Backpropagation algorithm"
+            ];
+
+            samples.forEach((text, i) => {
+                const x = Math.random();
+                const y = Math.random();
+                const z = Math.random();
+                const depth = Math.floor(Math.random() * 5) + 1;
+                microscope.add_block(text, x, y, z, depth);
+            });
+
+            updateStats();
+            showMessage(`Loaded ${samples.length} sample blocks`);
+        };
+
+        // Clear all
+        window.clearAll = function() {
+            if (!microscope) return;
+            microscope.clear();
+            updateStats();
+            document.getElementById('searchResults').innerHTML = '<p style="opacity: 0.7;">Search results will appear here...</p>';
+            showMessage('All blocks cleared');
+        };
+
+        // Run benchmark
+        window.runBenchmark = async function() {
+            if (!microscope) return;
+
+            showMessage('Running benchmark...');
+            const iterations = 100;
+            let totalTime = 0;
+
+            for (let i = 0; i < iterations; i++) {
+                const query = `test query ${i}`;
+                const start = performance.now();
+                microscope.semantic_search(query, 5);
+                totalTime += performance.now() - start;
+            }
+
+            const avgTime = totalTime / iterations;
+            const qps = Math.floor(1000 / avgTime);
+            document.getElementById('performance').textContent = qps;
+            showMessage(`Benchmark complete: ${qps} queries/sec`);
+        };
+
+        // Export data
+        window.exportData = function() {
+            if (!microscope) return;
+            const json = microscope.export_json();
+            const blob = new Blob([json], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'microscope_memory_export.json';
+            a.click();
+            URL.revokeObjectURL(url);
+            showMessage('Data exported');
+        };
+
+        // Update statistics
+        function updateStats() {
+            if (!microscope) return;
+            const count = microscope.block_count();
+            document.getElementById('blockCount').textContent = count;
+            document.getElementById('memoryUsage').textContent = `${Math.floor(count * 0.3)}KB`;
+        }
+
+        // Show message
+        function showMessage(msg) {
+            console.log(msg);
+            // In real app, would show toast notification
+        }
+
+        // Show error
+        function showError(msg) {
+            console.error(msg);
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'error';
+            errorDiv.textContent = msg;
+            document.querySelector('.container').prepend(errorDiv);
+        }
+
+        // Initialize 3D visualization (placeholder)
+        function init3D() {
+            const canvas = document.getElementById('canvas3d');
+            const ctx = canvas.getContext('2d');
+            canvas.width = canvas.offsetWidth;
+            canvas.height = canvas.offsetHeight;
+
+            // Simple placeholder visualization
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = 'white';
+            ctx.font = '20px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('3D Visualization (WebGL coming soon)', canvas.width/2, canvas.height/2);
+        }
+
+        // Initialize on load
+        window.addEventListener('load', async () => {
+            await initWasm();
+            init3D();
+        });
+    </script>
+</body>
+</html>

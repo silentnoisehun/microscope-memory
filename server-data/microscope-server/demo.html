@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🔬 Microscope Memory — Live Demo</title>
+<style>
+  :root {
+    --bg: #0d0f14;
+    --bg2: #13161d;
+    --bg3: #1a1d26;
+    --border: #252a35;
+    --cyan: #00f2ff;
+    --orange: #ff9d00;
+    --green: #00ff88;
+    --red: #ff4466;
+    --text: #d0d8e8;
+    --muted: #5a6480;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; font-size: 14px; min-height: 100vh; }
+
+  header {
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 24px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  header h1 { font-size: 18px; color: var(--cyan); font-weight: 600; letter-spacing: 0.5px; }
+  header h1 span { font-size: 11px; background: var(--cyan); color: #000; padding: 2px 7px; border-radius: 10px; margin-left: 8px; vertical-align: middle; font-weight: 700; }
+  #conn-badge {
+    margin-left: auto;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    cursor: pointer;
+  }
+  #conn-badge.ok { border-color: var(--green); color: var(--green); }
+  #conn-badge.err { border-color: var(--red); color: var(--red); }
+
+  .layout { display: grid; grid-template-columns: 320px 1fr; gap: 0; height: calc(100vh - 53px); }
+
+  .sidebar {
+    background: var(--bg2);
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  .main {
+    overflow-y: auto;
+    padding: 20px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .section-title {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+
+  /* Status box */
+  .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .stat-box {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+  }
+  .stat-box .val { font-size: 22px; font-weight: 700; color: var(--cyan); }
+  .stat-box .lbl { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+  /* Quick demo buttons */
+  .demo-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .demo-btn {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    padding: 7px 10px;
+    font-size: 12px;
+    cursor: pointer;
+    text-align: left;
+    transition: border-color 0.15s, color 0.15s;
+  }
+  .demo-btn:hover { border-color: var(--cyan); color: var(--cyan); }
+  .demo-btn .tag { font-size: 10px; color: var(--muted); display: block; margin-top: 2px; }
+
+  /* Search */
+  .search-row { display: flex; gap: 8px; }
+  input[type=text], textarea, select {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    padding: 9px 12px;
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.15s;
+    width: 100%;
+    font-family: inherit;
+  }
+  input[type=text]:focus, textarea:focus { border-color: var(--cyan); }
+  textarea { resize: vertical; min-height: 70px; }
+  select { cursor: pointer; }
+
+  .k-input { width: 60px; flex-shrink: 0; }
+
+  button.primary {
+    background: var(--cyan);
+    color: #000;
+    border: none;
+    border-radius: 6px;
+    padding: 9px 16px;
+    font-weight: 700;
+    font-size: 13px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: opacity 0.15s;
+  }
+  button.primary:hover { opacity: 0.85; }
+  button.primary:disabled { opacity: 0.4; cursor: not-allowed; }
+  button.secondary {
+    background: var(--bg3);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 9px 14px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: border-color 0.15s;
+  }
+  button.secondary:hover { border-color: var(--cyan); }
+
+  /* Store form */
+  .store-form { display: flex; flex-direction: column; gap: 8px; }
+  .store-row { display: flex; gap: 8px; align-items: center; }
+  .layer-select { flex: 1; }
+  .imp-input { width: 60px; flex-shrink: 0; }
+
+  /* Results */
+  .results-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .results-title { font-size: 15px; font-weight: 600; }
+  .results-count {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 2px 9px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .results-query { font-size: 12px; color: var(--muted); margin-left: auto; font-style: italic; }
+
+  .result-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    animation: fadeIn 0.2s ease;
+  }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+  .result-card:hover { border-color: #2e3545; }
+
+  .card-meta { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .badge {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 4px;
+  }
+  .badge-layer { background: #0d2035; color: #5ab4e0; }
+  .badge-depth { background: #1a0d35; color: #a07fea; }
+  .badge-dist { background: #1a1a0d; color: #c8b040; }
+  .badge-scope { background: #0d1a12; color: #40c870; }
+
+  .card-text { color: var(--text); line-height: 1.55; font-size: 13.5px; }
+
+  .empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--muted);
+  }
+  .empty-state .icon { font-size: 48px; margin-bottom: 12px; }
+  .empty-icon-small { font-size: 32px; margin-bottom: 8px; }
+
+  .spinner {
+    display: inline-block;
+    width: 16px; height: 16px;
+    border: 2px solid var(--border);
+    border-top-color: var(--cyan);
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+    vertical-align: middle;
+    margin-right: 8px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .toast {
+    position: fixed;
+    bottom: 24px; right: 24px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 18px;
+    font-size: 13px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    animation: slideUp 0.2s ease;
+    z-index: 999;
+  }
+  @keyframes slideUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+  .toast.ok { border-color: var(--green); color: var(--green); }
+  .toast.err { border-color: var(--red); color: var(--red); }
+
+  .host-row { display: flex; gap: 8px; align-items: center; }
+  .host-row input { font-family: 'Consolas', monospace; font-size: 12px; }
+
+  /* Tabs */
+  .tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--border); margin-bottom: 20px; }
+  .tab-btn {
+    background: none; border: none; color: var(--muted);
+    padding: 9px 18px; font-size: 13px; cursor: pointer;
+    border-bottom: 2px solid transparent; margin-bottom: -1px;
+    transition: color 0.15s, border-color 0.15s;
+    font-family: inherit;
+  }
+  .tab-btn:hover { color: var(--text); }
+  .tab-btn.active { color: var(--cyan); border-bottom-color: var(--cyan); }
+  .tab-pane { display: none; }
+  .tab-pane.active { display: flex; flex-direction: column; gap: 20px; }
+
+  /* Bench table */
+  .bench-header { display: flex; align-items: baseline; gap: 12px; }
+  .bench-header h2 { font-size: 15px; font-weight: 600; }
+  .bench-meta { font-size: 12px; color: var(--muted); }
+  .bench-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .bench-table th {
+    background: var(--bg3); color: var(--muted); font-size: 10px;
+    text-transform: uppercase; letter-spacing: 1px;
+    padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--border);
+  }
+  .bench-table td { padding: 9px 12px; border-bottom: 1px solid #1c2030; }
+  .bench-table tr:last-child td { border-bottom: none; }
+  .bench-table tr:hover td { background: var(--bg3); }
+  .bench-name { font-family: 'Consolas', monospace; color: var(--cyan); }
+  .bench-med { font-weight: 700; color: var(--text); }
+  .bench-range { color: var(--muted); font-size: 12px; }
+  .bench-bar-cell { width: 120px; }
+  .bench-bar-bg { background: var(--bg3); border-radius: 3px; height: 6px; overflow: hidden; }
+  .bench-bar-fill { background: var(--cyan); height: 100%; border-radius: 3px; opacity: 0.7; }
+  .bench-section-row td {
+    background: var(--bg2); color: var(--muted); font-size: 10px;
+    text-transform: uppercase; letter-spacing: 1.2px; padding: 6px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .pill {
+    display: inline-block; padding: 2px 8px; border-radius: 10px;
+    font-size: 11px; font-weight: 600;
+  }
+  .pill-fast { background: #0d2010; color: #40e870; }
+  .pill-mid  { background: #1a1200; color: #e0a020; }
+  .pill-slow { background: #1a0808; color: #e04040; }
+
+  @media (max-width: 700px) {
+    .layout { grid-template-columns: 1fr; }
+    .sidebar { border-right: none; border-bottom: 1px solid var(--border); height: auto; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🔬 Microscope Memory <span>LIVE DEMO</span></h1>
+  <button id="conn-badge" onclick="checkStatus()">⟳ Connecting…</button>
+</header>
+
+<div class="layout">
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+
+    <!-- Connection -->
+    <div>
+      <div class="section-title">Bridge Connection</div>
+      <div class="host-row">
+        <input type="text" id="base-url" value="http://localhost:6060" placeholder="http://localhost:6060">
+        <button class="secondary" onclick="checkStatus()">↺</button>
+      </div>
+    </div>
+
+    <!-- Status stats -->
+    <div>
+      <div class="section-title">Engine Status</div>
+      <div class="stat-grid">
+        <div class="stat-box"><div class="val" id="stat-blocks">—</div><div class="lbl">Blocks</div></div>
+        <div class="stat-box"><div class="val" id="stat-append">—</div><div class="lbl">Append Log</div></div>
+        <div class="stat-box"><div class="val" id="stat-layers">—</div><div class="lbl">Layers</div></div>
+        <div class="stat-box"><div class="val" id="stat-ver">—</div><div class="lbl">Version</div></div>
+      </div>
+    </div>
+
+    <!-- Quick demo -->
+    <div>
+      <div class="section-title">One-Click Demo Queries</div>
+      <div class="demo-grid">
+        <button class="demo-btn" onclick="quickRecall('Rust ownership and borrow checker')">
+          Rust ownership <span class="tag">memory safety</span>
+        </button>
+        <button class="demo-btn" onclick="quickRecall('PSI engine cognitive state')">
+          PSI engine <span class="tag">consciousness</span>
+        </button>
+        <button class="demo-btn" onclick="quickRecall('SIMD vector operations CPU')">
+          SIMD vectors <span class="tag">performance</span>
+        </button>
+        <button class="demo-btn" onclick="quickRecall('Hebbian plasticity synapse')">
+          Hebbian learning <span class="tag">neuroscience</span>
+        </button>
+        <button class="demo-btn" onclick="quickRecall('mmap memory mapped files')">
+          mmap syscall <span class="tag">zero-copy</span>
+        </button>
+        <button class="demo-btn" onclick="quickRecall('Fourier transform frequency')">
+          Fourier analysis <span class="tag">signal</span>
+        </button>
+        <button class="demo-btn" onclick="quickRecall('Merkle tree cryptographic hash')">
+          Merkle tree <span class="tag">integrity</span>
+        </button>
+        <button class="demo-btn" onclick="quickRecall('BERT embeddings semantic vector')">
+          BERT embeddings <span class="tag">NLP</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Store -->
+    <div>
+      <div class="section-title">Store New Memory</div>
+      <div class="store-form">
+        <textarea id="store-text" placeholder="Enter memory text…"></textarea>
+        <div class="store-row">
+          <select id="store-layer" class="layer-select">
+            <option value="long_term">long_term</option>
+            <option value="short_term">short_term</option>
+            <option value="identity">identity</option>
+            <option value="emotional">emotional</option>
+            <option value="working">working</option>
+            <option value="episodic">episodic</option>
+          </select>
+          <input type="number" id="store-imp" class="imp-input" value="5" min="1" max="10" title="Importance (1-10)">
+          <button class="primary" onclick="storeMemory()">Store</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- MAIN -->
+  <div class="main">
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchTab('demo', this)">Live Demo</button>
+      <button class="tab-btn" onclick="switchTab('bench', this)">Benchmarks</button>
+    </div>
+
+    <!-- Demo tab -->
+    <div id="tab-demo" class="tab-pane active">
+      <div class="search-row">
+        <input type="text" id="search-input" placeholder="Search memory… (e.g. 'cache coherency')"
+          onkeydown="if(event.key==='Enter') doSearch()">
+        <input type="number" id="search-k" class="k-input" value="10" min="1" max="100" title="Top-K results">
+        <button class="primary" id="search-btn" onclick="doSearch()">Search</button>
+      </div>
+      <div id="results-area">
+        <div class="empty-state">
+          <div class="icon">🔍</div>
+          <div>Click a demo query or type a search to explore memory</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Benchmarks tab -->
+    <div id="tab-bench" class="tab-pane">
+      <div class="bench-header">
+        <h2>cargo bench — Criterion results</h2>
+        <span class="bench-meta">v0.7.0 · 98,925 blocks · 170+60 fixture entries · Windows 11 · Release build</span>
+      </div>
+      <table class="bench-table">
+        <thead>
+          <tr>
+            <th>Benchmark</th>
+            <th>Median</th>
+            <th>Range (low–high)</th>
+            <th class="bench-bar-cell"></th>
+            <th>Rating</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="bench-section-row"><td colspan="5">Spatial Lookup (radial search)</td></tr>
+          <tr>
+            <td class="bench-name">spatial_look/depth_1</td>
+            <td class="bench-med">10.66 µs</td>
+            <td class="bench-range">10.58 – 10.74 µs</td>
+            <td><div class="bench-bar-bg"><div class="bench-bar-fill" style="width:3%"></div></div></td>
+            <td><span class="pill pill-fast">sub-100µs</span></td>
+          </tr>
+          <tr>
+            <td class="bench-name">spatial_look/depth_2</td>
+            <td class="bench-med">10.39 µs</td>
+            <td class="bench-range">10.29 – 10.51 µs</td>
+            <td><div class="bench-bar-bg"><div class="bench-bar-fill" style="width:3%"></div></div></td>
+            <td><span class="pill pill-fast">sub-100µs</span></td>
+          </tr>
+          <tr>
+            <td class="bench-name">spatial_look/depth_3</td>
+            <td class="bench-med">11.61 µs</td>
+            <td class="bench-range">11.54 – 11.68 µs</td>
+            <td><div class="bench-bar-bg"><div class="bench-bar-fill" style="width:3%"></div></div></td>
+            <td><span class="pill pill-fast">sub-100µs</span></td>
+          </tr>
+
+          <tr class="bench-section-row"><td colspan="5">Coordinate Hashing</td></tr>
+          <tr>
+            <td class="bench-name">content_coords/hash_only</td>
+            <td class="bench-med">32.6 ns</td>
+            <td class="bench-range">32.5 – 32.7 ns</td>
+            <td><div class="bench-bar-bg"><div class="bench-bar-fill" style="width:1%"></div></div></td>
+            <td><span class="pill pill-fast">near-zero</span></td>
+          </tr>
+          <tr>
+            <td class="bench-name">content_coords/blended_w0.5</td>
+            <td class="bench-med">320 ns</td>
+            <td class="bench-range">319.6 – 321.4 ns</td>
+            <td><div class="bench-bar-bg"><div class="bench-bar-fill" style="width:2%"></div></div></td>
+            <td><span class="pill pill-fast">sub-µs</span></td>
+          </tr>
+
+          <tr class="bench-section-row"><td colspan="5">Text Search</td></tr>
+          <tr>
+            <td class="bench-name">find_text/existing_term</td>
+            <td class="bench-med">1.064 ms</td>
+            <td class="bench-range">1.060 – 1.069 ms</td>
+            <td><div class="bench-bar-bg"><div class="bench-bar-fill" style="width:28%"></div></div></td>
+            <td><span class="pill pill-mid">linear scan</span></td>
+          </tr>
+          <tr>
+            <td class="bench-name">find_text/missing_term</td>
+            <td class="bench-med">1.027 ms</td>
+            <td class="bench-range">1.020 – 1.036 ms</td>
+            <td><div class="bench-bar-bg"><div class="bench-bar-fill" style="width:27%"></div></div></td>
+            <td><span class="pill pill-mid">linear scan</span></td>
+          </tr>
+
+          <tr class="bench-section-row"><td colspan="5">MQL Query Engine</td></tr>
+          <tr>
+            <td class="bench-name">mql_query/depth_filter</td>
+            <td class="bench-med">103 µs</td>
+            <td class="bench-range">102.8 – 103.9 µs</td>
+            <td><div class="bench-bar-bg"><div class="bench-bar-fill" style="width:5%"></div></div></td>
+            <td><span class="pill pill-fast">fast</span></td>
+          </tr>
+          <tr>
+            <td class="bench-name">mql_query/keyword_search</td>
+            <td class="bench-med">9.14 ms</td>
+            <td class="bench-range">9.09 – 9.20 ms</td>
+            <td><div class="bench-bar-bg"><div class="bench-bar-fill" style="width:100%"></div></div></td>
+            <td><span class="pill pill-mid">full scan</span></td>
+          </tr>
+
+          <tr class="bench-section-row"><td colspan="5">Append Log (persistence)</td></tr>
+          <tr>
+            <td class="bench-name">append_log/read_existing</td>
+            <td class="bench-med">72.0 µs</td>
+            <td class="bench-range">71.7 – 72.5 µs</td>
+            <td><div class="bench-bar-bg"><div class="bench-bar-fill" style="width:4%"></div></div></td>
+            <td><span class="pill pill-fast">fast</span></td>
+          </tr>
+          <tr>
+            <td class="bench-name">append_log/store+read</td>
+            <td class="bench-med">7.84 ms</td>
+            <td class="bench-range">7.69 – 8.00 ms</td>
+            <td><div class="bench-bar-bg"><div class="bench-bar-fill" style="width:86%"></div></div></td>
+            <td><span class="pill pill-mid">disk I/O</span></td>
+          </tr>
+
+          <tr class="bench-section-row"><td colspan="5">CRC-16 CCITT Integrity</td></tr>
+          <tr>
+            <td class="bench-name">crc16/short_11b</td>
+            <td class="bench-med">23.7 ns</td>
+            <td class="bench-range">23.6 – 23.7 ns</td>
+            <td><div class="bench-bar-bg"><div class="bench-bar-fill" style="width:1%"></div></div></td>
+            <td><span class="pill pill-fast">near-zero</span></td>
+          </tr>
+          <tr>
+            <td class="bench-name">crc16/medium_256b</td>
+            <td class="bench-med">540 ns</td>
+            <td class="bench-range">538 – 541 ns</td>
+            <td><div class="bench-bar-bg"><div class="bench-bar-fill" style="width:2%"></div></div></td>
+            <td><span class="pill pill-fast">sub-µs</span></td>
+          </tr>
+          <tr>
+            <td class="bench-name">crc16/long_4096b</td>
+            <td class="bench-med">8.59 µs</td>
+            <td class="bench-range">8.57 – 8.62 µs</td>
+            <td><div class="bench-bar-bg"><div class="bench-bar-fill" style="width:3%"></div></div></td>
+            <td><span class="pill pill-fast">sub-100µs</span></td>
+          </tr>
+
+          <tr class="bench-section-row"><td colspan="5">Pipeline (one-time build cost)</td></tr>
+          <tr>
+            <td class="bench-name">build_pipeline</td>
+            <td class="bench-med">523 ms</td>
+            <td class="bench-range">501 – 548 ms</td>
+            <td><div class="bench-bar-bg"><div class="bench-bar-fill" style="width:57%"></div></div></td>
+            <td><span class="pill pill-slow">one-time</span></td>
+          </tr>
+        </tbody>
+      </table>
+      <div style="font-size:12px;color:var(--muted);padding:4px 0">
+        Measured with <strong style="color:var(--text)">Criterion 0.5</strong> · 100 samples each · reproducible fixtures via <code style="background:var(--bg3);padding:1px 5px;border-radius:3px">tests/fixtures/layers/</code>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  let BASE = 'http://localhost:6060';
+  let toastTimer = null;
+
+  function base() { return document.getElementById('base-url').value.replace(/\/$/, ''); }
+
+  async function checkStatus() {
+    const badge = document.getElementById('conn-badge');
+    badge.className = '';
+    badge.textContent = '⟳ Connecting…';
+    try {
+      const r = await fetch(base() + '/v1/status');
+      if (!r.ok) throw new Error(r.status);
+      const d = await r.json();
+      badge.className = 'ok';
+      badge.textContent = '● Connected';
+      document.getElementById('stat-blocks').textContent = d.blocks ?? '—';
+      document.getElementById('stat-append').textContent = d.append_log ?? '—';
+      document.getElementById('stat-layers').textContent = (d.layers ?? []).length;
+      document.getElementById('stat-ver').textContent = 'v' + (d.version ?? '?');
+    } catch(e) {
+      badge.className = 'err';
+      badge.textContent = '✕ Offline';
+      document.getElementById('stat-blocks').textContent = '—';
+      document.getElementById('stat-append').textContent = '—';
+      document.getElementById('stat-layers').textContent = '—';
+      document.getElementById('stat-ver').textContent = '—';
+    }
+  }
+
+  async function quickRecall(q) {
+    document.getElementById('search-input').value = q;
+    doSearch();
+  }
+
+  async function doSearch() {
+    const q = document.getElementById('search-input').value.trim();
+    if (!q) return;
+    const k = parseInt(document.getElementById('search-k').value) || 10;
+    const btn = document.getElementById('search-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>Searching…';
+    setResults(null, q);
+    try {
+      const r = await fetch(base() + `/v1/recall?q=${encodeURIComponent(q)}&k=${k}`);
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const data = await r.json();
+      setResults(data, q);
+    } catch(e) {
+      setError(e.message);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Search';
+    }
+  }
+
+  function setResults(items, query) {
+    const area = document.getElementById('results-area');
+    if (items === null) {
+      area.innerHTML = `<div class="empty-state"><span class="spinner"></span> Searching for <em>"${esc(query)}"</em>…</div>`;
+      return;
+    }
+    if (!items.length) {
+      area.innerHTML = `<div class="empty-state"><div class="empty-icon-small">🌌</div><div>No results for <em>"${esc(query)}"</em></div><div style="margin-top:8px;font-size:12px;color:var(--muted)">Try a different query or store some memories first.</div></div>`;
+      return;
+    }
+    const header = `
+      <div class="results-header">
+        <span class="results-title">Results</span>
+        <span class="results-count">${items.length} found</span>
+        <span class="results-query">"${esc(query)}"</span>
+      </div>`;
+    const cards = items.map((m, i) => `
+      <div class="result-card">
+        <div class="card-meta">
+          <span class="badge badge-layer">${esc(m.layer)}</span>
+          <span class="badge badge-depth">D${m.depth}</span>
+          <span class="badge badge-dist">dist ${m.distance.toFixed(3)}</span>
+          ${m.memory_scope ? `<span class="badge badge-scope">${esc(m.memory_scope)}</span>` : ''}
+        </div>
+        <div class="card-text">${esc(m.text)}</div>
+      </div>`).join('');
+    area.innerHTML = header + cards;
+  }
+
+  function setError(msg) {
+    const area = document.getElementById('results-area');
+    area.innerHTML = `<div class="empty-state" style="color:var(--red)"><div class="empty-icon-small">⚠️</div><div>Error: ${esc(msg)}</div><div style="margin-top:8px;font-size:12px;color:var(--muted)">Is the bridge running? <code>microscope bridge</code></div></div>`;
+  }
+
+  async function storeMemory() {
+    const text = document.getElementById('store-text').value.trim();
+    if (!text) return;
+    const layer = document.getElementById('store-layer').value;
+    const imp = parseInt(document.getElementById('store-imp').value) || 5;
+    try {
+      const r = await fetch(base() + '/v1/remember', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, layer, importance: imp })
+      });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      document.getElementById('store-text').value = '';
+      toast('Memory stored ✓', 'ok');
+      checkStatus();
+    } catch(e) {
+      toast('Error: ' + e.message, 'err');
+    }
+  }
+
+  function toast(msg, type) {
+    clearTimeout(toastTimer);
+    let el = document.querySelector('.toast');
+    if (el) el.remove();
+    el = document.createElement('div');
+    el.className = 'toast ' + (type || '');
+    el.textContent = msg;
+    document.body.appendChild(el);
+    toastTimer = setTimeout(() => el.remove(), 3000);
+  }
+
+  function esc(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function switchTab(name, btn) {
+    document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('tab-' + name).classList.add('active');
+    btn.classList.add('active');
+  }
+
+  // Init
+  checkStatus();
+  setInterval(checkStatus, 15000);
+  document.getElementById('base-url').addEventListener('change', checkStatus);
+</script>
+</body>
+</html>

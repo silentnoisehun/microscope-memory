@@ -1,0 +1,186 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Microscope Memory — Spine Bridge API",
+    "description": "AI-native cognitive memory interface for ChatGPT, Claude, and other LLMs.\n\nMicroscope Memory is a sub-microsecond, zoom-based hierarchical memory engine.\nThis API lets AI models store and recall memories using natural language.\n\n## Layers\nidentity, long_term, short_term, associative, emotional, relational, reflections, crypto_chain, echo_cache, rust_state\n\n## Usage tips\n- Call `recall` before answering to check for existing context\n- Call `remember` to commit important facts for future sessions\n- Higher `importance` (1–10) surfaces memories more prominently",
+    "version": "0.6.4"
+  },
+  "servers": [
+    {
+      "url": "http://localhost:6060",
+      "description": "Local Spine Bridge (default)"
+    }
+  ],
+  "paths": {
+    "/status": {
+      "get": {
+        "operationId": "getMemoryStatus",
+        "summary": "Get memory engine status",
+        "description": "Returns the current state of the engine: block count, append log size, available layers. Call this first to verify the engine is running.",
+        "responses": {
+          "200": {
+            "description": "Engine status",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/StatusResponse" }
+              }
+            }
+          },
+          "500": {
+            "description": "Engine error — run 'microscope-mem build' first"
+          }
+        }
+      }
+    },
+    "/recall": {
+      "get": {
+        "operationId": "recallMemory",
+        "summary": "Recall relevant memories by natural language query",
+        "description": "Searches the memory engine using a natural language query. Returns the most relevant memory blocks ordered by spatial proximity (lower distance = more relevant).\n\n**Use this before answering any question** to check if relevant context exists.",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "description": "Natural language query",
+            "schema": { "type": "string", "minLength": 1, "maxLength": 500 },
+            "example": "What did we discuss about the Rust architecture?"
+          },
+          {
+            "name": "k",
+            "in": "query",
+            "required": false,
+            "description": "Maximum number of results (default 10, max 50)",
+            "schema": { "type": "integer", "minimum": 1, "maximum": 50, "default": 10 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of relevant memory blocks ordered by relevance",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/MemoryResult" }
+                }
+              }
+            }
+          },
+          "500": { "description": "Engine error" }
+        }
+      }
+    },
+    "/remember": {
+      "post": {
+        "operationId": "rememberMemory",
+        "summary": "Store a new memory",
+        "description": "Commits a new memory to permanent storage. The memory is immediately available for recall.\n\nChoose the appropriate layer:\n- `long_term` — facts, knowledge, decisions (default)\n- `short_term` — temporary context\n- `associative` — links between concepts\n- `emotional` — emotional context, preferences\n- `relational` — relationships between entities\n- `reflections` — meta-thoughts, evaluations",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/RememberRequest" },
+              "examples": {
+                "basicFact": {
+                  "summary": "Store a basic fact",
+                  "value": {
+                    "text": "The Spine Bridge API is a REST interface for Microscope Memory",
+                    "layer": "long_term",
+                    "importance": 8
+                  }
+                },
+                "preference": {
+                  "summary": "Store user preference",
+                  "value": {
+                    "text": "User prefers concise technical explanations",
+                    "layer": "emotional",
+                    "importance": 7
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Memory committed successfully",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/RememberResponse" }
+              }
+            }
+          },
+          "500": { "description": "Write error" }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "StatusResponse": {
+        "type": "object",
+        "required": ["version", "blocks", "append_log", "layers"],
+        "properties": {
+          "version": { "type": "string", "example": "0.6.4" },
+          "blocks": { "type": "integer", "description": "Indexed memory blocks in main index", "example": 1024 },
+          "append_log": { "type": "integer", "description": "Uncommitted entries pending rebuild", "example": 12 },
+          "layers": {
+            "type": "array",
+            "items": { "type": "string" },
+            "example": ["long_term", "short_term", "associative", "emotional"]
+          }
+        }
+      },
+      "MemoryResult": {
+        "type": "object",
+        "required": ["text", "depth", "layer", "distance"],
+        "properties": {
+          "text": { "type": "string", "description": "Memory content", "example": "The Spine Bridge API runs on Axum" },
+          "depth": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 8,
+            "description": "Memory depth (D0=identity, D3=memories, D5=tokens, D8=raw bytes)",
+            "example": 4
+          },
+          "layer": { "type": "string", "description": "Memory layer", "example": "long_term" },
+          "distance": {
+            "type": "number",
+            "format": "float",
+            "description": "Euclidean distance in semantic space. Lower = more relevant. <0.1 = very strong match.",
+            "example": 0.042
+          }
+        }
+      },
+      "RememberRequest": {
+        "type": "object",
+        "required": ["text"],
+        "properties": {
+          "text": { "type": "string", "minLength": 1, "maxLength": 256, "description": "Memory content to store", "example": "Docker deployment uses Railway for one-click cloud hosting" },
+          "layer": {
+            "type": "string",
+            "default": "long_term",
+            "enum": ["identity", "long_term", "short_term", "associative", "emotional", "relational", "reflections", "crypto_chain", "echo_cache", "rust_state"],
+            "description": "Target memory layer"
+          },
+          "importance": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10,
+            "default": 5,
+            "description": "Importance weight. Higher values surface this memory more in future recalls.",
+            "example": 8
+          }
+        }
+      },
+      "RememberResponse": {
+        "type": "object",
+        "required": ["status", "message"],
+        "properties": {
+          "status": { "type": "string", "example": "committed" },
+          "message": { "type": "string", "example": "Memory stored in append log" }
+        }
+      }
+    }
+  }
+}

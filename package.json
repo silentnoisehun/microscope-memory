@@ -1,0 +1,28 @@
+{
+  "name": "microscope-memory",
+  "version": "1.0.0",
+  "description": "[![Rust](https://img.shields.io/badge/language-Rust-orange.svg)](https://www.rust-lang.org)\r [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)\r [![Zero-JSON](https://img.shields.io/badge/Architecture-Zero--JSON-green.svg)](#core-pillars)\r [![API v1](https://img.shields.io/badge/API-v1.0-cyan.svg)](#-spine-bridge-api-v1)\r [![Doctor](https://img.shields.io/badge/Reliability-Doctor--Cmd-green.svg)](#-reliability--doctor-command)",
+  "main": "index.js",
+  "directories": {
+    "example": "examples",
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/silentnoisehun/microscope-memory.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "bugs": {
+    "url": "https://github.com/silentnoisehun/microscope-memory/issues"
+  },
+  "homepage": "https://github.com/silentnoisehun/microscope-memory#readme",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0"
+  }
+}

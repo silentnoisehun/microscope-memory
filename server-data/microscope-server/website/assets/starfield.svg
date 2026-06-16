@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <radialGradient id="g0" cx="22%" cy="30%" r="70%">
+      <stop offset="0%" stop-color="#1f2f49"/>
+      <stop offset="48%" stop-color="#0f1d31"/>
+      <stop offset="100%" stop-color="#070c16"/>
+    </radialGradient>
+    <radialGradient id="nebulaA" cx="28%" cy="34%" r="42%">
+      <stop offset="0%" stop-color="#b8c9ff" stop-opacity=".34"/>
+      <stop offset="58%" stop-color="#8ba8d4" stop-opacity=".12"/>
+      <stop offset="100%" stop-color="#6f87b1" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="nebulaB" cx="72%" cy="62%" r="50%">
+      <stop offset="0%" stop-color="#90b2dc" stop-opacity=".18"/>
+      <stop offset="65%" stop-color="#7597c9" stop-opacity=".08"/>
+      <stop offset="100%" stop-color="#5f7da6" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="soft" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2"/>
+    </filter>
+  </defs>
+
+  <rect width="1600" height="900" fill="url(#g0)"/>
+  <ellipse cx="430" cy="340" rx="610" ry="250" fill="url(#nebulaA)" filter="url(#soft)"/>
+  <ellipse cx="1150" cy="620" rx="540" ry="260" fill="url(#nebulaB)" filter="url(#soft)"/>
+
+  <g fill="#f4f8ff">
+    <circle cx="58" cy="72" r="1.25"/><circle cx="122" cy="188" r="1.1"/><circle cx="184" cy="46" r="1.15"/><circle cx="215" cy="252" r="1.2"/>
+    <circle cx="260" cy="120" r="1.08"/><circle cx="320" cy="206" r="1.28"/><circle cx="368" cy="98" r="1.12"/><circle cx="406" cy="300" r="1.35"/>
+    <circle cx="452" cy="74" r="1.15"/><circle cx="490" cy="224" r="1.15"/><circle cx="530" cy="146" r="1.25"/><circle cx="588" cy="94" r="1.1"/>
+    <circle cx="628" cy="248" r="1.2"/><circle cx="678" cy="188" r="1.1"/><circle cx="720" cy="110" r="1.18"/><circle cx="760" cy="270" r="1.05"/>
+    <circle cx="814" cy="162" r="1.22"/><circle cx="846" cy="46" r="1.1"/><circle cx="902" cy="216" r="1.14"/><circle cx="936" cy="112" r="1.18"/>
+    <circle cx="980" cy="70" r="1.25"/><circle cx="1018" cy="260" r="1.06"/><circle cx="1062" cy="132" r="1.17"/><circle cx="1118" cy="88" r="1.08"/>
+    <circle cx="1162" cy="220" r="1.24"/><circle cx="1210" cy="144" r="1.1"/><circle cx="1260" cy="70" r="1.2"/><circle cx="1304" cy="196" r="1.17"/>
+    <circle cx="1348" cy="126" r="1.15"/><circle cx="1390" cy="254" r="1.08"/><circle cx="1440" cy="86" r="1.18"/><circle cx="1490" cy="176" r="1.22"/>
+    <circle cx="1552" cy="96" r="1.15"/><circle cx="78" cy="360" r="1.1"/><circle cx="128" cy="438" r="1.15"/><circle cx="180" cy="522" r="1.06"/>
+    <circle cx="224" cy="390" r="1.2"/><circle cx="280" cy="464" r="1.15"/><circle cx="326" cy="556" r="1.1"/><circle cx="372" cy="418" r="1.22"/>
+    <circle cx="430" cy="502" r="1.12"/><circle cx="472" cy="596" r="1.08"/><circle cx="530" cy="454" r="1.16"/><circle cx="576" cy="536" r="1.1"/>
+    <circle cx="620" cy="628" r="1.18"/><circle cx="676" cy="470" r="1.24"/><circle cx="722" cy="546" r="1.06"/><circle cx="768" cy="640" r="1.16"/>
+    <circle cx="818" cy="498" r="1.08"/><circle cx="862" cy="584" r="1.2"/><circle cx="912" cy="660" r="1.08"/><circle cx="958" cy="512" r="1.14"/>
+    <circle cx="1008" cy="596" r="1.1"/><circle cx="1054" cy="688" r="1.18"/><circle cx="1100" cy="540" r="1.12"/><circle cx="1154" cy="620" r="1.07"/>
+    <circle cx="1206" cy="708" r="1.22"/><circle cx="1250" cy="560" r="1.08"/><circle cx="1302" cy="646" r="1.12"/><circle cx="1344" cy="742" r="1.18"/>
+    <circle cx="1396" cy="596" r="1.1"/><circle cx="1442" cy="684" r="1.16"/><circle cx="1490" cy="778" r="1.08"/><circle cx="1540" cy="626" r="1.2"/>
+  </g>
+
+  <g fill="#f8fbff" opacity=".9">
+    <circle cx="272" cy="214" r="1.9"/><circle cx="542" cy="320" r="2.1"/><circle cx="874" cy="244" r="2"/>
+    <circle cx="1168" cy="304" r="2.15"/><circle cx="1364" cy="216" r="1.95"/><circle cx="418" cy="676" r="2.05"/>
+    <circle cx="760" cy="742" r="2.2"/><circle cx="1028" cy="772" r="2"/><circle cx="1298" cy="708" r="2.1"/>
+  </g>
+</svg>

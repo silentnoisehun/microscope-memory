@@ -38,10 +38,13 @@ pub mod snapshot;
 #[cfg(feature = "stealth")]
 pub mod syscaller;
 
+pub mod daydream;
 pub mod dream;
 pub mod emotional_contagion;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod eureka;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod salience;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod narrative;
 #[cfg(not(target_arch = "wasm32"))]

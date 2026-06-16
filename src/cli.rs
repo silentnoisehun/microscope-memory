@@ -234,6 +234,17 @@ pub enum Cmd {
     EmotionalExchange,
     /// Run manual reconsolidation on recent recalls (emotion blend + spatial drift)
     Reconsolidate,
+    /// Show the salience network state (inhibitions, mask)
+    Salience,
+    /// Run associative daydreaming — internal free association without external prompt
+    Daydream {
+        /// Number of drift steps
+        #[arg(default_value = "3")]
+        steps: usize,
+        /// Show detailed dream path
+        #[arg(long)]
+        verbose: bool,
+    },
     /// Show the inner narrative — the system's current sense of self
     Narrative {
         /// Show detailed breakdown (emotion vector, all context)

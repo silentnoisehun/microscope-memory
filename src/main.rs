@@ -485,27 +485,48 @@ fn recall(config: &Config, query: &str, k: usize, emotion: Option<[f32; 21]>) {
         if !rc_text.is_empty() {
             println!("{}", rc_text);
         }
-    }
 
-    // ═══ Narrative update: the system tells itself what happened ═══
-    let narrative_output_dir = Path::new(&config.paths.output_dir);
-    let mut narrative_state = microscope_memory::narrative::NarrativeState::load_or_init(narrative_output_dir);
-    // Gather context
-    let wm_state = microscope_memory::working_memory::WorkingMemory::load_or_init(narrative_output_dir);
-    let wm_texts: Vec<String> = wm_state.items.iter().map(|i| i.text.clone()).collect();
-    let sr_state = microscope_memory::spaced_repetition::SpacedRepetition::load_or_init(narrative_output_dir);
-    let tg_state = microscope_memory::thought_graph::ThoughtGraphState::load_or_init(narrative_output_dir);
-    let ring = microscope_memory::EmotionalStateRing::load_or_init(narrative_output_dir);
-    let _ = narrative_state.update(
-        narrative_output_dir,
-        Some(&ring),
-        Some(&wm_texts),
-        Some(sr_state.due_count()),
-        Some(tg_state.nodes.len()),
-        Some(query),
-    );
-    if narrative_state.session_count <= 3 {
-        println!("  {} \"{}\"", "SELF".cyan().bold(), safe_truncate(&narrative_state.narrative, 60));
+        // ═══ Salience filter: only the strongest signal reaches narrative ═══
+        let mut salience_state = microscope_memory::salience::SalienceState::load_or_init(output_dir);
+        let high_salience = salience_state.filter(
+            &activated.iter().map(|&(idx, _)| {
+                // emotional_delta: approximate using hebbian energy, insight: from eureka, recency: 1.0
+                let hebb_e = hebb.activations.get(idx as usize).map(|a| a.energy).unwrap_or(0.5);
+                (idx, hebb_e * 0.3, 0.5, 1.0f32)
+            }).collect::<Vec<_>>()
+        );
+        // Inhibit the highest-salience topic so it doesn't repeat
+        if let Some((salient_idx, _)) = high_salience.first() {
+            let topic = microscope_memory::salience::SalienceState::topic_hash(&format!("block_{}", salient_idx));
+            salience_state.inhibit(topic);
+            let _ = salience_state.save(output_dir);
+        }
+
+        // ═══ Narrative update: the system tells itself what happened ═══
+        let wm_state = microscope_memory::working_memory::WorkingMemory::load_or_init(output_dir);
+        let wm_texts: Vec<String> = wm_state.items.iter().map(|i| i.text.clone()).collect();
+        let sr_state = microscope_memory::spaced_repetition::SpacedRepetition::load_or_init(output_dir);
+        let tg_state = microscope_memory::thought_graph::ThoughtGraphState::load_or_init(output_dir);
+        let ring = microscope_memory::EmotionalStateRing::load_or_init(output_dir);
+        let mut narrative_state = microscope_memory::narrative::NarrativeState::load_or_init(output_dir);
+        let _ = narrative_state.update(
+            output_dir,
+            Some(&ring),
+            Some(&wm_texts),
+            Some(sr_state.due_count()),
+            Some(tg_state.nodes.len()),
+            Some(query),
+        );
+        if narrative_state.session_count <= 3 {
+            println!("  {} \"{}\"", "SELF".cyan().bold(), safe_truncate(&narrative_state.narrative, 60));
+        }
+
+        // ═══ Meta-kognitív rekonszolidáció: the narrative becomes a memory ═══
+        microscope_memory::narrative::metacognitive_store(
+            output_dir,
+            &narrative_state.narrative,
+            &narrative_state.emotion,
+        );
     }
 
     let elapsed = t0.elapsed();
@@ -2348,6 +2369,35 @@ async fn main() {
                 spatial,
                 activated.len(),
             );
+        }
+        Cmd::Salience => {
+            let output_dir = Path::new(&config.paths.output_dir);
+            let salience = microscope_memory::salience::SalienceState::load_or_init(output_dir);
+            println!("{}", "SALIENCE NETWORK".cyan().bold());
+            if salience.inhibitions.is_empty() {
+                println!("  (no active inhibitions — network is clear)");
+            } else {
+                println!("  {} active inhibitions:", salience.inhibitions.len());
+                for e in &salience.inhibitions {
+                    println!("  topic={:016x} strength={:.2}", e.topic_hash, e.remaining_strength);
+                }
+            }
+        }
+        Cmd::Daydream { steps, verbose } => {
+            let output_dir = Path::new(&config.paths.output_dir);
+            let narrative = microscope_memory::narrative::NarrativeState::load_or_init(output_dir);
+            let seed = if narrative.session_count > 0 {
+                narrative.narrative.clone()
+            } else {
+                "Microscope Memory".to_string()
+            };
+            println!("{} from \"{}\"", "DAYDREAM".cyan().bold(), safe_truncate(&seed, 40));
+            match microscope_memory::daydream::daydream(&config, &seed, steps) {
+                Ok(result) => {
+                    println!("{}", microscope_memory::daydream::format_daydream(&result, verbose));
+                }
+                Err(e) => eprintln!("  {} daydream: {}", "ERR".red(), e),
+            }
         }
         Cmd::Narrative { verbose } => {
             let output_dir = Path::new(&config.paths.output_dir);

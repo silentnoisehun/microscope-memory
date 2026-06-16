@@ -133,6 +133,41 @@ impl NarrativeState {
     }
 }
 
+/// Meta-kognitív rekonszolidáció: a narratíva visszaírása a memóriába.
+///
+/// Minden generált narratív mondatot elmentünk store_memory-val,
+/// [MetaCognitive] prefix-szel, hogy a rendszer később emlékezzen rá,
+/// miről gondolkodott.
+pub fn metacognitive_store(output_dir: &Path, narrative: &str, emotion: &[f32; 21]) {
+    // Nem tároljuk a csendes vagy üres narratívákat
+    if narrative.is_empty() || narrative == "I am silent." {
+        return;
+    }
+    // A store_memory-hoz config kell, de itt nincs. Használjuk az emotion_log-ot
+    // és a persist_to_layer_file-t, hogy a rebuild túlélje.
+    let layer = "meta_cognitive";
+    let layer_path = output_dir.parent().and_then(|p| p.parent()).map(|root| {
+        root.join("layers").join(format!("{}.txt", layer))
+    }).unwrap_or_else(|| {
+        output_dir.join("..").join("layers").join(format!("{}.txt", layer))
+    });
+
+    // Write directly to layer file (best-effort)
+    if let Ok(mut file) = fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&layer_path)
+    {
+        use std::io::Write;
+        let ts = now_ms();
+        let line = format!("[MetaCognitive] [{}] {}\n", ts, narrative);
+        let _ = file.write_all(line.as_bytes());
+    }
+
+    // Also write emotion to emotion_log for rebuild survival
+    let _ = crate::reader::append_emotion_log(output_dir, &format!("[MetaCognitive] {}", narrative), emotion);
+}
+
 // ─── Narrative generation ──────────────────────────
 
 /// Megépíti a "belső monológ" mondatot a jelenlegi állapotból.

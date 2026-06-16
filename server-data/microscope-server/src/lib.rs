@@ -58,8 +58,9 @@ pub mod cli;
 
 // Re-export commonly used items
 pub use reader::{
-    read_append_log, store_memory, AppendEntry, BlockHeader, DataStore, MicroscopeReader,
-    RadialResult, ResultSet,
+    emotional_similarity, format_emotion, load_emotion_lookup, read_append_log, store_memory,
+    AppendEntry, BlockHeader, DataStore, MicroscopeReader, RadialResult, ResultSet,
+    EMOTION_DIMS, EMOTION_VECTOR_SIZE,
 };
 
 // Re-export CLI

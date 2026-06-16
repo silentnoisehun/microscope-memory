@@ -44,6 +44,8 @@ const UNSATISFIED_MS: u64 = 5_000; // <5s gap = unsatisfied
 pub struct AttentionSignals {
     pub query_length: usize,
     pub emotional_energy: f32,
+    /// Magnitude of the current 21D emotional state ring (0.0 = neutral).
+    pub emotional_intensity: f32,
     pub session_depth: usize,
     pub pattern_confidence: f32,
     pub cache_hit_rate: f32,
@@ -121,8 +123,9 @@ impl AttentionState {
             raw[5] *= 1.3; // ThoughtGraph: long = complex reasoning chain
         }
 
-        // Factor 2: emotional energy
+        // Factor 2: emotional energy + intensity
         raw[4] *= 1.0 + signals.emotional_energy.min(2.0);
+        raw[4] *= 1.0 + signals.emotional_intensity.min(2.0);
 
         // Factor 3: session depth
         let depth_factor = (signals.session_depth as f32 / 5.0).min(1.0);
@@ -388,6 +391,7 @@ mod tests {
         AttentionSignals {
             query_length: 20,
             emotional_energy: 0.0,
+            emotional_intensity: 0.0,
             session_depth: 0,
             pattern_confidence: 0.0,
             cache_hit_rate: 0.0,

@@ -212,19 +212,21 @@ fn handle_tools_list(id: &Value) -> Value {
                         "properties": {
                             "text": { "type": "string", "description": "Memory text to store" },
                             "layer": { "type": "string", "description": "Memory layer (long_term, short_term, session, associative, emotional, relational, reflections, echo_cache)", "default": "long_term" },
-                            "importance": { "type": "integer", "description": "Importance level 1-10", "default": 5 }
+                            "importance": { "type": "integer", "description": "Importance level 1-10", "default": 5 },
+                            "emotion": { "type": "array", "items": { "type": "number" }, "minItems": 21, "maxItems": 21, "description": "21D emotion vector: [joy, sadness, anger, fear, surprise, disgust, trust, anticipation, love, gratitude, curiosity, awe, confusion, anxiety, serenity, hope, pride, shame, guilt, empathy, excitement]" }
                         },
                         "required": ["text"]
                     }
                 },
                 {
                     "name": "memory_recall",
-                    "description": "Natural language recall with auto-zoom — searches both main index and append log",
+                    "description": "Natural language recall with auto-zoom — searches both main index and append log. Optional emotion vector biases results toward emotionally similar memories.",
                     "inputSchema": {
                         "type": "object",
                         "properties": {
                             "query": { "type": "string", "description": "Natural language query" },
-                            "k": { "type": "integer", "description": "Max results to return", "default": 10 }
+                            "k": { "type": "integer", "description": "Max results to return", "default": 10 },
+                            "emotion": { "type": "array", "items": { "type": "number" }, "minItems": 21, "maxItems": 21, "description": "21D emotion vector for emotional recall: [joy, sadness, anger, fear, surprise, disgust, trust, anticipation, love, gratitude, curiosity, awe, confusion, anxiety, serenity, hope, pride, shame, guilt, empathy, excitement]" }
                         },
                         "required": ["query"]
                     }
@@ -405,10 +407,23 @@ fn tool_store(config: &Config, args: &Value) -> Result<String, String> {
         .and_then(|v: &Value| v.as_u64())
         .unwrap_or(5) as u8;
 
+    // Parse optional 21D emotion vector
+    let emotion: Option<[f32; 21]> = args.get("emotion").and_then(|v: &Value| {
+        let arr = v.as_array()?;
+        if arr.len() != 21 {
+            return None;
+        }
+        let mut emo = [0.0f32; 21];
+        for (i, val) in arr.iter().enumerate() {
+            emo[i] = val.as_f64().unwrap_or(0.0) as f32;
+        }
+        Some(emo)
+    });
+
     let sid = std::process::id();
     let tagged = format!("[sid-{:04}] {}", sid % 10000, text);
 
-    store_memory(config, &tagged, layer, importance)?;
+    store_memory(config, &tagged, layer, importance, emotion)?;
 
     let (x, y, z) = crate::content_coords(&tagged, layer);
     let depth = crate::auto_depth(&tagged);
@@ -439,8 +454,36 @@ fn tool_recall(config: &Config, args: &Value) -> Result<String, String> {
         .ok_or("Missing required parameter: query")?;
     let k = args.get("k").and_then(|v: &Value| v.as_u64()).unwrap_or(10) as usize;
 
+    // Parse optional 21D emotion vector for emotional recall
+    let query_emotion: Option<[f32; 21]> = args.get("emotion").and_then(|v: &Value| {
+        let arr = v.as_array()?;
+        if arr.len() != 21 { return None; }
+        let mut emo = [0.0f32; 21];
+        for (i, val) in arr.iter().enumerate() {
+            emo[i] = val.as_f64().unwrap_or(0.0) as f32;
+        }
+        Some(emo)
+    });
+    let emotional_recall_weight = config.search.emotional_bias_weight * 0.15;
+
     let reader = MicroscopeReader::open(config)?;
     let output_dir = Path::new(&config.paths.output_dir);
+
+    // Load emotional state ring for priming + attention intensity
+    let emotional_ring = crate::EmotionalStateRing::load_or_init(output_dir);
+    let emotional_intensity = emotional_ring.intensity();
+
+    // If no explicit emotion, try priming from the emotional state ring
+    let query_emotion = query_emotion.or_else(|| {
+        if emotional_ring.is_active() {
+            if let Some((name, val)) = emotional_ring.dominant() {
+                eprintln!("  [] emotional prime: {} ({:.2})", name, val);
+            }
+            Some(emotional_ring.current)
+        } else {
+            None
+        }
+    });
 
     let (qx, qy, qz) = crate::content_coords_blended(query, "long_term", config.search.semantic_weight);
 
@@ -464,6 +507,7 @@ fn tool_recall(config: &Config, args: &Value) -> Result<String, String> {
     let attn_signals = crate::attention::AttentionSignals {
         query_length: query.len(),
         emotional_energy,
+        emotional_intensity,
         session_depth: tg_pre.current_path().len(),
         pattern_confidence: 0.0,
         cache_hit_rate: pc_pre.stats.hit_rate(),
@@ -506,6 +550,11 @@ fn tool_recall(config: &Config, args: &Value) -> Result<String, String> {
     }
     let keywords: Vec<&str> = keyword_list.iter().map(|s| s.as_str()).collect();
 
+    // Load emotions.bin lookup for main-index emotional recall
+    let emotion_lookup = query_emotion.as_ref().and_then(|_| {
+        crate::load_emotion_lookup(output_dir)
+    });
+
     let mut all_results: Vec<(f32, usize, bool)> = Vec::new();
 
     for zoom in zoom_lo..=zoom_hi {
@@ -521,6 +570,11 @@ fn tool_recall(config: &Config, args: &Value) -> Result<String, String> {
                 let dz = h.z - qz;
                 let spatial_dist = dx * dx + dy * dy + dz * dz;
                 let boost = keyword_hits as f32 * 0.1;
+                // Emotional similarity boost (if query emotion AND emotions.bin data available)
+                let emo_boost = query_emotion.as_ref().and_then(|qe| {
+                    emotion_lookup.as_ref().and_then(|lookup| lookup(i))
+                        .map(|block_emo| crate::emotional_similarity(qe, &block_emo) * emotional_recall_weight)
+                }).unwrap_or(0.0);
                 let layer_imp = match h.layer_id {
                     li if LAYER_NAMES.get(li as usize) == Some(&"session") => 8.0,
                     li if LAYER_NAMES.get(li as usize) == Some(&"short_term") => 6.0,
@@ -528,7 +582,7 @@ fn tool_recall(config: &Config, args: &Value) -> Result<String, String> {
                     _ => 4.0,
                 };
                 let imp_weight = 2.0 / (1.0 + layer_imp * 0.1);
-                let combined = (spatial_dist - boost).max(0.0) * imp_weight;
+                let combined = (spatial_dist - boost - emo_boost).max(0.0) * imp_weight;
                 all_results.push((combined, i, true));
             }
         }
@@ -544,9 +598,13 @@ fn tool_recall(config: &Config, args: &Value) -> Result<String, String> {
         let text_lower = entry.text.to_lowercase();
         let keyword_hits = keywords.iter().filter(|&&kw| text_lower.contains(kw)).count();
         let boost = keyword_hits as f32 * 0.1;
-        if dist < 0.1 || keyword_hits > 0 {
+        // Emotional boost from inline append entry emotion
+        let emo_boost = query_emotion.as_ref()
+            .map(|qe| crate::emotional_similarity(qe, &entry.emotion) * emotional_recall_weight)
+            .unwrap_or(0.0);
+        if dist < 0.1 || keyword_hits > 0 || emo_boost > 0.0 {
             let imp_weight = 2.0 / (1.0 + entry.importance as f32 * 0.1);
-            let combined = (dist - boost).max(0.0) * imp_weight;
+            let combined = (dist - boost - emo_boost).max(0.0) * imp_weight;
             all_results.push((combined, ai + 1_000_000, false));
         }
     }
@@ -700,7 +758,7 @@ fn tool_recall(config: &Config, args: &Value) -> Result<String, String> {
                     .unwrap_or_default()
             };
             if !text.is_empty() {
-                let _ = store_memory(config, &text, "echo_cache", 8 - i as u8);
+                let _ = store_memory(config, &text, "echo_cache", 8 - i as u8, None);
             }
         }
         // Associative: link top-3 results that share keywords
@@ -712,7 +770,7 @@ fn tool_recall(config: &Config, args: &Value) -> Result<String, String> {
                 let text_b = if is_b { reader.text(idx_b) } else { "" };
                 if !text_a.is_empty() && !text_b.is_empty() {
                     let link = format!("LINK: [{:.40}] <-> [{:.40}] via '{}'", text_a, text_b, query);
-                    let _ = store_memory(config, &link, "associative", 6);
+                    let _ = store_memory(config, &link, "associative", 6, None);
                 }
             }
         }
@@ -813,9 +871,11 @@ fn tool_build(config: &Config, args: &Value) -> Result<String, String> {
 
     crate::build::build(config, force)?;
 
-    // Clear append log after successful rebuild
+    // Clear append log and emotions log after successful rebuild
     let append_path = Path::new(&config.paths.output_dir).join("append.bin");
     let _ = std::fs::remove_file(append_path);
+    let emotions_path = Path::new(&config.paths.output_dir).join("emotions.bin");
+    let _ = std::fs::remove_file(emotions_path);
 
     let reader = MicroscopeReader::open(config)?;
     Ok(format!(
@@ -1018,7 +1078,7 @@ fn tool_consolidate(config: &Config, _args: &Value) -> Result<String, String> {
         );
         summaries.push(summary);
 
-        store_memory(config, &format!("[{}] CONSOLIDATED: {} interactions from {}", sid, group.len(), top_topics.join(", ")), "long_term", 8)?;
+        store_memory(config, &format!("[{}] CONSOLIDATED: {} interactions from {}", sid, group.len(), top_topics.join(", ")), "long_term", 8, None)?;
     }
 
     let mut output = format!("Consolidated {} session groups:\n\n", summaries.len());

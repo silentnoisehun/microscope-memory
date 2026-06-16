@@ -2,6 +2,7 @@
 
 use colored::Colorize;
 use rayon::prelude::*;
+use sha2::{Digest, Sha256};
 use std::fs;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
@@ -522,6 +523,18 @@ impl MicroscopeReader {
     }
 }
 
+// ─── 21D Emotion Vector ─────────────────────────────
+/// The 21 named dimensions of the emotion vector.
+pub const EMOTION_DIMS: &[&str] = &[
+    "joy", "sadness", "anger", "fear", "surprise",
+    "disgust", "trust", "anticipation", "love", "gratitude",
+    "curiosity", "awe", "confusion", "anxiety", "serenity",
+    "hope", "pride", "shame", "guilt", "empathy",
+    "excitement",
+];
+/// Size of the emotion vector in bytes (21 × f32 = 84)
+pub const EMOTION_VECTOR_SIZE: usize = 21 * 4;
+
 // ─── APPEND LOG ──────────────────────────────────────
 
 #[allow(dead_code)]
@@ -533,6 +546,23 @@ pub struct AppendEntry {
     pub x: f32,
     pub y: f32,
     pub z: f32,
+    /// 21D emotion vector (zero-initialized if not stored)
+    pub emotion: [f32; 21],
+}
+
+impl Default for AppendEntry {
+    fn default() -> Self {
+        Self {
+            text: String::new(),
+            layer_id: 0,
+            importance: 5,
+            depth: 4,
+            x: 0.0,
+            y: 0.0,
+            z: 0.0,
+            emotion: [0.0; 21],
+        }
+    }
 }
 
 pub fn read_append_log(path: &Path) -> Vec<AppendEntry> {
@@ -547,12 +577,21 @@ pub fn read_append_log(path: &Path) -> Vec<AppendEntry> {
     let mut entries = Vec::new();
     let mut pos = 0;
 
-    let is_v2 = data.len() >= 4 && &data[0..4] == b"APv2";
+    let is_v2 = data.len() >= 4 && &data[0..2] == b"AP";
+    let has_emotion = data.len() >= 4 && &data[0..4] == b"APv3";
+
     if is_v2 {
         pos = 4;
     }
 
-    let header_size = if is_v2 { 19 } else { 18 };
+    // APv1: 18 bytes (no depth field), APv2: 19 bytes, APv3: 103 bytes (with emotion)
+    let header_size = if has_emotion {
+        103
+    } else if is_v2 {
+        19
+    } else {
+        18
+    };
 
     while pos + header_size <= data.len() {
         let len = u32::from_le_bytes(data[pos..pos + 4].try_into().unwrap()) as usize;
@@ -572,6 +611,19 @@ pub fn read_append_log(path: &Path) -> Vec<AppendEntry> {
                 .try_into()
                 .unwrap(),
         );
+
+        // Read 21D emotion vector (v3 only, zero for older formats)
+        let mut emotion = [0.0f32; 21];
+        if has_emotion {
+            let emo_start = pos + 19;
+            for i in 0..21 {
+                let off = emo_start + i * 4;
+                emotion[i] = f32::from_le_bytes(
+                    data[off..off + 4].try_into().unwrap_or([0u8; 4]),
+                );
+            }
+        }
+
         pos += header_size;
         if pos + len > data.len() {
             break;
@@ -586,6 +638,7 @@ pub fn read_append_log(path: &Path) -> Vec<AppendEntry> {
             x,
             y,
             z,
+            emotion,
         });
     }
     entries
@@ -605,6 +658,254 @@ pub fn print_append_result(appended: &[AppendEntry], idx: usize, dist: f32) {
             safe_truncate(&e.text, 70)
         );
     }
+}
+
+// ─── EMOTIONS.BIN (parallel fixed-record file) ───────
+
+/// Path to the emotions.bin file relative to output_dir.
+pub fn emotions_path(output_dir: &Path) -> PathBuf {
+    output_dir.join("emotions.bin")
+}
+
+/// Read the entire emotions.bin file into a Vec of [f32; 21].
+/// Returns an empty vec if the file doesn't exist.
+/// Each record is EMOTION_VECTOR_SIZE (84) bytes.
+pub fn read_emotions(path: &Path) -> Vec<[f32; 21]> {
+    if !path.exists() {
+        return vec![];
+    }
+    let data = match fs::read(path) {
+        Ok(d) => d,
+        Err(_) => return vec![],
+    };
+    let record_size = EMOTION_VECTOR_SIZE;
+    let count = data.len() / record_size;
+    let mut emotions = Vec::with_capacity(count);
+    for i in 0..count {
+        let off = i * record_size;
+        let mut emo = [0.0f32; 21];
+        for j in 0..21 {
+            let boff = off + j * 4;
+            if boff + 4 <= data.len() {
+                emo[j] = f32::from_le_bytes(
+                    data[boff..boff + 4].try_into().unwrap_or([0u8; 4]),
+                );
+            }
+        }
+        emotions.push(emo);
+    }
+    emotions
+}
+
+/// Write a single emotion vector to emotions.bin at `block_idx` position.
+/// Creates or grows the file as needed. Zero-fills any gap.
+pub fn write_emotion(path: &Path, block_idx: usize, emotion: &[f32; 21]) -> Result<(), String> {
+    let record_size = EMOTION_VECTOR_SIZE;
+    let needed_size = (block_idx + 1) * record_size;
+
+    let mut data = if path.exists() {
+        fs::read(path).unwrap_or_default()
+    } else {
+        Vec::new()
+    };
+
+    // Extend file with zeros if needed
+    if data.len() < needed_size {
+        data.resize(needed_size, 0u8);
+    }
+
+    let off = block_idx * record_size;
+    for j in 0..21 {
+        let boff = off + j * 4;
+        let bytes = emotion[j].to_le_bytes();
+        data[boff..boff + 4].copy_from_slice(&bytes);
+    }
+
+    fs::write(path, &data).map_err(|e| format!("write emotions.bin: {}", e))?;
+    Ok(())
+}
+
+// ─── EMOTION LOG (text_hash → emotion, survives rebuild) ──
+
+const EMOTION_LOG_MAGIC: &[u8; 4] = b"EML1";
+const EMOTION_LOG_RECORD_SIZE: usize = 32 + 84; // SHA-256 (32) + 21×f32 (84)
+
+/// Path to the emotion_log.bin file relative to output_dir.
+pub fn emotion_log_path(output_dir: &Path) -> PathBuf {
+    output_dir.join("emotion_log.bin")
+}
+
+/// Append a (text_hash, emotion) record to emotion_log.bin.
+/// Creates the file with magic header if it doesn't exist.
+pub fn append_emotion_log(
+    output_dir: &Path,
+    text: &str,
+    emotion: &[f32; 21],
+) -> Result<(), String> {
+    if emotion.iter().all(|&v| v == 0.0) {
+        return Ok(()); // skip neutral
+    }
+    let path = emotion_log_path(output_dir);
+    let mut file = fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&path)
+        .map_err(|e| format!("open emotion_log.bin: {}", e))?;
+
+    // Write magic header if file is empty
+    if file.metadata().map(|m| m.len() == 0).unwrap_or(true) {
+        file.write_all(EMOTION_LOG_MAGIC)
+            .map_err(|e| format!("write emotion_log.bin magic: {}", e))?;
+    }
+
+    // Compute SHA-256 of the text
+    let hash = Sha256::digest(text.as_bytes());
+
+    // Write hash (32 bytes) + emotion (84 bytes)
+    file.write_all(&hash)
+        .map_err(|e| format!("write emotion_log.bin hash: {}", e))?;
+    for val in emotion {
+        file.write_all(&val.to_le_bytes())
+            .map_err(|e| format!("write emotion_log.bin emotion: {}", e))?;
+    }
+    Ok(())
+}
+
+/// Read all (hash, emotion) records from emotion_log.bin.
+pub fn read_emotion_log(output_dir: &Path) -> Vec<([u8; 32], [f32; 21])> {
+    let path = emotion_log_path(output_dir);
+    if !path.exists() {
+        return vec![];
+    }
+    let data = match fs::read(&path) {
+        Ok(d) => d,
+        Err(_) => return vec![],
+    };
+    // Skip 4-byte magic
+    let start = if data.len() >= 4 && &data[0..4] == EMOTION_LOG_MAGIC {
+        4
+    } else {
+        0
+    };
+    let rec_size = EMOTION_LOG_RECORD_SIZE;
+    let count = (data.len() - start) / rec_size;
+    let mut records = Vec::with_capacity(count);
+    for i in 0..count {
+        let off = start + i * rec_size;
+        let mut hash = [0u8; 32];
+        hash.copy_from_slice(&data[off..off + 32]);
+        let mut emotion = [0.0f32; 21];
+        for j in 0..21 {
+            let boff = off + 32 + j * 4;
+            emotion[j] = f32::from_le_bytes(
+                data[boff..boff + 4].try_into().unwrap_or([0u8; 4]),
+            );
+        }
+        records.push((hash, emotion));
+    }
+    records
+}
+
+/// Build emotions.bin from the emotion log after a rebuild.
+/// Matches each block's text SHA-256 against the log, then writes
+/// the matching emotion to emotions.bin at the block's index.
+pub fn build_emotions_from_log(
+    output_dir: &Path,
+    reader: &MicroscopeReader,
+) -> Result<(), String> {
+    let records = read_emotion_log(output_dir);
+    if records.is_empty() {
+        return Ok(());
+    }
+
+    // Build a lookup map: 32-byte hash → emotion vector
+    // Use a simple linear scan (emotion log is small, typically <1000 entries)
+    let emotions_path = output_dir.join("emotions.bin");
+    let block_count = reader.block_count;
+    let mut matched = 0usize;
+
+    for i in 0..block_count {
+        let text = reader.text(i);
+        if text.is_empty() {
+            continue;
+        }
+        let hash = Sha256::digest(text.as_bytes());
+        // Linear search in records
+        if let Some((_, emotion)) = records.iter().find(|(h, _)| h.as_slice() == hash.as_slice()) {
+            write_emotion(&emotions_path, i, emotion)?;
+            matched += 1;
+        }
+    }
+
+    if matched > 0 {
+        println!(
+            "  {} emotions.bin: {}/{} blocks matched",
+            "EMOTION".magenta(),
+            matched,
+            block_count
+        );
+    }
+    Ok(())
+}
+
+/// Format an emotion vector as a human-readable string showing the top-K dimensions.
+pub fn format_emotion(emotion: &[f32; 21], top_k: usize) -> String {
+    let mut pairs: Vec<(usize, &f32)> = emotion.iter().enumerate().collect();
+    pairs.sort_by(|a, b| b.1.partial_cmp(a.1).unwrap());
+    let top: Vec<String> = pairs
+        .iter()
+        .take(top_k.min(21))
+        .filter(|(_, &v)| v > 0.05)
+        .map(|(i, v)| {
+            let name = EMOTION_DIMS.get(*i).unwrap_or(&"?");
+            format!("{}:{:.2}", name, v)
+        })
+        .collect();
+    if top.is_empty() {
+        "neutral".to_string()
+    } else {
+        top.join(" ")
+    }
+}
+
+/// Cosine similarity between two 21D emotion vectors.
+/// Returns 0.0 if either vector is zero (neutral).
+/// Range: 0.0 (unrelated) to 1.0 (identical direction).
+pub fn emotional_similarity(a: &[f32; 21], b: &[f32; 21]) -> f32 {
+    let dot: f32 = a.iter().zip(b.iter()).map(|(x, y)| x * y).sum();
+    let mag_a: f32 = a.iter().map(|x| x * x).sum::<f32>().sqrt();
+    let mag_b: f32 = b.iter().map(|x| x * x).sum::<f32>().sqrt();
+    if mag_a < 1e-8 || mag_b < 1e-8 {
+        return 0.0;
+    }
+    (dot / (mag_a * mag_b)).max(0.0) // clamp negative to 0
+}
+
+/// Load emotions.bin and return a slice-lookup function:
+/// `|block_idx| -> Option<[f32; 21]>` that returns the emotion vector for a given block index.
+/// Returns None if the file doesn't exist or is empty.
+pub fn load_emotion_lookup(output_dir: &Path) -> Option<Box<dyn Fn(usize) -> Option<[f32; 21]>>> {
+    let path = output_dir.join("emotions.bin");
+    let data = fs::read(&path).ok()?;
+    let record_size = EMOTION_VECTOR_SIZE;
+    let count = data.len() / record_size;
+    if count == 0 {
+        return None;
+    }
+    Some(Box::new(move |block_idx: usize| {
+        if block_idx >= count {
+            return None;
+        }
+        let off = block_idx * record_size;
+        let mut emo = [0.0f32; 21];
+        for j in 0..21 {
+            let boff = off + j * 4;
+            if boff + 4 <= data.len() {
+                emo[j] = f32::from_le_bytes(data[boff..boff + 4].try_into().unwrap_or([0u8; 4]));
+            }
+        }
+        Some(emo)
+    }))
 }
 
 // ─── RADIAL SEARCH TYPES ─────────────────────────────
@@ -741,6 +1042,7 @@ pub fn store_memory(
     text: &str,
     layer: &str,
     importance: u8,
+    emotion: Option<[f32; 21]>,
 ) -> Result<(), String> {
     let _lock = FileLock::acquire(config)?;
     let t0 = std::time::Instant::now();
@@ -767,12 +1069,13 @@ pub fn store_memory(
     };
 
     if needs_magic {
-        write(&mut file, b"APv2")?;
+        write(&mut file, b"APv3")?;
     }
 
     let text_bytes = text.as_bytes();
     let len = text_bytes.len().min(BLOCK_DATA_SIZE);
 
+    // Write header: len(4) + lid(1) + imp(1) + depth(1) + xyz(12) + emotion(84) = 103
     write(&mut file, &(len as u32).to_le_bytes())?;
     write(&mut file, &[lid])?;
     write(&mut file, &[importance])?;
@@ -780,15 +1083,38 @@ pub fn store_memory(
     write(&mut file, &x.to_le_bytes())?;
     write(&mut file, &y.to_le_bytes())?;
     write(&mut file, &z.to_le_bytes())?;
+
+    // Write 21D emotion vector (zero if not provided)
+    let emo = emotion.unwrap_or([0.0f32; 21]);
+    for val in &emo {
+        write(&mut file, &val.to_le_bytes())?;
+    }
+
+    // Update emotional state ring (server-side only)
+    #[cfg(not(target_arch = "wasm32"))]
+    if emo.iter().any(|&v| v != 0.0) {
+        let output_dir = Path::new(&config.paths.output_dir);
+        let mut esr = crate::emotional_state::EmotionalStateRing::load_or_init(output_dir);
+        esr.update(&emo, importance);
+        let _ = esr.save(output_dir);
+    }
+
     write(&mut file, &text_bytes[..len])?;
+
+    // Append to emotion_log.bin for rebuild survival
+    #[cfg(not(target_arch = "wasm32"))]
+    if emo.iter().any(|&v| v != 0.0) {
+        let output_dir = Path::new(&config.paths.output_dir);
+        let _ = append_emotion_log(output_dir, text, &emo);
+    }
 
     if let Err(e) = persist_to_layer_file(config, text, layer) {
         eprintln!("  {} persist to layer file: {}", "WARN".yellow(), e);
     }
 
     let elapsed = t0.elapsed();
-    println!(
-        "  {} D{} [{}/{}] ({:.3},{:.3},{:.3}) {}",
+    print!(
+        "  {} D{} [{}/{}] ({:.3},{:.3},{:.3})",
         "STORED".green().bold(),
         depth,
         layer,
@@ -796,8 +1122,13 @@ pub fn store_memory(
         x,
         y,
         z,
-        safe_truncate(text, 60)
     );
+    // Show top-3 emotion dimensions if non-zero
+    if emo.iter().any(|&v| v != 0.0) {
+        let emo_str = format_emotion(&emo, 3);
+        print!(" [{}]", emo_str.cyan());
+    }
+    println!(" {}", safe_truncate(text, 60));
     println!("  {} ns", elapsed.as_nanos());
     Ok(())
 }

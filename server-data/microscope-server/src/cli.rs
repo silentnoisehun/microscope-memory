@@ -27,12 +27,18 @@ pub enum Cmd {
         layer: String,
         #[arg(short = 'i', long, default_value = "5")]
         importance: u8,
+        /// 21D emotion vector as comma-separated floats: joy,sadness,anger,fear,surprise,disgust,trust,anticipation,love,gratitude,curiosity,awe,confusion,anxiety,serenity,hope,pride,shame,guilt,empathy,excitement
+        #[arg(short = 'e', long, value_delimiter = ',', num_args = 0..=21)]
+        emotion: Option<Vec<f32>>,
     },
     /// Recall — natural language query, auto-zoom
     Recall {
         query: String,
         #[arg(default_value = "10")]
         k: usize,
+        /// 21D emotion vector for emotional recall (comma-separated): joy,sadness,anger,fear,surprise,disgust,trust,anticipation,love,gratitude,curiosity,awe,confusion,anxiety,serenity,hope,pride,shame,guilt,empathy,excitement
+        #[arg(short = 'e', long, value_delimiter = ',', num_args = 0..=21)]
+        emotion: Option<Vec<f32>>,
     },
     /// Manual look: x y z zoom [k]
     Look {

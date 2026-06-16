@@ -751,6 +751,12 @@ pub fn build(config: &Config, force: bool) -> Result<(), String> {
         );
     }
 
+    // ═══ Emotion log → emotions.bin ═══
+    {
+        let reader = MicroscopeReader::open(config)?;
+        crate::reader::build_emotions_from_log(output_dir, &reader)?;
+    }
+
     println!("\n{}", "ZERO JSON. Pure binary. Done.".green().bold());
     Ok(())
 }

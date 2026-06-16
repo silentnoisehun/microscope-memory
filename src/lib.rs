@@ -14,6 +14,8 @@ pub mod embedding_index;
 pub mod embeddings;
 pub mod emotional;
 #[cfg(not(target_arch = "wasm32"))]
+pub mod emotional_state;
+#[cfg(not(target_arch = "wasm32"))]
 pub mod federation;
 pub mod fingerprint;
 pub mod hebbian;
@@ -58,9 +60,12 @@ pub mod cli;
 
 // Re-export commonly used items
 pub use reader::{
-    read_append_log, store_memory, AppendEntry, BlockHeader, DataStore, MicroscopeReader,
-    RadialResult, ResultSet,
+    append_emotion_log, build_emotions_from_log, emotional_similarity, format_emotion,
+    load_emotion_lookup, read_append_log, store_memory, AppendEntry, BlockHeader, DataStore,
+    MicroscopeReader, RadialResult, ResultSet, EMOTION_DIMS, EMOTION_VECTOR_SIZE,
 };
+#[cfg(not(target_arch = "wasm32"))]
+pub use emotional_state::{emotional_prime_weight, EmotionalStateRing};
 
 // Re-export CLI
 pub use cli::{Cli, Cmd};

@@ -14,6 +14,7 @@ use crate::hebbian::HebbianState;
 use crate::predictive_cache::PredictiveCache;
 use crate::resonance::ResonanceState;
 use crate::thought_graph::ThoughtGraphState;
+use crate::{emotional_similarity, load_emotion_lookup};
 
 // ─── Constants ──────────────────────────────────────
 
@@ -213,13 +214,45 @@ pub fn dream_consolidate(output_dir: &Path, block_count: usize) -> Result<DreamC
         }
     }
 
-    // Step 2: Strengthen frequently co-appearing pairs
+    // Step 2: Strengthen frequently co-appearing pairs with emotional coherence boost
+    let emotion_lookup = load_emotion_lookup(output_dir);
     let mut strengthened = 0u32;
+    let mut coherence_boosted = 0u32;
+    let mut _emotion_pruned = 0u32;
+
     for ((a, b), appearances) in &pair_appearances {
         if *appearances >= STRENGTHEN_MIN_APPEARANCES {
+            // Check emotional coherence for extra boost
+            let coherence_mult = emotion_lookup.as_ref().and_then(|lookup| {
+                lookup(*a as usize).and_then(|ea| {
+                    lookup(*b as usize).map(|eb| {
+                        let sim = emotional_similarity(&ea, &eb);
+                        if sim > 0.4 {
+                            coherence_boosted += 1;
+                            1.0 + sim * 0.5 // up to 1.5x extra boost
+                        } else {
+                            1.0
+                        }
+                    })
+                })
+            }).unwrap_or(1.0);
+
             if let Some(pair) = hebb.coactivations.get_mut(&(*a, *b)) {
-                pair.count = (pair.count as f32 * STRENGTHEN_MULTIPLIER) as u32;
+                pair.count = (pair.count as f32 * STRENGTHEN_MULTIPLIER * coherence_mult) as u32;
                 strengthened += 1;
+            }
+        } else if let Some(ref lookup) = emotion_lookup {
+            // Emotionally incoherent pairs get extra pruning pressure
+            if let (Some(ea), Some(eb)) = (lookup(*a as usize), lookup(*b as usize)) {
+                let sim = emotional_similarity(&ea, &eb);
+                if sim < 0.1 {
+                    if let Some(pair) = hebb.coactivations.get_mut(&(*a, *b)) {
+                        if pair.count > 1 {
+                            pair.count /= 2;
+                            _emotion_pruned += 1;
+                        }
+                    }
+                }
             }
         }
     }

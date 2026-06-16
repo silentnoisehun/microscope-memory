@@ -127,10 +127,16 @@ fn stats(reader: &MicroscopeReader) {
     println!("{}", "=".repeat(50));
 }
 
-fn recall(config: &Config, query: &str, k: usize) {
+fn recall(config: &Config, query: &str, k: usize, emotion: Option<[f32; 21]>) {
     let t0 = Instant::now();
     let reader = open_reader(config);
-    println!("{} '{}':", "RECALL".cyan().bold(), query);
+    let emo_label = emotion.as_ref().map(|e| format_emotion(e, 3)).unwrap_or_default();
+    if !emo_label.is_empty() {
+        println!("{} '{}' [emotion: {}]", "RECALL".cyan().bold(), query, emo_label.cyan());
+    } else {
+        println!("{} '{}':", "RECALL".cyan().bold(), query);
+    }
+    let emotional_recall_weight = config.search.emotional_bias_weight * 0.15;
 
     let (qx, qy, qz) = content_coords_blended(query, "long_term", config.search.semantic_weight);
 
@@ -190,6 +196,11 @@ fn recall(config: &Config, query: &str, k: usize) {
     let q_lower = query.to_lowercase();
     let keywords: Vec<&str> = q_lower.split_whitespace().filter(|w| w.len() > 2).collect();
 
+    // Load emotions.bin for main-index emotional recall
+    let emotion_lookup = emotion.as_ref().and_then(|_| {
+        load_emotion_lookup(Path::new(&config.paths.output_dir))
+    });
+
     for zoom in zoom_lo..=zoom_hi {
         // Red Audit: Timing jitter using polymorphic build-time value
         #[cfg(feature = "stealth")]
@@ -209,7 +220,12 @@ fn recall(config: &Config, query: &str, k: usize) {
                 let dz = h.z - qz;
                 let spatial_dist = dx * dx + dy * dy + dz * dz;
                 let boost = keyword_hits as f32 * 0.1;
-                let combined = (spatial_dist - boost).max(0.0);
+                // Emotional similarity boost (if query emotion + emotions.bin data)
+                let emo_boost = emotion.as_ref().and_then(|qe| {
+                    emotion_lookup.as_ref().and_then(|lookup| lookup(i))
+                        .map(|be| emotional_similarity(qe, &be) * emotional_recall_weight)
+                }).unwrap_or(0.0);
+                let combined = (spatial_dist - boost - emo_boost).max(0.0);
                 all_results.push((combined, i, true));
             }
         }
@@ -228,8 +244,12 @@ fn recall(config: &Config, query: &str, k: usize) {
             .filter(|&&kw| text_lower.contains(kw))
             .count();
         let boost = keyword_hits as f32 * 0.1;
-        if dist < 0.1 || keyword_hits > 0 {
-            all_results.push(((dist - boost).max(0.0), ai + 1_000_000, false));
+        // Emotional boost from inline append entry emotion
+        let emo_boost = emotion.as_ref()
+            .map(|qe| emotional_similarity(qe, &entry.emotion) * emotional_recall_weight)
+            .unwrap_or(0.0);
+        if dist < 0.1 || keyword_hits > 0 || emo_boost > 0.0 {
+            all_results.push(((dist - boost - emo_boost).max(0.0), ai + 1_000_000, false));
         }
     }
 
@@ -977,11 +997,26 @@ async fn main() {
             text,
             layer,
             importance,
+            emotion,
         } => {
-            store_memory(&config, &text, &layer, importance).expect("store failed");
+            let emo: Option<[f32; 21]> = emotion.map(|v| {
+                let mut arr = [0.0f32; 21];
+                for (i, val) in v.iter().enumerate().take(21) {
+                    arr[i] = *val;
+                }
+                arr
+            });
+            store_memory(&config, &text, &layer, importance, emo).expect("store failed");
         }
-        Cmd::Recall { query, k } => {
-            recall(&config, &query, k);
+        Cmd::Recall { query, k, emotion } => {
+            let emo: Option<[f32; 21]> = emotion.map(|v| {
+                let mut arr = [0.0f32; 21];
+                for (i, val) in v.iter().enumerate().take(21) {
+                    arr[i] = *val;
+                }
+                arr
+            });
+            recall(&config, &query, k, emo);
         }
         Cmd::Radial {
             x,
@@ -1282,6 +1317,8 @@ async fn main() {
             microscope_memory::build::build(&config, true).expect("rebuild failed");
             let append_path = Path::new(&config.paths.output_dir).join("append.bin");
             let _ = fs::remove_file(append_path);
+            let emotions_path = Path::new(&config.paths.output_dir).join("emotions.bin");
+            let _ = fs::remove_file(emotions_path);
             println!("  Append log cleared.");
         }
         Cmd::GpuBench => {
@@ -2198,7 +2235,7 @@ async fn main() {
             } else {
                 &text_repr
             };
-            let _ = store_memory(&config, text_short, "rust_state", importance);
+            let _ = store_memory(&config, text_short, "rust_state", importance, None);
 
             // Register in multimodal index
             let mut index = microscope_memory::multimodal::ModalityIndex::load_or_init(output_dir);

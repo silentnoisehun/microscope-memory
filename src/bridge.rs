@@ -353,12 +353,12 @@ async fn remember_memory(
     let mut written_scopes = Vec::new();
 
     if matches!(scope, MemoryScope::Personal | MemoryScope::Both) {
-        crate::store_memory(&user_config, &payload.text, &layer, importance)
+        crate::store_memory(&user_config, &payload.text, &layer, importance, None)
             .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
         written_scopes.push("personal");
     }
     if matches!(scope, MemoryScope::Shared | MemoryScope::Both) {
-        crate::store_memory(&shared_cfg, &payload.text, &layer, importance)
+        crate::store_memory(&shared_cfg, &payload.text, &layer, importance, None)
             .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
         written_scopes.push("shared");
     }
@@ -418,7 +418,7 @@ async fn mobile_remember(
     let importance = payload.importance.unwrap_or(7);
     let scoped_text = scope_user_text(&payload.user_id, &payload.text);
 
-    crate::store_memory(&state.config, &scoped_text, &layer, importance)
+    crate::store_memory(&state.config, &scoped_text, &layer, importance, None)
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     Ok(Json(serde_json::json!({
@@ -708,14 +708,14 @@ async fn mobile_chat(
 
     if payload.remember_user.unwrap_or(true) {
         let text = scope_user_text(&payload.user_id, &payload.message);
-        crate::store_memory(&state.config, &text, &layer, importance)
+        crate::store_memory(&state.config, &text, &layer, importance, None)
             .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
         stored.push("user_message".to_string());
     }
 
     if payload.remember_assistant.unwrap_or(true) {
         let text = scope_user_text(&payload.user_id, &reply);
-        crate::store_memory(&state.config, &text, &layer, importance)
+        crate::store_memory(&state.config, &text, &layer, importance, None)
             .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
         stored.push("assistant_reply".to_string());
     }
@@ -1028,6 +1028,7 @@ async fn consolidate_sessions(
             &summary,
             "long_term",
             8,
+            None,
         )
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
         summaries.push(summary);

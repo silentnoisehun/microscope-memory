@@ -66,6 +66,7 @@ fn test_store_and_recall() {
         "Test memory about standing on own feet",
         "long_term",
         5,
+        None,
     )
     .expect("store");
 

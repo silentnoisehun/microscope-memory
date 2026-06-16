@@ -464,6 +464,21 @@ fn recall(config: &Config, query: &str, k: usize, emotion: Option<[f32; 21]>) {
                 }
             }
         }
+
+        // ═══ Reconsolidation: every recall rewrites memory ═══
+        let (rc_emo, rc_spatial) = microscope_memory::reconsolidation::reconsolidate(
+            output_dir,
+            &reader,
+            query,
+            emotion.as_ref(),
+            config,
+            4,
+            &activated,
+        );
+        let rc_text = microscope_memory::reconsolidation::format_reconsolidation(rc_emo, rc_spatial);
+        if !rc_text.is_empty() {
+            println!("{}", rc_text);
+        }
     }
 
     let elapsed = t0.elapsed();
@@ -2278,6 +2293,27 @@ async fn main() {
                     }
                 }
             }
+        }
+        Cmd::Reconsolidate => {
+            let output_dir = Path::new(&config.paths.output_dir);
+            let reader = match MicroscopeReader::open(&config) {
+                Ok(r) => r,
+                Err(_) => { eprintln!("  {} open reader failed — run build first", "ERR".red()); return; }
+            };
+            // Process Hebbian hot blocks (most recently activated)
+            let hebb = microscope_memory::hebbian::HebbianState::load_or_init(output_dir, reader.block_count);
+            let hot = hebb.hottest_blocks(50);
+            let activated: Vec<(u32, f32)> = hot.iter().map(|&(idx, _)| (idx as u32, 1.0)).collect();
+            let (emo, spatial) = microscope_memory::reconsolidation::reconsolidate(
+                output_dir, &reader, "", None, &config, 3, &activated,
+            );
+            println!(
+                "{} emotion={} spatial={} ({} hot blocks)",
+                "RECONSOLIDATED".magenta().bold(),
+                emo,
+                spatial,
+                activated.len(),
+            );
         }
         Cmd::Spaced { due, k } => {
             let output_dir = Path::new(&config.paths.output_dir);

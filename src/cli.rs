@@ -232,6 +232,8 @@ pub enum Cmd {
     EmotionalField,
     /// Exchange emotional snapshots across federated indices
     EmotionalExchange,
+    /// Run manual reconsolidation on recent recalls (emotion blend + spatial drift)
+    Reconsolidate,
     /// Spaced repetition — Ebbinghaus forgetting curve management (SM-2)
     Spaced {
         /// Show only due blocks

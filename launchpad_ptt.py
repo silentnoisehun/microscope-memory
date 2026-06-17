@@ -18,7 +18,7 @@ import sounddevice as sd
 import soundfile as sf
 from pathlib import Path
 
-from lpminimk3 import Mode, find_launchpids, find_launchpads
+from lpminimk3 import Mode, find_launchpads
 import mido
 
 # =============================================================================

@@ -15,6 +15,16 @@ Thumbs.db
 layers/*
 !layers/.gitkeep
 
+# Runtime-generated binary data (not tracked)
+data/emotion_log.bin
+data/emotional_state.bin
+data/namespaces/
+data/narrative.bin
+data/spaced.bin
+data/working_memory.bin
+server-data/microscope-server/data/*.bin
+server-data/microscope-server/data/*.idx
+
 # Generated viz/snapshot files
 cognitive_map.json
 viz.json

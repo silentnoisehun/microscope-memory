@@ -15,5 +15,5 @@
   <circle cx="256" cy="150" r="4" fill="#a5b4fc" opacity="0.4"/>
   <circle cx="210" cy="170" r="3" fill="#a5b4fc" opacity="0.3"/>
   <circle cx="300" cy="170" r="3" fill="#a5b4fc" opacity="0.3"/>
-  <text x="256" y="440" text-anchor="middle" fill="#8888a0" font-family="sans-serif" font-size="32" font-weight="300">Liora</text>
+  
 </svg>

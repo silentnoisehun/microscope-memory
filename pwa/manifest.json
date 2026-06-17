@@ -1,6 +1,6 @@
 ﻿{
-  "name": "Microscope Memory — Liora",
-  "short_name": "Liora",
+  "name": "Microscope Memory",
+  "short_name": "Micro",
   "description": "Beszélgess Liorával — privát, lokális AI társ",
   "start_url": "chat.html",
   "display": "standalone",

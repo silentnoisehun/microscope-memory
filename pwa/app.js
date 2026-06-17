@@ -1,6 +1,6 @@
 ﻿const API = "http://localhost:6060";
 const OLLAMA = "http://localhost:11434";
-let persona = "Liora";
+let persona = "";
 let modelName = "llama3.2";
 let messages = [];
 let chatHistory = [];
@@ -44,7 +44,7 @@ async function storeMsg(role, text) {
     await fetch(`${API}/store`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: `[LioraChat] ${label}: ${text}`, layer, importance }),
+      body: JSON.stringify({ text: `[MicroChat] ${label}: ${text}`, layer, importance }),
     });
   } catch {}
 }
@@ -198,7 +198,7 @@ importBtn.addEventListener("click", importChatGPT);
   if (hasOllama) {
     addMessage("system", `${persona} elerheto (${modelName})`);
     // send memory greeting
-    await recallContext("Liora emlekek");
+    await recallContext("emlekek");
   } else {
     addMessage("system", `${persona} nem elerheto — nincs Ollama kapcsolat`);
   }

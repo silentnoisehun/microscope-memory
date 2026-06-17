@@ -146,8 +146,8 @@ pub enum Cmd {
     ImportChatGpt {
         /// Path to ChatGPT export JSON file (conversations.json) — or Google Drive shared link
         json: Option<String>,
-        /// AI persona name (default: Liora)
-        #[arg(long, default_value = "Liora")]
+        /// AI persona name
+        #[arg(long, default_value = "AI")]
         persona: String,
         /// Show only summary without importing
         #[arg(long)]

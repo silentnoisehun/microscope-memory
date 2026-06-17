@@ -243,7 +243,7 @@ impl ChatGPTImporter {
             let store_text = format!(
                 "[{} | {}] {}: {}",
                 msg.conversation_title, msg.sender_name,
-                if msg.role == "assistant" { "Liora" } else { "Szilvi" },
+                if msg.role == "assistant" { &self.persona_name } else { &self.user_name },
                 msg.text
             );
 

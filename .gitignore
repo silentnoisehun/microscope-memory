@@ -6,7 +6,7 @@ __pycache__/
 # Large generated binary data
 data/*.bin
 data/*.idx
-!data/append.bin
+data/namespaces/
 server-data/
 backup/
 

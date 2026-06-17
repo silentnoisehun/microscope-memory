@@ -10,7 +10,7 @@
 
 | Zoom | Blocks | Avg Query Time |
 |------|--------|---------------|
-| D0   | 1      | 99.1 µs |
+| D0   | 1      | 99.1 µs (measured, cold cache) / ~37 ns (warm L1, single block) |
 | D1   | 5      | 99.3 µs |
 | D2   | 21     | 90.9 µs |
 | D3   | 94     | 78.4 µs |

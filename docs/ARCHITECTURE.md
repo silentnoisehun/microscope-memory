@@ -36,7 +36,7 @@ a memóriablokkok **aktiválással erősödnek**, a gyakran együtt hozzáfért 
 
 | Metrika | Érték |
 |---------|-------|
-| D0 visszakeresés | **37 ns** |
+| D0 visszakeresés | **37 ns** *(warm L1 cache, 1 blokk)* / ~99 µs *(measured, cold cache)* |
 | Teljes recall (D0–D8) | **< 500 µs** |
 | Bináris formátum | **nulla JSON** |
 | Rust sorok (core) | **< 8 000** |

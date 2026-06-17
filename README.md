@@ -1,5 +1,7 @@
 # Microscope Memory
 
+![Microscope Memory Header](microscope-memory-header.png)
+
 **A zoom-based hierarchical memory engine for AI agents. Pure binary, mmap-backed, sub-microsecond reads.**
 
 Most AI memory systems store conversation history as flat text or JSON blobs and re-embed everything on every query. Microscope Memory takes a different approach: every piece of text is decomposed once into a 9-level hierarchy — from a single-sentence identity summary down to raw bytes — and stored as fixed-size binary blocks that are memory-mapped directly off disk. There is no parsing step at query time. There is no JSON. The query's "zoom level" determines how much detail comes back, and retrieval at any level is a direct memory read.

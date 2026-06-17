@@ -1,4 +1,17 @@
-//! antidebug.rs — Soft Anti-VM and Sandbox detection.
+//! Soft Anti-VM and Sandbox detection ("Ghost Mode").
+//!
+//! ## Why this exists in an open-source MIT project
+//!
+//! These functions are **gated behind the `stealth` feature flag** (`--features stealth`)
+//! and are **not compiled by default**. They exist for advanced deployment scenarios
+//! where the Microscope Memory binary runs on infrastructure that is also used by
+//! malware analysts or automated sandboxes (e.g., CTF environments, public research
+//! clusters). When the binary detects a high-confidence sandbox signature, it enables
+//! "Ghost Mode" which adds timing jitter and IAT camouflage to avoid trivial
+//! fingerprinting.
+//!
+//! Without `--features stealth`, all of this code compiles to a no-op.
+//! The `stealth` feature is purely optional and does not affect the core memory engine.
 //! (Red Audit - Phase 3)
 
 use std::arch::x86_64::__cpuid;

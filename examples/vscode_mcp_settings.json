@@ -1,0 +1,14 @@
+{
+  "mcp": {
+    "servers": {
+      "microscope": {
+        "type": "stdio",
+        "command": "python",
+        "args": ["${workspaceFolder}/examples/mcp_integration.py", "--stdio"],
+        "env": {
+          "MICROSCOPE_BIN": "${workspaceFolder}/target/release/microscope-mem.exe"
+        }
+      }
+    }
+  }
+}

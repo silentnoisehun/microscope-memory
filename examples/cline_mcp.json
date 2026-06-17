@@ -1,0 +1,39 @@
+{
+  "$schema": "https://raw.githubusercontent.com/cline/mcp/main/schema.json",
+  "mcpServers": {
+    "microscope-memory": {
+      "description": "Persistent hierarchical memory for AI coding agents",
+      "command": "python",
+      "args": ["-m", "microscope_mcp"],
+      "env": {
+        "MICROSCOPE_BIN": "${workspaceFolder}/target/release/microscope-mem.exe"
+      },
+      "tools": [
+        {
+          "name": "recall",
+          "description": "Recall information from persistent memory",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "query": {"type": "string", "description": "What to search for"},
+              "k": {"type": "integer", "default": 10, "description": "Number of results"}
+            },
+            "required": ["query"]
+          }
+        },
+        {
+          "name": "store",
+          "description": "Store information into persistent memory",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "text": {"type": "string", "description": "What to remember"},
+              "importance": {"type": "integer", "default": 5}
+            },
+            "required": ["text"]
+          }
+        }
+      ]
+    }
+  }
+}

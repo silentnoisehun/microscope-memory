@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "microscope-memory": {
+      "command": "python",
+      "args": ["-m", "microscope_mcp", "--stdio"],
+      "env": {
+        "MICROSCOPE_BIN": "${workspaceFolder}/target/release/microscope-mem.exe"
+      },
+      "disabled": false,
+      "autoApprove": ["recall", "store"]
+    }
+  }
+}

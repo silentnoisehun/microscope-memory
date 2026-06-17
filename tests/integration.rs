@@ -428,3 +428,149 @@ fn test_embedding_index_search() {
         assert!(!results.is_empty());
     }
 }
+
+
+// ─── Morphogenesis Integration ───────────────────────────
+
+#[test]
+fn test_morphogenesis_mycelium_growth_integration() {
+    use microscope_memory::morphogenesis::*;
+    let seed = Seed::new("int_test", 0.0, 0.0, 0.0, "service");
+    let field = MorphogenField::new();
+    let config = GrowthConfig::mycelium_default();
+    let organism = mycelium_growth(&seed, &field, &config);
+    assert!(!organism.nodes.is_empty(), "Mycelium should grow nodes");
+}
+
+#[test]
+fn test_morphogenesis_engine_evolve() {
+    use microscope_memory::morphogenesis::*;
+    let engine = MorphogenesisEngine::new();
+    let seeds = vec![Seed::new("evo", 0.0, 0.0, 0.0, "test")];
+    let results = engine.evolve_population(&seeds, 3, &FitnessObjective::Balanced, 8);
+    assert!(!results.is_empty(), "Should produce organisms");
+}
+
+// ─── Pattern Recognition Integration ─────────────────────
+
+#[test]
+fn test_pattern_recognition_sequences() {
+    use microscope_memory::pattern_recognition::*;
+    let recognizer = PatternRecognizer::new();
+    // Register a known pattern, then verify it's there
+    recognizer.register_pattern("test_seq", PatternType::Sequence, 
+        PatternTemplate::Sequence(vec!["a".to_string(), "b".to_string()]), 
+        "test", vec![]);
+    let found = recognizer.find_pattern("test_seq");
+    assert!(found.is_some(), "Should find registered pattern");
+    assert_eq!(found.unwrap().pattern_type, PatternType::Sequence);
+}
+
+#[test]
+fn test_pattern_recognition_motifs() {
+    use microscope_memory::pattern_recognition::*;
+    let recognizer = PatternRecognizer::new();
+    recognizer.register_pattern("motif_test", PatternType::Structural,
+        PatternTemplate::Structural(vec![("a".to_string(), "b".to_string(), 1.0)]),
+        "test_graph", vec![]);
+    let patterns = recognizer.list_patterns(Some(PatternType::Structural), Some("test_graph"));
+    assert!(patterns.len() >= 1, "Should have structural patterns");
+}
+
+// ─── Executive Integration ───────────────────────────────
+
+#[test]
+fn test_executive_schedule_and_cycle() {
+    use microscope_memory::executive::Executive;
+    let exec = Executive::new();
+    exec.register_module("a", "A", 200, 0.3, vec![]);
+    exec.register_module("b", "B", 100, 0.5, vec![]);
+    let plan = exec.schedule();
+    assert_eq!(plan.module_order[0], "a", "Higher priority first");
+    let executed = exec.cycle();
+    assert!(!executed.is_empty(), "Should execute modules");
+}
+
+#[test]
+fn test_executive_homeostasis() {
+    use microscope_memory::executive::Executive;
+    let exec = Executive::new();
+    exec.register_module("m", "M", 50, 0.5, vec![]);
+    exec.update_resources(|r| r.energy_level = 0.05);
+    let actions = exec.homeostasis();
+    assert!(actions.contains(&"energy_conservation".to_string()));
+}
+
+// ─── Planning Integration ────────────────────────────────
+
+#[test]
+fn test_planning_goal_decomposition() {
+    use microscope_memory::planning::Planner;
+    let planner = Planner::new();
+    let gid = planner.add_goal("learn", "Learn Rust", 100, None);
+    let subs = planner.decompose_goal(gid);
+    assert!(!subs.is_empty(), "Should decompose into subgoals");
+}
+
+#[test]
+fn test_planning_create_and_execute() {
+    use microscope_memory::planning::Planner;
+    let planner = Planner::new();
+    let gid = planner.add_goal("learn", "Learning", 100, None);
+    planner.decompose_goal(gid);
+    let plan = planner.create_plan(gid);
+    assert_eq!(plan.status, microscope_memory::planning::PlanStatus::Draft);
+    let step = planner.execute_step(plan.id);
+    assert!(step.is_some(), "Should execute first step");
+}
+
+// ─── Autopoiesis Integration ─────────────────────────────
+
+#[test]
+fn test_autopoiesis_template_and_mutation() {
+    use microscope_memory::autopoiesis::*;
+    let engine = AutopoiesisEngine::new();
+    engine.register_template("tmpl", "mod", "fn {{name}}() {}", vec!["name".to_string()], "Test");
+    let mut vars = std::collections::HashMap::new();
+    vars.insert("name".to_string(), "hello".to_string());
+    let code = engine.generate_from_template("tmpl", &vars);
+    assert_eq!(code, Some("fn hello() {}".to_string()));
+}
+
+#[test]
+fn test_autopoiesis_mutation_lifecycle() {
+    use microscope_memory::autopoiesis::*;
+    let engine = AutopoiesisEngine::new();
+    let id = engine.propose_mutation("fix", MutationType::Modification, "test_mod", "code", "reason", "system");
+    assert!(engine.apply_mutation(id));
+    assert!(!engine.list_mutations(None).is_empty());
+}
+
+// ─── Code Memory Integration ─────────────────────────────
+
+#[test]
+fn test_code_memory_store_and_recall() {
+    use microscope_memory::code_memory::*;
+    let cm = CodeMemory::new();
+    cm.store(CodeEntryType::Function, "parse", "fn parse() {}", "lib.rs", "rust", "proj", vec![], vec![]);
+    let q = CodeQuery { query: "parse".to_string(), language: None, entry_type: None, project: None, file: None, k: 10 };
+    assert!(!cm.recall(&q).is_empty());
+}
+
+#[test]
+fn test_code_memory_error_solution() {
+    use microscope_memory::code_memory::*;
+    let cm = CodeMemory::new();
+    let id = cm.store_error_solution("cannot borrow", "add mut", "test.rs", "rust", "proj");
+    let entry = cm.get(id);
+    assert_eq!(entry.unwrap().solution, Some("add mut".to_string()));
+}
+
+#[test]
+fn test_code_memory_stats() {
+    use microscope_memory::code_memory::*;
+    let cm = CodeMemory::new();
+    cm.store(CodeEntryType::Function, "a", "fn a() {}", "a.rs", "rust", "p1", vec![], vec![]);
+    cm.store(CodeEntryType::Type, "B", "struct B {}", "b.rs", "rust", "p2", vec![], vec![]);
+    assert_eq!(cm.stats().0, 2);
+}

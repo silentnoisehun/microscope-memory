@@ -165,20 +165,47 @@ microscope-memory/
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-### Rétegek (kognitív, nem mélységi)
+### Rétegek (kognitív, nem mélységi) — 12 réteg, layers/ mappa
 
 ```
-LAYER_NAMES = [
-    "identity",     # 0 — Ki vagyok
-    "long_term",    # 1 — Kernel tudás
-    "short_term",   # 2 — Aktuális kontextus
-    "associative",  # 3 — Szabad asszociációk
-    "emotional",    # 4 — Érzelmi állapotok
-    "relational",   # 5 — Kapcsolatok, relációk
-    "reflections",  # 6 — Meta-kogníció
-    "crypto_chain", # 7 — Integritás, verziózás
-    "echo_cache",   # 8 — Gyors válaszok, visszhangok
+LAYER_NAMES (lib.rs:144) = [
+    "identity",     #  0 — D0, rendszer identitás
+    "long_term",    #  1 — Kernel tudás, legfontosabb emlékek
+    "short_term",   #  2 — Aktuális kontextus,Working memory
+    "associative",  #  3 — Szabad asszociációk, mycelium-linkek
+    "emotional",    #  4 — Érzelmi állapotok, valence, energia
+    "relational",   #  5 — Kapcsolatok, relációk, графи
+    "reflections",  #  6 — Meta-kogníció, önreflexió
+    "crypto_chain", #  7 — Integritás, verziózás, hash-lánc
+    "echo_cache",   #  8 — Gyors válaszok, visszhangok, cached outputs
+    "rust_state",   #  9 — Rust runtime state, crate-ek, build info
+    "code",         # 10 — KÓDOLÓ AGENSEKNEK: functions, symbols,
+                    #     error-solution pairs, project dependencies
+    "session",      # 11 — Session-lánc, kontextus folytonosság
 ]
+```
+
+### Layers/ mappa — 14 fájl
+
+```
+layers/
+├── identity.txt      (22 B)  — D0, rendszer identitás
+├── long_term.txt     (4.5 KB) — Kernel tudás, legfontosabb emlékek
+├── short_term.txt    (224 B)  — Working memory, aktuális kontextus
+├── associative.txt   (3.4 KB) — Szabad asszociációk
+├── emotional.txt     (23 B)  — Érzelmi állapotok
+├── relational.txt    (27 B)  — Kapcsolatok, relációk
+├── reflections.txt   (35 B)  — Meta-kogníció
+├── crypto_chain.txt  (38 B)  — Hash-lánc, integritás
+├── echo_cache.txt   (1.8 KB) — Gyors válaszok, cached outputs
+├── rust_state.txt    (23 B)  — Rust runtime állapot
+├── code.txt         (106 B)  — KÓDOLÓ AGENS MEMÓRIA:
+│                               functions · symbols
+│                               error-solution pairs
+│                               project dependencies
+├── session.txt       (5.5 KB) — Session-lánc, kontextus folytonosság
+├── meta_cognitive.txt(2.6 KB) — Meta-kognitív stratégiák
+└── demo.txt          (503 B)  — Demo, példák
 ```
 
 ---

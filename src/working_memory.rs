@@ -23,6 +23,8 @@ const RECENCY_BOOST: f32 = 0.10;   // utolsó elem boost
 pub enum MemoryType {
     Episodic = 0,
     Semantic = 1,
+    Implicit = 2,
+    Explicit = 3,
 }
 
 /// Egy item a working memory-ban.
@@ -78,7 +80,13 @@ impl WorkingMemory {
                     let imp = f32::from_le_bytes(data[off+16..off+20].try_into().unwrap());
                     let dr = f32::from_le_bytes(data[off+20..off+24].try_into().unwrap());
                     let sp = data[off+24];
-                    let mt = if data[off+25] == 0 { MemoryType::Episodic } else { MemoryType::Semantic };
+                    let mt = match data[off+25] {
+                        0 => MemoryType::Episodic,
+                        1 => MemoryType::Semantic,
+                        2 => MemoryType::Implicit,
+                        3 => MemoryType::Explicit,
+                        _ => MemoryType::Episodic,
+                    };
                     let ac = u32::from_le_bytes(data[off+26..off+30].try_into().unwrap());
                     let ll = data[off+30] as usize;
                     off += 31;

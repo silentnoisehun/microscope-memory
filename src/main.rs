@@ -1554,6 +1554,8 @@ async fn main() {
                             let mem_type = match item.memory_type {
                                 microscope_memory::working_memory::MemoryType::Episodic => "episodic",
                                 microscope_memory::working_memory::MemoryType::Semantic => "semantic",
+                                microscope_memory::working_memory::MemoryType::Implicit => "implicit",
+                                microscope_memory::working_memory::MemoryType::Explicit => "explicit",
                             };
                             println!(
                                 "  [{:2}] imp={:.1} acc={} {:8} {}",
@@ -2589,6 +2591,742 @@ async fn main() {
         Cmd::Bridge { host, port } => {
             if let Err(e) = microscope_memory::bridge::run(config, host, port).await {
                 eprintln!("  {} Bridge error: {}", "ERROR:".red(), e);
+            }
+        }
+        // New cognitive enhancement commands
+        Cmd::Sandbox { simulate, actions, best, clear } => {
+            use microscope_memory::mental_sandbox::MentalSandbox;
+            
+            let mut sandbox = MentalSandbox::new();
+            // Add some default long-term goals
+            sandbox.add_goal("efficient");
+            sandbox.add_goal("reliable");
+            sandbox.add_goal("user_friendly");
+            
+            if clear {
+                sandbox.clear();
+                println!("  {} All scenarios cleared", "OK".green());
+            }
+            
+            if let Some(desc) = simulate {
+                let actions_list = actions.as_ref()
+                    .map(|a| a.split(',').map(|s| s.trim()).collect())
+                    .unwrap_or_else(|| vec!["default_action"]);
+                
+                let scenario = sandbox.simulate_scenario(&desc, actions_list);
+                println!("  {} Scenario simulated:", "SIMULATION".cyan().bold());
+                println!("    ID: {}", scenario.id);
+                println!("    Description: {}", scenario.description);
+                println!("    Actions: {}", scenario.actions.join(", "));
+                println!("    Outcome Probability: {:.1}%", scenario.outcome_probability * 100.0);
+                println!("    Risk Score: {:.2}", scenario.risk_score);
+                println!("    Reward Potential: {:.2}", scenario.reward_potential);
+            }
+            
+            if best {
+                if let Some(best_scenario) = sandbox.get_best_scenario() {
+                    println!("  {} Best scenario:", "BEST".green().bold());
+                    println!("    ID: {}", best_scenario.id);
+                    println!("    Description: {}", best_scenario.description);
+                    println!("    Risk/Reward Ratio: {:.2}", 
+                        best_scenario.reward_potential / (best_scenario.risk_score + 0.01));
+                } else {
+                    println!("  {} No scenarios available", "INFO:".cyan());
+                }
+            }
+        }
+        Cmd::Impulse { filter, source, urgency, suppress, stats, clear } => {
+            use microscope_memory::impulse_control::ImpulseControl;
+            
+            let mut control = ImpulseControl::new();
+            // Add some default suppression patterns
+            control.add_suppression_pattern("spam");
+            control.add_suppression_pattern("advertisement");
+            
+            if clear {
+                control.clear_patterns();
+                println!("  {} All suppression patterns cleared", "OK".green());
+            }
+            
+            if let Some(pattern) = suppress {
+                control.add_suppression_pattern(&pattern);
+                println!("  {} Added suppression pattern: '{}'", "OK".green(), pattern);
+            }
+            
+            if let Some(content) = filter {
+                let stimulus = control.filter_stimulus(&content, &source, urgency);
+                println!("  {} Stimulus filtered:", "IMPULSE CONTROL".cyan().bold());
+                println!("    Content: {}", stimulus.content);
+                println!("    Source: {}", stimulus.source);
+                println!("    Relevance: {:.2}", stimulus.relevance);
+                println!("    Urgency: {:.2}", stimulus.urgency);
+                println!("    Status: {}", 
+                    if stimulus.suppressed { "SUPPRESSED".red() } 
+                    else { "ALLOWED".green() });
+            }
+            
+            if stats {
+                let (attention_budget, pattern_count) = control.get_stats();
+                println!("  {} System stats:", "STATS".green().bold());
+                println!("    Attention Budget: {:.1}%", attention_budget * 100.0);
+                println!("    Suppression Patterns: {}", pattern_count);
+            }
+        }
+        Cmd::Meta { record, evaluate, trends, report, add_strategy } => {
+            use microscope_memory::meta_supervision::{MetaSupervisor, generate_report};
+            
+            let mut supervisor = MetaSupervisor::new();
+            
+            if let Some(record_str) = record {
+                let parts: Vec<&str> = record_str.split(',').collect();
+                if parts.len() >= 5 {
+                    let metrics = supervisor.record_metrics(
+                        parts[0].parse().unwrap_or(50.0),
+                        parts[1].parse().unwrap_or(100.0),
+                        parts[2].parse().unwrap_or(0.8),
+                        parts[3].parse().unwrap_or(0.5),
+                        parts[4].parse().unwrap_or(0.1),
+                    );
+                    println!("  {} Metrics recorded:", "RECORDED".cyan().bold());
+                    println!("    Overall Score: {:.2}", metrics.overall_score);
+                    println!("    Response Time: {:.1}ms", metrics.response_time_ms);
+                    println!("    Memory Usage: {:.1}MB", metrics.memory_usage_mb);
+                }
+            }
+            
+            if evaluate {
+                if let Some(correction) = supervisor.evaluate_and_correct() {
+                    println!("  {} Correction needed: {}", "EVALUATION".yellow().bold(), correction);
+                } else {
+                    println!("  {} System performance OK", "OK".green());
+                }
+            }
+            
+            if trends {
+                let (current_score, trend, volatility) = supervisor.get_summary();
+                println!("  {} Performance trends:", "TRENDS".cyan().bold());
+                println!("    Current Score: {:.2}", current_score);
+                println!("    Trend: {:.3}", trend);
+                println!("    Volatility: {:.3}", volatility);
+                println!("    Direction: {}", 
+                    if trend > 0.05 { "IMPROVING".green() }
+                    else if trend < -0.05 { "DECLINING".red() }
+                    else { "STABLE".yellow() });
+            }
+            
+            if report {
+                let report_text = generate_report(&supervisor);
+                println!("{}", report_text);
+            }
+            
+            if let Some(strategy) = add_strategy {
+                supervisor.add_correction_strategy(&strategy);
+                println!("  {} Added correction strategy: '{}'", "OK".green(), strategy);
+            }
+        }
+        Cmd::Implicit { show, practice, skills, patterns, decay } => {
+            use microscope_memory::implicit_memory::ImplicitMemory;
+            
+            let output_dir = Path::new(&config.paths.output_dir);
+            let mut implicit = ImplicitMemory::load_or_init(output_dir);
+            
+            if show {
+                println!("{}", "IMPLICIT MEMORY".cyan().bold());
+                println!("  Patterns:      {}", implicit.patterns.len());
+                println!("  Skills:        {}", implicit.skills.len());
+                println!("  Habits:        {}", implicit.habits.len());
+                println!("  Conditioning:  {}", implicit.conditioning.len());
+            }
+            
+            if let Some(practice_str) = practice {
+                let parts: Vec<&str> = practice_str.split(':').collect();
+                if parts.len() == 2 {
+                    let skill_name = parts[0];
+                    let success = parts[1] == "success" || parts[1] == "true";
+                    implicit.practice_skill(skill_name, !success);
+                    implicit.save(output_dir).ok();
+                    println!("  {} Practiced '{}': {}", "OK".green(), skill_name, 
+                        if success { "SUCCESS".green() } else { "FAILURE".red() });
+                }
+            }
+            
+            if skills {
+                let ranking = implicit.skill_ranking();
+                println!("  {} Skill ranking:", "SKILLS".yellow().bold());
+                for (name, skill) in ranking.iter().take(10) {
+                    println!("    {} mastery={:.1}% errors={:.1}% practiced={} times",
+                        name, skill.mastery_level * 100.0, skill.error_rate * 100.0, skill.practice_count);
+                }
+            }
+            
+            if patterns {
+                let top = implicit.strongest_patterns(10);
+                println!("  {} Strongest patterns:", "PATTERNS".yellow().bold());
+                for (hash, pattern) in top {
+                    println!("    hash={:x} strength={:.2} freq={} perf={:.1}%",
+                        hash, pattern.strength, pattern.frequency, pattern.performance_metric * 100.0);
+                }
+            }
+            
+            if decay {
+                implicit.decay();
+                implicit.save(output_dir).ok();
+                println!("  {} Memory decayed: patterns={} skills={} habits={}",
+                    "DECAY".cyan(), implicit.patterns.len(), implicit.skills.len(), implicit.habits.len());
+            }
+        }
+        Cmd::Explicit { show, store_fact, concept, facts, concepts } => {
+            use microscope_memory::explicit_memory::ExplicitMemory;
+            
+            let output_dir = Path::new(&config.paths.output_dir);
+            let mut explicit = ExplicitMemory::load_or_init(output_dir);
+            
+            if show {
+                println!("{}", "EXPLICIT MEMORY".cyan().bold());
+                println!("  Facts:         {}", explicit.facts.len());
+                println!("  Concepts:      {}", explicit.concepts.len());
+                println!("  Events:        {}", explicit.events.len());
+                println!("  Relationships: {}", explicit.relationships.len());
+            }
+            
+            if let Some(fact_str) = store_fact {
+                let parts: Vec<&str> = fact_str.split(':').collect();
+                if parts.len() >= 2 {
+                    let statement = parts[0];
+                    let source = parts[1];
+                    let confidence = if parts.len() > 2 {
+                        parts[2].parse().unwrap_or(0.7)
+                    } else {
+                        0.7
+                    };
+                    explicit.store_fact(statement, source, confidence);
+                    explicit.save(output_dir).ok();
+                    println!("  {} Stored fact: '{}' (conf={:.1}%)", "OK".green(), 
+                        safe_truncate(statement, 50), confidence * 100.0);
+                }
+            }
+            
+            if let Some(concept_str) = concept {
+                let parts: Vec<&str> = concept_str.split(':').collect();
+                if parts.len() >= 2 {
+                    let name = parts[0];
+                    let definition = parts[1];
+                    let abstraction = if parts.len() > 2 {
+                        parts[2].parse().unwrap_or(0.5)
+                    } else {
+                        0.5
+                    };
+                    explicit.define_concept(name, definition, abstraction);
+                    explicit.save(output_dir).ok();
+                    println!("  {} Defined concept: '{}' (abstraction={:.1}%)", 
+                        "OK".green(), name, abstraction * 100.0);
+                }
+            }
+            
+            if facts {
+                let high_conf = explicit.high_confidence_facts(0.7);
+                println!("  {} High-confidence facts:", "FACTS".yellow().bold());
+                for fact in high_conf.iter().take(10) {
+                    println!("    [conf={:.0}%] {} (src={})", 
+                        fact.confidence * 100.0, safe_truncate(&fact.statement, 50), fact.source);
+                }
+            }
+            
+            if concepts {
+                println!("  {} Concepts:", "CONCEPTS".yellow().bold());
+                for (name, concept) in explicit.concepts.iter().take(10) {
+                    println!("    {} (abstract={:.1}%) - {}", 
+                        name, concept.abstraction_level * 100.0, safe_truncate(&concept.definition, 40));
+                }
+            }
+        }
+        Cmd::Hippo { show, consolidate, related, replay, decay } => {
+            use microscope_memory::hippocampus::Hippocampus;
+            
+            let output_dir = Path::new(&config.paths.output_dir);
+            let mut hippo = Hippocampus::load_or_init(output_dir);
+            
+            if show {
+                let (bindings, episodes, consolidated, avg_strength) = hippo.stats();
+                println!("{}", "HIPPOCAMPUS".cyan().bold());
+                println!("  Context bindings: {}", bindings);
+                println!("  Episodes:         {}", episodes);
+                println!("  Consolidated:     {}", consolidated);
+                println!("  Avg binding str:  {:.2}", avg_strength);
+            }
+            
+            if consolidate {
+                let candidates = hippo.get_consolidation_candidates(5);
+                println!("  {} Consolidation candidates:", "CONSOLIDATE".yellow().bold());
+                for (i, episode) in candidates.iter().enumerate() {
+                    println!("    [{}] episode_id={:x} blocks={} strength={:.2}",
+                        i+1, episode.episode_id, episode.blocks.len(), episode.context_binding.binding_strength);
+                    hippo.mark_consolidating(episode.episode_id);
+                }
+                hippo.save(output_dir).ok();
+            }
+            
+            if let Some(ep_id) = related {
+                let related_eps = hippo.get_related_episodes(ep_id);
+                println!("  {} Related episodes to {:x}:", "RELATED".yellow().bold(), ep_id);
+                for ep in related_eps.iter().take(5) {
+                    println!("    episode_id={:x} blocks={} context={}", 
+                        ep.episode_id, ep.blocks.len(), safe_truncate(&ep.context_binding.context, 30));
+                }
+            }
+            
+            if let Some(ep_id) = replay {
+                if let Some(blocks) = hippo.replay_episode(ep_id) {
+                    hippo.mark_consolidated(ep_id);
+                    hippo.save(output_dir).ok();
+                    println!("  {} Replayed episode {:x}: {} blocks", 
+                        "REPLAY".green(), ep_id, blocks.len());
+                } else {
+                    println!("  {} Episode not found", "ERROR".red());
+                }
+            }
+            
+            if decay {
+                hippo.decay();
+                hippo.save(output_dir).ok();
+                let (bindings, episodes, _, _) = hippo.stats();
+                println!("  {} Memory decayed: bindings={} episodes={}", 
+                    "DECAY".cyan(), bindings, episodes);
+            }
+        }
+        Cmd::Neuro { show, synapse, pathway, prune, reorganize, pathways } => {
+            use microscope_memory::neuroplasticity::Neuroplasticity;
+            
+            let output_dir = Path::new(&config.paths.output_dir);
+            let mut neuro = Neuroplasticity::load_or_init(output_dir);
+            
+            if show {
+                let (synapses, paths, avg_weight, plasticity, strong) = neuro.stats();
+                println!("{}", "NEUROPLASTICITY".cyan().bold());
+                println!("  Synaptic connections: {}", synapses);
+                println!("  Neural pathways:      {}", paths);
+                println!("  Avg synaptic weight:  {:.2}", avg_weight);
+                println!("  Network plasticity:   {:.1}%", plasticity * 100.0);
+                println!("  Strong pathways:      {}", strong);
+            }
+            
+            if let Some(syn_str) = synapse {
+                let parts: Vec<&str> = syn_str.split(':').collect();
+                if parts.len() >= 2 {
+                    let from: u32 = parts[0].parse().unwrap_or(0);
+                    let to: u32 = parts[1].parse().unwrap_or(0);
+                    let success = parts.len() > 2 && (parts[2] == "success" || parts[2] == "true");
+                    neuro.strengthen_synapse(from, to, success);
+                    neuro.save(output_dir).ok();
+                    println!("  {} Synapse {} → {}: {}", "OK".green(), from, to,
+                        if success { "STRENGTHENED".green() } else { "WEAKENED".red() });
+                }
+            }
+            
+            if let Some(path_str) = pathway {
+                let parts: Vec<&str> = path_str.split(':').collect();
+                if parts.len() >= 2 {
+                    let domain = parts[0];
+                    let nodes: Vec<u32> = parts[1].split(',')
+                        .filter_map(|s| s.parse().ok())
+                        .collect();
+                    if !nodes.is_empty() {
+                        let id = neuro.strengthen_pathway(nodes.clone(), domain);
+                        neuro.save(output_dir).ok();
+                        println!("  {} Pathway {} reinforced: {} nodes (domain: {})", 
+                            "OK".green(), id, nodes.len(), domain);
+                    }
+                }
+            }
+            
+            if prune {
+                let pruned = neuro.prune_weak_synapses(0.2);
+                neuro.save(output_dir).ok();
+                println!("  {} Pruned {} weak synapses", "PRUNE".yellow(), pruned);
+            }
+            
+            if reorganize {
+                let reorganized = neuro.reorganize_pathways();
+                neuro.save(output_dir).ok();
+                println!("  {} Reorganized network: {} changes", "REORGANIZE".yellow(), reorganized);
+            }
+            
+            if pathways {
+                let strongest = neuro.strongest_pathways(10);
+                println!("  {} Strongest pathways:", "PATHWAYS".yellow().bold());
+                for (i, pathway) in strongest.iter().enumerate() {
+                    println!("    [{}] strength={:.2} efficiency={:.2} uses={} domain={}",
+                        i+1, pathway.strength, pathway.efficiency, pathway.usage_count, pathway.specialized_for);
+                }
+            }
+        }
+        Cmd::Struct { show, neurogenesis, grow, prune, specialized } => {
+            use microscope_memory::structural_plasticity::StructuralPlasticity;
+            
+            let output_dir = Path::new(&config.paths.output_dir);
+            let mut struct_pls = StructuralPlasticity::load_or_init(output_dir);
+            
+            if show {
+                let (neurons, branches, avg_length, genesis_events) = struct_pls.stats();
+                println!("{}", "STRUCTURAL PLASTICITY".cyan().bold());
+                println!("  Neuron-like structures: {}", neurons);
+                println!("  Dendritic branches:     {}", branches);
+                println!("  Avg dendrite length:    {:.2}", avg_length);
+                println!("  Neurogenesis events:    {}", genesis_events);
+            }
+            
+            if let Some(genesis_str) = neurogenesis {
+                let parts: Vec<&str> = genesis_str.split(':').collect();
+                if parts.len() >= 2 {
+                    let blocks: Vec<u32> = parts[0].split(',')
+                        .filter_map(|s| s.parse().ok())
+                        .collect();
+                    let specialization = parts[1];
+                    if !blocks.is_empty() {
+                        let neuron_id = struct_pls.neurogenesis(blocks.clone(), specialization);
+                        struct_pls.save(output_dir).ok();
+                        println!("  {} New neuron created: id={:x} blocks={} spec={}", 
+                            "NEUROGENESIS".green().bold(), neuron_id, blocks.len(), specialization);
+                    }
+                }
+            }
+            
+            if let Some(grow_str) = grow {
+                let parts: Vec<&str> = grow_str.split(':').collect();
+                if parts.len() == 2 {
+                    if let (Ok(neuron_id), Ok(block)) = (parts[0].parse::<u64>(), parts[1].parse::<u32>()) {
+                        if struct_pls.grow_dendrite(neuron_id, block) {
+                            struct_pls.save(output_dir).ok();
+                            println!("  {} Dendrite grown: neuron={:x} new_branch={}", 
+                                "GROWTH".green(), neuron_id, block);
+                        } else {
+                            println!("  {} Dendrite growth failed or neuron pruned", "WARN".yellow());
+                        }
+                    }
+                }
+            }
+            
+            if let Some(neuron_id) = prune {
+                let pruned = struct_pls.prune_inactive_branches(neuron_id);
+                struct_pls.save(output_dir).ok();
+                println!("  {} Pruned {} inactive branches from neuron {:x}", 
+                    "PRUNE".yellow(), pruned, neuron_id);
+            }
+            
+            if specialized {
+                let specialized_list = struct_pls.specialized_neurons();
+                println!("  {} Specialized neurons:", "SPECIALIZED".yellow().bold());
+                for (id, spec, branches) in specialized_list.iter().take(10) {
+                    println!("    neuron_id={:x} specialization={} branches={}", id, spec, branches);
+                }
+            }
+        }
+        Cmd::Func { show, area, map, connect, damage, plastic } => {
+            use microscope_memory::functional_plasticity::FunctionalPlasticity;
+            
+            let output_dir = Path::new(&config.paths.output_dir);
+            let mut func_pls = FunctionalPlasticity::load_or_init(output_dir);
+            
+            if show {
+                let (areas, blocks, maps, avg_plasticity) = func_pls.stats();
+                println!("{}", "FUNCTIONAL PLASTICITY".cyan().bold());
+                println!("  Functional areas:    {}", areas);
+                println!("  Total blocks:         {}", blocks);
+                println!("  Sensorimotor maps:    {}", maps);
+                println!("  Avg plasticity:       {:.2}", avg_plasticity);
+            }
+            
+            if let Some(area_str) = area {
+                let parts: Vec<&str> = area_str.split(':').collect();
+                if parts.len() >= 3 {
+                    let name = parts[0];
+                    let domain = parts[1];
+                    let blocks: Vec<u32> = parts[2].split(',')
+                        .filter_map(|s| s.parse().ok())
+                        .collect();
+                    if !blocks.is_empty() {
+                        let area_id = func_pls.create_area(name, domain, blocks.clone());
+                        func_pls.save(output_dir).ok();
+                        println!("  {} Created area: id={:x} name={} domain={} blocks={}", 
+                            "AREA".green().bold(), area_id, name, domain, blocks.len());
+                    }
+                }
+            }
+            
+            if let Some(map_str) = map {
+                let parts: Vec<&str> = map_str.split(':').collect();
+                if parts.len() == 2 {
+                    if let Ok(input) = parts[0].parse::<u32>() {
+                        let outputs: Vec<u32> = parts[1].split(',')
+                            .filter_map(|s| s.parse().ok())
+                            .collect();
+                        if !outputs.is_empty() {
+                            let strength = func_pls.map_sensorimotor(input, outputs.clone());
+                            func_pls.save(output_dir).ok();
+                            println!("  {} Mapped: {} → {} blocks (strength={:.2})", 
+                                "MAP".green(), input, outputs.len(), strength);
+                        }
+                    }
+                }
+            }
+            
+            if let Some(conn_str) = connect {
+                let parts: Vec<&str> = conn_str.split(':').collect();
+                if parts.len() == 2 {
+                    if let (Ok(a1), Ok(a2)) = (parts[0].parse::<u64>(), parts[1].parse::<u64>()) {
+                        if func_pls.connect_areas(a1, a2) {
+                            func_pls.save(output_dir).ok();
+                            println!("  {} Connected areas: {:x} ↔ {:x}", "CONNECT".green(), a1, a2);
+                        } else {
+                            println!("  {} Connection failed: areas not found", "ERROR".red());
+                        }
+                    }
+                }
+            }
+            
+            if let Some(dmg_str) = damage {
+                let parts: Vec<&str> = dmg_str.split(':').collect();
+                if parts.len() == 2 {
+                    if let (Ok(area_id), Ok(severity)) = (parts[0].parse::<u64>(), parts[1].parse::<f32>()) {
+                        func_pls.damage_area(area_id, severity);
+                        func_pls.save(output_dir).ok();
+                        println!("  {} Damage simulation: area={:x} severity={:.1}%", 
+                            "DAMAGE".red().bold(), area_id, severity * 100.0);
+                    }
+                }
+            }
+            
+            if plastic {
+                let most_plastic = func_pls.most_plastic(10);
+                println!("  {} Most plastic areas:", "PLASTIC".yellow().bold());
+                for (name, plasticity) in most_plastic {
+                    println!("    {} plasticity_index={:.2}", name, plasticity);
+                }
+            }
+        }
+        Cmd::Syn { show, ltp, ltd, stdp, hetero, timedep, strong, ltp_dominant } => {
+            use microscope_memory::synaptic_plasticity::SynapticPlasticity;
+            
+            let output_dir = Path::new(&config.paths.output_dir);
+            let mut syn_pls = SynapticPlasticity::load_or_init(output_dir);
+            
+            if show {
+                let (total, ltp_events, ltd_events, avg_weight, ltp_ratio) = syn_pls.stats();
+                println!("{}", "SYNAPTIC PLASTICITY".cyan().bold());
+                println!("  Total synapses:       {}", total);
+                println!("  LTP events:           {}", ltp_events);
+                println!("  LTD events:           {}", ltd_events);
+                println!("  Avg synaptic weight:  {:.2}", avg_weight);
+                println!("  LTP/total ratio:      {:.1}%", ltp_ratio * 100.0);
+            }
+            
+            if let Some(ltp_str) = ltp {
+                let parts: Vec<&str> = ltp_str.split(':').collect();
+                if parts.len() == 2 {
+                    if let (Ok(pre), Ok(post)) = (parts[0].parse::<u32>(), parts[1].parse::<u32>()) {
+                        let weight = syn_pls.ltp(pre, post);
+                        syn_pls.save(output_dir).ok();
+                        println!("  {} LTP: {} → {} (weight={:.2})", "POTENTIATION".green().bold(), pre, post, weight);
+                    }
+                }
+            }
+            
+            if let Some(ltd_str) = ltd {
+                let parts: Vec<&str> = ltd_str.split(':').collect();
+                if parts.len() == 2 {
+                    if let (Ok(pre), Ok(post)) = (parts[0].parse::<u32>(), parts[1].parse::<u32>()) {
+                        let weight = syn_pls.ltd(pre, post);
+                        syn_pls.save(output_dir).ok();
+                        println!("  {} LTD: {} → {} (weight={:.2})", "DEPRESSION".red().bold(), pre, post, weight);
+                    }
+                }
+            }
+            
+            if let Some(stdp_str) = stdp {
+                let parts: Vec<&str> = stdp_str.split(':').collect();
+                if parts.len() == 4 {
+                    if let (Ok(pre), Ok(post), Ok(pre_t), Ok(post_t)) = 
+                        (parts[0].parse::<u32>(), parts[1].parse::<u32>(), 
+                         parts[2].parse::<i64>(), parts[3].parse::<i64>()) {
+                        let weight = syn_pls.stdp(pre, post, pre_t, post_t);
+                        syn_pls.save(output_dir).ok();
+                        let timing_diff = post_t - pre_t;
+                        let plasticity_type = if timing_diff > 0 { "STDP-LTP" } else { "STDP-LTD" };
+                        println!("  {} {} Δt={:+}ms (weight={:.2})", 
+                            "STDP".yellow().bold(), plasticity_type, timing_diff, weight);
+                    }
+                }
+            }
+            
+            if let Some(hetero_str) = hetero {
+                let parts: Vec<&str> = hetero_str.split(':').collect();
+                if parts.len() == 3 {
+                    if let (Ok(pre), Ok(post), Ok(radius)) = 
+                        (parts[0].parse::<u32>(), parts[1].parse::<u32>(), parts[2].parse::<u32>()) {
+                        syn_pls.heterosynaptic_depression((pre, post), radius);
+                        syn_pls.save(output_dir).ok();
+                        println!("  {} Heterosynaptic depression: ({},{}) radius={}", 
+                            "HETERO".yellow().bold(), pre, post, radius);
+                    }
+                }
+            }
+            
+            if let Some(td_str) = timedep {
+                let parts: Vec<&str> = td_str.split(':').collect();
+                if parts.len() == 4 {
+                    if let (Ok(pre), Ok(post), Ok(practice), Ok(age)) = 
+                        (parts[0].parse::<u32>(), parts[1].parse::<u32>(), 
+                         parts[2].parse::<u32>(), parts[3].parse::<u64>()) {
+                        let plasticity = syn_pls.time_dependent_plasticity((pre, post), practice, age);
+                        syn_pls.save(output_dir).ok();
+                        
+                        let phase = if practice < 10 { "EARLY" }
+                                   else if practice < 50 { "CONSOLIDATION" }
+                                   else { "MATURE" };
+                        println!("  {} Time-dependent plasticity: {} → {} phase={} practices={} learning_rate={:.3}", 
+                            "TIMEDEP".yellow().bold(), pre, post, phase, practice, plasticity);
+                    }
+                }
+            }
+            
+            if strong {
+                let strongest = syn_pls.strongest_synapses(10);
+                println!("  {} Strongest synapses:", "STRONG".yellow().bold());
+                for (i, ((pre, post), synapse)) in strongest.iter().enumerate() {
+                    println!("    [{}] {} → {} weight={:.2} (LTP:{} LTD:{})", 
+                        i+1, pre, post, synapse.weight, synapse.ltp_count, synapse.ltd_count);
+                }
+            }
+            
+            if ltp_dominant {
+                let ltp_syns = syn_pls.ltp_dominant();
+                println!("  {} LTP-dominant synapses: {}", "LTP".green().bold(), ltp_syns.len());
+                for (i, synapse) in ltp_syns.iter().take(10).enumerate() {
+                    println!("    [{}] {} → {} weight={:.2} (LTP:{} LTD:{})", 
+                        i+1, synapse.pre_block, synapse.post_block, synapse.weight, 
+                        synapse.ltp_count, synapse.ltd_count);
+                }
+            }
+        }
+        Cmd::Stim { show, activity, check, recommend, diversity } => {
+            use microscope_memory::mental_stimulation::MentalStimulation;
+            
+            let output_dir = Path::new(&config.paths.output_dir);
+            let mut stim = MentalStimulation::load_or_init(output_dir);
+            
+            if show {
+                let (engagement, time_since, activity_count, avg_intensity) = stim.stats();
+                println!("{}", "MENTAL STIMULATION".cyan().bold());
+                println!("  Engagement level:     {:.1}%", engagement * 100.0);
+                println!("  Time since activity:  {}ms", time_since);
+                println!("  Total activities:     {}", activity_count);
+                println!("  Recent intensity:     {:.2}", avg_intensity);
+                println!("  Stimulation need:     {:.1}%", stim.stimulation_need * 100.0);
+            }
+            
+            if let Some(act_str) = activity {
+                let parts: Vec<&str> = act_str.split(':').collect();
+                if parts.len() == 2 {
+                    let activity_type = parts[0];
+                    if let Ok(intensity) = parts[1].parse::<f32>() {
+                        stim.record_activity(activity_type, intensity);
+                        stim.save(output_dir).ok();
+                        println!("  {} Activity recorded: {} intensity={:.2}", 
+                            "OK".green(), activity_type, intensity);
+                    }
+                }
+            }
+            
+            if check {
+                let needs_it = stim.needs_stimulation();
+                println!("  {} Stimulation needed: {}", 
+                    "CHECK".cyan(), if needs_it { "YES".red() } else { "NO".green() });
+                println!("    Engagement: {:.1}%", stim.engagement_level * 100.0);
+                println!("    Threshold: {:.1}%", stim.novelty_threshold * 100.0);
+            }
+            
+            if recommend {
+                let activities = stim.get_stimulation_activities();
+                println!("  {} Recommended activities:", "RECOMMEND".yellow().bold());
+                if activities.is_empty() {
+                    println!("    (no special stimulation needed)");
+                } else {
+                    for activity in activities {
+                        println!("    - {}", activity);
+                    }
+                }
+            }
+            
+            if diversity {
+                let div = stim.activity_diversity();
+                println!("  {} Activity diversity: {:.1}%", "DIVERSITY".yellow(), div * 100.0);
+            }
+        }
+        Cmd::Focus { enter, exit, process, show, insights } => {
+            use microscope_memory::hyperfocus::Hyperfocus;
+            
+            let output_dir = Path::new(&config.paths.output_dir);
+            let mut focus = Hyperfocus::load_or_init(output_dir);
+            
+            if let Some(enter_str) = enter {
+                let parts: Vec<&str> = enter_str.split(':').collect();
+                if parts.len() >= 2 {
+                    let target = parts[0];
+                    let focus_type = parts[1];
+                    let multiplier = focus.enter_hyperfocus(target, focus_type);
+                    focus.save(output_dir).ok();
+                    println!("  {} HYPERFOCUS ACTIVATED", ">>".red().bold());
+                    println!("    Target: {}", target);
+                    println!("    Type: {}", focus_type);
+                    println!("    Attention multiplier: {:.1}x", multiplier);
+                    println!("    Resources allocated: 95%");
+                }
+            }
+            
+            if exit {
+                if let Some(state) = focus.exit_hyperfocus() {
+                    focus.save(output_dir).ok();
+                    println!("  {} HYPERFOCUS EXITED", "<<".yellow().bold());
+                    println!("    Blocks processed: {}", state.blocks_processed);
+                    println!("    Depth achieved: {:.1}%", state.depth_level * 100.0);
+                    println!("    Final efficiency: {:.1}%", state.efficiency * 100.0);
+                } else {
+                    println!("  {} No active hyperfocus", "INFO".cyan());
+                }
+            }
+            
+            if let Some(proc_str) = process {
+                let parts: Vec<&str> = proc_str.split(':').collect();
+                if parts.len() == 2 {
+                    if let (Ok(blocks), Ok(complexity)) = 
+                        (parts[0].parse::<u32>(), parts[1].parse::<f32>()) {
+                        focus.process_data(blocks, complexity);
+                        focus.save(output_dir).ok();
+                        println!("  {} Data processed: {} blocks, complexity={:.2}", 
+                            "PROCESSING".green(), blocks, complexity);
+                    }
+                }
+            }
+            
+            if show {
+                let (active, intensity, depth, blocks) = focus.stats();
+                println!("{}", "HYPERFOCUS STATE".cyan().bold());
+                println!("  Active: {}", if active { "YES".green() } else { "NO".red() });
+                if active {
+                    println!("  Intensity: {:.1}%", intensity * 100.0);
+                    println!("  Depth level: {:.1}%", depth * 100.0);
+                    println!("  Blocks processed: {}", blocks);
+                    println!("  Attention multiplier: {:.1}x", focus.attention_multiplier);
+                    println!("  Productive: {}", if focus.is_productive() { "YES".green() } else { "NO".red() });
+                }
+            }
+            
+            if insights {
+                let insights_list = focus.get_insights();
+                println!("  {} Insights:", "INSIGHTS".yellow().bold());
+                for insight in insights_list {
+                    println!("    - {}", insight);
+                }
             }
         }
     }

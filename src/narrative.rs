@@ -219,7 +219,7 @@ fn build_narrative(
     if let Some(q) = query {
         let q = q.trim();
         if !q.is_empty() {
-            let short = if q.len() > 30 { &q[..30] } else { q };
+            let short = crate::safe_truncate(q, 30);
             parts.push(format!("exploring '{}'", short));
         }
     }

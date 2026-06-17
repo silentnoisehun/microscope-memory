@@ -53,6 +53,34 @@ pub mod reconsolidation;
 pub mod spaced_repetition;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod working_memory;
+
+// New cognitive enhancement modules
+#[cfg(not(target_arch = "wasm32"))]
+pub mod mental_sandbox;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod impulse_control;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod meta_supervision;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod implicit_memory;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod explicit_memory;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod hippocampus;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod neuroplasticity;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod structural_plasticity;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod functional_plasticity;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod synaptic_plasticity;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod mental_stimulation;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod hyperfocus;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod advanced_cognition;
 pub mod multimodal;
 pub mod predictive_cache;
 pub mod temporal_archetype;

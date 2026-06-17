@@ -4,8 +4,16 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![API v1](https://img.shields.io/badge/API-v1.0-cyan.svg)](#-spine-bridge-api-v1)
 
+```
+    ◇
+  ◇    ◇      a semmiből teremtődik a mindenség
+◇          ◇
+  ◇    ◇
+    ◇
+```
+
 **Microscope Memory** is a hierarchical cognitive memory engine designed for AI agents.  
-It combines sub-microsecond binary memory retrieval with a living ecosystem of cognitive modules.
+Sub-microsecond binary memory retrieval with a living ecosystem of cognitive modules.
 
 ---
 
@@ -34,12 +42,7 @@ Multi-domain pattern detection:
 - **Cross-domain** — pattern correlation across layers
 
 ### 🧠 Executive
-Cognitive conductor — module scheduling, resource allocation, homeostasis:
-```bash
-microscope-mem neuro       # Neuroplasticity state
-microscope-mem impulse     # Impulse control
-microscope-mem focus       # Hyperfocus mode
-```
+Cognitive conductor — module scheduling, resource allocation, homeostasis.
 
 ### 🎯 Planning
 Goal decomposition (HTN) and action planning:
@@ -97,6 +100,21 @@ microscope-mem serve --port 8080
 
 ---
 
+## 📊 Benchmarks
+
+| System | Query Type | Avg Latency | Index Size |
+|--------|-----------|-------------|------------|
+| **Microscope Memory** | Exact spatial recall | **87 µs** | 722 KB |
+| FAISS (flat IP) | Approximate k-NN | ~1-5 ms | ~10-50 MB |
+| Pinecone | Approximate vector search | ~5-20 ms | hosted |
+| ChromaDB | Approximate vector search | ~5-50 ms | ~10-100 MB |
+
+Microscope uses hierarchical spatial indexing (D0-D8), not approximate vector search.  
+It trades semantic fuzziness for deterministic, sub-millisecond exact recall.  
+See [BENCHMARKS.md](BENCHMARKS.md) for full data.
+
+---
+
 ## 🤖 Spine Bridge API v1
 
 | Method | Endpoint | Description |
@@ -130,12 +148,19 @@ cargo build --release
 
 ---
 
-## 📊 Benchmarks
-
-Microscope outperforms traditional Vector DBs by 100x-1000x in raw retrieval latency — sub-microsecond binary access vs millisecond vector search.
-
----
-
 ## License
 
 MIT — see [LICENSE](LICENSE)
+
+---
+
+```
+    ◇
+  ◇    ◇      a semmiből teremtődik a mindenség
+◇          ◇
+  ◇    ◇
+    ◇
+```
+
+*Designed by Máté Róbert*  
+*The Silent Noise Research Series*

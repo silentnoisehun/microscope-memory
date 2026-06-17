@@ -545,6 +545,78 @@ pub enum Cmd {
         #[arg(long)]
         insights: bool,
     },
+    /// Architecture Simulator — real-time architecture simulation and stress testing
+    Simulate {
+        /// Register a new architecture (name:description:components:connections)
+        #[arg(long)]
+        register: Option<String>,
+        /// List all registered architectures
+        #[arg(long)]
+        list: bool,
+        /// Run simulation on architecture (arch_id)
+        #[arg(long)]
+        run: Option<String>,
+        /// Run stress test (arch_id)
+        #[arg(long)]
+        stress: Option<String>,
+        /// Compare two architectures (arch_a,arch_b)
+        #[arg(long)]
+        compare: Option<String>,
+        /// Show simulation results
+        #[arg(long)]
+        results: Option<String>,
+        /// Show learned patterns
+        #[arg(long)]
+        patterns: bool,
+        /// Clear all results
+        #[arg(long)]
+        clear: bool,
+        /// Simulation duration in seconds
+        #[arg(long, default_value = "60")]
+        duration: f64,
+        /// Load pattern (linear, spike, sine, random)
+        #[arg(long, default_value = "sine")]
+        load_pattern: String,
+        /// Peak load (0.0-1.0)
+        #[arg(long, default_value = "0.8")]
+        peak_load: f64,
+        /// Enable fault injection
+        #[arg(long)]
+        faults: bool,
+    },
+    /// Heuristic Decision Maker — evaluate options and make decisions
+    Decide {
+        /// Evaluate options (comma-separated: desc,utility,risk)
+        #[arg(long)]
+        evaluate: Option<String>,
+        /// Make a decision from options
+        #[arg(long)]
+        decide: Option<String>,
+        /// Quick decision (time budget in ms)
+        #[arg(long)]
+        quick: Option<String>,
+        /// Recommend architecture for requirements
+        #[arg(long)]
+        recommend: Option<String>,
+        /// Set decision preference (risk_averse, aggressive, balanced)
+        #[arg(long)]
+        preference: Option<String>,
+        /// Evaluate decision outcome (decision_id:score:reflection)
+        #[arg(long)]
+        outcome: Option<String>,
+        /// Show decision statistics
+        #[arg(long)]
+        stats: bool,
+        /// Show decision log
+        #[arg(long)]
+        log: bool,
+        /// Recognize patterns in decisions
+        #[arg(long)]
+        patterns: bool,
+        /// Show learned heuristic patterns
+        #[arg(long)]
+        learned: bool,
+    },
 }
 
 #[derive(Subcommand)]

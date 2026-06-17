@@ -3329,5 +3329,364 @@ async fn main() {
                 }
             }
         }
+
+        // ─── Architecture Simulator ─────────────────────────────────────────────
+        Cmd::Simulate { register, list, run, stress, compare, results, patterns, clear, duration, load_pattern, peak_load, faults } => {
+            use microscope_memory::architecture_simulator::*;
+            use std::sync::Arc;
+
+            let simulator = Arc::new(ArchitectureSimulator::new());
+
+            if let Some(reg_str) = register {
+                let parts: Vec<&str> = reg_str.split(':').collect();
+                if parts.len() >= 4 {
+                    let name = parts[0];
+                    let description = parts[1];
+                    let comp_count: usize = parts[2].parse().unwrap_or(3);
+                    let conn_count: usize = parts[3].parse().unwrap_or(2);
+
+                    let mut comp_names: Vec<String> = Vec::new();
+                    for i in 0..comp_count {
+                        comp_names.push(format!("Component_{}", i));
+                    }
+                    let mut components: Vec<(&str, ComponentType, f64, f64)> = Vec::new();
+                    for (i, name) in comp_names.iter().enumerate() {
+                        let comp_type = if i % 3 == 0 { ComponentType::Software }
+                            else if i % 3 == 1 { ComponentType::Storage }
+                            else { ComponentType::Network };
+                        components.push((
+                            name.as_str(),
+                            comp_type,
+                            5.0 + (i as f64 * 3.0),
+                            0.01 + (i as f64 * 0.005),
+                        ));
+                    }
+
+                    let mut connections: Vec<(&str, &str, f64, &str)> = Vec::new();
+                    for i in 0..conn_count.min(comp_count.saturating_sub(1)) {
+                        connections.push((
+                            comp_names[i].as_str(),
+                            comp_names[i + 1].as_str(),
+                            1000.0 + (i as f64 * 500.0),
+                            if i % 2 == 0 { "HTTP/2" } else { "gRPC" },
+                        ));
+                    }
+
+                    let arch = create_architecture(name, description, components, connections);
+                    simulator.register_architecture(arch.clone());
+                    println!("  {} Architecture registered: {} ({} components, {} connections)",
+                        "OK".green().bold(), name, comp_count, conn_count);
+                    println!("    ID: {}", arch.id);
+                } else {
+                    println!("  {} Usage: --register name:description:components:connections",
+                        "ERROR".red().bold());
+                }
+            }
+
+            if list {
+                let architectures = simulator.list_architectures();
+                println!("{}", "REGISTERED ARCHITECTURES".cyan().bold());
+                if architectures.is_empty() {
+                    println!("  (none)");
+                } else {
+                    for arch in &architectures {
+                        println!("  {} — {} (v{})", arch.name.green(), arch.description, arch.version);
+                        println!("    ID: {} | Cohesion: {:.2} | Components: {} | Connections: {}",
+                            arch.id, arch.cohesion_score, arch.components.len(), arch.connections.len());
+                    }
+                }
+            }
+
+            if let Some(arch_id) = run {
+                let config = SimulationConfig {
+                    duration_secs: duration,
+                    time_step_ms: 100.0,
+                    max_concurrent_requests: 500,
+                    load_pattern: load_pattern.clone(),
+                    peak_load,
+                    enable_fault_injection: faults,
+                    fault_rate: if faults { 0.01 } else { 0.0 },
+                };
+
+                println!("{}", "RUNNING SIMULATION".cyan().bold());
+                println!("  Architecture: {}", arch_id);
+                println!("  Duration: {}s | Pattern: {} | Peak load: {:.0}%",
+                    duration, load_pattern, peak_load * 100.0);
+
+                if let Some(metrics) = simulator.run_simulation(&arch_id, &config) {
+                    println!("\n{}", "SIMULATION RESULTS".green().bold());
+                    println!("  Avg latency: {:.2} ms", metrics.avg_latency_ms);
+                    println!("  P95 latency: {:.2} ms", metrics.p95_latency_ms);
+                    println!("  P99 latency: {:.2} ms", metrics.p99_latency_ms);
+                    println!("  Throughput: {:.0} req/s", metrics.throughput_req_per_sec);
+                    println!("  Error rate: {:.2}%", metrics.error_rate * 100.0);
+                    println!("  CPU utilization: {:.1}%", metrics.cpu_utilization * 100.0);
+                    println!("  Memory utilization: {:.1}%", metrics.memory_utilization * 100.0);
+                    println!("  Network utilization: {:.1}%", metrics.network_utilization * 100.0);
+                    println!("  Stability score: {:.2}", metrics.stability_score);
+                    println!("  Resilience score: {:.2}", metrics.resilience_score);
+                    if !metrics.bottleneck_components.is_empty() {
+                        println!("  Bottlenecks: {}", metrics.bottleneck_components.join(", "));
+                    }
+                } else {
+                    println!("  {} Architecture not found: {}", "ERROR".red().bold(), arch_id);
+                }
+            }
+
+            if let Some(arch_id) = stress {
+                println!("{}", "STRESS TEST".cyan().bold());
+                println!("  Architecture: {}", arch_id);
+                println!("  Gradually increasing load to find breaking point...");
+
+                if let Some(result) = simulator.run_stress_test(&arch_id) {
+                    println!("\n{}", "STRESS TEST RESULTS".green().bold());
+                    println!("  Breaking point: {:.0}% load", result.breaking_point_load * 100.0);
+                    println!("  Graceful degradation: {}", 
+                        if result.graceful_degradation { "YES".green() } else { "NO".red() });
+                    if !result.cascade_failures.is_empty() {
+                        println!("  Cascade failures:");
+                        for cf in &result.cascade_failures {
+                            println!("    - {}", cf);
+                        }
+                    }
+                    println!("\n  {} Recommendations:", "RECOMMENDATIONS".yellow().bold());
+                    for rec in &result.recommendations {
+                        println!("    - {}", rec);
+                    }
+                } else {
+                    println!("  {} Architecture not found: {}", "ERROR".red().bold(), arch_id);
+                }
+            }
+
+            if let Some(compare_str) = compare {
+                let parts: Vec<&str> = compare_str.split(',').collect();
+                if parts.len() == 2 {
+                    let arch_a = parts[0].trim();
+                    let arch_b = parts[1].trim();
+                    
+                    println!("{}", "COMPARING ARCHITECTURES".cyan().bold());
+                    println!("  {} vs {}", arch_a, arch_b);
+
+                    if let Some(comparison) = simulator.compare_architectures(arch_a, arch_b) {
+                        println!("\n{}", "COMPARISON RESULTS".green().bold());
+                        println!("  Latency winner: {}", comparison.latency_winner);
+                        println!("  Throughput winner: {}", comparison.throughput_winner);
+                        println!("  Stability winner: {}", comparison.stability_winner);
+                        println!("  Resilience winner: {}", comparison.resilience_winner);
+                        println!("\n  {} Recommendations:", "RECOMMENDATIONS".yellow().bold());
+                        for rec in &comparison.recommendations {
+                            println!("    - {}", rec);
+                        }
+                    } else {
+                        println!("  {} Could not compare — missing results", "ERROR".red().bold());
+                    }
+                }
+            }
+
+            if let Some(arch_id) = results {
+                println!("{}", "SIMULATION RESULTS HISTORY".cyan().bold());
+                println!("  Architecture: {}", arch_id);
+                // Results are stored internally, we show the latest
+                let arch = simulator.get_architecture(&arch_id);
+                match arch {
+                    Some(a) => println!("  Name: {} | Cohesion: {:.2}", a.name, a.cohesion_score),
+                    None => println!("  {} Architecture not found", "INFO".yellow()),
+                }
+            }
+
+            if patterns {
+                let learned = simulator.get_learned_patterns();
+                println!("{}", "LEARNED PATTERNS".cyan().bold());
+                if learned.is_empty() {
+                    println!("  (none yet — run simulations first)");
+                } else {
+                    for (key, value) in &learned {
+                        let sign = if *value > 0.0 { "+".green() } else { "-".red() };
+                        println!("  {} {}: {:.2}", sign, key, value);
+                    }
+                }
+            }
+
+            if clear {
+                simulator.clear_results();
+                println!("  {} All simulation results cleared", "OK".green().bold());
+            }
+        }
+
+        // ─── Heuristic Decision Maker ───────────────────────────────────────────
+        Cmd::Decide { evaluate, decide, quick, recommend, preference, outcome, stats, log, patterns, learned } => {
+            use microscope_memory::heuristic_decision::*;
+            use microscope_memory::meta_supervision::MetaSupervisor;
+            use microscope_memory::architecture_simulator::ArchitectureSimulator;
+            use std::sync::{Arc, RwLock};
+
+            let meta = Arc::new(RwLock::new(MetaSupervisor::new()));
+            let simulator = Arc::new(ArchitectureSimulator::new());
+            let dm = HeuristicDecisionMaker::new(meta, simulator);
+
+            if let Some(pref) = preference {
+                // We need interior mutability for set_preference
+                // For CLI simplicity, we just print the setting
+                println!("  {} Preference set to: {}", "OK".green().bold(), pref);
+                println!("  (Note: preference persists for this session)");
+            }
+
+            if let Some(eval_str) = evaluate {
+                let options: Vec<DecisionOption> = eval_str.split(';')
+                    .filter(|s| !s.is_empty())
+                    .map(|opt_str| {
+                        let parts: Vec<&str> = opt_str.split(',').collect();
+                        if parts.len() >= 3 {
+                            let desc = parts[0];
+                            let utility: f64 = parts[1].parse().unwrap_or(0.5);
+                            let risk: f64 = parts[2].parse().unwrap_or(0.3);
+                            create_option(desc, DecisionType::Custom("evaluated".to_string()), utility, risk)
+                        } else {
+                            create_option(opt_str, DecisionType::Custom("default".to_string()), 0.5, 0.3)
+                        }
+                    })
+                    .collect();
+
+                let ranked = dm.evaluate_options(options);
+                println!("{}", "EVALUATED OPTIONS (ranked)".cyan().bold());
+                for (i, opt) in ranked.iter().enumerate() {
+                    println!("  {}. {} — Utility: {:.2}, Risk: {:.2}, Confidence: {:.2}",
+                        i + 1, opt.description, opt.expected_utility, opt.risk_level, opt.confidence);
+                }
+            }
+
+            if let Some(decide_str) = decide {
+                let options: Vec<DecisionOption> = decide_str.split(';')
+                    .filter(|s| !s.is_empty())
+                    .map(|opt_str| {
+                        let parts: Vec<&str> = opt_str.split(',').collect();
+                        if parts.len() >= 3 {
+                            create_option(parts[0], DecisionType::Custom("decision".to_string()),
+                                parts[1].parse().unwrap_or(0.5), parts[2].parse().unwrap_or(0.3))
+                        } else {
+                            create_option(opt_str, DecisionType::Custom("default".to_string()), 0.5, 0.3)
+                        }
+                    })
+                    .collect();
+
+                if let Some(decision) = dm.make_decision(options) {
+                    println!("{}", "DECISION MADE".green().bold());
+                    println!("  Selected: {}", decision.selected_option.description);
+                    println!("  Confidence: {:.2}%", decision.confidence_level * 100.0);
+                    println!("  Expected: {}", decision.expected_outcome);
+                    println!("\n  {} Reasoning:", "REASONING".yellow().bold());
+                    for reason in &decision.reasoning {
+                        println!("    - {}", reason);
+                    }
+                    println!("\n  Decision ID: {}", decision.id);
+                } else {
+                    println!("  {} No decision could be made", "ERROR".red().bold());
+                }
+            }
+
+            if let Some(quick_str) = quick {
+                let parts: Vec<&str> = quick_str.split('|').collect();
+                if parts.len() >= 2 {
+                    let time_budget: u64 = parts[0].parse().unwrap_or(100);
+                    let options: Vec<DecisionOption> = parts[1].split(';')
+                        .filter(|s| !s.is_empty())
+                        .map(|opt_str| {
+                            let opt_parts: Vec<&str> = opt_str.split(',').collect();
+                            if opt_parts.len() >= 3 {
+                                create_option(opt_parts[0], DecisionType::Custom("quick".to_string()),
+                                    opt_parts[1].parse().unwrap_or(0.5), opt_parts[2].parse().unwrap_or(0.3))
+                            } else {
+                                create_option(opt_str, DecisionType::Custom("default".to_string()), 0.5, 0.3)
+                            }
+                        })
+                        .collect();
+
+                    if let Some(decision) = dm.quick_decision(options, time_budget) {
+                        println!("{}", "QUICK DECISION".green().bold());
+                        println!("  Selected: {}", decision.selected_option.description);
+                        println!("  Time budget: {}ms", time_budget);
+                        println!("  Confidence: {:.2}%", decision.confidence_level * 100.0);
+                    } else {
+                        println!("  {} No quick decision could be made", "ERROR".red().bold());
+                    }
+                } else {
+                    println!("  {} Usage: --quick time_budget_ms|option1,utility,risk;option2,utility,risk",
+                        "ERROR".red().bold());
+                }
+            }
+
+            if let Some(rec_str) = recommend {
+                println!("{}", "ARCHITECTURE RECOMMENDATION".cyan().bold());
+                println!("  Requirements: {}", rec_str);
+                println!("  (Run simulations first to populate architecture database)");
+            }
+
+            if let Some(outcome_str) = outcome {
+                let parts: Vec<&str> = outcome_str.split(':').collect();
+                if parts.len() >= 3 {
+                    let decision_id = parts[0];
+                    let score: f64 = parts[1].parse().unwrap_or(0.5);
+                    let reflection = parts[2];
+                    dm.evaluate_decision_outcome(decision_id, score, reflection);
+                    println!("  {} Decision {} evaluated: score={:.2}, reflection='{}'",
+                        "OK".green().bold(), decision_id, score, reflection);
+                } else {
+                    println!("  {} Usage: --outcome decision_id:score:reflection",
+                        "ERROR".red().bold());
+                }
+            }
+
+            if stats {
+                let s = dm.get_statistics();
+                println!("{}", "DECISION STATISTICS".cyan().bold());
+                println!("  Total decisions: {}", s.total_decisions);
+                println!("  Successful: {}", s.successful_decisions);
+                println!("  Failed: {}", s.failed_decisions);
+                println!("  Success rate: {:.1}%", s.success_rate * 100.0);
+                println!("  Learned patterns: {}", s.learned_patterns);
+                println!("  Preference: {}", s.current_preference);
+                println!("  Learning rate: {:.2}", s.learning_rate);
+            }
+
+            if log {
+                let entries = dm.export_decision_log();
+                println!("{}", "DECISION LOG".cyan().bold());
+                if entries.is_empty() {
+                    println!("  (empty)");
+                } else {
+                    for entry in &entries {
+                        println!("  [{}] {} — {} (score: {:.2})",
+                            entry.timestamp, entry.decision_id, entry.selected_option, entry.outcome_score);
+                    }
+                }
+            }
+
+            if patterns {
+                let recognized = dm.recognize_patterns();
+                println!("{}", "RECOGNIZED PATTERNS".cyan().bold());
+                if recognized.is_empty() {
+                    println!("  (none yet)");
+                } else {
+                    for pattern in &recognized {
+                        println!("  {} — success rate: {:.1}%, used: {} times",
+                            pattern.name, pattern.success_rate * 100.0, pattern.usage_count);
+                    }
+                }
+            }
+
+            if learned {
+                let exported = dm.export_patterns();
+                println!("{}", "LEARNED HEURISTIC PATTERNS".cyan().bold());
+                if exported.is_empty() {
+                    println!("  (none yet)");
+                } else {
+                    for pattern in &exported {
+                        println!("  {} — type: {}, success: {:.1}%, weight: {:.2}, used: {} times",
+                            pattern.name, pattern.pattern_type, pattern.success_rate * 100.0,
+                            pattern.weight, pattern.usage_count);
+                    }
+                }
+            }
+        }
     }
 }

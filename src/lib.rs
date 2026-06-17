@@ -81,6 +81,10 @@ pub mod mental_stimulation;
 pub mod hyperfocus;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod advanced_cognition;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod architecture_simulator;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod heuristic_decision;
 pub mod multimodal;
 pub mod predictive_cache;
 pub mod temporal_archetype;

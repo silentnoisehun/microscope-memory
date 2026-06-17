@@ -152,6 +152,7 @@ pub const LAYER_NAMES: &[&str] = &[
     "crypto_chain",
     "echo_cache",
     "rust_state",
+    "code",
     "session",
 ];
 
@@ -331,5 +332,6 @@ mod tests {
         assert_ne!(a, crc16_ccitt(b"hello worl!"));
     }
 }
+
 
 

@@ -1,0 +1,3 @@
+﻿code memory entries for coding agents
+functions, symbols, error-solution pairs, project dependencies
+

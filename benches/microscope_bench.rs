@@ -179,6 +179,7 @@ fn bench_append_log(c: &mut Criterion) {
                     black_box("Benchmark test memory entry about quantum computing"),
                     black_box("long_term"),
                     black_box(5),
+                    None,
                 )
                 .expect("store");
                 let append_path = Path::new(&config.paths.output_dir).join("append.bin");
@@ -197,6 +198,7 @@ fn bench_append_log(c: &mut Criterion) {
             "Benchmark pre-stored memory entry",
             "long_term",
             5,
+            None,
         )
         .expect("store");
         let append_path = Path::new(&config.paths.output_dir).join("append.bin");
@@ -220,4 +222,190 @@ criterion_group!(
     bench_content_coords,
     bench_append_log,
 );
-criterion_main!(benches);
+criterion_main!(benches, cognitive_benches);
+
+// ─── Morphogenesis benchmarks ────────────────────────────
+
+fn bench_morphogenesis_growth(c: &mut Criterion) {
+    use microscope_memory::morphogenesis::*;
+
+    let mut group = c.benchmark_group("morphogenesis");
+    
+    group.bench_function("mycelium_growth", |b| {
+        b.iter(|| {
+            let seed = Seed::new("bench", 0.0, 0.0, 0.0, "service");
+            let field = MorphogenField::new();
+            let config = GrowthConfig::mycelium_default();
+            let org = mycelium_growth(black_box(&seed), black_box(&field), black_box(&config));
+            black_box(org.nodes.len());
+        });
+    });
+
+    group.bench_function("capillary_growth", |b| {
+        b.iter(|| {
+            let seed = Seed::new("bench", 0.0, 0.0, 0.0, "gateway");
+            let field = MorphogenField::new();
+            let config = GrowthConfig::capillary_default();
+            let org = capillary_growth(black_box(&seed), black_box(&field), black_box(&config));
+            black_box(org.nodes.len());
+        });
+    });
+
+    group.bench_function("fractal_growth", |b| {
+        b.iter(|| {
+            let seed = Seed::new("bench", 0.0, 0.0, 0.0, "service");
+            let field = MorphogenField::new();
+            let config = GrowthConfig::fractal_lsystem_default();
+            let org = fractal_growth(black_box(&seed), black_box(&field), black_box(&config));
+            black_box(org.nodes.len());
+        });
+    });
+
+    group.bench_function("slime_mold_growth", |b| {
+        b.iter(|| {
+            let seed = Seed::new("bench", 0.0, 0.0, 0.0, "router");
+            let field = MorphogenField::new();
+            let config = GrowthConfig::slime_mold_default();
+            let org = slime_mold_growth(black_box(&seed), black_box(&field), black_box(&config));
+            black_box(org.nodes.len());
+        });
+    });
+
+    group.finish();
+}
+
+fn bench_morphogenesis_evaluate_fitness(c: &mut Criterion) {
+    use microscope_memory::morphogenesis::*;
+
+    let seed = Seed::new("bench", 0.0, 0.0, 0.0, "service");
+    let field = MorphogenField::new();
+    let config = GrowthConfig::mycelium_default();
+    let organism = mycelium_growth(&seed, &field, &config);
+
+    c.bench_function("evaluate_fitness", |b| {
+        b.iter(|| {
+            let result = evaluate_fitness(black_box(&organism), black_box(&FitnessObjective::Balanced));
+            black_box(result.score);
+        });
+    });
+}
+
+// ─── Executive benchmarks ────────────────────────────────
+
+fn bench_executive_schedule(c: &mut Criterion) {
+    use microscope_memory::executive::Executive;
+
+    let exec = Executive::new();
+    exec.register_module("test1", "Test Module 1", 100, 0.5, vec![]);
+    exec.register_module("test2", "Test Module 2", 200, 0.3, vec![]);
+    exec.register_module("test3", "Test Module 3", 50, 0.8, vec![]);
+
+    c.bench_function("executive_schedule", |b| {
+        b.iter(|| {
+            let plan = exec.schedule();
+            black_box(plan.module_order.len());
+        });
+    });
+
+    c.bench_function("executive_cycle", |b| {
+        b.iter(|| {
+            let executed = exec.cycle();
+            black_box(executed.len());
+        });
+    });
+}
+
+// ─── Pattern Recognition benchmarks ──────────────────────
+
+fn bench_pattern_recognition(c: &mut Criterion) {
+    use microscope_memory::pattern_recognition::*;
+
+    let recognizer = PatternRecognizer::new();
+
+    let elements: Vec<String> = (0..100).map(|i| format!("word_{}", i % 20)).collect();
+
+    c.bench_function("find_sequences", |b| {
+        b.iter(|| {
+            let patterns = recognizer.find_sequences(black_box(&elements), black_box("bench"));
+            black_box(patterns.len());
+        });
+    });
+
+    // Structural motifs
+    let edges: Vec<(String, String, f64)> = (0..50).map(|i| {
+        (format!("node_{}", i), format!("node_{}", (i + 1) % 50), rand::random::<f64>())
+    }).collect();
+
+    c.bench_function("find_motifs", |b| {
+        b.iter(|| {
+            let patterns = recognizer.find_motifs(black_box(&edges), black_box("bench"));
+            black_box(patterns.len());
+        });
+    });
+}
+
+// ─── Planner benchmarks ──────────────────────────────────
+
+fn bench_planning(c: &mut Criterion) {
+    use microscope_memory::planning::Planner;
+
+    let planner = Planner::new();
+    let goal_id = planner.add_goal("learn", "Learn about Rust", 100, None);
+
+    c.bench_function("decompose_goal", |b| {
+        b.iter(|| {
+            let subs = planner.decompose_goal(black_box(goal_id));
+            black_box(subs.len());
+        });
+    });
+
+    c.bench_function("create_plan", |b| {
+        b.iter(|| {
+            let plan = planner.create_plan(black_box(goal_id));
+            black_box(plan.actions.len());
+        });
+    });
+}
+
+// ─── Autopoiesis benchmarks ──────────────────────────────
+
+fn bench_autopoiesis(c: &mut Criterion) {
+    use microscope_memory::autopoiesis::AutopoiesisEngine;
+
+    let engine = AutopoiesisEngine::new();
+    engine.register_template("test_tmpl", "test_module", "fn hello() { println!(\"{{name}}\"); }",
+        vec!["name".to_string()], "Test template");
+
+    c.bench_function("autopoiesis_generate_template", |b| {
+        b.iter(|| {
+            let mut vars = std::collections::HashMap::new();
+            vars.insert("name".to_string(), "world".to_string());
+            let code = engine.generate_from_template(black_box("test_tmpl"), black_box(&vars));
+            black_box(code);
+        });
+    });
+
+    c.bench_function("autopoiesis_propose_mutation", |b| {
+        b.iter(|| {
+            let id = engine.propose_mutation(
+                black_box("bench_mut"),
+                black_box(microscope_memory::autopoiesis::MutationType::Modification),
+                black_box("test_module"),
+                black_box("fn test() {}"),
+                black_box("benchmark"),
+                black_box("system"),
+            );
+            black_box(id);
+        });
+    });
+}
+
+criterion_group!(
+    cognitive_benches,
+    bench_morphogenesis_growth,
+    bench_morphogenesis_evaluate_fitness,
+    bench_executive_schedule,
+    bench_pattern_recognition,
+    bench_planning,
+    bench_autopoiesis,
+);

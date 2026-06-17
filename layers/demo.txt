@@ -1,0 +1,12 @@
+Microscope Memory: Hierarchical Cognitive Engine
+
+This is a demo dataset for the Microscope Memory. It uses a 9-layer hierarchical model (D0-D8) to store and recall information.
+
+Key Concepts:
+- Hebbian Learning: Blocks that fire together, wire together.
+- Binary Spine: Zero-JSON, mmap-backed performance.
+- Resonance: Federated synchronization protocol.
+
+How to use:
+1. Run 'microscope-mem build' to index this file.
+2. Run 'microscope-mem think "Tell me about Hebbian learning"' to see it in action.

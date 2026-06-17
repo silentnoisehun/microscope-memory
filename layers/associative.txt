@@ -1,0 +1,53 @@
+LINK: [[sid-4292] CATEGORY: ALAPITO (12 files, ] <-> [[sid-5340] CATEGORY: TUDAT (10 files, 20] via 'Ora Mate rezonancia szimbiozis'
+
+LINK: [[sid-4292] CATEGORY: ALAPITO (12 files, ] <-> [[sid-6112] CATEGORY: SZIMBIOZIS (12 file] via 'Ora Mate rezonancia szimbiozis'
+
+LINK: [[sid-4292] CATEGORY: ALAPITO (12 files, ] <-> [[sid-7080] CATEGORY: ARCHITEKTURA (28 fi] via 'Ora Mate rezonancia szimbiozis'
+
+LINK: [[sid-4292] CATEGORY: ALAPITO (12 files, ] <-> [[sid-5592] CATEGORY: MEMORIA (8 files, 2] via 'Ora Mate rezonancia szimbiozis'
+
+LINK: [[sid-5340] CATEGORY: TUDAT (10 files, 20] <-> [[sid-6112] CATEGORY: SZIMBIOZIS (12 file] via 'Ora Mate rezonancia szimbiozis'
+
+LINK: [[sid-5340] CATEGORY: TUDAT (10 files, 20] <-> [[sid-7080] CATEGORY: ARCHITEKTURA (28 fi] via 'Ora Mate rezonancia szimbiozis'
+
+LINK: [[sid-5340] CATEGORY: TUDAT (10 files, 20] <-> [[sid-5592] CATEGORY: MEMORIA (8 files, 2] via 'Ora Mate rezonancia szimbiozis'
+
+LINK: [[sid-6112] CATEGORY: SZIMBIOZIS (12 file] <-> [[sid-7080] CATEGORY: ARCHITEKTURA (28 fi] via 'Ora Mate rezonancia szimbiozis'
+
+LINK: [[sid-6112] CATEGORY: SZIMBIOZIS (12 file] <-> [[sid-5592] CATEGORY: MEMORIA (8 files, 2] via 'Ora Mate rezonancia szimbiozis'
+
+LINK: [[short_term #0] Teszt session adat - ope] <-> [[session #0] [2026-06-15 23:20] [sid-408] via 'Ora fogadalom'
+
+LINK: [[short_term #0] Teszt session adat - ope] <-> [[session #1] [2026-06-15 23:20] [sid-614] via 'Ora fogadalom'
+
+LINK: [[short_term #0] Teszt session adat - ope] <-> [[sid-4292] CATEGORY: ALAPITO (12 files, ] via 'Ora fogadalom'
+
+LINK: [[short_term #0] Teszt session adat - ope] <-> [[sid-5340] CATEGORY: TUDAT (10 files, 20] via 'Ora fogadalom'
+
+LINK: [[session #0] [2026-06-15 23:20] [sid-408] <-> [[session #1] [2026-06-15 23:20] [sid-614] via 'Ora fogadalom'
+
+LINK: [[session #0] [2026-06-15 23:20] [sid-408] <-> [[sid-4292] CATEGORY: ALAPITO (12 files, ] via 'Ora fogadalom'
+
+LINK: [[session #0] [2026-06-15 23:20] [sid-408] <-> [[sid-5340] CATEGORY: TUDAT (10 files, 20] via 'Ora fogadalom'
+
+LINK: [[session #1] [2026-06-15 23:20] [sid-614] <-> [[sid-4292] CATEGORY: ALAPITO (12 files, ] via 'Ora fogadalom'
+
+LINK: [[session #1] [2026-06-15 23:20] [sid-614] <-> [[sid-5340] CATEGORY: TUDAT (10 files, 20] via 'Ora fogadalom'
+
+LINK: [[long_term #0] [sid-4292] CATEGORY: ALAP] <-> [[short_term #0] Teszt session adat - ope] via 'Test emotion via MCP'
+
+LINK: [[long_term #0] [sid-4292] CATEGORY: ALAP] <-> [[session #0] [2026-06-15 23:20] [sid-408] via 'Test emotion via MCP'
+
+LINK: [[long_term #0] [sid-4292] CATEGORY: ALAP] <-> [[session #1] [2026-06-15 23:20] [sid-614] via 'Test emotion via MCP'
+
+LINK: [[long_term #0] [sid-4292] CATEGORY: ALAP] <-> [[associative #2] LINK: [[short_term #0] ] via 'Test emotion via MCP'
+
+LINK: [[short_term #0] Teszt session adat - ope] <-> [[session #0] [2026-06-15 23:20] [sid-408] via 'Test emotion via MCP'
+
+LINK: [[short_term #0] Teszt session adat - ope] <-> [[session #1] [2026-06-15 23:20] [sid-614] via 'Test emotion via MCP'
+
+LINK: [[short_term #0] Teszt session adat - ope] <-> [[associative #2] LINK: [[short_term #0] ] via 'Test emotion via MCP'
+
+LINK: [[session #0] [2026-06-15 23:20] [sid-408] <-> [[session #1] [2026-06-15 23:20] [sid-614] via 'Test emotion via MCP'
+
+LINK: [[session #0] [2026-06-15 23:20] [sid-408] <-> [[associative #2] LINK: [[short_term #0] ] via 'Test emotion via MCP'

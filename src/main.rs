@@ -957,7 +957,7 @@ fn serve_viewer(port: u16) {
     use std::io::{BufRead, Write};
     use std::net::TcpListener;
 
-    let addr = format!("127.0.0.1:{}", port);
+    let addr = format!("0.0.0.0:{}", port);
     let listener = match TcpListener::bind(&addr) {
         Ok(l) => l,
         Err(e) => {

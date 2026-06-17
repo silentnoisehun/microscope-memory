@@ -1,0 +1,15 @@
+{
+  "name": "Microscope Memory - n8n Webhook",
+  "nodes": [
+    {"name": "Webhook", "type": "n8n-nodes-base.webhook", "parameters": {"path": "microscope"}},
+    {"name": "HTTP Request", "type": "n8n-nodes-base.httpRequest", "parameters": {
+      "method": "POST",
+      "url": "http://localhost:6060/v1/remember",
+      "sendBody": true,
+      "bodyParameters": {"parameters": [
+        {"name": "text", "value": "={{$json.body.text}}"}, {"name": "importance", "value": "={{$json.body.importance || 5}}"}
+      ]}
+    }}
+  ],
+  "connections": {}
+}

@@ -3715,6 +3715,265 @@ async fn main() {
             }
         }
 
+        // ─── Morphogenesis ──────────────────────────────────────────────────────
+        Cmd::Morph { grow, seed_type, pattern, energy, x, y, z, evolve, pop_size, objective, list, best, express, analyze, mutation_rate, daemon, interval, threshold } => {
+            use microscope_memory::morphogenesis::*;
+            use std::sync::Arc;
+
+            let engine = Arc::new(MorphogenesisEngine::new());
+
+            // Növekedési minta konfiguráció
+            let config = match pattern.to_lowercase().as_str() {
+                "mycelium" => GrowthConfig::mycelium_default(),
+                "capillary" => GrowthConfig::capillary_default(),
+                "slime" => GrowthConfig::slime_mold_default(),
+                "fractal" => GrowthConfig::fractal_lsystem_default(),
+                "hybrid" => GrowthConfig { pattern: GrowthPattern::Hybrid, ..GrowthConfig::default() },
+                _ => {
+                    eprintln!("{} Unknown pattern '{}', using mycelium", "ERROR".red().bold(), pattern);
+                    GrowthConfig::mycelium_default()
+                }
+            };
+
+            // Morfogén mező alapértelmezett attraktorokkal
+            let mut field = MorphogenField::new();
+            field.add_attractor(5.0, 5.0, 5.0, 10.0);
+            field.add_attractor(-5.0, -5.0, 0.0, 5.0);
+
+            engine.set_field(field);
+            engine.set_config(config);
+
+            // GROW: növesztés seed-ből
+            if let Some(seed_desc) = grow {
+                let seed = Seed {
+                    id: format!("cli_seed_{}", rand::random::<u32>()),
+                    position: (x, y, z),
+                    energy,
+                    type_tag: seed_type.clone(),
+                    preferred_pattern: None,
+                };
+
+                println!("{} Growing from seed '{}' at ({}, {}, {}) with {} energy",
+                    "MORPH".cyan().bold(), seed_desc, x, y, z, energy);
+                println!("{} Pattern: {}", "PATTERN".green().bold(), pattern);
+
+                let organism = engine.grow_from_seed(&seed, None);
+                println!("\n{}", "GROWN ORGANISM".green().bold());
+                println!("  ID:     {}", organism.id.yellow());
+                println!("  Name:   {}", organism.name);
+                println!("  Nodes:  {}", organism.nodes.len());
+                println!("  Connections: {}", organism.connections.len());
+                if let Some(ref m) = organism.metrics {
+                    println!("  Max depth:  {}", m.max_depth);
+                    println!("  Fractal dim: {:.3}", m.fractal_dimension);
+                    println!("  Redundancy: {:.3}", m.redundancy_score);
+                    println!("  Avg path:   {:.3}", m.avg_path_length);
+                }
+                println!("  Fitness: {:.3}", organism.fitness_score);
+            }
+
+            // EVOLVE: evolúciós futtatás
+            if let Some(generations) = evolve {
+                let seeds = vec![Seed::new("evo_seed", x, y, z, &seed_type).with_energy(energy)];
+
+                let objective = match objective.to_lowercase().as_str() {
+                    "latency" => FitnessObjective::MinimizeLatency,
+                    "throughput" => FitnessObjective::MaximizeThroughput,
+                    "cost" => FitnessObjective::MinimizeCost,
+                    "redundancy" => FitnessObjective::MaximizeRedundancy,
+                    _ => FitnessObjective::Balanced,
+                };
+
+                println!("\n{} Running evolution for {} generations (pop={})...",
+                    "EVOLVE".magenta().bold(), generations, pop_size);
+
+                let results = engine.evolve_population(
+                    &seeds,
+                    generations,
+                    &objective,
+                    pop_size,
+                );
+
+                println!("\n{} Evolution complete", "DONE".green().bold());
+                for (i, org) in results.iter().enumerate().take(5) {
+                    println!("  {}. {} [Fitness: {:.3}] {:?} — {} nodes, {} connections",
+                        i + 1,
+                        org.id.yellow(),
+                        org.fitness_score,
+                        org.growth_pattern,
+                        org.nodes.len(),
+                        org.connections.len(),
+                    );
+                }
+
+                let summary = engine.evolution_summary();
+                if !summary.is_empty() {
+                    println!("\n{} Evolution history:", "TREND".cyan().bold());
+                    for (gen, score) in &summary {
+                        let bar = "█".repeat((score * 40.0) as usize);
+                        println!("  Gen {:2}: {:.3} {}", gen, score, bar);
+                    }
+                }
+            }
+
+            // LIST: organizmusok listázása
+            if list {
+                let engine_ref = &*engine;
+                // Use organisms via a temp scope
+                println!("\n{} Organisms:", "LIST".cyan().bold());
+                println!("  (use --best or --grow to create organisms first)");
+            }
+
+            // BEST: legjobb organizmus
+            if best {
+                if let Some(org) = engine.get_best_organism() {
+                    println!("\n{}", "BEST ORGANISM".green().bold());
+                    println!("{}", org);
+                } else {
+                    println!("{} No organisms grown yet", "INFO".yellow());
+                }
+            }
+
+            // EXPRESS: Architecture-vé alakítás
+            if let Some(_org_id) = express {
+                if let Some(org) = engine.get_best_organism() {
+                    let arch = express_as_architecture(&org);
+                    println!("\n{} Expressed as Architecture:", "EXPRESS".green().bold());
+                    println!("  Name: {}", arch.name);
+                    println!("  Components: {}", arch.components.len());
+                    println!("  Connections: {}", arch.connections.len());
+                    println!("  Version: {}", arch.version);
+                } else {
+                    println!("{} No organism to express", "INFO".yellow());
+                }
+            }
+
+            // ANALYZE: topológiai elemzés
+            if let Some(_org_id) = analyze {
+                if let Some(org) = engine.get_best_organism() {
+                    let analysis = MorphogenesisEngine::analyze_topology(&org);
+                    println!("\n{} Topology Analysis:", "ANALYSIS".cyan().bold());
+                    for (key, value) in &analysis {
+                        println!("  {}: {}", key.green(), value);
+                    }
+                } else {
+                    println!("{} No organism to analyze", "INFO".yellow());
+                }
+            }
+
+            // DAEMON: background loop — vagus → morphogenesis → simulator → neuroplasticity
+            if daemon {
+                use microscope_memory::vagus::{VagusNerve, VagusTone, SystemPulse};
+                use microscope_memory::architecture_simulator::ArchitectureSimulator;
+                use microscope_memory::neuroplasticity::Neuroplasticity;
+                use std::thread;
+                use std::time::Duration;
+
+                println!("\n{} Starting Morphogenesis Daemon", "DAEMON".yellow().bold());
+                println!("  Interval: {}s, Threshold: {:.1}", interval, threshold);
+                println!("  Press Ctrl+C to stop\n");
+
+                let engine_daemon = engine.clone();
+                let handle = thread::spawn(move || {
+                    let mut cycle = 0u64;
+                    let sim = Arc::new(ArchitectureSimulator::new());
+                    let mut neuro = Neuroplasticity::new();
+
+                    // Vagus tónus: idővel fluktuál
+                    let mut vagus_tone = VagusTone {
+                        current: 0.7,
+                        baseline: 0.7,
+                        trend: 0.0,
+                        volatility: 0.1,
+                        last_update: 0,
+                    };
+
+                    loop {
+                        cycle += 1;
+                        let now = std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .unwrap_or_default()
+                            .as_secs();
+
+                        // Vagus szimuláció: természetes fluktuáció + random zaj
+                        let noise = (rand::random::<f64>() - 0.5) * vagus_tone.volatility;
+                        vagus_tone.current = (vagus_tone.current + noise * 0.1).clamp(0.0, 1.0);
+                        vagus_tone.last_update = now;
+
+                        // Rendszer pulzus (szimulált)
+                        let pulse = SystemPulse {
+                            timestamp: now,
+                            cpu_pressure: 0.3 + rand::random::<f64>() * 0.5,
+                            memory_pressure: 0.2 + rand::random::<f64>() * 0.4,
+                            io_pressure: 0.1 + rand::random::<f64>() * 0.3,
+                            network_pressure: 0.2 + rand::random::<f64>() * 0.4,
+                            request_rate: 100.0 + rand::random::<f64>() * 400.0,
+                            error_rate: rand::random::<f64>() * 0.05,
+                            hrv: 0.5 + rand::random::<f64>() * 0.3,
+                        };
+
+                        // Status sor
+                        let stress_indicator = if vagus_tone.current < threshold {
+                            "STRESS".red().bold()
+                        } else {
+                            "OK    ".green().bold()
+                        };
+                        print!("\r {} Cycle {:4} | Vagus: {:.3} | CPU: {:.0}% | Mem: {:.0}% | Net: {:.0}%     ",
+                            stress_indicator, cycle, vagus_tone.current,
+                            pulse.cpu_pressure * 100.0, pulse.memory_pressure * 100.0,
+                            pulse.network_pressure * 100.0);
+
+                        // Ha stressz > küszöb, trigger kompenzatórikus növekedés
+                        if vagus_tone.current < threshold {
+                            let seed = Seed {
+                                id: format!("daemon_{}", cycle),
+                                position: (0.0, 0.0, 0.0),
+                                energy: (1.0 - vagus_tone.current) * 200.0,
+                                type_tag: "compensatory".to_string(),
+                                preferred_pattern: match () {
+                                    _ if pulse.cpu_pressure > 0.7 => Some(GrowthPattern::Capillary),
+                                    _ if pulse.network_pressure > 0.7 => Some(GrowthPattern::Mycelium),
+                                    _ => {
+                                        let patterns = [
+                                            GrowthPattern::Mycelium,
+                                            GrowthPattern::Capillary,
+                                            GrowthPattern::SlimeMold,
+                                            GrowthPattern::FractalLSystem,
+                                        ];
+                                        Some(patterns[cycle as usize % 4])
+                                    }
+                                },
+                            };
+
+                            if let Some(org) = trigger_from_vagus(&vagus_tone, &pulse, &engine_daemon, threshold) {
+                                print!("\n{} Grown compensatory structure: {} nodes, {:.3} fitness\n",
+                                    "🌱".green(), org.nodes.len(), org.fitness_score);
+
+                                // Expresszálás Architecture-vé és szimuláció
+                                let arch = express_as_architecture(&org);
+                                sim.register_architecture(arch);
+
+                                // Leképezés neuroplasticity-re
+                                let pathways = map_to_neuroplasticity(&org);
+                                for (from, to, weight) in &pathways {
+                                    neuro.strengthen_synapse(*from, *to, *weight > 0.3);
+                                }
+
+                                let (syn_count, path_count, avg_w, plast, strong) = neuro.stats();
+                                print!("\r  🧠 Neuroplasticity: {} synapses, {} pathways, avg_w={:.2}, strong={}\n",
+                                    syn_count, path_count, avg_w, strong);
+                            }
+                        }
+
+                        thread::sleep(Duration::from_secs(interval));
+                    }
+                });
+
+                // Várjunk a daemon szálra
+                handle.join().unwrap();
+            }
+        }
+
         // ─── Heuristic Decision Maker ───────────────────────────────────────────
         Cmd::Decide { evaluate, decide, quick, recommend, preference, outcome, stats, log, patterns, learned } => {
             use microscope_memory::heuristic_decision::*;

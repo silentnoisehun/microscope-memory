@@ -629,6 +629,63 @@ pub enum Cmd {
         #[arg(long)]
         history: bool,
     },
+    /// Morphogenesis — biológiai mintákon alapuló generatív architektúra-tenyésztés
+    Morph {
+        /// Növesztés egy seed-ből (seed leírás)
+        #[arg(long)]
+        grow: Option<String>,
+        /// Seed típus (service, database, cache, gateway)
+        #[arg(long, default_value = "service")]
+        seed_type: String,
+        /// Növekedési minta (mycelium, capillary, slime, fractal, hybrid)
+        #[arg(long, default_value = "mycelium")]
+        pattern: String,
+        /// Seed energia
+        #[arg(long, default_value_t = 100.0)]
+        energy: f64,
+        /// Seed pozíció X
+        #[arg(long, default_value_t = 0.0)]
+        x: f64,
+        /// Seed pozíció Y
+        #[arg(long, default_value_t = 0.0)]
+        y: f64,
+        /// Seed pozíció Z
+        #[arg(long, default_value_t = 0.0)]
+        z: f64,
+        /// Evolúció futtatása N generáción át
+        #[arg(long)]
+        evolve: Option<u32>,
+        /// Populáció méret
+        #[arg(long, default_value_t = 12)]
+        pop_size: usize,
+        /// Fitness cél (latency, throughput, cost, redundancy, balanced)
+        #[arg(long, default_value = "balanced")]
+        objective: String,
+        /// Listázza az organizmusokat
+        #[arg(long)]
+        list: bool,
+        /// Legjobb organizmus mutatása
+        #[arg(long)]
+        best: bool,
+        /// Expresszálás Architecture-ként (organizmus ID)
+        #[arg(long)]
+        express: Option<String>,
+        /// Topológiai elemzés (organizmus ID)
+        #[arg(long)]
+        analyze: Option<String>,
+        /// Mutáció ráta evolúciónál
+        #[arg(long, default_value_t = 0.15)]
+        mutation_rate: f64,
+        /// Background daemon — figyeli a vagus tónust és automatikusan növeszt kompenzatórikus struktúrákat
+        #[arg(long)]
+        daemon: bool,
+        /// Daemon ciklus idő másodpercben
+        #[arg(long, default_value_t = 5)]
+        interval: u64,
+        /// Vagus stressz küszöb (0.0-1.0)
+        #[arg(long, default_value_t = 0.5)]
+        threshold: f64,
+    },
     /// Heuristic Decision Maker — evaluate options and make decisions
     Decide {
         /// Evaluate options (comma-separated: desc,utility,risk)

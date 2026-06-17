@@ -1,4 +1,4 @@
-//! Microscope Memory library interface.
+﻿//! Microscope Memory library interface.
 //! Re-exports core types and functions for integration tests and external use.
 
 #[cfg(feature = "stealth")]
@@ -62,6 +62,8 @@ pub mod impulse_control;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod meta_supervision;
 #[cfg(not(target_arch = "wasm32"))]
+pub mod executive;
+#[cfg(not(target_arch = "wasm32"))]
 pub mod implicit_memory;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod explicit_memory;
@@ -90,7 +92,15 @@ pub mod knowledge_base;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod architecture_generator;
 #[cfg(not(target_arch = "wasm32"))]
+pub mod morphogenesis;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod pattern_recognition;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod planning;
+#[cfg(not(target_arch = "wasm32"))]
 pub mod vagus;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod autopoiesis;
 pub mod multimodal;
 pub mod predictive_cache;
 pub mod temporal_archetype;
@@ -121,7 +131,7 @@ pub use emotional_state::{emotional_prime_weight, EmotionalStateRing};
 // Re-export CLI
 pub use cli::{Cli, Cmd};
 
-// ─── Shared constants ────────────────────────────────
+// â”€â”€â”€ Shared constants â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 pub const DEFAULT_CONFIG_PATH: &str = "config.toml";
 pub const BLOCK_DATA_SIZE: usize = 256;
 pub const HEADER_SIZE: usize = 32;
@@ -141,7 +151,7 @@ pub const LAYER_NAMES: &[&str] = &[
     "session",
 ];
 
-// ─── Shared utility functions ────────────────────────
+// â”€â”€â”€ Shared utility functions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 pub fn layer_to_id(name: &str) -> u8 {
     LAYER_NAMES.iter().position(|&n| n == name).unwrap_or(0) as u8
@@ -256,7 +266,7 @@ pub fn to_block(text: &str) -> Vec<u8> {
     }
 }
 
-// ─── AUTO ZOOM / AUTO DEPTH ──────────────────────────
+// â”€â”€â”€ AUTO ZOOM / AUTO DEPTH â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 pub fn auto_zoom(query: &str) -> (u8, u8) {
     let stopwords = ["a", "the", "is", "of", "and", "to", "in", "it", "on", "for"];
@@ -317,3 +327,5 @@ mod tests {
         assert_ne!(a, crc16_ccitt(b"hello worl!"));
     }
 }
+
+

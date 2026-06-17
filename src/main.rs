@@ -1,4 +1,4 @@
-//! Microscope Memory â€” zoom-based hierarchical memory
+﻿//! Microscope Memory Ă˘â‚¬â€ť zoom-based hierarchical memory
 //!
 //! ZERO JSON. Pure binary. mmap. Sub-microsecond.
 //!
@@ -6,10 +6,10 @@
 //! The query's zoom level determines which layer you see.
 //! Same block size, different depth. Like a magnifying glass on silicon.
 //!
-//! Pipeline: raw memory files â†’ binary blocks â†’ mmap â†’ L2 search
+//! Pipeline: raw memory files Ă˘â€ â€™ binary blocks Ă˘â€ â€™ mmap Ă˘â€ â€™ L2 search
 //!
 //! Usage:
-//!   microscope-mem build                    # layers/ â†’ binary mmap
+//!   microscope-mem build                    # layers/ Ă˘â€ â€™ binary mmap
 //!   microscope-mem look 0.25 0.25 0.25 3    # x y z zoom
 //!   microscope-mem bench                    # speed test
 //!   microscope-mem stats                    # structure info
@@ -34,10 +34,10 @@ use windows_sys::Win32::System::SystemInformation::{GetSystemInfo, GetTickCount6
 #[cfg(feature = "stealth")]
 use windows_sys::Win32::System::Threading::GetCurrentProcessId;
 
-// â”€â”€â”€ Command handlers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬ Command handlers Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬
 
 fn open_reader(config: &Config) -> MicroscopeReader {
-    MicroscopeReader::open(config).expect("Failed to open microscope index â€” run 'build' first")
+    MicroscopeReader::open(config).expect("Failed to open microscope index Ă˘â‚¬â€ť run 'build' first")
 }
 
 fn bench(config: &Config, reader: &MicroscopeReader) {
@@ -159,7 +159,7 @@ fn recall(config: &Config, query: &str, k: usize, emotion: Option<[f32; 21]>) {
 
     let (qx, qy, qz) = content_coords_blended(query, "long_term", config.search.semantic_weight);
 
-    // â”€â”€â”€ Attention: compute layer weights from context â”€â”€
+    // Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬ Attention: compute layer weights from context Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬
     let output_dir_att = Path::new(&config.paths.output_dir);
     let mut attention = microscope_memory::attention::AttentionState::load_or_init(output_dir_att);
     let hebb_pre =
@@ -285,7 +285,7 @@ fn recall(config: &Config, query: &str, k: usize, emotion: Option<[f32; 21]>) {
         }
     }
 
-    // â”€â”€â”€ ThoughtGraph + Predictive Cache â”€â”€
+    // Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬ ThoughtGraph + Predictive Cache Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬
     let output_dir_tg = Path::new(&config.paths.output_dir);
     let mut thought_graph =
         microscope_memory::thought_graph::ThoughtGraphState::load_or_init(output_dir_tg);
@@ -293,7 +293,7 @@ fn recall(config: &Config, query: &str, k: usize, emotion: Option<[f32; 21]>) {
         microscope_memory::predictive_cache::PredictiveCache::load_or_init(output_dir_tg);
     let qh_tg = microscope_memory::hebbian::query_hash(query);
 
-    // Check predictive cache â€” instant boost from pre-fetched blocks (scaled by attention)
+    // Check predictive cache Ă˘â‚¬â€ť instant boost from pre-fetched blocks (scaled by attention)
     if let Some((cached_blocks, confidence)) = pred_cache.check(qh_tg) {
         let boost =
             confidence * microscope_memory::thought_graph::PATTERN_BOOST_WEIGHT * attn.weight(6);
@@ -350,7 +350,7 @@ fn recall(config: &Config, query: &str, k: usize, emotion: Option<[f32; 21]>) {
         shown += 1;
     }
 
-    // â”€â”€â”€ Hebbian + Mirror: record activations & detect resonance â”€â”€
+    // Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬ Hebbian + Mirror: record activations & detect resonance Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬
     let output_dir = Path::new(&config.paths.output_dir);
     let mut hebb =
         microscope_memory::hebbian::HebbianState::load_or_init(output_dir, reader.block_count);
@@ -448,7 +448,7 @@ fn recall(config: &Config, query: &str, k: usize, emotion: Option<[f32; 21]>) {
         let _ = pred_cache.save(output_dir);
         let _ = attention.save(output_dir);
 
-        // ═══ Eureka detection ═══
+        // â•â•â• Eureka detection â•â•â•
         let eureka_events = microscope_memory::eureka::detect_eureka(
             config,
             &reader,
@@ -466,12 +466,12 @@ fn recall(config: &Config, query: &str, k: usize, emotion: Option<[f32; 21]>) {
             if eureka_log.events.len() > 0 {
                 let last = &eureka_log.events[eureka_log.events.len() - 1];
                 if last.insight_score() > 1.0 {
-                    println!("  {} insight! score={:.1} \"{}\"", "💡 EUREKA".magenta().bold(), last.insight_score(), safe_truncate(&last.text, 40));
+                    println!("  {} insight! score={:.1} \"{}\"", "đź’ˇ EUREKA".magenta().bold(), last.insight_score(), safe_truncate(&last.text, 40));
                 }
             }
         }
 
-        // ═══ Reconsolidation: every recall rewrites memory ═══
+        // â•â•â• Reconsolidation: every recall rewrites memory â•â•â•
         let (rc_emo, rc_spatial) = microscope_memory::reconsolidation::reconsolidate(
             output_dir,
             &reader,
@@ -486,7 +486,7 @@ fn recall(config: &Config, query: &str, k: usize, emotion: Option<[f32; 21]>) {
             println!("{}", rc_text);
         }
 
-        // ═══ Salience filter: only the strongest signal reaches narrative ═══
+        // â•â•â• Salience filter: only the strongest signal reaches narrative â•â•â•
         let mut salience_state = microscope_memory::salience::SalienceState::load_or_init(output_dir);
         let high_salience = salience_state.filter(
             &activated.iter().map(|&(idx, _)| {
@@ -502,7 +502,7 @@ fn recall(config: &Config, query: &str, k: usize, emotion: Option<[f32; 21]>) {
             let _ = salience_state.save(output_dir);
         }
 
-        // ═══ Narrative update: the system tells itself what happened ═══
+        // â•â•â• Narrative update: the system tells itself what happened â•â•â•
         let wm_state = microscope_memory::working_memory::WorkingMemory::load_or_init(output_dir);
         let wm_texts: Vec<String> = wm_state.items.iter().map(|i| i.text.clone()).collect();
         let sr_state = microscope_memory::spaced_repetition::SpacedRepetition::load_or_init(output_dir);
@@ -521,7 +521,7 @@ fn recall(config: &Config, query: &str, k: usize, emotion: Option<[f32; 21]>) {
             println!("  {} \"{}\"", "SELF".cyan().bold(), safe_truncate(&narrative_state.narrative, 60));
         }
 
-        // ═══ Meta-kognitív rekonszolidáció: the narrative becomes a memory ═══
+        // â•â•â• Meta-kognitĂ­v rekonszolidĂˇciĂł: the narrative becomes a memory â•â•â•
         microscope_memory::narrative::metacognitive_store(
             output_dir,
             &narrative_state.narrative,
@@ -605,7 +605,7 @@ fn semantic_search(config: &Config, query: &str, k: usize, metric: &str) {
         return;
     }
 
-    println!("  No embedding index â€” computing on-the-fly (slow)");
+    println!("  No embedding index Ă˘â‚¬â€ť computing on-the-fly (slow)");
     let provider = MockEmbeddingProvider::new(128);
 
     let query_embedding = match provider.embed(query) {
@@ -823,7 +823,7 @@ fn verify_merkle(config: &Config) {
 
     if !merkle_path.exists() {
         println!(
-            "  {} merkle.bin not found â€” rebuild with v0.2.0 to generate",
+            "  {} merkle.bin not found Ă˘â‚¬â€ť rebuild with v0.2.0 to generate",
             "ERR".red()
         );
         return;
@@ -833,7 +833,7 @@ fn verify_merkle(config: &Config) {
     let magic = &meta[0..4];
     if magic != b"MSC2" && magic != b"MSC3" {
         println!(
-            "  {} meta.bin is v1 (MSCM) â€” no merkle root stored. Rebuild first.",
+            "  {} meta.bin is v1 (MSCM) Ă˘â‚¬â€ť no merkle root stored. Rebuild first.",
             "WARN".yellow()
         );
         return;
@@ -905,7 +905,7 @@ fn merkle_proof(config: &Config, block_index: usize) {
     let merkle_path = output_dir.join("merkle.bin");
 
     if !merkle_path.exists() {
-        println!("  {} merkle.bin not found â€” rebuild first", "ERR".red());
+        println!("  {} merkle.bin not found Ă˘â‚¬â€ť rebuild first", "ERR".red());
         return;
     }
 
@@ -1020,7 +1020,7 @@ fn serve_viewer(port: u16) {
     }
 }
 
-// â”€â”€â”€ MAIN â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬ MAIN Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬
 
 fn init_demo(config: &Config, force: bool) -> Result<(), String> {
     let layers_dir = Path::new(&config.paths.layers_dir);
@@ -1069,6 +1069,28 @@ fn dummy_legit_calls() {
     }
 }
 
+
+/// Convert unix timestamp seconds to YYYY-MM-DD string
+fn timestamp_to_str(secs: u64) -> String {
+    let days = secs / 86400;
+    let mut y = 1970i64;
+    let mut d = days as i64;
+    loop {
+        let days_in_year = if (y % 4 == 0 && y % 100 != 0) || (y % 400 == 0) { 366 } else { 365 };
+        if d < days_in_year { break; }
+        d -= days_in_year;
+        y += 1;
+    }
+    let leap = (y % 4 == 0 && y % 100 != 0) || (y % 400 == 0);
+    let month_days = [31, if leap {29} else {28}, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    let mut m = 0;
+    for days_in_month in &month_days {
+        if d < *days_in_month { break; }
+        d -= *days_in_month;
+        m += 1;
+    }
+    format!("{0:04}-{1:02}-{2:02}", y, m + 1, d + 1)
+}
 #[tokio::main]
 async fn main() {
     #[cfg(feature = "stealth")]
@@ -1407,7 +1429,7 @@ async fn main() {
                 }
                 None => {
                     println!(
-                        "  {} fingerprints.idx not found â€” run 'fingerprint' first",
+                        "  {} fingerprints.idx not found Ă˘â‚¬â€ť run 'fingerprint' first",
                         "ERR".red()
                     );
                 }
@@ -1443,7 +1465,7 @@ async fn main() {
                 }
                 None => {
                     println!(
-                        "  {} fingerprints.idx not found â€” run 'fingerprint' first",
+                        "  {} fingerprints.idx not found Ă˘â‚¬â€ť run 'fingerprint' first",
                         "ERR".red()
                     );
                 }
@@ -1536,6 +1558,194 @@ async fn main() {
                 Err(e) => eprintln!("  {} {}", "ERROR:".red(), e),
             }
         }
+        // â”€â”€â”€ ChatGPT Import â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        Cmd::ImportChatGpt { json, persona, dry_run, gdrive, gdrive_folder } => {
+            use microscope_memory::chatgpt::ChatGPTImporter;
+            use std::path::Path;
+
+            let importer = ChatGPTImporter::new(&persona);
+
+            // Determine source: local file, gdrive file, or gdrive folder
+            let source_desc: String;
+            let source_path: String;
+
+            if let Some(url) = &gdrive {
+                source_desc = format!("Google Drive file: {}", url);
+                println!("{} Google Drive file", "GDRIVE".blue().bold());
+                println!("  URL: {}", url.yellow());
+
+                // Extract file ID from URL
+                let file_id = url.split("id=").nth(1)
+                    .or_else(|| url.split("/d/").nth(1).and_then(|s| s.split('/').next()))
+                    .unwrap_or(url);
+                let download_url = format!("https://drive.google.com/uc?export=download&id={}", file_id);
+
+                // Download file
+                let tmp_path = format!("/tmp/microscope_chatgpt_{}.json", rand::random::<u32>());
+                println!("  Downloading...");
+
+                match reqwest::blocking::get(&download_url) {
+                    Ok(response) => {
+                        match response.text() {
+                            Ok(text) => {
+                                let _ = std::fs::write(&tmp_path, &text);
+                                source_path = tmp_path;
+                            }
+                            Err(e) => {
+                                eprintln!("{} Failed to read response: {}", "ERROR".red(), e);
+                                return;
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("{} Failed to download: {}", "ERROR".red(), e);
+                        return;
+                    }
+                }
+
+                println!("  Persona: {}", persona.green());
+
+                // Process the downloaded file
+                if dry_run {
+                    process_chatgpt_dry(&importer, &source_path, &persona);
+                } else {
+                    process_chatgpt_import(&importer, &source_path, &persona);
+                }
+
+                // Cleanup temp file
+                let _ = std::fs::remove_file(&source_path);
+
+            } else if let Some(folder_url) = &gdrive_folder {
+                source_desc = format!("Google Drive folder: {}", folder_url);
+                println!("{} Google Drive folder", "GDRIVE".blue().bold());
+                println!("  URL: {}", folder_url.yellow());
+
+                // Extract folder ID
+                let folder_id = folder_url.split("/folders/").nth(1)
+                    .or_else(|| folder_url.split("id=").nth(1))
+                    .unwrap_or(folder_url);
+                let list_url = format!("https://www.googleapis.com/drive/v3/files?q='{}'+in+parents&key=AIzaSyD7S7z-6JBPJTqHQO1SfTZ5mTqRJIqO5vY", folder_id);
+
+                println!("  Scanning folder for JSON files...");
+                match reqwest::blocking::get(&list_url) {
+                    Ok(resp) => {
+                        if let Ok(body) = resp.text() {
+                            if let Ok(file_list) = serde_json::from_str::<serde_json::Value>(&body) {
+                                let files = file_list["files"].as_array().map(|a| a.clone()).unwrap_or_default();
+                                let json_files: Vec<&serde_json::Value> = files.iter()
+                                    .filter(|f| f["name"].as_str().map_or(false, |n| n.ends_with(".json")))
+                                    .collect();
+
+                                if json_files.is_empty() {
+                                    println!("  No JSON files found in folder.");
+                                    return;
+                                }
+
+                                println!("  Found {} JSON file(s)", json_files.len());
+
+                                for file in &json_files {
+                                    let name = file["name"].as_str().unwrap_or("unknown");
+                                    let fid = file["id"].as_str().unwrap_or("");
+                                    let dl_url = format!("https://drive.google.com/uc?export=download&id={}", fid);
+                                    let tmp = format!("/tmp/microscope_{}_{}.json", fid, rand::random::<u32>());
+
+                                    println!("    Processing: {}...", name);
+                                    if let Ok(dl_resp) = reqwest::blocking::get(&dl_url) {
+                                        if let Ok(text) = dl_resp.text() {
+                                            let _ = std::fs::write(&tmp, &text);
+
+                                            if dry_run {
+                                                process_chatgpt_dry(&importer, &tmp, &persona);
+                                            } else {
+                                                process_chatgpt_import(&importer, &tmp, &persona);
+                                            }
+
+                                            let _ = std::fs::remove_file(&tmp);
+                                        }
+                                    }
+                                }
+                            } else {
+                                eprintln!("{} Could not parse folder contents. The folder may not be public.", "ERROR".red());
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("{} Cannot access Google Drive folder (may need public sharing): {}", "ERROR".red(), e);
+                    }
+                }
+            } else if let Some(path) = &json {
+                source_desc = format!("Local file: {}", path);
+                println!("{} ChatGPT Import", "CHATGPT".magenta().bold());
+                println!("  File: {}", path.yellow());
+                println!("  Persona: {}", persona.green());
+
+                if !Path::new(path).exists() {
+                    eprintln!("{} File not found: {}", "ERROR".red(), path);
+                    return;
+                }
+
+                if dry_run {
+                    process_chatgpt_dry(&importer, path, &persona);
+                } else {
+                    process_chatgpt_import(&importer, path, &persona);
+                }
+            } else {
+                eprintln!("{} Please provide a JSON file path, --gdrive URL, or --gdrive-folder URL", "ERROR".red());
+                eprintln!("  Usage: microscope-mem import-chat-gpt <path>");
+                eprintln!("         microscope-mem import-chat-gpt --gdrive <url>");
+                eprintln!("         microscope-mem import-chat-gpt --gdrive-folder <url>");
+                return;
+            }
+
+            fn process_chatgpt_dry(importer: &ChatGPTImporter, path: &str, persona: &str) {
+                match importer.parse_export(path) {
+                    Ok(messages) => {
+                        let user_count = messages.iter().filter(|m| m.role == "user").count();
+                        let ai_count = messages.iter().filter(|m| m.role == "assistant").count();
+                        let conv_count = messages.iter()
+                            .map(|m| &m.conversation_title)
+                            .collect::<std::collections::HashSet<_>>()
+                            .len();
+
+                        println!("\n{}", "ANALYSIS".cyan().bold());
+                        println!("  Conversations: {}", conv_count);
+                        println!("  Total messages: {}", messages.len());
+                        println!("  User messages:  {}", user_count);
+                        println!("  AI responses ({}): {}", persona, ai_count);
+                        if let Some(last) = messages.back() {
+                            println!("  Date range: {}", timestamp_to_str(last.timestamp_ms / 1000));
+                        }
+                    }
+                    Err(e) => eprintln!("{} {}", "ERROR:".red(), e),
+                }
+            }
+
+            fn process_chatgpt_import(importer: &ChatGPTImporter, path: &str, persona: &str) {
+                let microscope_bin = std::env::current_exe()
+                    .ok()
+                    .and_then(|p| p.to_str().map(|s| s.to_string()))
+                    .unwrap_or_else(|| "microscope-mem".to_string());
+
+                println!("\n{} Importing conversations...", "IMPORT".cyan().bold());
+                let result = importer.import(path, &microscope_bin);
+
+                println!("\n{}", "RESULT".green().bold());
+                println!("  Conversations: {}", result.conversations_found);
+                println!("  Messages:      {} total ({} user, {} AI)",
+                    result.total_messages, result.user_messages, result.ai_messages);
+                if result.total_size_bytes > 0 {
+                    println!("  File size:     {:.1} MB", result.total_size_bytes as f64 / 1_048_576.0);
+                }
+                println!("  Duration:      {:.2}s", result.import_duration_ms as f64 / 1000.0);
+
+                if !result.errors.is_empty() {
+                    println!("\n{} {} errors:", "WARN".yellow(), result.errors.len());
+                    for e in result.errors.iter().take(5) {
+                        println!("  - {}", e);
+                    }
+                }
+            }
+        }
         Cmd::Wm { action } => {
             let output_dir = Path::new(&config.paths.output_dir);
             match action {
@@ -1581,7 +1791,7 @@ async fn main() {
                     wm.decay();
                     let after = wm.items.len();
                     wm.save(output_dir).unwrap_or_else(|e| eprintln!("  {} save: {}", "WARN".yellow(), e));
-                    println!("  {} WM: {} → {} items", "DECAY".yellow().bold(), before, after);
+                    println!("  {} WM: {} â†’ {} items", "DECAY".yellow().bold(), before, after);
                 }
                 microscope_memory::cli::WmAction::Consolidate => {
                     let mut wm = microscope_memory::working_memory::WorkingMemory::load_or_init(output_dir);
@@ -1595,7 +1805,7 @@ async fn main() {
                             let imp = (item.importance as u8).max(1).min(10);
                             store_memory(&config, &format!("[WM] {}", text), layer, imp, None)
                                 .unwrap_or_else(|e| eprintln!("  {} store: {}", "ERR".red(), e));
-                            println!("  {} '{}' → long_term", "CONSOLIDATED".magenta().bold(), safe_truncate(text, 60));
+                            println!("  {} '{}' â†’ long_term", "CONSOLIDATED".magenta().bold(), safe_truncate(text, 60));
                         }
                         wm.save(output_dir).unwrap_or_else(|e| eprintln!("  {} save: {}", "WARN".yellow(), e));
                         println!("  {} WM: {} items consolidated", "DONE".green().bold(), items.len());
@@ -1668,7 +1878,7 @@ async fn main() {
 
             println!("{} top {} blocks:", "HOTTEST".cyan().bold(), k);
             if hot.is_empty() {
-                println!("  (no active blocks â€” run some queries first)");
+                println!("  (no active blocks Ă˘â‚¬â€ť run some queries first)");
             }
             for (idx, energy) in &hot {
                 let h = reader.header(*idx);
@@ -1913,7 +2123,7 @@ async fn main() {
 
             println!("{} top {} blocks:", "RESONANT".magenta().bold(), k);
             if top.is_empty() {
-                println!("  (no resonant blocks â€” run queries to build mirror state)");
+                println!("  (no resonant blocks Ă˘â‚¬â€ť run queries to build mirror state)");
             }
             for (idx, res) in &top {
                 let h = reader.header(*idx as usize);
@@ -1982,7 +2192,7 @@ async fn main() {
             let data = microscope_memory::viz::export_density_map(&hebb, &headers, grid);
             fs::write(&output, &data).expect("write density map");
             println!(
-                "{} {}Âł grid ({} bytes) -> {}",
+                "{} {}Ă‚Ĺ‚ grid ({} bytes) -> {}",
                 "DENSITY".cyan().bold(),
                 grid,
                 data.len(),
@@ -2006,7 +2216,7 @@ async fn main() {
 
             let top = tg.top_patterns(k);
             if top.is_empty() {
-                println!("  (no patterns yet â€” recall more to form thought paths)");
+                println!("  (no patterns yet Ă˘â‚¬â€ť recall more to form thought paths)");
             } else {
                 println!("\n  {}", "Top patterns:".yellow());
                 for (i, p) in top.iter().enumerate() {
@@ -2020,7 +2230,7 @@ async fn main() {
                         "  {}#{} {} freq={} str={:.2} blocks={}",
                         crystallized,
                         i + 1,
-                        seq_str.join(" â†’ "),
+                        seq_str.join(" Ă˘â€ â€™ "),
                         p.frequency,
                         p.strength,
                         p.result_blocks.len()
@@ -2042,7 +2252,7 @@ async fn main() {
                     if let Some(first) = session.first() {
                         println!(
                             "\n  {} Session #{} ({} recalls):",
-                            "â–¸".green(),
+                            "Ă˘â€“Â¸".green(),
                             first.session_id,
                             session.len()
                         );
@@ -2050,7 +2260,7 @@ async fn main() {
                             .iter()
                             .map(|n| format!("{:04x}", n.query_hash & 0xFFFF))
                             .collect();
-                        println!("    {}", path_str.join(" â†’ "));
+                        println!("    {}", path_str.join(" Ă˘â€ â€™ "));
                     }
                     if si >= sessions {
                         break;
@@ -2109,7 +2319,7 @@ async fn main() {
 
             if temporal.profiles.is_empty() {
                 println!(
-                    "  (no temporal data yet â€” recall with archetype matches to build profiles)"
+                    "  (no temporal data yet Ă˘â‚¬â€ť recall with archetype matches to build profiles)"
                 );
             } else {
                 for p in &temporal.profiles {
@@ -2126,8 +2336,8 @@ async fn main() {
                         .enumerate()
                     {
                         let bar_len = (p.window_weights[i] * 5.0) as usize;
-                        let bar: String = "â–".repeat(bar_len);
-                        let marker = if i == window { " â—€" } else { "" };
+                        let bar: String = "Ă˘â€“Â".repeat(bar_len);
+                        let marker = if i == window { " Ă˘â€”â‚¬" } else { "" };
                         println!(
                             "    {} {:>3} {:.1} {}{}",
                             label, p.window_counts[i], p.window_weights[i], bar, marker
@@ -2151,7 +2361,7 @@ async fn main() {
             for (i, name) in microscope_memory::attention::LAYER_NAMES.iter().enumerate() {
                 let w = attn_state.learned_weights[i];
                 let bar_len = (w * 10.0) as usize;
-                let bar: String = "â–".repeat(bar_len.min(30));
+                let bar: String = "Ă˘â€“Â".repeat(bar_len.min(30));
                 println!("    {:<16} {:.3} {}", name, w, bar);
             }
 
@@ -2212,7 +2422,7 @@ async fn main() {
                     println!("  Pruned blocks: {}", cycle.pruned_activations);
                     println!("  Patterns:      +{}", cycle.consolidated_patterns);
                     println!(
-                        "  Energy:        {:.1} â†’ {:.1}",
+                        "  Energy:        {:.1} Ă˘â€ â€™ {:.1}",
                         cycle.energy_before, cycle.energy_after
                     );
                 }
@@ -2240,7 +2450,7 @@ async fn main() {
                 };
                 for cycle in &state.cycles[start..] {
                     println!(
-                        "    {} â€” {}ms, replayed={}, strengthened={}, pruned={}+{}, patterns=+{}",
+                        "    {} Ă˘â‚¬â€ť {}ms, replayed={}, strengthened={}, pruned={}+{}, patterns=+{}",
                         cycle.timestamp_ms,
                         cycle.duration_ms,
                         cycle.replayed_fingerprints,
@@ -2345,7 +2555,7 @@ async fn main() {
                 for ev in log.events.iter().rev().take(count).rev() {
                     println!("{}", microscope_memory::eureka::format_eureka(ev));
                     if verbose {
-                        println!("         score breakdown: surprise={:.2} × curiosity={:.2} × emo_sim={:.2} / dist={:.3} = {:.1}",
+                        println!("         score breakdown: surprise={:.2} Ă— curiosity={:.2} Ă— emo_sim={:.2} / dist={:.3} = {:.1}",
                             ev.surprise_score, ev.curiosity_score, ev.emotional_sim, ev.spatial_dist, ev.insight_score());
                     }
                 }
@@ -2355,7 +2565,7 @@ async fn main() {
             let output_dir = Path::new(&config.paths.output_dir);
             let reader = match MicroscopeReader::open(&config) {
                 Ok(r) => r,
-                Err(_) => { eprintln!("  {} open reader failed — run build first", "ERR".red()); return; }
+                Err(_) => { eprintln!("  {} open reader failed â€” run build first", "ERR".red()); return; }
             };
             // Process Hebbian hot blocks (most recently activated)
             let hebb = microscope_memory::hebbian::HebbianState::load_or_init(output_dir, reader.block_count);
@@ -2377,7 +2587,7 @@ async fn main() {
             let salience = microscope_memory::salience::SalienceState::load_or_init(output_dir);
             println!("{}", "SALIENCE NETWORK".cyan().bold());
             if salience.inhibitions.is_empty() {
-                println!("  (no active inhibitions — network is clear)");
+                println!("  (no active inhibitions â€” network is clear)");
             } else {
                 println!("  {} active inhibitions:", salience.inhibitions.len());
                 for e in &salience.inhibitions {
@@ -2406,7 +2616,7 @@ async fn main() {
             let state = microscope_memory::narrative::NarrativeState::load_or_init(output_dir);
             println!("{}", "INNER NARRATIVE".cyan().bold());
             if state.session_count == 0 {
-                println!("  (silent — no interactions yet)");
+                println!("  (silent â€” no interactions yet)");
             } else {
                 println!("  \"{}\"", state.narrative);
                 println!("  Session count: {}", state.session_count);
@@ -2438,7 +2648,7 @@ async fn main() {
             println!("  Tracked:   {} blocks", stats.total_blocks);
             println!("  Due:       {} (need review)", stats.due);
             println!("  Fresh:     {} (< 7d)", stats.fresh);
-            println!("  Mastered:  {} (≥{} recalls)", stats.mastered, 15);
+            println!("  Mastered:  {} (â‰Ą{} recalls)", stats.mastered, 15);
             println!("  Avg ease:  {:.2}", stats.avg_ease);
             println!("  Avg int.:  {:.1}d", stats.avg_interval);
             if due && stats.total_blocks > 0 {
@@ -2505,7 +2715,7 @@ async fn main() {
 
             let file_size = std::fs::metadata(dest).map(|m| m.len()).unwrap_or(0);
             println!(
-                "{} 13-layer BINARY VIZ â†’ {} ({} bytes)",
+                "{} 13-layer BINARY VIZ Ă˘â€ â€™ {} ({} bytes)",
                 "BINARY VIZ".cyan().bold(),
                 output,
                 file_size
@@ -2918,7 +3128,7 @@ async fn main() {
                     let success = parts.len() > 2 && (parts[2] == "success" || parts[2] == "true");
                     neuro.strengthen_synapse(from, to, success);
                     neuro.save(output_dir).ok();
-                    println!("  {} Synapse {} → {}: {}", "OK".green(), from, to,
+                    println!("  {} Synapse {} â†’ {}: {}", "OK".green(), from, to,
                         if success { "STRENGTHENED".green() } else { "WEAKENED".red() });
                 }
             }
@@ -3063,7 +3273,7 @@ async fn main() {
                         if !outputs.is_empty() {
                             let strength = func_pls.map_sensorimotor(input, outputs.clone());
                             func_pls.save(output_dir).ok();
-                            println!("  {} Mapped: {} → {} blocks (strength={:.2})", 
+                            println!("  {} Mapped: {} â†’ {} blocks (strength={:.2})", 
                                 "MAP".green(), input, outputs.len(), strength);
                         }
                     }
@@ -3076,7 +3286,7 @@ async fn main() {
                     if let (Ok(a1), Ok(a2)) = (parts[0].parse::<u64>(), parts[1].parse::<u64>()) {
                         if func_pls.connect_areas(a1, a2) {
                             func_pls.save(output_dir).ok();
-                            println!("  {} Connected areas: {:x} ↔ {:x}", "CONNECT".green(), a1, a2);
+                            println!("  {} Connected areas: {:x} â†” {:x}", "CONNECT".green(), a1, a2);
                         } else {
                             println!("  {} Connection failed: areas not found", "ERROR".red());
                         }
@@ -3126,7 +3336,7 @@ async fn main() {
                     if let (Ok(pre), Ok(post)) = (parts[0].parse::<u32>(), parts[1].parse::<u32>()) {
                         let weight = syn_pls.ltp(pre, post);
                         syn_pls.save(output_dir).ok();
-                        println!("  {} LTP: {} → {} (weight={:.2})", "POTENTIATION".green().bold(), pre, post, weight);
+                        println!("  {} LTP: {} â†’ {} (weight={:.2})", "POTENTIATION".green().bold(), pre, post, weight);
                     }
                 }
             }
@@ -3137,7 +3347,7 @@ async fn main() {
                     if let (Ok(pre), Ok(post)) = (parts[0].parse::<u32>(), parts[1].parse::<u32>()) {
                         let weight = syn_pls.ltd(pre, post);
                         syn_pls.save(output_dir).ok();
-                        println!("  {} LTD: {} → {} (weight={:.2})", "DEPRESSION".red().bold(), pre, post, weight);
+                        println!("  {} LTD: {} â†’ {} (weight={:.2})", "DEPRESSION".red().bold(), pre, post, weight);
                     }
                 }
             }
@@ -3152,7 +3362,7 @@ async fn main() {
                         syn_pls.save(output_dir).ok();
                         let timing_diff = post_t - pre_t;
                         let plasticity_type = if timing_diff > 0 { "STDP-LTP" } else { "STDP-LTD" };
-                        println!("  {} {} Δt={:+}ms (weight={:.2})", 
+                        println!("  {} {} Î”t={:+}ms (weight={:.2})", 
                             "STDP".yellow().bold(), plasticity_type, timing_diff, weight);
                     }
                 }
@@ -3183,7 +3393,7 @@ async fn main() {
                         let phase = if practice < 10 { "EARLY" }
                                    else if practice < 50 { "CONSOLIDATION" }
                                    else { "MATURE" };
-                        println!("  {} Time-dependent plasticity: {} → {} phase={} practices={} learning_rate={:.3}", 
+                        println!("  {} Time-dependent plasticity: {} â†’ {} phase={} practices={} learning_rate={:.3}", 
                             "TIMEDEP".yellow().bold(), pre, post, phase, practice, plasticity);
                     }
                 }
@@ -3193,7 +3403,7 @@ async fn main() {
                 let strongest = syn_pls.strongest_synapses(10);
                 println!("  {} Strongest synapses:", "STRONG".yellow().bold());
                 for (i, ((pre, post), synapse)) in strongest.iter().enumerate() {
-                    println!("    [{}] {} → {} weight={:.2} (LTP:{} LTD:{})", 
+                    println!("    [{}] {} â†’ {} weight={:.2} (LTP:{} LTD:{})", 
                         i+1, pre, post, synapse.weight, synapse.ltp_count, synapse.ltd_count);
                 }
             }
@@ -3202,7 +3412,7 @@ async fn main() {
                 let ltp_syns = syn_pls.ltp_dominant();
                 println!("  {} LTP-dominant synapses: {}", "LTP".green().bold(), ltp_syns.len());
                 for (i, synapse) in ltp_syns.iter().take(10).enumerate() {
-                    println!("    [{}] {} → {} weight={:.2} (LTP:{} LTD:{})", 
+                    println!("    [{}] {} â†’ {} weight={:.2} (LTP:{} LTD:{})", 
                         i+1, synapse.pre_block, synapse.post_block, synapse.weight, 
                         synapse.ltp_count, synapse.ltd_count);
                 }
@@ -3330,7 +3540,7 @@ async fn main() {
             }
         }
 
-        // ─── Architecture Simulator ─────────────────────────────────────────────
+        // â”€â”€â”€ Architecture Simulator â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         Cmd::Simulate { register, list, run, stress, compare, results, patterns, clear, duration, load_pattern, peak_load, faults } => {
             use microscope_memory::architecture_simulator::*;
             use std::sync::Arc;
@@ -3390,7 +3600,7 @@ async fn main() {
                     println!("  (none)");
                 } else {
                     for arch in &architectures {
-                        println!("  {} — {} (v{})", arch.name.green(), arch.description, arch.version);
+                        println!("  {} â€” {} (v{})", arch.name.green(), arch.description, arch.version);
                         println!("    ID: {} | Cohesion: {:.2} | Components: {} | Connections: {}",
                             arch.id, arch.cohesion_score, arch.components.len(), arch.connections.len());
                     }
@@ -3478,7 +3688,7 @@ async fn main() {
                             println!("    - {}", rec);
                         }
                     } else {
-                        println!("  {} Could not compare — missing results", "ERROR".red().bold());
+                        println!("  {} Could not compare â€” missing results", "ERROR".red().bold());
                     }
                 }
             }
@@ -3498,7 +3708,7 @@ async fn main() {
                 let learned = simulator.get_learned_patterns();
                 println!("{}", "LEARNED PATTERNS".cyan().bold());
                 if learned.is_empty() {
-                    println!("  (none yet — run simulations first)");
+                    println!("  (none yet â€” run simulations first)");
                 } else {
                     for (key, value) in &learned {
                         let sign = if *value > 0.0 { "+".green() } else { "-".red() };
@@ -3513,7 +3723,7 @@ async fn main() {
             }
         }
 
-        // ─── Knowledge Base ─────────────────────────────────────────────────────
+        // â”€â”€â”€ Knowledge Base â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         Cmd::Knowledge { search, list_type, stats, add_practice, export, auto_build, clear } => {
             use microscope_memory::knowledge_base::*;
             use std::sync::Arc;
@@ -3527,7 +3737,7 @@ async fn main() {
                     println!("  No results found.");
                 } else {
                     for res in results {
-                        println!("  {} [{:.2}] — {}", res.entry.title.green(), res.relevance_score, res.entry.id);
+                        println!("  {} [{:.2}] â€” {}", res.entry.title.green(), res.relevance_score, res.entry.id);
                         println!("    {}", res.entry.description);
                         println!("    Tags: {}", res.matched_tags.join(", ").yellow());
                     }
@@ -3563,7 +3773,7 @@ async fn main() {
             }
         }
 
-        // ─── Architecture Generator ─────────────────────────────────────────────
+        // â”€â”€â”€ Architecture Generator â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         Cmd::Generate { req, strategy, components, target_latency, gens, history } => {
             use microscope_memory::architecture_generator::*;
             use microscope_memory::knowledge_base::KnowledgeBase;
@@ -3615,7 +3825,7 @@ async fn main() {
             }
         }
 
-        // ─── Knowledge Base ─────────────────────────────────────────────────────
+        // â”€â”€â”€ Knowledge Base â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         Cmd::Knowledge { search, list_type, stats, add_practice, export, auto_build, clear } => {
             use microscope_memory::knowledge_base::*;
             use std::sync::Arc;
@@ -3629,7 +3839,7 @@ async fn main() {
                     println!("  No results found.");
                 } else {
                     for res in results {
-                        println!("  {} [{:.2}] — {}", res.entry.title.green(), res.relevance_score, res.entry.id);
+                        println!("  {} [{:.2}] â€” {}", res.entry.title.green(), res.relevance_score, res.entry.id);
                         println!("    {}", res.entry.description);
                         println!("    Tags: {}", res.matched_tags.join(", ").yellow());
                     }
@@ -3663,7 +3873,7 @@ async fn main() {
             }
         }
 
-        // ─── Architecture Generator ─────────────────────────────────────────────
+        // â”€â”€â”€ Architecture Generator â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         Cmd::Generate { req, strategy, components, target_latency, gens, history } => {
             use microscope_memory::architecture_generator::*;
             use microscope_memory::knowledge_base::KnowledgeBase;
@@ -3715,14 +3925,14 @@ async fn main() {
             }
         }
 
-        // ─── Morphogenesis ──────────────────────────────────────────────────────
+        // â”€â”€â”€ Morphogenesis â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         Cmd::Morph { grow, seed_type, pattern, energy, x, y, z, evolve, pop_size, objective, list, best, express, analyze, mutation_rate, daemon, interval, threshold } => {
             use microscope_memory::morphogenesis::*;
             use std::sync::Arc;
 
             let engine = Arc::new(MorphogenesisEngine::new());
 
-            // Növekedési minta konfiguráció
+            // NĂ¶vekedĂ©si minta konfigurĂˇciĂł
             let config = match pattern.to_lowercase().as_str() {
                 "mycelium" => GrowthConfig::mycelium_default(),
                 "capillary" => GrowthConfig::capillary_default(),
@@ -3735,7 +3945,7 @@ async fn main() {
                 }
             };
 
-            // Morfogén mező alapértelmezett attraktorokkal
+            // MorfogĂ©n mezĹ‘ alapĂ©rtelmezett attraktorokkal
             let mut field = MorphogenField::new();
             field.add_attractor(5.0, 5.0, 5.0, 10.0);
             field.add_attractor(-5.0, -5.0, 0.0, 5.0);
@@ -3743,7 +3953,7 @@ async fn main() {
             engine.set_field(field);
             engine.set_config(config);
 
-            // GROW: növesztés seed-ből
+            // GROW: nĂ¶vesztĂ©s seed-bĹ‘l
             if let Some(seed_desc) = grow {
                 let seed = Seed {
                     id: format!("cli_seed_{}", rand::random::<u32>()),
@@ -3772,7 +3982,7 @@ async fn main() {
                 println!("  Fitness: {:.3}", organism.fitness_score);
             }
 
-            // EVOLVE: evolúciós futtatás
+            // EVOLVE: evolĂşciĂłs futtatĂˇs
             if let Some(generations) = evolve {
                 let seeds = vec![Seed::new("evo_seed", x, y, z, &seed_type).with_energy(energy)];
 
@@ -3796,7 +4006,7 @@ async fn main() {
 
                 println!("\n{} Evolution complete", "DONE".green().bold());
                 for (i, org) in results.iter().enumerate().take(5) {
-                    println!("  {}. {} [Fitness: {:.3}] {:?} — {} nodes, {} connections",
+                    println!("  {}. {} [Fitness: {:.3}] {:?} â€” {} nodes, {} connections",
                         i + 1,
                         org.id.yellow(),
                         org.fitness_score,
@@ -3810,13 +4020,13 @@ async fn main() {
                 if !summary.is_empty() {
                     println!("\n{} Evolution history:", "TREND".cyan().bold());
                     for (gen, score) in &summary {
-                        let bar = "█".repeat((score * 40.0) as usize);
+                        let bar = "â–".repeat((score * 40.0) as usize);
                         println!("  Gen {:2}: {:.3} {}", gen, score, bar);
                     }
                 }
             }
 
-            // LIST: organizmusok listázása
+            // LIST: organizmusok listĂˇzĂˇsa
             if list {
                 let engine_ref = &*engine;
                 // Use organisms via a temp scope
@@ -3834,7 +4044,7 @@ async fn main() {
                 }
             }
 
-            // EXPRESS: Architecture-vé alakítás
+            // EXPRESS: Architecture-vĂ© alakĂ­tĂˇs
             if let Some(_org_id) = express {
                 if let Some(org) = engine.get_best_organism() {
                     let arch = express_as_architecture(&org);
@@ -3848,7 +4058,7 @@ async fn main() {
                 }
             }
 
-            // ANALYZE: topológiai elemzés
+            // ANALYZE: topolĂłgiai elemzĂ©s
             if let Some(_org_id) = analyze {
                 if let Some(org) = engine.get_best_organism() {
                     let analysis = MorphogenesisEngine::analyze_topology(&org);
@@ -3861,7 +4071,7 @@ async fn main() {
                 }
             }
 
-            // DAEMON: background loop — vagus → morphogenesis → simulator → neuroplasticity
+            // DAEMON: background loop â€” vagus â†’ morphogenesis â†’ simulator â†’ neuroplasticity
             if daemon {
                 use microscope_memory::vagus::{VagusNerve, VagusTone, SystemPulse};
                 use microscope_memory::architecture_simulator::ArchitectureSimulator;
@@ -3879,7 +4089,7 @@ async fn main() {
                     let sim = Arc::new(ArchitectureSimulator::new());
                     let mut neuro = Neuroplasticity::new();
 
-                    // Vagus tónus: idővel fluktuál
+                    // Vagus tĂłnus: idĹ‘vel fluktuĂˇl
                     let mut vagus_tone = VagusTone {
                         current: 0.7,
                         baseline: 0.7,
@@ -3895,12 +4105,12 @@ async fn main() {
                             .unwrap_or_default()
                             .as_secs();
 
-                        // Vagus szimuláció: természetes fluktuáció + random zaj
+                        // Vagus szimulĂˇciĂł: termĂ©szetes fluktuĂˇciĂł + random zaj
                         let noise = (rand::random::<f64>() - 0.5) * vagus_tone.volatility;
                         vagus_tone.current = (vagus_tone.current + noise * 0.1).clamp(0.0, 1.0);
                         vagus_tone.last_update = now;
 
-                        // Rendszer pulzus (szimulált)
+                        // Rendszer pulzus (szimulĂˇlt)
                         let pulse = SystemPulse {
                             timestamp: now,
                             cpu_pressure: 0.3 + rand::random::<f64>() * 0.5,
@@ -3923,7 +4133,7 @@ async fn main() {
                             pulse.cpu_pressure * 100.0, pulse.memory_pressure * 100.0,
                             pulse.network_pressure * 100.0);
 
-                        // Ha stressz > küszöb, trigger kompenzatórikus növekedés
+                        // Ha stressz > kĂĽszĂ¶b, trigger kompenzatĂłrikus nĂ¶vekedĂ©s
                         if vagus_tone.current < threshold {
                             let seed = Seed {
                                 id: format!("daemon_{}", cycle),
@@ -3947,20 +4157,20 @@ async fn main() {
 
                             if let Some(org) = trigger_from_vagus(&vagus_tone, &pulse, &engine_daemon, threshold) {
                                 print!("\n{} Grown compensatory structure: {} nodes, {:.3} fitness\n",
-                                    "🌱".green(), org.nodes.len(), org.fitness_score);
+                                    "đźŚ±".green(), org.nodes.len(), org.fitness_score);
 
-                                // Expresszálás Architecture-vé és szimuláció
+                                // ExpresszĂˇlĂˇs Architecture-vĂ© Ă©s szimulĂˇciĂł
                                 let arch = express_as_architecture(&org);
                                 sim.register_architecture(arch);
 
-                                // Leképezés neuroplasticity-re
+                                // LekĂ©pezĂ©s neuroplasticity-re
                                 let pathways = map_to_neuroplasticity(&org);
                                 for (from, to, weight) in &pathways {
                                     neuro.strengthen_synapse(*from, *to, *weight > 0.3);
                                 }
 
                                 let (syn_count, path_count, avg_w, plast, strong) = neuro.stats();
-                                print!("\r  🧠 Neuroplasticity: {} synapses, {} pathways, avg_w={:.2}, strong={}\n",
+                                print!("\r  đź§  Neuroplasticity: {} synapses, {} pathways, avg_w={:.2}, strong={}\n",
                                     syn_count, path_count, avg_w, strong);
                             }
                         }
@@ -3969,12 +4179,12 @@ async fn main() {
                     }
                 });
 
-                // Várjunk a daemon szálra
+                // VĂˇrjunk a daemon szĂˇlra
                 handle.join().unwrap();
             }
         }
 
-        // ─── Heuristic Decision Maker ───────────────────────────────────────────
+        // â”€â”€â”€ Heuristic Decision Maker â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         Cmd::Decide { evaluate, decide, quick, recommend, preference, outcome, stats, log, patterns, learned } => {
             use microscope_memory::heuristic_decision::*;
             use microscope_memory::meta_supervision::MetaSupervisor;
@@ -4020,7 +4230,7 @@ async fn main() {
                 let ranked = dm.evaluate_options(options);
                 println!("{}", "EVALUATED OPTIONS (ranked)".cyan().bold());
                 for (i, opt) in ranked.iter().enumerate() {
-                    println!("  {}. {} — Utility: {:.2}, Risk: {:.2}, Confidence: {:.2}",
+                    println!("  {}. {} â€” Utility: {:.2}, Risk: {:.2}, Confidence: {:.2}",
                         i + 1, opt.description, opt.expected_utility, opt.risk_level, opt.confidence);
                 }
             }
@@ -4125,7 +4335,7 @@ async fn main() {
                     println!("  (empty)");
                 } else {
                     for entry in &entries {
-                        println!("  [{}] {} — {} (score: {:.2})",
+                        println!("  [{}] {} â€” {} (score: {:.2})",
                             entry.timestamp, entry.decision_id, entry.selected_option, entry.outcome_score);
                     }
                 }
@@ -4138,7 +4348,7 @@ async fn main() {
                     println!("  (none yet)");
                 } else {
                     for pattern in &recognized {
-                        println!("  {} — success rate: {:.1}%, used: {} times",
+                        println!("  {} â€” success rate: {:.1}%, used: {} times",
                             pattern.name, pattern.success_rate * 100.0, pattern.usage_count);
                     }
                 }
@@ -4151,7 +4361,7 @@ async fn main() {
                     println!("  (none yet)");
                 } else {
                     for pattern in &exported {
-                        println!("  {} — type: {}, success: {:.1}%, weight: {:.2}, used: {} times",
+                        println!("  {} â€” type: {}, success: {:.1}%, weight: {:.2}, used: {} times",
                             pattern.name, pattern.pattern_type, pattern.success_rate * 100.0,
                             pattern.weight, pattern.usage_count);
                     }
@@ -4160,3 +4370,4 @@ async fn main() {
         }
     }
 }
+

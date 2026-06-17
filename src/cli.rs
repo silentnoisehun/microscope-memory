@@ -142,6 +142,23 @@ pub enum Cmd {
         #[arg(long)]
         output_dir: Option<String>,
     },
+    /// Import ChatGPT conversations export (JSON) into Microscope Memory
+    ImportChatGpt {
+        /// Path to ChatGPT export JSON file (conversations.json) — or Google Drive shared link
+        json: Option<String>,
+        /// AI persona name (default: Liora)
+        #[arg(long, default_value = "Liora")]
+        persona: String,
+        /// Show only summary without importing
+        #[arg(long)]
+        dry_run: bool,
+        /// Google Drive file URL (shared link to conversations.json)
+        #[arg(long)]
+        gdrive: Option<String>,
+        /// Google Drive shared folder URL — imports all JSON files from folder
+        #[arg(long)]
+        gdrive_folder: Option<String>,
+    },
     /// Diff two .mscope archives
     Diff {
         /// First archive

@@ -971,8 +971,13 @@ fn serve_viewer(port: u16) {
         "  Open your browser: {}",
         format!("http://localhost:{}/viewer.html", port).green()
     );
+    println!(
+        "  PWA Chat:    {}",
+        format!("http://localhost:{}/chat.html", port).green()
+    );
     println!("  Press Ctrl+C to stop.\n");
 
+    let pwa_path = std::env::current_dir().unwrap().join("pwa");
     let html_path = std::env::current_dir().unwrap().join("viewer.html");
     let bin_path = std::env::current_dir().unwrap().join("cognitive_map.bin");
 
@@ -992,7 +997,7 @@ fn serve_viewer(port: u16) {
             .to_string();
 
         let (status, content_type, body): (&str, &str, Vec<u8>) =
-            if path == "/viewer.html" || path == "/" {
+            if path == "/viewer.html" {
                 match fs::read(&html_path) {
                     Ok(b) => ("200 OK", "text/html; charset=utf-8", b),
                     Err(_) => (
@@ -1001,7 +1006,23 @@ fn serve_viewer(port: u16) {
                         b"viewer.html not found. Run 'cognitive-map' first.".to_vec(),
                     ),
                 }
-            } else if path == "/cognitive_map.bin" {
+            } else if path == "/" || path == "/chat.html" || path == "/app.js" || path == "/styles.css" || path == "/manifest.json" || path == "/service-worker.js" || path == "/icon.svg" {
+                        let file_name = if path == "/" { "chat.html" } else { &path[1..] };
+                        let file_path = pwa_path.join(file_name);
+                        let ext = file_name.rsplit('.').next().unwrap_or("");
+                        let ct = match ext {
+                            "html" => "text/html; charset=utf-8",
+                            "js" => "application/javascript",
+                            "css" => "text/css",
+                            "json" => "application/json",
+                            "svg" => "image/svg+xml",
+                            _ => "text/plain",
+                        };
+                        match fs::read(&file_path) {
+                            Ok(b) => ("200 OK", ct, b),
+                            Err(_) => ("404 Not Found", "text/plain", format!("{} not found", file_name).into_bytes().to_vec()),
+                        }
+                    } else if path == "/cognitive_map.bin" {
                 match fs::read(&bin_path) {
                     Ok(b) => ("200 OK", "application/octet-stream", b),
                     Err(_) => (

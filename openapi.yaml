@@ -20,7 +20,11 @@ info:
     - Set `layer` to `associative` for links between concepts
     - Set `layer` to `emotional` for emotional context
     - Higher `importance` (1–10) = prioritized in future recall
-  version: "0.6.4"
+
+    ## Namespacing
+    Most endpoints accept optional `user_id`, `memory_backend` (local|cloud), and
+    `memory_scope` (personal|shared|both) parameters for multi-user isolation.
+  version: "0.8.0"
   contact:
     name: Microscope Memory
     url: https://github.com/silentnoisehun/microscope-memory
@@ -28,6 +32,8 @@ info:
 servers:
   - url: http://localhost:6060
     description: Local Spine Bridge (default)
+  - url: http://localhost:6060/v1
+    description: Local Spine Bridge v1 prefix
   - url: https://your-deployment.railway.app
     description: Cloud deployment (configure your URL)
 
@@ -36,10 +42,7 @@ paths:
     get:
       operationId: getMemoryStatus
       summary: Get memory engine status
-      description: |
-        Returns the current state of the Microscope Memory engine,
-        including block count, append log size, and available layers.
-        Call this first to verify the engine is running.
+      description: Returns block count, append log size, and available layers.
       responses:
         "200":
           description: Engine status
@@ -47,171 +50,486 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/StatusResponse"
-              example:
-                version: "0.6.4"
-                blocks: 1024
-                append_log: 12
-                layers:
-                  - identity
-                  - long_term
-                  - short_term
-                  - associative
-                  - emotional
-                  - relational
-                  - reflections
-                  - crypto_chain
-                  - echo_cache
-                  - rust_state
         "500":
-          description: Engine error (index not built — run `microscope-mem build` first)
+          $ref: "#/components/responses/EngineError"
+
+  /session:
+    get:
+      operationId: getSession
+      summary: Resolve namespace paths for a user/backend/scope combination
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+        - $ref: "#/components/parameters/MemoryBackend"
+        - $ref: "#/components/parameters/MemoryScope"
+      responses:
+        "200":
+          description: Resolved namespace info
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: "#/components/schemas/SessionResponse"
+        "500":
+          $ref: "#/components/responses/EngineError"
 
   /recall:
     get:
       operationId: recallMemory
       summary: Recall relevant memories by natural language query
       description: |
-        Searches the memory engine using a natural language query.
-        Returns the most relevant memory blocks ordered by spatial proximity.
-
-        The engine automatically determines the search depth and semantic weight.
-        Results include the memory text, its layer, depth, and distance score.
-
-        **Use this before answering any question** to check if relevant context exists.
+        Searches the memory engine using semantic hashing + SIMD radial search.
+        Use this before answering any question to check for relevant context.
       parameters:
         - name: q
           in: query
           required: true
-          description: Natural language query to search for
+          description: Natural language query
           schema:
             type: string
             minLength: 1
             maxLength: 500
-          example: "What did we discuss about the Rust architecture?"
         - name: k
           in: query
           required: false
-          description: Maximum number of results to return (default 10, max 50)
+          description: Max results (default 10, max 50)
           schema:
             type: integer
             minimum: 1
             maximum: 50
             default: 10
-          example: 5
+        - $ref: "#/components/parameters/UserId"
+        - $ref: "#/components/parameters/MemoryBackend"
+        - $ref: "#/components/parameters/MemoryScope"
       responses:
         "200":
-          description: List of relevant memory blocks, ordered by relevance
+          description: Relevant memory blocks ordered by distance
           content:
             application/json:
               schema:
                 type: array
                 items:
                   $ref: "#/components/schemas/MemoryResult"
-              example:
-                - text: "The Spine Bridge API runs on Axum with CORS enabled"
-                  depth: 4
-                  layer: "long_term"
-                  distance: 0.042
-                - text: "Tokio runtime is used for async operation"
-                  depth: 5
-                  layer: "associative"
-                  distance: 0.087
         "400":
-          description: Missing or invalid query parameter
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "#/components/responses/BadRequest"
         "500":
-          description: Engine error
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "#/components/responses/EngineError"
 
   /remember:
     post:
       operationId: rememberMemory
       summary: Store a new memory
       description: |
-        Commits a new memory to the append log for permanent storage.
-        The memory is immediately available for recall.
-
-        Choose the appropriate `layer`:
-        - `long_term` — facts, knowledge, decisions (default)
-        - `short_term` — temporary context, current session
-        - `associative` — links between concepts
-        - `emotional` — emotional context, preferences
-        - `relational` — relationships between entities
-        - `reflections` — meta-thoughts, evaluations
-
-        Set `importance` (1–10) to control weighting in future recalls.
-        Higher importance memories are surfaced more prominently.
+        Commits a new memory to the append log. Immediately available for recall.
+        Use `layer` to categorize and `importance` (1–10) to weight future recall.
       requestBody:
         required: true
         content:
           application/json:
             schema:
               $ref: "#/components/schemas/RememberRequest"
-            examples:
-              basicFact:
-                summary: Storing a basic fact
-                value:
-                  text: "The Spine Bridge API is a REST interface for Microscope Memory"
-                  layer: "long_term"
-                  importance: 8
-              emotionalContext:
-                summary: Storing emotional context
-                value:
-                  text: "User prefers concise technical explanations, dislikes verbosity"
-                  layer: "emotional"
-                  importance: 7
-              shortTermNote:
-                summary: Temporary session note
-                value:
-                  text: "Currently working on Docker deployment for Railway"
-                  layer: "short_term"
-                  importance: 5
       responses:
         "200":
-          description: Memory committed successfully
+          description: Memory committed
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/RememberResponse"
-              example:
-                status: "committed"
-                message: "Memory stored in append log"
         "400":
-          description: Invalid request body
+          $ref: "#/components/responses/BadRequest"
+        "500":
+          $ref: "#/components/responses/EngineError"
+
+  /find:
+    get:
+      operationId: findMemory
+      summary: Find memories by text substring / keyword
+      description: |
+        Searches memory blocks by text match (not semantic). Faster than recall for
+        exact keyword lookups. Returns text, depth, and layer — no distance score.
+      parameters:
+        - name: q
+          in: query
+          required: true
+          description: Keyword or substring to search
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 500
+        - name: k
+          in: query
+          required: false
+          description: Max results (default 10)
+          schema:
+            type: integer
+            minimum: 1
+            default: 10
+      responses:
+        "200":
+          description: Matching memory blocks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/FindResult"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "500":
+          $ref: "#/components/responses/EngineError"
+
+  /look:
+    get:
+      operationId: lookMemory
+      summary: Look at a specific 3D coordinate in memory space
+      description: |
+        Returns memory blocks closest to the given (x, y, z) coordinate at a specific
+        zoom level (D0–D8). Useful for spatial exploration of the memory index.
+      parameters:
+        - name: x
+          in: query
+          required: true
+          schema:
+            type: number
+            format: float
+        - name: "y"
+          in: query
+          required: true
+          schema:
+            type: number
+            format: float
+        - name: z
+          in: query
+          required: true
+          schema:
+            type: number
+            format: float
+        - name: zoom
+          in: query
+          required: true
+          description: Depth level 0–8
+          schema:
+            type: integer
+            minimum: 0
+            maximum: 8
+        - name: k
+          in: query
+          required: false
+          description: Max results (default 10)
+          schema:
+            type: integer
+            minimum: 1
+            default: 10
+      responses:
+        "200":
+          description: Nearby memory blocks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LookResult"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "500":
+          $ref: "#/components/responses/EngineError"
+
+  /mql:
+    get:
+      operationId: mqlQuery
+      summary: Query memory using MQL (Microscope Query Language)
+      description: |
+        Executes a structured MQL expression against the memory index and append log.
+        Returns blocks with a relevance score.
+      parameters:
+        - name: mql
+          in: query
+          required: true
+          description: MQL expression string
+          schema:
+            type: string
+            minLength: 1
+      responses:
+        "200":
+          description: Query results with scores
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MqlResult"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "500":
+          $ref: "#/components/responses/EngineError"
+
+  /build:
+    post:
+      operationId: buildIndex
+      summary: Rebuild the memory index from the append log
+      description: |
+        Merges the append log into the main binary index, clears the log, and
+        returns updated block count. Use `force: true` to rebuild even if up-to-date.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                force:
+                  type: boolean
+                  default: false
+                  description: Force full rebuild even if index is current
+      responses:
+        "200":
+          description: Build result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+                  blocks:
+                    type: integer
+                    example: 20323
+                  depths:
+                    type: integer
+                    description: Number of non-empty depth levels
+                    example: 9
+        "500":
+          $ref: "#/components/responses/EngineError"
+
+  /session_log:
+    get:
+      operationId: getSessionLog
+      summary: Get recent session layer entries
+      description: Returns the last N entries from the session.txt layer file.
+      parameters:
+        - name: n
+          in: query
+          required: false
+          description: Number of recent entries to return (default 50)
+          schema:
+            type: integer
+            minimum: 1
+            default: 50
+      responses:
+        "200":
+          description: Recent session entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+        "500":
+          $ref: "#/components/responses/EngineError"
+
+  /consolidate:
+    post:
+      operationId: consolidateSessions
+      summary: Consolidate session entries into long-term memory
+      description: |
+        Groups session.txt entries by session ID, summarizes each group, and
+        stores summaries as long_term memories (importance 8).
+      responses:
+        "200":
+          description: Consolidation result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  consolidated:
+                    type: integer
+                    description: Number of session groups consolidated
+                  groups:
+                    type: array
+                    items:
+                      type: string
+                    description: Summary strings that were stored
+        "500":
+          $ref: "#/components/responses/EngineError"
+
+  /dream:
+    post:
+      operationId: dreamConsolidation
+      summary: Run a dream consolidation cycle
+      description: |
+        Triggers the offline consolidation process: replays fingerprints, strengthens
+        co-activated pairs, prunes weak associations, and consolidates patterns.
+        Analogous to sleep-based memory consolidation.
+      responses:
+        "200":
+          description: Dream cycle result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DreamResult"
+        "500":
+          $ref: "#/components/responses/EngineError"
+
+  /mobile/recall:
+    post:
+      operationId: mobileRecall
+      summary: Recall memories (mobile POST variant)
+      description: POST-based recall for mobile clients where GET with body is inconvenient.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [user_id, query]
+              properties:
+                user_id:
+                  type: string
+                query:
+                  type: string
+                k:
+                  type: integer
+                  default: 10
+      responses:
+        "200":
+          description: Relevant memory blocks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MemoryResult"
+        "500":
+          $ref: "#/components/responses/EngineError"
+
+  /mobile/remember:
+    post:
+      operationId: mobileRemember
+      summary: Store a memory (mobile variant, user-scoped)
+      description: Stores a memory prefixed with the user_id scope tag.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [user_id, text]
+              properties:
+                user_id:
+                  type: string
+                text:
+                  type: string
+                layer:
+                  type: string
+                  default: long_term
+                importance:
+                  type: integer
+                  minimum: 1
+                  maximum: 10
+                  default: 7
+      responses:
+        "200":
+          description: Memory committed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: committed
+                  message:
+                    type: string
+        "500":
+          $ref: "#/components/responses/EngineError"
+
+  /mobile/chat:
+    post:
+      operationId: mobileChat
+      summary: Provider-agnostic chat with automatic memory recall + store
+      description: |
+        Recalls relevant memories, sends the message + context to an LLM provider
+        (Ollama, OpenAI, or Gemini), then optionally stores both user message and
+        assistant reply back into memory.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MobileChatRequest"
+      responses:
+        "200":
+          description: Chat response with recalled memories and stored items
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MobileChatResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "502":
+          description: LLM provider error
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
         "500":
-          description: Engine error (filesystem write failed)
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "#/components/responses/EngineError"
 
   /openapi.json:
     get:
       operationId: getOpenApiSpec
-      summary: Get this OpenAPI specification as JSON
-      description: Returns the machine-readable OpenAPI spec for tool registration.
+      summary: OpenAPI specification (JSON)
       responses:
         "200":
-          description: OpenAPI specification document
+          description: OpenAPI spec document
           content:
             application/json:
               schema:
                 type: object
 
 components:
+  parameters:
+    UserId:
+      name: user_id
+      in: query
+      required: false
+      description: User identifier for namespace isolation (default "guest")
+      schema:
+        type: string
+        maxLength: 64
+    MemoryBackend:
+      name: memory_backend
+      in: query
+      required: false
+      description: Storage backend — local or cloud (default "local")
+      schema:
+        type: string
+        enum: [local, cloud]
+        default: local
+    MemoryScope:
+      name: memory_scope
+      in: query
+      required: false
+      description: Which namespace to search — personal, shared, or both (default "both")
+      schema:
+        type: string
+        enum: [personal, shared, both]
+        default: both
+
+  responses:
+    BadRequest:
+      description: Invalid request parameters
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    EngineError:
+      description: Internal engine error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
   schemas:
     StatusResponse:
       type: object
@@ -219,50 +537,94 @@ components:
       properties:
         version:
           type: string
-          description: Engine version string
-          example: "0.6.4"
+          example: "0.8.0"
         blocks:
           type: integer
-          description: Number of indexed memory blocks in the main index
-          example: 1024
+          example: 20323
         append_log:
           type: integer
-          description: Number of uncommitted entries in the append log
           example: 12
         layers:
           type: array
           items:
             type: string
-          description: Available memory layers
-          example: ["identity", "long_term", "short_term", "associative"]
+          example: [identity, long_term, short_term, associative, emotional]
+
+    SessionResponse:
+      type: object
+      required: [user_id, memory_backend, memory_scope, namespace_dir, personal_namespace_dir, shared_namespace_dir]
+      properties:
+        user_id:
+          type: string
+        memory_backend:
+          type: string
+        memory_scope:
+          type: string
+        namespace_dir:
+          type: string
+        personal_namespace_dir:
+          type: string
+        shared_namespace_dir:
+          type: string
 
     MemoryResult:
+      type: object
+      required: [text, depth, layer, distance, memory_scope]
+      properties:
+        text:
+          type: string
+        depth:
+          type: integer
+          minimum: 0
+          maximum: 8
+          description: "Depth level D0–D8 (D0=identity, D8=raw bytes)"
+        layer:
+          type: string
+        distance:
+          type: number
+          format: float
+          description: Euclidean distance in semantic space (lower = more relevant)
+        memory_scope:
+          type: string
+
+    FindResult:
+      type: object
+      required: [text, depth, layer]
+      properties:
+        text:
+          type: string
+        depth:
+          type: integer
+        layer:
+          type: string
+
+    LookResult:
       type: object
       required: [text, depth, layer, distance]
       properties:
         text:
           type: string
-          description: The memory content text
-          example: "The Spine Bridge API runs on Axum with CORS enabled"
         depth:
           type: integer
-          minimum: 0
-          maximum: 8
-          description: |
-            Memory depth level (D0–D8).
-            D0=identity, D3=memories, D5=tokens, D8=raw bytes.
-          example: 4
         layer:
           type: string
-          description: The memory layer this block belongs to
-          example: "long_term"
         distance:
           type: number
           format: float
-          description: |
-            Euclidean distance in semantic space (lower = more relevant).
-            Values below 0.1 indicate very strong matches.
-          example: 0.042
+
+    MqlResult:
+      type: object
+      required: [text, depth, layer, score]
+      properties:
+        text:
+          type: string
+        depth:
+          type: integer
+        layer:
+          type: string
+        score:
+          type: number
+          format: float
 
     RememberRequest:
       type: object
@@ -270,49 +632,139 @@ components:
       properties:
         text:
           type: string
-          minLength: 1
           maxLength: 256
-          description: The memory content to store (max 256 bytes)
-          example: "The Spine Bridge API is a REST interface for Microscope Memory"
         layer:
           type: string
-          default: "long_term"
-          enum:
-            - identity
-            - long_term
-            - short_term
-            - associative
-            - emotional
-            - relational
-            - reflections
-            - crypto_chain
-            - echo_cache
-            - rust_state
-          description: Memory layer (default long_term)
-          example: "long_term"
+          default: long_term
+          enum: [identity, long_term, short_term, associative, emotional, relational, reflections, crypto_chain, echo_cache, rust_state]
         importance:
           type: integer
           minimum: 1
           maximum: 10
           default: 5
-          description: Importance weight (1=low, 10=critical). Affects recall ranking.
-          example: 8
+        user_id:
+          type: string
+        memory_backend:
+          type: string
+          enum: [local, cloud]
+          default: local
+        memory_scope:
+          type: string
+          enum: [personal, shared, both]
+          default: both
 
     RememberResponse:
       type: object
-      required: [status, message]
       properties:
         status:
           type: string
-          example: "committed"
+          example: committed
         message:
           type: string
-          example: "Memory stored in append log"
+        user_id:
+          type: string
+        memory_backend:
+          type: string
+        memory_scope:
+          type: string
+        written_scopes:
+          type: array
+          items:
+            type: string
+        namespace_dir:
+          type: string
+        personal_namespace_dir:
+          type: string
+        shared_namespace_dir:
+          type: string
+
+    DreamResult:
+      type: object
+      properties:
+        status:
+          type: string
+          example: ok
+        duration_ms:
+          type: integer
+        replayed_fingerprints:
+          type: integer
+        strengthened_pairs:
+          type: integer
+        pruned_pairs:
+          type: integer
+        pruned_activations:
+          type: integer
+        consolidated_patterns:
+          type: integer
+        energy_before:
+          type: number
+          format: float
+        energy_after:
+          type: number
+          format: float
+
+    MobileChatRequest:
+      type: object
+      required: [user_id, message, provider, model]
+      properties:
+        user_id:
+          type: string
+        message:
+          type: string
+        provider:
+          type: string
+          enum: [ollama, openai, gemini]
+        model:
+          type: string
+          example: llama3
+        api_base:
+          type: string
+          description: Override the provider's default base URL
+        recall_k:
+          type: integer
+          default: 8
+          description: Number of memories to recall for context
+        system_prompt:
+          type: string
+        layer:
+          type: string
+          default: long_term
+        importance:
+          type: integer
+          minimum: 1
+          maximum: 10
+          default: 7
+        remember_user:
+          type: boolean
+          default: true
+          description: Store the user's message in memory
+        remember_assistant:
+          type: boolean
+          default: true
+          description: Store the assistant's reply in memory
+
+    MobileChatResponse:
+      type: object
+      required: [provider, model, reply, recalled, stored]
+      properties:
+        provider:
+          type: string
+        model:
+          type: string
+        reply:
+          type: string
+        recalled:
+          type: array
+          items:
+            $ref: "#/components/schemas/MemoryResult"
+        stored:
+          type: array
+          items:
+            type: string
+          description: Which items were stored (e.g. ["user_message", "assistant_reply"])
 
     ErrorResponse:
       type: object
       properties:
         error:
           type: string
-          description: Error description
-          example: "Index not built — run 'microscope-mem build' first"

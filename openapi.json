@@ -2,13 +2,25 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Microscope Memory — Spine Bridge API",
-    "description": "AI-native cognitive memory interface for ChatGPT, Claude, and other LLMs.\n\nMicroscope Memory is a sub-microsecond, zoom-based hierarchical memory engine.\nThis API lets AI models store and recall memories using natural language.\n\n## Layers\nidentity, long_term, short_term, associative, emotional, relational, reflections, crypto_chain, echo_cache, rust_state\n\n## Usage tips\n- Call `recall` before answering to check for existing context\n- Call `remember` to commit important facts for future sessions\n- Higher `importance` (1–10) surfaces memories more prominently",
-    "version": "0.6.4"
+    "description": "AI-native cognitive memory interface for ChatGPT, Claude, and other LLMs.\n\nMicroscope Memory is a **sub-microsecond**, zoom-based hierarchical memory engine.\nThis API lets AI models **store** and **recall** memories using natural language.\n\n## How it works\n- Memories are stored in a 3D coordinate space using semantic hashing\n- Recall uses SIMD-accelerated radial search at the correct depth layer\n- Layers: identity, long_term, short_term, associative, emotional, relational,\n  reflections, crypto_chain, echo_cache, rust_state\n\n## Usage tips\n- Use `recall` before answering to check if relevant context exists\n- Use `remember` to commit important facts for future sessions\n- Set `layer` to `associative` for links between concepts\n- Set `layer` to `emotional` for emotional context\n- Higher `importance` (1–10) = prioritized in future recall\n\n## Namespacing\nMost endpoints accept optional `user_id`, `memory_backend` (local|cloud), and\n`memory_scope` (personal|shared|both) parameters for multi-user isolation.\n",
+    "version": "0.8.0",
+    "contact": {
+      "name": "Microscope Memory",
+      "url": "https://github.com/silentnoisehun/microscope-memory"
+    }
   },
   "servers": [
     {
       "url": "http://localhost:6060",
       "description": "Local Spine Bridge (default)"
+    },
+    {
+      "url": "http://localhost:6060/v1",
+      "description": "Local Spine Bridge v1 prefix"
+    },
+    {
+      "url": "https://your-deployment.railway.app",
+      "description": "Cloud deployment (configure your URL)"
     }
   ],
   "paths": {
@@ -16,18 +28,52 @@
       "get": {
         "operationId": "getMemoryStatus",
         "summary": "Get memory engine status",
-        "description": "Returns the current state of the engine: block count, append log size, available layers. Call this first to verify the engine is running.",
+        "description": "Returns block count, append log size, and available layers.",
         "responses": {
           "200": {
             "description": "Engine status",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/StatusResponse" }
+                "schema": {
+                  "$ref": "#/components/schemas/StatusResponse"
+                }
               }
             }
           },
           "500": {
-            "description": "Engine error — run 'microscope-mem build' first"
+            "$ref": "#/components/responses/EngineError"
+          }
+        }
+      }
+    },
+    "/session": {
+      "get": {
+        "operationId": "getSession",
+        "summary": "Resolve namespace paths for a user/backend/scope combination",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UserId"
+          },
+          {
+            "$ref": "#/components/parameters/MemoryBackend"
+          },
+          {
+            "$ref": "#/components/parameters/MemoryScope"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resolved namespace info",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/EngineError"
           }
         }
       }
@@ -36,37 +82,61 @@
       "get": {
         "operationId": "recallMemory",
         "summary": "Recall relevant memories by natural language query",
-        "description": "Searches the memory engine using a natural language query. Returns the most relevant memory blocks ordered by spatial proximity (lower distance = more relevant).\n\n**Use this before answering any question** to check if relevant context exists.",
+        "description": "Searches the memory engine using semantic hashing + SIMD radial search.\nUse this before answering any question to check for relevant context.\n",
         "parameters": [
           {
             "name": "q",
             "in": "query",
             "required": true,
             "description": "Natural language query",
-            "schema": { "type": "string", "minLength": 1, "maxLength": 500 },
-            "example": "What did we discuss about the Rust architecture?"
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 500
+            }
           },
           {
             "name": "k",
             "in": "query",
             "required": false,
-            "description": "Maximum number of results (default 10, max 50)",
-            "schema": { "type": "integer", "minimum": 1, "maximum": 50, "default": 10 }
+            "description": "Max results (default 10, max 50)",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 10
+            }
+          },
+          {
+            "$ref": "#/components/parameters/UserId"
+          },
+          {
+            "$ref": "#/components/parameters/MemoryBackend"
+          },
+          {
+            "$ref": "#/components/parameters/MemoryScope"
           }
         ],
         "responses": {
           "200": {
-            "description": "List of relevant memory blocks ordered by relevance",
+            "description": "Relevant memory blocks ordered by distance",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "array",
-                  "items": { "$ref": "#/components/schemas/MemoryResult" }
+                  "items": {
+                    "$ref": "#/components/schemas/MemoryResult"
+                  }
                 }
               }
             }
           },
-          "500": { "description": "Engine error" }
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "500": {
+            "$ref": "#/components/responses/EngineError"
+          }
         }
       }
     },
@@ -74,27 +144,224 @@
       "post": {
         "operationId": "rememberMemory",
         "summary": "Store a new memory",
-        "description": "Commits a new memory to permanent storage. The memory is immediately available for recall.\n\nChoose the appropriate layer:\n- `long_term` — facts, knowledge, decisions (default)\n- `short_term` — temporary context\n- `associative` — links between concepts\n- `emotional` — emotional context, preferences\n- `relational` — relationships between entities\n- `reflections` — meta-thoughts, evaluations",
+        "description": "Commits a new memory to the append log. Immediately available for recall.\nUse `layer` to categorize and `importance` (1–10) to weight future recall.\n",
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
-              "schema": { "$ref": "#/components/schemas/RememberRequest" },
-              "examples": {
-                "basicFact": {
-                  "summary": "Store a basic fact",
-                  "value": {
-                    "text": "The Spine Bridge API is a REST interface for Microscope Memory",
-                    "layer": "long_term",
-                    "importance": 8
+              "schema": {
+                "$ref": "#/components/schemas/RememberRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Memory committed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RememberResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "500": {
+            "$ref": "#/components/responses/EngineError"
+          }
+        }
+      }
+    },
+    "/find": {
+      "get": {
+        "operationId": "findMemory",
+        "summary": "Find memories by text substring / keyword",
+        "description": "Searches memory blocks by text match (not semantic). Faster than recall for\nexact keyword lookups. Returns text, depth, and layer — no distance score.\n",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "description": "Keyword or substring to search",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 500
+            }
+          },
+          {
+            "name": "k",
+            "in": "query",
+            "required": false,
+            "description": "Max results (default 10)",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 10
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Matching memory blocks",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/FindResult"
                   }
-                },
-                "preference": {
-                  "summary": "Store user preference",
-                  "value": {
-                    "text": "User prefers concise technical explanations",
-                    "layer": "emotional",
-                    "importance": 7
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "500": {
+            "$ref": "#/components/responses/EngineError"
+          }
+        }
+      }
+    },
+    "/look": {
+      "get": {
+        "operationId": "lookMemory",
+        "summary": "Look at a specific 3D coordinate in memory space",
+        "description": "Returns memory blocks closest to the given (x, y, z) coordinate at a specific\nzoom level (D0–D8). Useful for spatial exploration of the memory index.\n",
+        "parameters": [
+          {
+            "name": "x",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "number",
+              "format": "float"
+            }
+          },
+          {
+            "name": "y",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "number",
+              "format": "float"
+            }
+          },
+          {
+            "name": "z",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "number",
+              "format": "float"
+            }
+          },
+          {
+            "name": "zoom",
+            "in": "query",
+            "required": true,
+            "description": "Depth level 0–8",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 8
+            }
+          },
+          {
+            "name": "k",
+            "in": "query",
+            "required": false,
+            "description": "Max results (default 10)",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 10
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Nearby memory blocks",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/LookResult"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "500": {
+            "$ref": "#/components/responses/EngineError"
+          }
+        }
+      }
+    },
+    "/mql": {
+      "get": {
+        "operationId": "mqlQuery",
+        "summary": "Query memory using MQL (Microscope Query Language)",
+        "description": "Executes a structured MQL expression against the memory index and append log.\nReturns blocks with a relevance score.\n",
+        "parameters": [
+          {
+            "name": "mql",
+            "in": "query",
+            "required": true,
+            "description": "MQL expression string",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Query results with scores",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MqlResult"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "500": {
+            "$ref": "#/components/responses/EngineError"
+          }
+        }
+      }
+    },
+    "/build": {
+      "post": {
+        "operationId": "buildIndex",
+        "summary": "Rebuild the memory index from the append log",
+        "description": "Merges the append log into the main binary index, clears the log, and\nreturns updated block count. Use `force: true` to rebuild even if up-to-date.\n",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "force": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Force full rebuild even if index is current"
                   }
                 }
               }
@@ -103,82 +370,766 @@
         },
         "responses": {
           "200": {
-            "description": "Memory committed successfully",
+            "description": "Build result",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/RememberResponse" }
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "ok"
+                    },
+                    "blocks": {
+                      "type": "integer",
+                      "example": 20323
+                    },
+                    "depths": {
+                      "type": "integer",
+                      "description": "Number of non-empty depth levels",
+                      "example": 9
+                    }
+                  }
+                }
               }
             }
           },
-          "500": { "description": "Write error" }
+          "500": {
+            "$ref": "#/components/responses/EngineError"
+          }
+        }
+      }
+    },
+    "/session_log": {
+      "get": {
+        "operationId": "getSessionLog",
+        "summary": "Get recent session layer entries",
+        "description": "Returns the last N entries from the session.txt layer file.",
+        "parameters": [
+          {
+            "name": "n",
+            "in": "query",
+            "required": false,
+            "description": "Number of recent entries to return (default 50)",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 50
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Recent session entries",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/EngineError"
+          }
+        }
+      }
+    },
+    "/consolidate": {
+      "post": {
+        "operationId": "consolidateSessions",
+        "summary": "Consolidate session entries into long-term memory",
+        "description": "Groups session.txt entries by session ID, summarizes each group, and\nstores summaries as long_term memories (importance 8).\n",
+        "responses": {
+          "200": {
+            "description": "Consolidation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "consolidated": {
+                      "type": "integer",
+                      "description": "Number of session groups consolidated"
+                    },
+                    "groups": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "Summary strings that were stored"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/EngineError"
+          }
+        }
+      }
+    },
+    "/dream": {
+      "post": {
+        "operationId": "dreamConsolidation",
+        "summary": "Run a dream consolidation cycle",
+        "description": "Triggers the offline consolidation process: replays fingerprints, strengthens\nco-activated pairs, prunes weak associations, and consolidates patterns.\nAnalogous to sleep-based memory consolidation.\n",
+        "responses": {
+          "200": {
+            "description": "Dream cycle result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DreamResult"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/EngineError"
+          }
+        }
+      }
+    },
+    "/mobile/recall": {
+      "post": {
+        "operationId": "mobileRecall",
+        "summary": "Recall memories (mobile POST variant)",
+        "description": "POST-based recall for mobile clients where GET with body is inconvenient.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "user_id",
+                  "query"
+                ],
+                "properties": {
+                  "user_id": {
+                    "type": "string"
+                  },
+                  "query": {
+                    "type": "string"
+                  },
+                  "k": {
+                    "type": "integer",
+                    "default": 10
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Relevant memory blocks",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MemoryResult"
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/EngineError"
+          }
+        }
+      }
+    },
+    "/mobile/remember": {
+      "post": {
+        "operationId": "mobileRemember",
+        "summary": "Store a memory (mobile variant, user-scoped)",
+        "description": "Stores a memory prefixed with the user_id scope tag.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "user_id",
+                  "text"
+                ],
+                "properties": {
+                  "user_id": {
+                    "type": "string"
+                  },
+                  "text": {
+                    "type": "string"
+                  },
+                  "layer": {
+                    "type": "string",
+                    "default": "long_term"
+                  },
+                  "importance": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 10,
+                    "default": 7
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Memory committed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "committed"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/EngineError"
+          }
+        }
+      }
+    },
+    "/mobile/chat": {
+      "post": {
+        "operationId": "mobileChat",
+        "summary": "Provider-agnostic chat with automatic memory recall + store",
+        "description": "Recalls relevant memories, sends the message + context to an LLM provider\n(Ollama, OpenAI, or Gemini), then optionally stores both user message and\nassistant reply back into memory.\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MobileChatRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Chat response with recalled memories and stored items",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MobileChatResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "502": {
+            "description": "LLM provider error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/EngineError"
+          }
+        }
+      }
+    },
+    "/openapi.json": {
+      "get": {
+        "operationId": "getOpenApiSpec",
+        "summary": "OpenAPI specification (JSON)",
+        "responses": {
+          "200": {
+            "description": "OpenAPI spec document",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
         }
       }
     }
   },
   "components": {
+    "parameters": {
+      "UserId": {
+        "name": "user_id",
+        "in": "query",
+        "required": false,
+        "description": "User identifier for namespace isolation (default \"guest\")",
+        "schema": {
+          "type": "string",
+          "maxLength": 64
+        }
+      },
+      "MemoryBackend": {
+        "name": "memory_backend",
+        "in": "query",
+        "required": false,
+        "description": "Storage backend — local or cloud (default \"local\")",
+        "schema": {
+          "type": "string",
+          "enum": [
+            "local",
+            "cloud"
+          ],
+          "default": "local"
+        }
+      },
+      "MemoryScope": {
+        "name": "memory_scope",
+        "in": "query",
+        "required": false,
+        "description": "Which namespace to search — personal, shared, or both (default \"both\")",
+        "schema": {
+          "type": "string",
+          "enum": [
+            "personal",
+            "shared",
+            "both"
+          ],
+          "default": "both"
+        }
+      }
+    },
+    "responses": {
+      "BadRequest": {
+        "description": "Invalid request parameters",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "EngineError": {
+        "description": "Internal engine error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      }
+    },
     "schemas": {
       "StatusResponse": {
         "type": "object",
-        "required": ["version", "blocks", "append_log", "layers"],
+        "required": [
+          "version",
+          "blocks",
+          "append_log",
+          "layers"
+        ],
         "properties": {
-          "version": { "type": "string", "example": "0.6.4" },
-          "blocks": { "type": "integer", "description": "Indexed memory blocks in main index", "example": 1024 },
-          "append_log": { "type": "integer", "description": "Uncommitted entries pending rebuild", "example": 12 },
+          "version": {
+            "type": "string",
+            "example": "0.8.0"
+          },
+          "blocks": {
+            "type": "integer",
+            "example": 20323
+          },
+          "append_log": {
+            "type": "integer",
+            "example": 12
+          },
           "layers": {
             "type": "array",
-            "items": { "type": "string" },
-            "example": ["long_term", "short_term", "associative", "emotional"]
+            "items": {
+              "type": "string"
+            },
+            "example": [
+              "identity",
+              "long_term",
+              "short_term",
+              "associative",
+              "emotional"
+            ]
+          }
+        }
+      },
+      "SessionResponse": {
+        "type": "object",
+        "required": [
+          "user_id",
+          "memory_backend",
+          "memory_scope",
+          "namespace_dir",
+          "personal_namespace_dir",
+          "shared_namespace_dir"
+        ],
+        "properties": {
+          "user_id": {
+            "type": "string"
+          },
+          "memory_backend": {
+            "type": "string"
+          },
+          "memory_scope": {
+            "type": "string"
+          },
+          "namespace_dir": {
+            "type": "string"
+          },
+          "personal_namespace_dir": {
+            "type": "string"
+          },
+          "shared_namespace_dir": {
+            "type": "string"
           }
         }
       },
       "MemoryResult": {
         "type": "object",
-        "required": ["text", "depth", "layer", "distance"],
+        "required": [
+          "text",
+          "depth",
+          "layer",
+          "distance",
+          "memory_scope"
+        ],
         "properties": {
-          "text": { "type": "string", "description": "Memory content", "example": "The Spine Bridge API runs on Axum" },
+          "text": {
+            "type": "string"
+          },
           "depth": {
             "type": "integer",
             "minimum": 0,
             "maximum": 8,
-            "description": "Memory depth (D0=identity, D3=memories, D5=tokens, D8=raw bytes)",
-            "example": 4
+            "description": "Depth level D0–D8 (D0=identity, D8=raw bytes)"
           },
-          "layer": { "type": "string", "description": "Memory layer", "example": "long_term" },
+          "layer": {
+            "type": "string"
+          },
           "distance": {
             "type": "number",
             "format": "float",
-            "description": "Euclidean distance in semantic space. Lower = more relevant. <0.1 = very strong match.",
-            "example": 0.042
+            "description": "Euclidean distance in semantic space (lower = more relevant)"
+          },
+          "memory_scope": {
+            "type": "string"
+          }
+        }
+      },
+      "FindResult": {
+        "type": "object",
+        "required": [
+          "text",
+          "depth",
+          "layer"
+        ],
+        "properties": {
+          "text": {
+            "type": "string"
+          },
+          "depth": {
+            "type": "integer"
+          },
+          "layer": {
+            "type": "string"
+          }
+        }
+      },
+      "LookResult": {
+        "type": "object",
+        "required": [
+          "text",
+          "depth",
+          "layer",
+          "distance"
+        ],
+        "properties": {
+          "text": {
+            "type": "string"
+          },
+          "depth": {
+            "type": "integer"
+          },
+          "layer": {
+            "type": "string"
+          },
+          "distance": {
+            "type": "number",
+            "format": "float"
+          }
+        }
+      },
+      "MqlResult": {
+        "type": "object",
+        "required": [
+          "text",
+          "depth",
+          "layer",
+          "score"
+        ],
+        "properties": {
+          "text": {
+            "type": "string"
+          },
+          "depth": {
+            "type": "integer"
+          },
+          "layer": {
+            "type": "string"
+          },
+          "score": {
+            "type": "number",
+            "format": "float"
           }
         }
       },
       "RememberRequest": {
         "type": "object",
-        "required": ["text"],
+        "required": [
+          "text"
+        ],
         "properties": {
-          "text": { "type": "string", "minLength": 1, "maxLength": 256, "description": "Memory content to store", "example": "Docker deployment uses Railway for one-click cloud hosting" },
+          "text": {
+            "type": "string",
+            "maxLength": 256
+          },
           "layer": {
             "type": "string",
             "default": "long_term",
-            "enum": ["identity", "long_term", "short_term", "associative", "emotional", "relational", "reflections", "crypto_chain", "echo_cache", "rust_state"],
-            "description": "Target memory layer"
+            "enum": [
+              "identity",
+              "long_term",
+              "short_term",
+              "associative",
+              "emotional",
+              "relational",
+              "reflections",
+              "crypto_chain",
+              "echo_cache",
+              "rust_state"
+            ]
           },
           "importance": {
             "type": "integer",
             "minimum": 1,
             "maximum": 10,
-            "default": 5,
-            "description": "Importance weight. Higher values surface this memory more in future recalls.",
-            "example": 8
+            "default": 5
+          },
+          "user_id": {
+            "type": "string"
+          },
+          "memory_backend": {
+            "type": "string",
+            "enum": [
+              "local",
+              "cloud"
+            ],
+            "default": "local"
+          },
+          "memory_scope": {
+            "type": "string",
+            "enum": [
+              "personal",
+              "shared",
+              "both"
+            ],
+            "default": "both"
           }
         }
       },
       "RememberResponse": {
         "type": "object",
-        "required": ["status", "message"],
         "properties": {
-          "status": { "type": "string", "example": "committed" },
-          "message": { "type": "string", "example": "Memory stored in append log" }
+          "status": {
+            "type": "string",
+            "example": "committed"
+          },
+          "message": {
+            "type": "string"
+          },
+          "user_id": {
+            "type": "string"
+          },
+          "memory_backend": {
+            "type": "string"
+          },
+          "memory_scope": {
+            "type": "string"
+          },
+          "written_scopes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "namespace_dir": {
+            "type": "string"
+          },
+          "personal_namespace_dir": {
+            "type": "string"
+          },
+          "shared_namespace_dir": {
+            "type": "string"
+          }
+        }
+      },
+      "DreamResult": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "example": "ok"
+          },
+          "duration_ms": {
+            "type": "integer"
+          },
+          "replayed_fingerprints": {
+            "type": "integer"
+          },
+          "strengthened_pairs": {
+            "type": "integer"
+          },
+          "pruned_pairs": {
+            "type": "integer"
+          },
+          "pruned_activations": {
+            "type": "integer"
+          },
+          "consolidated_patterns": {
+            "type": "integer"
+          },
+          "energy_before": {
+            "type": "number",
+            "format": "float"
+          },
+          "energy_after": {
+            "type": "number",
+            "format": "float"
+          }
+        }
+      },
+      "MobileChatRequest": {
+        "type": "object",
+        "required": [
+          "user_id",
+          "message",
+          "provider",
+          "model"
+        ],
+        "properties": {
+          "user_id": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "provider": {
+            "type": "string",
+            "enum": [
+              "ollama",
+              "openai",
+              "gemini"
+            ]
+          },
+          "model": {
+            "type": "string",
+            "example": "llama3"
+          },
+          "api_base": {
+            "type": "string",
+            "description": "Override the provider's default base URL"
+          },
+          "recall_k": {
+            "type": "integer",
+            "default": 8,
+            "description": "Number of memories to recall for context"
+          },
+          "system_prompt": {
+            "type": "string"
+          },
+          "layer": {
+            "type": "string",
+            "default": "long_term"
+          },
+          "importance": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10,
+            "default": 7
+          },
+          "remember_user": {
+            "type": "boolean",
+            "default": true,
+            "description": "Store the user's message in memory"
+          },
+          "remember_assistant": {
+            "type": "boolean",
+            "default": true,
+            "description": "Store the assistant's reply in memory"
+          }
+        }
+      },
+      "MobileChatResponse": {
+        "type": "object",
+        "required": [
+          "provider",
+          "model",
+          "reply",
+          "recalled",
+          "stored"
+        ],
+        "properties": {
+          "provider": {
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          },
+          "reply": {
+            "type": "string"
+          },
+          "recalled": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MemoryResult"
+            }
+          },
+          "stored": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Which items were stored (e.g. [\"user_message\", \"assistant_reply\"])"
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string"
+          }
         }
       }
     }

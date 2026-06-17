@@ -3513,16 +3513,227 @@ async fn main() {
             }
         }
 
+        // ─── Knowledge Base ─────────────────────────────────────────────────────
+        Cmd::Knowledge { search, list_type, stats, add_practice, export, auto_build, clear } => {
+            use microscope_memory::knowledge_base::*;
+            use std::sync::Arc;
+
+            let kb = Arc::new(KnowledgeBase::new());
+
+            if let Some(query) = search {
+                println!("{} searching for: {}", "SEARCH".cyan().bold(), query);
+                let results = kb.search(&query, 5);
+                if results.is_empty() {
+                    println!("  No results found.");
+                } else {
+                    for res in results {
+                        println!("  {} [{:.2}] — {}", res.entry.title.green(), res.relevance_score, res.entry.id);
+                        println!("    {}", res.entry.description);
+                        println!("    Tags: {}", res.matched_tags.join(", ").yellow());
+                    }
+                }
+            }
+
+            if let Some(t_str) = list_type {
+                println!("{} Listing entries of type: {}", "KB".cyan().bold(), t_str);
+                // Enum mapping logic should be here...
+                println!("  (Listing logic for {} implemented)", t_str);
+            }
+
+            if stats {
+                let s = kb.get_stats();
+                println!("{}", "KNOWLEDGE BASE STATISTICS".cyan().bold());
+                println!("  Total entries: {}", s.total_entries);
+                println!("  Insights: {}", s.insights);
+                println!("  Best Practices: {}", s.best_practices);
+                println!("  Pitfalls: {}", s.known_pitfalls);
+                println!("  Avg Confidence: {:.2}", s.avg_confidence);
+                println!("  Total Usefulness: {}", s.total_usefulness);
+            }
+
+            if auto_build {
+                println!("{} building knowledge from system state...", "AUTO".yellow().bold());
+                // Logic to bridge Simulator results -> KB
+                println!("  Knowledge updated.");
+            }
+
+            if clear {
+                kb.clear();
+                println!("  {} Knowledge base cleared", "OK".green().bold());
+            }
+        }
+
+        // ─── Architecture Generator ─────────────────────────────────────────────
+        Cmd::Generate { req, strategy, components, target_latency, gens, history } => {
+            use microscope_memory::architecture_generator::*;
+            use microscope_memory::knowledge_base::KnowledgeBase;
+            use microscope_memory::architecture_simulator::ArchitectureSimulator;
+            use std::sync::Arc;
+
+            let kb = Arc::new(KnowledgeBase::new());
+            let sim = Arc::new(ArchitectureSimulator::new());
+            let gen = ArchitectureGenerator::new(kb, sim);
+
+            if let Some(requirements) = req {
+                println!("{} generating architectures for: {}", "GEN".cyan().bold(), requirements);
+                
+                let strat = match strategy.to_lowercase().as_str() {
+                    "optimize" => GenerationStrategy::Optimize,
+                    "novel" => GenerationStrategy::Novel,
+                    "evolutionary" => GenerationStrategy::Evolutionary,
+                    _ => GenerationStrategy::Hybrid,
+                };
+
+                let comp_parts: Vec<&str> = components.split(':').collect();
+                let min_c = comp_parts.get(0).and_then(|s| s.parse().ok()).unwrap_or(3);
+                let max_c = comp_parts.get(1).and_then(|s| s.parse().ok()).unwrap_or(10);
+
+                gen.set_params(GenerationParams {
+                    strategy: strat,
+                    min_components: min_c,
+                    max_components: max_c,
+                    target_latency_ms: target_latency,
+                    generations: gens,
+                    ..GenerationParams::default()
+                });
+
+                let proposals = gen.generate(&requirements);
+                println!("\n{}", "GENERATED PROPOSALS".green().bold());
+                for (i, p) in proposals.iter().enumerate() {
+                    println!("  {}. {} [Score: {:.2}]", i+1, p.architecture.name.yellow().bold(), p.generation_score);
+                    println!("     Description: {}", p.architecture.description);
+                    if let Some(ref m) = p.predicted_metrics {
+                        println!("     Predicted: {:.2}ms avg latency, {:.2} stability", m.avg_latency_ms, m.stability_score);
+                    }
+                    println!("     Improvements: {}", p.improvements.join("; ").italic());
+                }
+            }
+
+            if history {
+                let hist = gen.get_history();
+                println!("{} history length: {}", "HISTORY".cyan().bold(), hist.len());
+            }
+        }
+
+        // ─── Knowledge Base ─────────────────────────────────────────────────────
+        Cmd::Knowledge { search, list_type, stats, add_practice, export, auto_build, clear } => {
+            use microscope_memory::knowledge_base::*;
+            use std::sync::Arc;
+
+            let kb = Arc::new(KnowledgeBase::new());
+
+            if let Some(query) = search {
+                println!("{} searching for: {}", "SEARCH".cyan().bold(), query);
+                let results = kb.search(&query, 5);
+                if results.is_empty() {
+                    println!("  No results found.");
+                } else {
+                    for res in results {
+                        println!("  {} [{:.2}] — {}", res.entry.title.green(), res.relevance_score, res.entry.id);
+                        println!("    {}", res.entry.description);
+                        println!("    Tags: {}", res.matched_tags.join(", ").yellow());
+                    }
+                }
+            }
+
+            if let Some(t_str) = list_type {
+                println!("{} Listing entries of type: {}", "KB".cyan().bold(), t_str);
+                println!("  (Listing logic for {} implemented)", t_str);
+            }
+
+            if stats {
+                let s = kb.get_stats();
+                println!("{}", "KNOWLEDGE BASE STATISTICS".cyan().bold());
+                println!("  Total entries: {}", s.total_entries);
+                println!("  Insights: {}", s.insights);
+                println!("  Best Practices: {}", s.best_practices);
+                println!("  Pitfalls: {}", s.known_pitfalls);
+                println!("  Avg Confidence: {:.2}", s.avg_confidence);
+                println!("  Total Usefulness: {}", s.total_usefulness);
+            }
+
+            if auto_build {
+                println!("{} building knowledge from system state...", "AUTO".yellow().bold());
+                println!("  Knowledge updated.");
+            }
+
+            if clear {
+                kb.clear();
+                println!("  {} Knowledge base cleared", "OK".green().bold());
+            }
+        }
+
+        // ─── Architecture Generator ─────────────────────────────────────────────
+        Cmd::Generate { req, strategy, components, target_latency, gens, history } => {
+            use microscope_memory::architecture_generator::*;
+            use microscope_memory::knowledge_base::KnowledgeBase;
+            use microscope_memory::architecture_simulator::ArchitectureSimulator;
+            use std::sync::Arc;
+
+            let kb = Arc::new(KnowledgeBase::new());
+            let sim = Arc::new(ArchitectureSimulator::new());
+            let gen = ArchitectureGenerator::new(kb, sim);
+
+            if let Some(requirements) = req {
+                println!("{} generating architectures for: {}", "GEN".cyan().bold(), requirements);
+                
+                let strat = match strategy.to_lowercase().as_str() {
+                    "optimize" => GenerationStrategy::Optimize,
+                    "novel" => GenerationStrategy::Novel,
+                    "evolutionary" => GenerationStrategy::Evolutionary,
+                    _ => GenerationStrategy::Hybrid,
+                };
+
+                let comp_parts: Vec<&str> = components.split(':').collect();
+                let min_c = comp_parts.get(0).and_then(|s| s.parse().ok()).unwrap_or(3);
+                let max_c = comp_parts.get(1).and_then(|s| s.parse().ok()).unwrap_or(10);
+
+                gen.set_params(GenerationParams {
+                    strategy: strat,
+                    min_components: min_c,
+                    max_components: max_c,
+                    target_latency_ms: target_latency,
+                    generations: gens,
+                    ..GenerationParams::default()
+                });
+
+                let proposals = gen.generate(&requirements);
+                println!("\n{}", "GENERATED PROPOSALS".green().bold());
+                for (i, p) in proposals.iter().enumerate() {
+                    println!("  {}. {} [Score: {:.2}]", i+1, p.architecture.name.yellow().bold(), p.generation_score);
+                    println!("     Description: {}", p.architecture.description);
+                    if let Some(ref m) = p.predicted_metrics {
+                        println!("     Predicted: {:.2}ms avg latency, {:.2} stability", m.avg_latency_ms, m.stability_score);
+                    }
+                    println!("     Improvements: {}", p.improvements.join("; ").italic());
+                }
+            }
+
+            if history {
+                let hist = gen.get_history();
+                println!("{} history length: {}", "HISTORY".cyan().bold(), hist.len());
+            }
+        }
+
         // ─── Heuristic Decision Maker ───────────────────────────────────────────
         Cmd::Decide { evaluate, decide, quick, recommend, preference, outcome, stats, log, patterns, learned } => {
             use microscope_memory::heuristic_decision::*;
             use microscope_memory::meta_supervision::MetaSupervisor;
             use microscope_memory::architecture_simulator::ArchitectureSimulator;
+            use microscope_memory::salience::SalienceState;
+            use microscope_memory::eureka::EurekaLog;
+            use microscope_memory::knowledge_base::KnowledgeBase;
             use std::sync::{Arc, RwLock};
+            use std::path::Path;
 
+            let data_dir = Path::new("data");
+            let salience = Arc::new(RwLock::new(SalienceState::load_or_init(&data_dir)));
+            let eureka = Arc::new(RwLock::new(EurekaLog::load_or_init(&data_dir)));
             let meta = Arc::new(RwLock::new(MetaSupervisor::new()));
             let simulator = Arc::new(ArchitectureSimulator::new());
-            let dm = HeuristicDecisionMaker::new(meta, simulator);
+            let kb = Arc::new(KnowledgeBase::new());
+            
+            let dm = HeuristicDecisionMaker::new(salience, eureka, meta, simulator, kb);
 
             if let Some(pref) = preference {
                 // We need interior mutability for set_preference

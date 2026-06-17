@@ -85,6 +85,12 @@ pub mod advanced_cognition;
 pub mod architecture_simulator;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod heuristic_decision;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod knowledge_base;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod architecture_generator;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod vagus;
 pub mod multimodal;
 pub mod predictive_cache;
 pub mod temporal_archetype;

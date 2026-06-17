@@ -584,6 +584,51 @@ pub enum Cmd {
         #[arg(long)]
         faults: bool,
     },
+    /// Knowledge Base — search and manage architectural knowledge
+    Knowledge {
+        /// Search the knowledge base
+        #[arg(long)]
+        search: Option<String>,
+        /// List entries by type
+        #[arg(long)]
+        list_type: Option<String>,
+        /// Show knowledge base statistics
+        #[arg(long)]
+        stats: bool,
+        /// Add a best practice
+        #[arg(long)]
+        add_practice: Option<String>,
+        /// Export all knowledge
+        #[arg(long)]
+        export: bool,
+        /// Auto-build knowledge from system state
+        #[arg(long)]
+        auto_build: bool,
+        /// Clear knowledge base
+        #[arg(long)]
+        clear: bool,
+    },
+    /// Architecture Generator — generate new architectures from patterns
+    Generate {
+        /// Requirements for the architecture
+        #[arg(long)]
+        req: Option<String>,
+        /// Generation strategy (hybrid, optimize, novel, evolutionary)
+        #[arg(long, default_value = "hybrid")]
+        strategy: String,
+        /// Component range (min:max)
+        #[arg(long, default_value = "3:10")]
+        components: String,
+        /// Target latency in ms
+        #[arg(long, default_value_t = 50.0)]
+        target_latency: f64,
+        /// Number of generations (evolutionary only)
+        #[arg(long, default_value_t = 5)]
+        gens: u32,
+        /// Show generation history
+        #[arg(long)]
+        history: bool,
+    },
     /// Heuristic Decision Maker — evaluate options and make decisions
     Decide {
         /// Evaluate options (comma-separated: desc,utility,risk)

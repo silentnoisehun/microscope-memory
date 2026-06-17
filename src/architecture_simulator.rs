@@ -609,10 +609,11 @@ mod tests {
             ],
         );
 
+        let arch_id = arch.id.clone();
         simulator.register_architecture(arch);
         
         let config = SimulationConfig::default();
-        let result = simulator.run_simulation("arch_0", &config);
+        let result = simulator.run_simulation(&arch_id, &config);
         
         assert!(result.is_some());
         let metrics = result.unwrap();
@@ -638,8 +639,9 @@ mod tests {
             ],
         );
 
+        let arch_id = arch.id.clone();
         simulator.register_architecture(arch);
-        let result = simulator.run_stress_test("arch_0");
+        let result = simulator.run_stress_test(&arch_id);
         
         assert!(result.is_some());
         let stress = result.unwrap();

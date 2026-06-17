@@ -10,6 +10,9 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::meta_supervision::MetaSupervisor;
 use crate::architecture_simulator::{ArchitectureSimulator, SimulationConfig, SimulationMetrics};
+use crate::salience::SalienceState;
+use crate::eureka::EurekaLog;
+use crate::knowledge_base::KnowledgeBase;
 
 // ─── Alap típusok ───────────────────────────────────────────────────────────
 
@@ -99,10 +102,16 @@ pub struct DecisionLogEntry {
 
 /// A fő heurisztikus döntéshozó rendszer
 pub struct HeuristicDecisionMaker {
+    /// Salience hálózat — kiemelés
+    salience: Arc<RwLock<SalienceState>>,
+    /// Eureka detektor — váratlan összefüggések
+    eureka: Arc<RwLock<EurekaLog>>,
     /// Meta-felügyelet — teljesítményfigyelés
     meta_supervisor: Arc<RwLock<MetaSupervisor>>,
     /// Architektúra szimulátor
     simulator: Arc<ArchitectureSimulator>,
+    /// Tudásbázis
+    knowledge_base: Arc<KnowledgeBase>,
     /// Tanult heurisztikus minták
     patterns: Arc<RwLock<HashMap<String, HeuristicPattern>>>,
     /// Döntési napló
@@ -116,12 +125,18 @@ pub struct HeuristicDecisionMaker {
 impl HeuristicDecisionMaker {
     /// Létrehoz egy új döntéshozót
     pub fn new(
+        salience: Arc<RwLock<SalienceState>>,
+        eureka: Arc<RwLock<EurekaLog>>,
         meta_supervisor: Arc<RwLock<MetaSupervisor>>,
         simulator: Arc<ArchitectureSimulator>,
+        knowledge_base: Arc<KnowledgeBase>,
     ) -> Self {
         Self {
+            salience,
+            eureka,
             meta_supervisor,
             simulator,
+            knowledge_base,
             patterns: Arc::new(RwLock::new(HashMap::new())),
             decision_log: Arc::new(RwLock::new(Vec::new())),
             preference: "balanced".to_string(),
@@ -176,13 +191,36 @@ impl HeuristicDecisionMaker {
         score += option.confidence * 0.1;
 
         // 5. Salience pontszám (a kiemelési hálózatból)
-        score += option.salience_score * 0.1;
+        // Valós idejű salience számítás a leírás alapján
+        let salience_score = {
+            let salience = self.salience.read().unwrap();
+            let hash = SalienceState::topic_hash(&option.description);
+            let computed = salience.compute_salience(0.5f32, 0.5f32, 0.5f32, hash);
+            computed as f64
+        };
+        score += salience_score;
 
         // 6. Eureka pontszám (váratlan összefüggések)
-        score += option.eureka_score * 0.1;
+        // Az események insight_score-jának átlaga
+        let eureka_score = {
+            let eureka = self.eureka.read().unwrap();
+            let events = &eureka.events;
+            if events.is_empty() {
+                0.0
+            } else {
+                let total: f32 = events.iter().map(|e| e.insight_score()).sum();
+                (total / events.len() as f32) as f64
+            }
+        };
+        score += eureka_score * 0.1;
 
         // 7. Meta-felügyeleti pontszám
-        score += option.meta_score * 0.1;
+        let meta_score = {
+            let meta = self.meta_supervisor.read().unwrap();
+            let (current, _trend, _volatility) = meta.get_summary();
+            current as f64
+        };
+        score += meta_score * 0.1;
 
         // 8. Szimulációs előrejelzés (ha van)
         if let Some(ref sim) = option.simulation_prediction {
@@ -194,6 +232,16 @@ impl HeuristicDecisionMaker {
         // 9. Tanult minták alapján korrekció
         let pattern_correction = self.apply_learned_patterns(option);
         score += pattern_correction * 0.1;
+
+        // 10. Tudásbázisból származó megerősítés
+        let kb_boost = {
+            let results = self.knowledge_base.search(&option.description, 3);
+            let boost: f64 = results.iter()
+                .map(|r| r.entry.confidence * r.relevance_score.min(1.0) / 10.0)
+                .sum();
+            boost.min(0.2)
+        };
+        score += kb_boost;
 
         score
     }
@@ -380,18 +428,23 @@ impl HeuristicDecisionMaker {
 
             let sim_result = self.simulator.run_simulation(&arch.id, &config);
 
-            // Salience pontszám (illeszkedés a követelményekhez)
-            let salience_score = if arch.description.contains(requirements) || arch.name.contains(requirements) {
-                0.8
-            } else {
-                0.3
+            // Salience pontszám (valós salience számítás)
+            let salience_score = {
+                let salience = self.salience.read().unwrap();
+                let hash = SalienceState::topic_hash(&format!("{} {}", arch.name, requirements));
+                salience.compute_salience(0.5f32, 0.5f32, 0.5f32, hash) as f64
             };
 
-            // Eureka pontszám (váratlan összefüggések)
-            let eureka_score = if arch.cohesion_score > 0.8 {
-                0.6
-            } else {
-                0.2
+            // Eureka pontszám (insight score alapján)
+            let eureka_score = {
+                let eureka = self.eureka.read().unwrap();
+                let events = &eureka.events;
+                if events.is_empty() {
+                    0.0
+                } else {
+                    let total: f32 = events.iter().map(|e| e.insight_score()).sum();
+                    (total / events.len() as f32) as f64
+                }
             };
 
             // Meta-felügyeleti pontszám
@@ -577,12 +630,20 @@ mod tests {
     use super::*;
     use crate::meta_supervision::MetaSupervisor;
     use crate::architecture_simulator::ArchitectureSimulator;
+    use crate::salience::SalienceState;
+    use crate::eureka::EurekaLog;
+    use crate::knowledge_base::KnowledgeBase;
+    use std::path::Path;
 
     fn create_test_decision_maker() -> HeuristicDecisionMaker {
+        let data_dir = Path::new("data");
+        let salience = Arc::new(RwLock::new(SalienceState::load_or_init(&data_dir)));
+        let eureka = Arc::new(RwLock::new(EurekaLog::load_or_init(&data_dir)));
         let meta = Arc::new(RwLock::new(MetaSupervisor::new()));
         let simulator = Arc::new(ArchitectureSimulator::new());
+        let kb = Arc::new(KnowledgeBase::new());
 
-        HeuristicDecisionMaker::new(meta, simulator)
+        HeuristicDecisionMaker::new(salience, eureka, meta, simulator, kb)
     }
 
     #[test]

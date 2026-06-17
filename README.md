@@ -1,132 +1,141 @@
-# Microscope Memory v0.7.0 "Public Beta"
+# Microscope Memory v0.8.0 "Cognitive Evolution"
 
 [![Rust](https://img.shields.io/badge/language-Rust-orange.svg)](https://www.rust-lang.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Zero-JSON](https://img.shields.io/badge/Architecture-Zero--JSON-green.svg)](#core-pillars)
 [![API v1](https://img.shields.io/badge/API-v1.0-cyan.svg)](#-spine-bridge-api-v1)
-[![Doctor](https://img.shields.io/badge/Reliability-Doctor--Cmd-green.svg)](#-reliability--doctor-command)
 
-![Microscope Memory Viewer](unnamed.png)
-
-**Microscope Memory** is a high-performance, hierarchical cognitive memory engine designed for AI agents and LLM architectures. It specializes in **sub-microsecond retrieval** of long-term context, bypassing the overhead of traditional Vector DBs.
-
-v0.7.0 marks the transition to **Public Beta**, introducing enterprise-grade reliability, automated crash recovery, and a modular architecture.
-
-## Website
-
-- Landing page: `website/index.html`
-- One-click web demo: `viewer.html?file=cognitive_map.bin`
-- One-click local start: `OneClick_Start.bat`
-- MCP + delegation one-click stack: `scripts/start_agent_stack.bat`
-- Per-user memory namespace: pass `user_id` + `memory_backend=local|cloud` to `/v1/recall` and `/v1/remember`
-- Website auth: instant fallback works by default; set `window.MICROSCOPE_AUTH` in `website/index.html` for real Firebase Google/Apple signup
+**Microscope Memory** is a hierarchical cognitive memory engine designed for AI agents.  
+It combines sub-microsecond binary memory retrieval with a living ecosystem of cognitive modules.
 
 ---
 
-## ⚡ Core Pillars
+## New in v0.8.0 — Cognitive Modules
 
-- **Sub-nanosecond Core**: Built on direct memory mapping (`mmap`), achieving ~1.2ns raw read speeds.
-- **Cognitive Hierarchy**: 13 biological-inspired layers (Hebbian, Resonance, Emotional, etc.) mapping memories from raw bytes to abstract concepts.
-- **Zero-JSON Hot Path**: Packed 256-byte binary frames ensure zero parsing latency during retrieval. *Note: bincode is used for optional consciousness state files (Hebbian activations, resonance fields, etc.) — not the core query path.*
-- **Spine Bridge v1**: A stable, versioned REST API for seamless integration with LangChain, AutoGPT, and Custom GPTs.
-- **Reliability First**: Integrated Merkle Tree integrity and the new `doctor` command for automated repair.
-
----
-
-## 🏗️ Architecture Design
-
-<p align="center">
-  <img src="architecture-diagram.jpg" alt="Architecture Design">
-</p>
-
----
-
-## 🩺 Reliability & Doctor Command
-
-Beta v0.7.0 introduces the `doctor` command, ensuring your cognitive data remains uncorrupted even after system crashes.
+### 🧬 Morphogenesis
+Biological pattern-inspired architecture generation:
+- **Mycelium** — fungal network growth for P2P topologies
+- **Capillary** — fractal branching for hierarchical cache/dataflow
+- **Slime Mold** — Physarum-inspired optimal route finding
+- **Fractal L-System** — self-similar structure cultivation
+- **Evolutionary engine** — genetic algorithm over growth parameters
 
 ```bash
-# Run integrity diagnostics
-microscope-mem doctor
-
-# Automatically repair corrupted append log tails (Crash Recovery)
-microscope-mem doctor --fix
+microscope-mem morph --grow "api" --pattern mycelium
+microscope-mem morph --evolve 10 --objective latency
+microscope-mem morph --daemon --interval 5 --threshold 0.5
 ```
 
-- **Merkle Roots**: Every block is part of a Merkle Tree, verified at runtime.
-- **CRC16 Validation**: Data integrity is checked at the block level.
-- **Atomic Persistence**: Append-log design ensures zero data loss.
+### 🔍 Pattern Recognition
+Multi-domain pattern detection:
+- **Sequence** — recurring thought/recall pathways
+- **Temporal** — daily/weekly activity rhythms
+- **Structural** — graph motif detection in architectures
+- **Cluster** — DBSCAN-based spatial grouping in memory space
+- **Cross-domain** — pattern correlation across layers
+
+### 🧠 Executive
+Cognitive conductor — module scheduling, resource allocation, homeostasis:
+```bash
+microscope-mem neuro       # Neuroplasticity state
+microscope-mem impulse     # Impulse control
+microscope-mem focus       # Hyperfocus mode
+```
+
+### 🎯 Planning
+Goal decomposition (HTN) and action planning:
+- Cél → részcélok → akcióterv
+- Erőforrás becslés és kockázat számítás
+- Replanning változott körülmények esetén
+
+### 🔄 Autopoiesis
+Self-modifying code system:
+- Template-based code generation
+- Versioned mutations with rollback
+- Integration with planning → automated fixes
+
+### 💬 ChatGPT Import + PWA
+Import conversations from ChatGPT exports:
+```bash
+microscope-mem import-chat-gpt conversations.json --dry-run
+microscope-mem import-chat-gpt --gdrive <shared-url>
+microscope-mem import-chat-gpt --gdrive-folder <folder-url>
+```
+
+**PWA Chat** — installable web app:
+```bash
+microscope-mem serve --port 8080
+# Open http://localhost:8080/chat.html
+# Access from phone on same WiFi
+```
+
+---
+
+## ⚡ Core Engine
+
+- **Sub-microsecond retrieval** — direct `mmap` binary frames, zero-JSON hot path
+- **9-depth cognitive hierarchy** (D0-D8): identity, long-term, short-term, associative, emotional, relational, reflections, crypto-chain, echo cache
+- **21D emotion vectors** — every memory carries emotional context
+- **Merkle Tree integrity** + CRC16 per-block validation
+- **Atomic append-log** — crash-proof persistence
+
+---
+
+## 🔬 Cognitive Features
+
+| Feature | Module | Description |
+|---------|--------|-------------|
+| Hebbian Learning | `hebbian.rs` | Co-activation → spatial drift |
+| Neuroplasticity | `neuroplasticity.rs` | Synaptic strengthening/pruning |
+| Hippocampus | `hippocampus.rs` | Episodic binding and consolidation |
+| Working Memory | `working_memory.rs` | 7±2 buffer with temporal decay |
+| Attention | `attention.rs` | Layer weight modulation |
+| Dream | `dream.rs` | Offline memory replay and pruning |
+| Emotional Contagion | `emotional_contagion.rs` | Cross-instance emotion sharing |
+| Resonance | `resonance.rs` | Federated pulse synchronization |
+| Hyperfocus | `hyperfocus.rs` | Deep focus mode |
+| Mental Sandbox | `mental_sandbox.rs` | Pre-action scenario simulation |
 
 ---
 
 ## 🤖 Spine Bridge API v1
 
-The Spine Bridge acts as the "Corpus Callosum" between your LLM and the Microscope Engine.
-
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `GET` | `/v1/status` | Engine health, version & stats |
-| `GET` | `/v1/recall?q=...&k=10` | Semantic/Spatial recall |
-| `POST` | `/v1/remember` | Store a new cognitive memory |
-| `POST` | `/v1/mobile/chat` | User-scoped persistent mobile chat (Ollama/OpenAI/Gemini) |
+| `GET` | `/v1/status` | Engine health & stats |
+| `GET` | `/v1/recall?q=...&k=10` | Semantic/spatial recall |
+| `POST` | `/v1/remember` | Store a memory |
+| `POST` | `/v1/mobile/chat` | User-scoped mobile chat |
 
-### Integration Example (Python)
 ```python
 import requests
-# Recall user preference from hierarchical memory
-res = requests.get("http://localhost:6060/v1/recall", params={"q": "User's favorite OS", "k": 1})
+res = requests.get("http://localhost:6060/v1/recall", params={"q": "User preference", "k": 3})
 print(res.json())
 ```
-*See `examples/langchain_integration.py` for full LangChain tools.*
-*Mobile quickstart: see `.github/mobile/README.md`.*
 
 ---
 
-## 🕵️ Red Audit & Stealth Mode (Optional)
-
-For users requiring advanced evasion or anti-analysis, the **Red Audit** features are now decoupled behind the `stealth` feature flag.
+## 🏗️ Quick Start
 
 ```bash
-# Build with Red Audit / Stealth features active
-cargo build --release --features stealth
+git clone https://github.com/silentnoisehun/microscope-memory.git
+cd microscope-memory
+cargo build --release
+
+# Launch HTTP server with PWA chat
+./target/release/microscope-mem serve --port 8080
+
+# Or start the Bridge API
+./target/release/microscope-mem bridge --port 6060
 ```
-
-- **Ghost Mode**: Soft Anti-VM detection and silent data masking.
-- **Direct Syscalls**: Bypasses user-mode hooks via raw x64 assembly.
-- **Polymorphic Build**: Every binary has a unique signature (SHA256).
-
----
-
-## 🧠 ONNX Embedding Provider (Optional)
-
-For ONNX-based embedding models, use the `onnx` feature flag.
-
-```bash
-# Build with ONNX embedding support
-cargo build --release --features onnx
-```
-
-- **ONNX Models**: Support for ONNX format embedding models via `onnx_model_path` config.
-- **Tokenizer Integration**: Compatible with custom tokenizers.
-
----
-
-## 🚀 One-Click Start
-
-1. **Clone & Enter**:
-   ```bash
-   git clone https://github.com/silentnoisehun/microscope-memory.git
-   cd microscope-memory
-   ```
-
-2. **Launch**:
-   Double click `OneClick_Start.bat`. It will build your local engine and start the background API service.
 
 ---
 
 ## 📊 Benchmarks
-Microscope outperforms traditional Vector DBs by 100x-1000x in raw retrieval latency. 
-See [BENCHMARKS.md](BENCHMARKS.md) for detailed results.
+
+Microscope outperforms traditional Vector DBs by 100x-1000x in raw retrieval latency — sub-microsecond binary access vs millisecond vector search.
 
 ---
-*Architected by [Máté Róbert](https://github.com/silentnoisehun) — The Silent Noise Research Series.*
+
+## License
+
+MIT — see [LICENSE](LICENSE)

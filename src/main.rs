@@ -2955,6 +2955,71 @@ async fn main() {
                 println!("  {} Added correction strategy: '{}'", "OK".green(), strategy);
             }
         }
+        // ─── Code Memory ────────────────────────────────────────────────
+        Cmd::Code { store, error, recall, list, lang, project, k, symbol, stats } => {
+            use microscope_memory::code_memory::{CodeMemory, CodeEntryType, CodeQuery};
+
+            let code_mem = CodeMemory::new();
+
+            if let Some(entry_str) = store {
+                let parts: Vec<&str> = entry_str.splitn(6, ':').collect();
+                if parts.len() >= 3 {
+                    let etype = match parts[0].to_lowercase().as_str() {
+                        "function" | "fn" => CodeEntryType::Function,
+                        "type" | "struct" | "class" => CodeEntryType::Type,
+                        "import" => CodeEntryType::Import,
+                        "error" | "err" => CodeEntryType::ErrorSolution,
+                        "config" => CodeEntryType::Config,
+                        "dependency" | "dep" => CodeEntryType::Dependency,
+                        "convention" => CodeEntryType::Convention,
+                        _ => CodeEntryType::Note,
+                    };
+                    let id = code_mem.store(etype, parts.get(1).unwrap_or(&""), parts.get(2).unwrap_or(&""),
+                        parts.get(3).unwrap_or(&""), parts.get(4).unwrap_or(&"rust"), parts.get(5).unwrap_or(&"default"), vec![], vec![]);
+                    println!("  {} Stored #{} [{}]", "CODE".cyan().bold(), id, parts.get(1).unwrap_or(&""));
+                }
+            }
+
+            if let Some(err_sol) = error {
+                let parts: Vec<&str> = err_sol.splitn(4, ':').collect();
+                if parts.len() >= 2 {
+                    let id = code_mem.store_error_solution(parts[0], parts[1], parts.get(2).unwrap_or(&"unknown.rs"), parts.get(3).unwrap_or(&"rust"), "default");
+                    println!("  {} Stored error-solution #{}", "FIX".green().bold(), id);
+                }
+            }
+
+            if let Some(q) = recall {
+                let query = CodeQuery { query: q, language: lang.clone(), entry_type: None, project: project.clone(), file: None, k };
+                let results = code_mem.recall(&query);
+                if results.is_empty() {
+                    println!("  {} No results", "INFO".yellow());
+                } else {
+                    for entry in &results {
+                        println!("  [{:?}] {} — {}", entry.entry_type, entry.title.yellow(), entry.file_path);
+                    }
+                }
+            }
+
+            if let Some(ref sym) = symbol {
+                let results = code_mem.recall_by_symbol(sym);
+                println!("  {} Symbol '{}' in {} entries", "SYM".cyan().bold(), sym, results.len());
+            }
+
+            if let Some(ref lt) = list {
+                let etype = match lt.to_lowercase().as_str() { "function"|"fn" => CodeEntryType::Function, "error" => CodeEntryType::ErrorSolution, _ => CodeEntryType::Note };
+                for entry in &code_mem.list_by_type(etype) {
+                    println!("  #{} {} — {}", entry.id, entry.title.yellow(), entry.file_path);
+                }
+            }
+
+            if stats {
+                let (total, errors, projects) = code_mem.stats();
+                println!("  Entries: {}, Errors: {}", total, errors);
+                for (p, c) in &projects { println!("    {}: {}", p, c); }
+            }
+        }
+
+        // ─── Implicit Memory ────────────────────────────────────────────
         Cmd::Implicit { show, practice, skills, patterns, decay } => {
             use microscope_memory::implicit_memory::ImplicitMemory;
             

@@ -385,6 +385,36 @@ pub enum Cmd {
         #[arg(long)]
         add_strategy: Option<String>,
     },
+    /// Code Memory — dedikált kódmemória réteg kódoló agentek számára
+    Code {
+        /// Store code entry (type:title:code:file:lang:project)
+        #[arg(long)]
+        store: Option<String>,
+        /// Store error:solution pair
+        #[arg(long)]
+        error: Option<String>,
+        /// Recall from code memory
+        #[arg(long)]
+        recall: Option<String>,
+        /// List by type (function, error, type, import, etc.)
+        #[arg(long)]
+        list: Option<String>,
+        /// Filter by language
+        #[arg(long)]
+        lang: Option<String>,
+        /// Filter by project
+        #[arg(long)]
+        project: Option<String>,
+        /// Number of results
+        #[arg(long, default_value_t = 5)]
+        k: usize,
+        /// Search by symbol name
+        #[arg(long)]
+        symbol: Option<String>,
+        /// Show stats
+        #[arg(long)]
+        stats: bool,
+    },
     /// Implicit memory - procedural learning and habits
     Implicit {
         /// Show implicit memory state

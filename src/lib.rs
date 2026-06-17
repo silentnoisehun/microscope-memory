@@ -103,6 +103,8 @@ pub mod vagus;
 pub mod autopoiesis;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod chatgpt;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod code_memory;
 pub mod multimodal;
 pub mod predictive_cache;
 pub mod temporal_archetype;

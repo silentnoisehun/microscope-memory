@@ -5,50 +5,59 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] - 2026-06-17
+
+### Added
+- **morphogenesis.rs** — 4 biological growth algorithms (mycelium, capillary, slime mold, fractal L-system) + evolutionary engine
+- **pattern_recognition.rs** — sequence, temporal, structural & cluster pattern detection with cross-domain correlation
+- **executive.rs** — cognitive conductor: module scheduling, resource allocation, homeostasis
+- **planning.rs** — HTN goal decomposition, action planning, replanning on changing conditions
+- **autopoiesis.rs** — template-based code generation, versioned mutations, rollback mechanism
+- **code_memory.rs** — dedicated memory layer for coding agents (code snippets, symbols, error↔solution pairs)
+- **chatgpt.rs** — ChatGPT export parser with Google Drive import support (--gdrive, --gdrive-folder)
+- **PWA chat** — Progressive Web App with manifest, service worker, installable on mobile
+- **MCP integration** — Model Context Protocol server for Claude Code, Cline, Kilo Code, OpenCode
+- **25 integration examples** — LangChain, OpenAI Assistant, Ollama RAG, Discord, Slack, WhatsApp, n8n, Docker, Home Assistant, Streamlit, Obsidian, AutoGPT, Cloudflare Worker
+
+### Changed
+- CLI: added `morph`, `code`, `import-chat-gpt` commands
+- Serve: binds to 0.0.0.0, serves PWA on /chat.html, displays local IP for phone access
+- Scripts: updated binary name, ports, and removed obsolete TTS references
+- Layers: added missing layer files (identity, emotional, relational, reflections, crypto_chain, rust_state, code)
+- README: full rewrite with v0.8.0 features and Vector DB comparison benchmarks
+- BENCHMARKS.md: added comparison table (FAISS, Pinecone, ChromaDB, Qdrant)
+
+### Removed
+- demo.html (replaced by PWA chat)
+- website/ directory (landing page)
+- server-data/ (obsolete server duplicate, 606MB)
+- backup/ directory
+- tools/edge_tts_server.py (obsolete, replaced by voice-mcp)
+- examples/index.html
+
+### Performance
+- Overall query: 87 µs avg across 9 depths (20323 blocks)
+- 4D soft zoom: 249 µs/query
+- 265 tests, all passing
+
 ## [0.7.0] - 2026-04-08
 
 ### Added
-- Comprehensive MQL integration tests (Boolean AND/OR, Spatial `near:`, Layer/Depth filters)
-- Python API documentation in README
-- WASM browser integration documentation in README
-- Fixed 3D coordinate distribution for emotional memory clusters
+- Comprehensive MQL integration tests
+- Python API documentation
+- WASM browser integration documentation
 
 ### Changed
-- Refined CLI command descriptions for `build` and `rebuild`
-- Improved `config.example.toml` comments on semantic search and embedding depth
+- Refined CLI command descriptions
+- Improved config.example.toml comments
 
 ## [0.1.0] - 2026-03-21
 
 ### Added
-- Initial release of Microscope Memory
-- 9-level hierarchical depth system (D0-D8)
-- Pure binary storage with mmap support
+- Initial release: 9-level hierarchical depth system (D0-D8)
+- Pure binary storage with mmap
 - Sub-microsecond query performance
 - 3D spatial indexing with L2 distance search
 - Natural language recall with auto-zoom
-- Hybrid search combining vector distance and keyword matching
-- Support for 9 cognitive memory layers
-- Python alternative implementation with NumPy
-- Comprehensive benchmark suite
-- Fixed 256-character viewport blocks
-- Append log for incremental updates
-- Store and recall CLI commands
+- 9 cognitive memory layers
 - GitHub Actions CI/CD pipeline
-
-### Technical Details
-- Zero JSON, pure binary format
-- Memory-mapped I/O for zero-copy access
-- Deterministic content-based positioning
-- Cache-optimized data structures (L1d/L2 for shallow depths)
-- Rust implementation with safety guarantees
-- Cross-platform support (Linux, Windows, macOS)
-
-### Performance
-- D0-D1: 37-92 nanoseconds per query
-- D2-D4: 0.5-4 microseconds per query
-- D5-D6: 18-72 microseconds per query
-- D7-D8: ~500 microseconds per query
-- Build time: ~2 seconds for 500+ memories
-- Total index size: ~8 MB for 227,168 blocks
-
-[0.1.0]: https://github.com/silentnoisehun/microscope-memory/releases/tag/v0.1.0

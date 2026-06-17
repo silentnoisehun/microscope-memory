@@ -1,2 +1,2 @@
 @echo off
-"E:\microscope-memory\target\release\microscope-mem.exe" store %*
+"%~dp0target\release\microscope-mem.exe" store %*

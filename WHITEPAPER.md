@@ -2,15 +2,15 @@
 
 **Author:** Mate Robert (Silent)
 
-**Version:** 0.7.0
+**Version:** 0.8.0
 
-**Date:** March 2026
+**Date:** June 2026
 
 ---
 
 ## Abstract
 
-This paper presents Microscope Memory, a hierarchical memory system implemented in Rust that models information retrieval as an act of magnification — and memory itself as a living, self-organizing structure. The system organizes data into nine depth levels (D0--D8), from identity summaries to raw bytes, with every block constrained to a 256-byte viewport. Beyond the core indexing engine, Microscope Memory implements a thirteen-layer consciousness architecture: Hebbian learning (block-level activation and coordinate drift), mirror neurons (activation fingerprint resonance), resonance fields (spatial pulse propagation), archetype emergence (crystallized activation patterns), emotional bias (search space warping), thought graph (recall path tracking and pattern recognition), predictive caching (pre-fetching blocks with reinforcement feedback), temporal archetypes (time-windowed activation profiles), attention mechanism (dynamic layer weighting with quality learning), cross-instance learning (federated pattern exchange), dream consolidation (offline memory replay and pruning), emotional contagion (shared emotional state across instances), multi-modal memory (images, audio, structured data), and interactive 3D visualization (Three.js cognitive map viewer). The system achieves sub-microsecond query latencies at shallow depths while maintaining reinforcement loops at multiple levels — predictions, attention weights, and temporal profiles all self-tune through use. Pure binary, zero JSON, under 8,000 lines of Rust.
+This paper presents Microscope Memory, a hierarchical memory system implemented in Rust that models information retrieval as an act of magnification — and memory itself as a living, self-organizing structure. The system organizes data into nine depth levels (D0--D8), from identity summaries to raw bytes, with every block constrained to a 256-byte viewport. Beyond the core indexing engine, Microscope Memory implements a thirteen-layer consciousness architecture: Hebbian learning (block-level activation and coordinate drift), mirror neurons (activation fingerprint resonance), resonance fields (spatial pulse propagation), archetype emergence (crystallized activation patterns), emotional bias (search space warping), thought graph (recall path tracking and pattern recognition), predictive caching (pre-fetching blocks with reinforcement feedback), temporal archetypes (time-windowed activation profiles), attention mechanism (dynamic layer weighting with quality learning), cross-instance learning (federated pattern exchange), dream consolidation (offline memory replay and pruning), emotional contagion (shared emotional state across instances), multi-modal memory (images, audio, structured data), and interactive 3D visualization (Three.js cognitive map viewer), morphogenesis (biological architecture growth), pattern recognition (multi-domain sequence and structural mining), executive function (cognitive module orchestration), planning (goal decomposition and action planning), autopoiesis (self-modifying code generation), and code memory (developer-agent memory layer). The system achieves sub-microsecond query latencies at shallow depths while maintaining reinforcement loops at multiple levels — predictions, attention weights, and temporal profiles all self-tune through use. Pure binary, zero JSON, under 25,000 lines of Rust.
 
 ---
 

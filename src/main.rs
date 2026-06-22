@@ -509,6 +509,83 @@ async fn main() {
             // Start MCP server for Claude Desktop integration
             microscope_memory::mcp::run(config);
         }
+        Cmd::Config { target } => {
+            // Generate MCP config for AI agents
+            let exe_path = std::env::current_exe()
+                .map(|p| p.display().to_string())
+                .unwrap_or_else(|_| "microscope-mem".to_string());
+
+            match target.to_lowercase().as_str() {
+                "claude" => {
+                    println!("// Claude Desktop MCP Configuration");
+                    println!("// Add to: ~/Library/Application Support/Claude/claude_desktop_config.json");
+                    println!("// Or on Windows: %APPDATA%\\Claude\\claude_desktop_config.json");
+                    println!("{{");
+                    println!("  \"mcpServers\": {{");
+                    println!("    \"microscope\": {{");
+                    println!("      \"command\": \"{}\",", exe_path);
+                    println!("      \"args\": [\"mcp\"]");
+                    println!("    }}");
+                    println!("  }}");
+                    println!("}}");
+                }
+                "hermes" => {
+                    println!("// Hermes Agent MCP Configuration");
+                    println!("// Add to: ~/.hermes/config.yaml");
+                    println!("mcp_servers:");
+                    println!("  microscope:");
+                    println!("    command: \"{}\"", exe_path);
+                    println!("    args: [\"mcp\"]");
+                    println!("    timeout: 30");
+                    println!("    connect_timeout: 10");
+                }
+                "cursor" => {
+                    println!("// Cursor IDE MCP Configuration");
+                    println!("// Add to: ~/.cursor/mcp.json");
+                    println!("{{");
+                    println!("  \"mcpServers\": {{");
+                    println!("    \"microscope\": {{");
+                    println!("      \"command\": \"{}\",", exe_path);
+                    println!("      \"args\": [\"mcp\"]");
+                    println!("    }}");
+                    println!("  }}");
+                    println!("}}");
+                }
+                "cline" => {
+                    println!("// Cline VS Code Extension MCP Configuration");
+                    println!("// Add to: ~/.cline/mcp_settings.json");
+                    println!("{{");
+                    println!("  \"mcpServers\": {{");
+                    println!("    \"microscope\": {{");
+                    println!("      \"command\": \"{}\",", exe_path);
+                    println!("      \"args\": [\"mcp\"]");
+                    println!("    }}");
+                    println!("  }}");
+                    println!("}}");
+                }
+                _ => {
+                    println!("// Generic MCP Configuration");
+                    println!("// Add to your AI agent's MCP config file");
+                    println!("// Command: {} mcp", exe_path);
+                    println!("// Protocol: JSON-RPC 2.0 over stdio");
+                    println!("//");
+                    println!("// Available tools:");
+                    println!("//   memory_status    — Get memory index status");
+                    println!("//   memory_store     — Store a new memory");
+                    println!("//   memory_recall    — Natural language recall");
+                    println!("//   memory_find      — Brute-force text search");
+                    println!("//   memory_mql_query — MQL query");
+                    println!("//   memory_build     — Rebuild index");
+                    println!("//   memory_session_log — Read session log");
+                    println!("//   memory_consolidate — Consolidate sessions");
+                    println!("//   memory_dream     — Dream consolidation");
+                    println!("//   memory_look      — Spatial look at coordinates");
+                    println!("//");
+                    println!("// JSON-RPC request example:");
+                    println!("// {{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{{\"name\":\"memory_recall\",\"arguments\":{{\"query\":\"hello\"}}}}}}");
+                }
+            }
+        }
         Cmd::Query { mql } => {
             let t0 = Instant::now();
             let q = microscope_memory::query::parse(&mql);

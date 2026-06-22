@@ -313,6 +313,12 @@ pub enum Cmd {
     },
     /// Start the MCP (Model Context Protocol) server for Claude Desktop integration
     Mcp,
+    /// Generate MCP config for AI agents (claude, hermes, cursor, cline, generic)
+    Config {
+        /// Target AI agent: claude, hermes, cursor, cline, generic
+        #[arg(default_value = "generic")]
+        target: String,
+    },
     /// Start the Spine Bridge API (Axum REST / OpenAPI) for LLM integrations
     Bridge {
         #[arg(short, long, default_value = "0.0.0.0")]

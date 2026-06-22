@@ -308,6 +308,29 @@ fn handle_tools_list(id: &Value) -> Value {
                         },
                         "required": ["x", "y", "z", "zoom"]
                     }
+                },
+                {
+                    "name": "memory_session_context",
+                    "description": "Store conversation context automatically — saves the current session for later recall",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "context": { "type": "string", "description": "Conversation context to store" },
+                            "summary": { "type": "string", "description": "Optional summary for long-term storage" }
+                        },
+                        "required": ["context"]
+                    }
+                },
+                {
+                    "name": "memory_ping",
+                    "description": "Quick auto-context — fast recall without full indexing. Use this before answering to get relevant context automatically.",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "query": { "type": "string", "description": "What to get context for" }
+                        },
+                        "required": ["query"]
+                    }
                 }
             ]
         }
@@ -333,6 +356,8 @@ fn handle_tools_call(id: &Value, request: &Value, config: &Config) -> Value {
         "memory_session_log" => tool_session_log(config, &args),
         "memory_consolidate" => tool_consolidate(config, &args),
         "memory_dream" => tool_dream(config, &args),
+        "memory_session_context" => tool_session_context(config, &args),
+        "memory_ping" => tool_ping(config, &args),
         _ => Err(format!("Unknown tool: {}", tool_name)),
     };
 
@@ -1115,4 +1140,100 @@ fn tool_dream(config: &Config, _args: &Value) -> Result<String, String> {
         )),
         Err(e) => Err(format!("Dream consolidation failed: {}", e)),
     }
+}
+
+// ─── Session Context Tool ────────────────────────────
+
+fn tool_session_context(config: &Config, args: &Value) -> Result<String, String> {
+    let context = args
+        .get("context")
+        .and_then(|v: &Value| v.as_str())
+        .ok_or("Missing required parameter: context")?;
+    let summary = args
+        .get("summary")
+        .and_then(|v: &Value| v.as_str())
+        .unwrap_or("");
+
+    // Store the conversation context
+    let tagged = format!("[SESSION_CONTEXT] {}", context);
+    store_memory(config, &tagged, "session", 7, None)?;
+
+    // If summary provided, store it in long_term
+    if !summary.is_empty() {
+        let summary_tagged = format!("[SESSION_SUMMARY] {}", summary);
+        store_memory(config, &summary_tagged, "long_term", 6, None)?;
+    }
+
+    Ok(format!(
+        "Session context stored:\n  Layer: session\n  Importance: 7\n  Context length: {} chars\n  Summary: {}",
+        context.len(),
+        if summary.is_empty() { "(none)" } else { summary }
+    ))
+}
+
+// ─── Ping Tool (Auto-Context) ────────────────────────────
+
+fn tool_ping(config: &Config, args: &Value) -> Result<String, String> {
+    let query = args
+        .get("query")
+        .and_then(|v: &Value| v.as_str())
+        .ok_or("Missing required parameter: query")?;
+
+    // Quick recall with low k for fast context
+    let reader = MicroscopeReader::open(config)?;
+    let output_dir = Path::new(&config.paths.output_dir);
+    let append_path = output_dir.join("append.bin");
+    let appended = read_append_log(&append_path);
+
+    let (qx, qy, qz) = crate::content_coords_blended(query, "long_term", config.search.semantic_weight);
+
+    let mut all_results: Vec<(f32, usize)> = Vec::new();
+
+    // Quick scan of main index (top 500 blocks for speed)
+    let scan_limit = reader.block_count.min(500);
+    for i in 0..scan_limit {
+        let h = reader.header(i);
+        let dx = qx - h.x;
+        let dy = qy - h.y;
+        let dz = qz - h.z;
+        let dist = dx * dx + dy * dy + dz * dz;
+        if dist < 0.05 {
+            all_results.push((dist, i));
+        }
+    }
+
+    // Check append log
+    for (ai, entry) in appended.iter().enumerate() {
+        let dx = qx - entry.x;
+        let dy = qy - entry.y;
+        let dz = qz - entry.z;
+        let dist = dx * dx + dy * dy + dz * dz;
+        if dist < 0.05 {
+            all_results.push((dist, 1_000_000 + ai));
+        }
+    }
+
+    all_results.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
+
+    let mut output = format!("PING '{}':\n", query);
+    let mut shown = 0;
+    for (dist, idx) in all_results.iter().take(5) {
+        let text = if *idx < 1_000_000 {
+            reader.text(*idx).to_string()
+        } else {
+            appended.get(*idx - 1_000_000)
+                .map(|e| e.text.clone())
+                .unwrap_or_default()
+        };
+        if !text.is_empty() {
+            output.push_str(&format!("  [{:.3}] {}\n", dist, crate::safe_truncate(&text, 120)));
+            shown += 1;
+        }
+    }
+
+    if shown == 0 {
+        output.push_str("  (no close matches)\n");
+    }
+
+    Ok(output)
 }

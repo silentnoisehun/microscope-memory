@@ -61,3 +61,5 @@ electron/out/
 python e:\microscope-local\tools\edge_tts_server.py
 file:///E:/pwa-microscope/index.html# Ignore Windows reserved device names
 nul
+
+pwa/

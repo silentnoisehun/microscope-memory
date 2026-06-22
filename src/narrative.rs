@@ -192,7 +192,7 @@ fn build_narrative(
             let foci: Vec<&str> = items.iter().take(2).map(|s| {
                 let s = s.trim();
                 if s.len() > MAX_FOCUS_LEN {
-                    &s[..MAX_FOCUS_LEN]
+                    &s[..s.floor_char_boundary(MAX_FOCUS_LEN)]
                 } else {
                     s
                 }

@@ -1,4 +1,4 @@
-﻿//! Microscope Memory library interface.
+//! Microscope Memory library interface.
 //! Re-exports core types and functions for integration tests and external use.
 
 #[cfg(feature = "stealth")]
@@ -121,12 +121,15 @@ pub mod python;
 #[cfg(feature = "gpu")]
 pub mod gpu;
 
+pub mod timeline;
+pub mod open_loops;
 pub mod cli;
 
 // Re-export commonly used items
 pub use reader::{
     append_emotion_log, build_emotions_from_log, emotional_similarity, format_emotion,
-    load_emotion_lookup, read_append_log, store_memory, AppendEntry, BlockHeader, DataStore,
+    load_emotion_lookup, read_append_log, store_memory, store_memory_with_emotion,
+    AppendEntry, BlockHeader, DataStore,
     MicroscopeReader, RadialResult, ResultSet, EMOTION_DIMS, EMOTION_VECTOR_SIZE,
 };
 #[cfg(not(target_arch = "wasm32"))]
@@ -135,7 +138,7 @@ pub use emotional_state::{emotional_prime_weight, EmotionalStateRing};
 // Re-export CLI
 pub use cli::{Cli, Cmd};
 
-// â”€â”€â”€ Shared constants â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Shared constants ────────────────────────────────
 pub const DEFAULT_CONFIG_PATH: &str = "config.toml";
 pub const BLOCK_DATA_SIZE: usize = 256;
 pub const HEADER_SIZE: usize = 32;
@@ -156,7 +159,7 @@ pub const LAYER_NAMES: &[&str] = &[
     "session",
 ];
 
-// â”€â”€â”€ Shared utility functions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Shared utility functions ────────────────────────
 
 pub fn layer_to_id(name: &str) -> u8 {
     LAYER_NAMES.iter().position(|&n| n == name).unwrap_or(0) as u8
@@ -271,7 +274,7 @@ pub fn to_block(text: &str) -> Vec<u8> {
     }
 }
 
-// â”€â”€â”€ AUTO ZOOM / AUTO DEPTH â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── AUTO ZOOM / AUTO DEPTH ──────────────────────────
 
 pub fn auto_zoom(query: &str) -> (u8, u8) {
     let stopwords = ["a", "the", "is", "of", "and", "to", "in", "it", "on", "for"];
@@ -335,3 +338,8 @@ mod tests {
 
 
 
+
+// Additional modules for main binary
+pub mod auto_context;
+pub mod emotional_21d;
+pub mod mermaid;

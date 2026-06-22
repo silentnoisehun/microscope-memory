@@ -7,7 +7,7 @@
 
 use crate::config::Config;
 use crate::reader::MicroscopeReader;
-use crate::{read_append_log, store_memory, LAYER_NAMES};
+use crate::{read_append_log, store_memory, store_memory_with_emotion, LAYER_NAMES};
 use serde_json::{json, Value};
 use std::collections::{HashMap, HashSet};
 use std::io::{self, BufRead, BufReader, Read, Write};
@@ -448,7 +448,7 @@ fn tool_store(config: &Config, args: &Value) -> Result<String, String> {
     let sid = std::process::id();
     let tagged = format!("[sid-{:04}] {}", sid % 10000, text);
 
-    store_memory(config, &tagged, layer, importance, emotion)?;
+    store_memory_with_emotion(config, &tagged, layer, importance, emotion)?;
 
     let (x, y, z) = crate::content_coords(&tagged, layer);
     let depth = crate::auto_depth(&tagged);
@@ -783,7 +783,7 @@ fn tool_recall(config: &Config, args: &Value) -> Result<String, String> {
                     .unwrap_or_default()
             };
             if !text.is_empty() {
-                let _ = store_memory(config, &text, "echo_cache", 8 - i as u8, None);
+                let _ = store_memory(config, &text, "echo_cache", 8 - i as u8);
             }
         }
         // Associative: link top-3 results that share keywords
@@ -795,7 +795,7 @@ fn tool_recall(config: &Config, args: &Value) -> Result<String, String> {
                 let text_b = if is_b { reader.text(idx_b) } else { "" };
                 if !text_a.is_empty() && !text_b.is_empty() {
                     let link = format!("LINK: [{:.40}] <-> [{:.40}] via '{}'", text_a, text_b, query);
-                    let _ = store_memory(config, &link, "associative", 6, None);
+                    let _ = store_memory(config, &link, "associative", 6);
                 }
             }
         }
@@ -1103,7 +1103,7 @@ fn tool_consolidate(config: &Config, _args: &Value) -> Result<String, String> {
         );
         summaries.push(summary);
 
-        store_memory(config, &format!("[{}] CONSOLIDATED: {} interactions from {}", sid, group.len(), top_topics.join(", ")), "long_term", 8, None)?;
+        store_memory(config, &format!("[{}] CONSOLIDATED: {} interactions from {}", sid, group.len(), top_topics.join(", ")), "long_term", 8)?;
     }
 
     let mut output = format!("Consolidated {} session groups:\n\n", summaries.len());
@@ -1156,12 +1156,12 @@ fn tool_session_context(config: &Config, args: &Value) -> Result<String, String>
 
     // Store the conversation context
     let tagged = format!("[SESSION_CONTEXT] {}", context);
-    store_memory(config, &tagged, "session", 7, None)?;
+    store_memory(config, &tagged, "session", 7)?;
 
     // If summary provided, store it in long_term
     if !summary.is_empty() {
         let summary_tagged = format!("[SESSION_SUMMARY] {}", summary);
-        store_memory(config, &summary_tagged, "long_term", 6, None)?;
+        store_memory(config, &summary_tagged, "long_term", 6)?;
     }
 
     Ok(format!(

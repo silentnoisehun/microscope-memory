@@ -1,27 +1,63 @@
 # Rust
-/target/
-*.pyc
-__pycache__/
+target/
 
-# Large generated binary data
-data/*.bin
-data/*.idx
-data/namespaces/
-server-data/
-backup/
+# IDEs
+.vscode/
+.idea/
 
-# Temp & log
+# OS
+.DS_Store
+Thumbs.db
+
+# Microscope Data (binary data kept in standalone)
+data/
+output/
+.tts_cache/
+*.bin
+*.idx
+layers/*
+!layers/.gitkeep
+
+# Generated viz/snapshot files
+cognitive_map.json
+viz.json
+density.bin
+*.mscope
+
+# Config (user specific)
+config.toml
+config.bin
+!config.example.toml
+
+# Logs and temp files
 *.log
 errors.txt
 compile_errors.txt
-*.tmp
+test_errors.json
+tmp/
+build_error*
+check_error*
+error_dump*
+bench_results/
 
-# IDE
-.idea/
-*.swp
-.vscode/
+# napi-rs native addon
+native/target/
+native/node_modules/
+native/*.node
 
-# Scripts
-*.cmd
-*.bat
-*.ps1
+# TTS audio cache (regenerated on demand)
+.tts_cache/
+
+# Auto-inject context files (regenerated per session)
+/tmp/microscope-ctx.txt
+microscope-ctx.txt
+
+# Electron
+electron/node_modules/
+electron/out/
+
+# Claude Code
+.claude/
+python e:\microscope-local\tools\edge_tts_server.py
+file:///E:/pwa-microscope/index.html# Ignore Windows reserved device names
+nul

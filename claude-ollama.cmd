@@ -1,7 +1,0 @@
-@echo off
-SET ANTHROPIC_BASE_URL=http://127.0.0.1:8080
-SET ANTHROPIC_API_KEY=ollama
-SET ANTHROPIC_AUTH_TOKEN=ollama
-SET CLAUDE_CODE_SIMPLE=1
-cd /d E:\microscope-local
-claude %*

@@ -75,3 +75,34 @@ find_backtick.py
 nul
 
 pwa/
+
+# Personal config files
+microscope.toml
+litellm_config.yaml
+
+# Personal notes and temp test files
+new_speak.txt
+new_speak2.txt
+pav7_*
+perplexity_test.png
+
+# Personal convenience scripts (not for distribution)
+recall.cmd
+store.cmd
+start-microscope.bat
+bridge-proxy.mjs
+claude-ollama.cmd
+anthropic_ollama_proxy.py
+create-desktop-shortcut.ps1
+OneClick_Start.bat
+build-wasm.sh
+
+# Lock files (generated, not needed in repo)
+electron/package-lock.json
+native/package-lock.json
+orchestrator/Cargo.lock
+
+# Duplicated frontend dirs (mermaid_app is a copy of mermaid)
+mermaid_app/
+modules/
+styles/

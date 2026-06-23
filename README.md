@@ -17,13 +17,13 @@ Microscope is designed to be the persistent memory of AI agents and LLM workflow
 
 | Operation | Latency | How |
 |-----------|---------|-----|
+| **Atomic hot field read** (consciousness stream) | **1 ns** | `AtomicU64`/`AtomicU32` load — a single `MOV` |
 | **D0 identity query** (1 block) | **37 ns** | Binary mmap + SIMD distance |
-| **Atomic hot field read** (consciousness stream) | **1 ns** | `AtomicU64`/`AtomicU32` load, no sync |
 | **Cached consciousness string** (`memory_consciousness` MCP tool) | **124 ns** | Pre-built string in `RwLock<String>` |
 | **Seqlock snapshot** (full 96-byte state) | **1.2 µs** | Sequence-locked protocol |
 | **4D soft-zoom query** (all 28k blocks) | 169 µs | Depth-banded binary search |
 
-**The 37 ns D0 query is single-digit CPU cycles.** The consciousness stream's hot-field reads are 1 ns — literally a single `MOV` instruction. Measured on this build, 28,492 blocks loaded. See [Performance](#-performance-measured) for the full benchmark and `tests/consciousness_perf.rs` for the consciousness-stream benchmarks.
+**The 1 ns atomic hot-field read is a single CPU instruction** — as fast as a register load, no synchronization overhead. The 37 ns D0 query is single-digit CPU cycles. Measured on this build, 28,492 blocks loaded. See [Performance](#-performance-measured) for the full benchmark and `tests/consciousness_perf.rs` for the consciousness-stream benchmarks.
 
 ---
 

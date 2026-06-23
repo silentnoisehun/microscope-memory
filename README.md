@@ -101,9 +101,9 @@ Supporting files: `merkle.bin` (SHA-256 tree), `embeddings.bin` (mmap'd vectors)
 
 The 256-byte viewport per block is the "atomic boundary of information" — below D8, decomposition destroys meaning.
 
-### 15 semantic layers (memory layers)
+### 12 indexed semantic layers (memory layers)
 
-`long_term`, `short_term`, `session`, `associative`, `emotional`, `relational`, `reflections`, `crypto_chain`, `echo_cache`, `rust_state`, `code`, `identity`, `meta_cognitive`, `project`, `demo` — each is a separate text file in `layers/` that the build step ingests into the binary index.
+`long_term`, `short_term`, `session`, `associative`, `emotional`, `relational`, `reflections`, `crypto_chain`, `echo_cache`, `rust_state`, `code`, `identity` — each is a separate text file in `layers/` that the build step ingests into the binary index. `meta_cognitive`, `project`, and `demo` also exist as layer files but are not included in the binary index by default (they are filesystem-only).
 
 ### 13 consciousness layers
 
@@ -298,7 +298,7 @@ microscope-mem config generic     # any MCP-compatible client
 
 ### 4. HTTP Spine Bridge (legacy)
 
-`microscope-mem serve` runs a small TCP/HTTP file server on port 6060 that serves the 3D viewer (`viewer.html`) and the PWA chat (`chat.html`). For programmatic access, the legacy axum-based REST API in `src/bridge.rs` exposes `/v1/recall`, `/v1/remember`, `/v1/status` but is not started by the `spine` CLI command (the napi-rs addon is the recommended path).
+`microscope-mem serve` runs a small TCP/HTTP file server on port 8080 that serves the 3D viewer (`viewer.html`) and the PWA chat (`chat.html`). For programmatic access, the legacy axum-based REST API in `src/bridge.rs` exposes `/v1/recall`, `/v1/remember`, `/v1/status` but is not started by the `spine` CLI command (the napi-rs addon is the recommended path).
 
 ---
 
@@ -387,18 +387,16 @@ Coverage spans all 13 consciousness layers, MQL, CRC, Merkle, snapshot, embeddin
 
 ## 🔍 Visualization
 
-Three levels of visualization, all exporting from the CLI:
+Two levels of visualization, all exporting from the CLI:
 
-1. **`cognitive-map`** — full 13-layer JSON export for the Three.js viewer (`viewer.html`). Auto-opens in browser. Per-layer color swatches, animated wave field, dream cycle energy, archetype temporal rings, attention weights, emotional field, predictions.
-2. **`viz`** — JSON snapshot of blocks, edges, field, archetypes, echoes, aggregate stats.
-3. **`density`** — binary DEN1 format, quantized 3D grid of Hebbian energy for volumetric rendering.
-
+1. **`cognitive-map`** — full 13-layer binary export for the Three.js viewer (`viewer.html`). Auto-opens in browser. Per-layer color swatches, animated wave field, dream cycle energy, archetype temporal rings, attention weights, emotional field, predictions.
+2. **`viz`** — binary snapshot of blocks, edges, field, archetypes, echoes, aggregate stats.
 To serve the viewer:
 
 ```bash
-microscope-mem cognitive-map    # writes cognitive_map.json
-microscope-mem serve --port 6060
-# Open http://localhost:6060/viewer.html
+microscope-mem cognitive-map    # writes cognitive_map.bin
+microscope-mem serve --port 8080
+# Open http://localhost:8080/viewer.html
 ```
 
 ---

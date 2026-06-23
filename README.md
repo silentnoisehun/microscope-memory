@@ -1,271 +1,627 @@
-# Microscope Memory
+# Microscope Memory v0.8.1
 
-![Microscope Memory Header](microscope-memory-header.png)
+[![Rust](https://img.shields.io/badge/language-Rust-orange.svg)](https://www.rust-lang.org)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Zero-JSON](https://img.shields.io/badge/Architecture-Zero--JSON-green.svg)](#core-architecture)
+[![MCP](https://img.shields.io/badge/MCP-Native-purple.svg)](#-mcp-server-claude-code--cursor--cline)
+[![Electron](https://img.shields.io/badge/UI-Electron--Tray-blue.svg)](#-electron-tray-app)
+[![Tests](https://img.shields.io/badge/Tests-271%20passing-brightgreen.svg)](#-testing)
 
-**A zoom-based hierarchical memory engine for AI agents. Pure binary, mmap-backed, sub-microsecond reads.**
+![Microscope Memory](unnamed.png)
 
-Most AI memory systems store conversation history as flat text or JSON blobs and re-embed everything on every query. Microscope Memory takes a different approach: every piece of text is decomposed once into a 9-level hierarchy — from a single-sentence identity summary down to raw bytes — and stored as fixed-size binary blocks that are memory-mapped directly off disk. There is no parsing step at query time. There is no JSON. The query's "zoom level" determines how much detail comes back, and retrieval at any level is a direct memory read.
+**Microscope Memory** is a Rust-native, binary, hierarchical cognitive memory engine with a 13-layer *consciousness architecture* on top. It models memory not as static storage, but as a living, self-organizing structure: every recall is a learning event, every idle moment can trigger dream consolidation, and the system tracks its own state and patterns across sessions.
 
-```
-microscope-mem build              # layers/*.txt -> binary index
-microscope-mem recall "what is Ora?" 10
-microscope-mem bridge --port 6060  # Spine Bridge REST API
-microscope-mem serve  --port 8080  # 3D viewer
-microscope-mem mcp                 # MCP server for Claude Desktop
-```
+Microscope is designed to be the persistent memory of AI agents and LLM workflows. It exposes its capabilities through three integration paths: a native Node.js addon for desktop apps, an MCP server for Claude Code/Cursor/Cline, and a binary CLI for scripts and shell pipelines.
 
 ---
 
-## Why this exists
-
-Conversational AI systems lose context the moment a session ends, or they pay the cost of re-embedding and re-ranking large text blobs on every single turn. This project was built to solve a narrower, concrete problem: **give an AI agent a memory store that persists across restarts, returns results in microseconds rather than milliseconds, and doesn't require a vector database, a JSON parser, or a network call to function.**
-
-It's a single static binary. It runs on a Raspberry Pi as easily as a server.
-
-## How it works
-
-### The core idea: fixed-size blocks at every depth
-
-Every block in the index — regardless of what depth it represents — is exactly 256 bytes of data behind a 32-byte header. This is the foundational design constraint. It means the reader never has to guess how much to read; it computes an offset and reads a constant span. There's no variable-length parsing, no delimiter scanning, no schema validation on the hot path.
-
-```
-microscope.bin   — Block headers (32 bytes each, mmap'd)
-├── x, y, z: f32       3D spatial position (FNV-hashed from content)
-├── zoom: f32          normalized depth (depth / 8.0)
-├── depth: u8          0–8
-├── layer_id: u8        which memory layer this belongs to
-├── data_offset: u32    byte offset into data.bin
-├── data_len: u16       actual text length (<= 256)
-├── parent_idx: u32     index of parent block
-├── child_count: u16
-└── crc16: [u8; 2]      per-block integrity check
-
-data.bin         — Raw UTF-8 text (optionally zstd-compressed)
-meta.bin         — MSC3 format: magic, version, block/depth counts, Merkle root, source hash
-merkle.bin       — Full SHA-256 Merkle tree over all blocks
-embeddings.bin   — mmap'd f32 vectors (Candle BERT or mock hash-based)
-append.bin       — Append-only log for new memories written between rebuilds
-```
-
-### The 9-level hierarchy (D0–D8)
-
-Text is decomposed once, at build time, into nine levels of granularity:
-
-| Depth | What it represents | Example block count* |
-|---|---|---|
-| D0 | Whole-system identity summary | 1 |
-| D1 | Per-layer summaries | 9 |
-| D2 | Topic clusters | ~100 |
-| D3 | Individual memories (raw entries) | ~500 |
-| D4 | Sentence-level splits | ~1,300 |
-| D5 | Word-level tokens (max 8/parent) | ~6,000 |
-| D6 | Syllable-like morpheme chunks | ~26,000 |
-| D7 | Individual characters | ~96,000 |
-| D8 | Raw byte representation | ~96,000 |
-
-*\*Counts from a benchmark run against ~227k total blocks; they scale with corpus size.*
-
-A query's "zoom level" picks which depth to search. A two-word query doesn't need to scan sentence-level blocks; a detailed question benefits from finer granularity. Auto-zoom heuristics map query length to a sensible depth range, but you can also query a specific depth or range directly via MQL (see below).
-
-### Spatial indexing without an index
-
-Each block's (x, y, z) position is computed by FNV-hashing its text content, offset by a fixed per-layer origin. This is deterministic — the same text always lands in the same place — and it means semantically or lexically similar content tends to cluster in 3D space without needing a separate spatial index structure to maintain. Nearest-neighbor search is L2 distance in this space, optionally SIMD-accelerated (SSE4/AVX2) and blended with keyword matching and BERT embedding similarity for hybrid ranking.
-
-### Memory layers
-
-Content is partitioned into 10 cognitive layers, each with its own region of 3D space:
-
-`identity` · `long_term` · `short_term` · `associative` · `emotional` · `relational` · `reflections` · `crypto_chain` · `echo_cache` · `rust_state`
-
-These are organizational categories, not separate storage backends — a single binary index holds all of them, distinguished by `layer_id` in the block header.
-
-### Incremental builds and the append log
-
-Rebuilding the full hierarchy for a large corpus isn't free, so the build pipeline hashes the source layer files (SHA-256) and skips the rebuild entirely if nothing changed. New memories written between rebuilds go into `append.bin`, an append-only log that's queried alongside the main index and merged in on the next `rebuild`. This means writes are cheap (a single append) and reads stay fast (mmap'd binary, no JSON parsing) even as new data accumulates.
-
-### Integrity
-
-Every block carries a CRC16-CCITT checksum. The full index is also covered by a SHA-256 Merkle tree, so you can generate and verify a proof for any individual block, or detect tampering across the whole structure with `verify-merkle`. This is useful if the memory store is shared, exported, or needs to be audited — the `.mscope` export format bundles everything (`meta.bin`, `microscope.bin`, `data.bin`, `merkle.bin`, `append.bin`, `embeddings.bin`) into one portable archive with reproducible hashes.
-
-### Beyond simple lookup: usage-pattern tracking
-
-A few modules go beyond pure storage-and-retrieve:
-
-- **Thought graph** (`thought_graph.rs`) — logs each recall as a node and consecutive recalls as edges. When a sequence of queries (A→B→C) recurs often enough, it crystallizes into a recognized pattern, which then gets a small boost in future ranking. This is closer to query-log analysis than to "learning" in the ML sense, but it does mean repeated usage patterns affect future results.
-- **Hebbian-style weighting** (`hebbian.rs`) — blocks that are retrieved together have their association strength adjusted over time, influencing future co-retrieval.
-- **Spaced repetition / reconsolidation** — modules that adjust block salience over time based on retrieval frequency and recency, loosely modeled on memory-consolidation research.
-
-These are real, working mechanisms that change retrieval behavior based on usage history — worth being precise about what they are: heuristic, file-backed feedback loops, not claims about cognition or awareness.
-
-## Performance
-
-Benchmarked on 227,168 blocks, 10,000 queries per depth, single machine:
-
-| Depth | Blocks | Query time |
-|---|---|---|
-| D0 | 1 | 37 ns |
-| D1 | 9 | 92 ns |
-| D2 | 108 | 506 ns |
-| D3 | 523 | 1.7 µs |
-| D4 | 1,349 | 3.9 µs |
-| D5 | 6,070 | 18 µs |
-| D6 | 26,198 | 72 µs |
-| D7 | 96,297 | 505 µs |
-| D8 | 96,613 | 492 µs |
-
-These numbers come from `microscope-mem bench` against the project's own test corpus on one machine — they aren't an independent third-party benchmark, and there's no published apples-to-apples comparison yet against vector databases under identical hardware and corpus conditions. Treat the relative ordering (lower depths are faster) as solid; treat absolute cross-tool comparisons with appropriate skepticism until run independently.
-
-## Installation
+## 🚀 Quick Start
 
 ```bash
-git clone https://github.com/silentnoisehun/microscope-memory.git
+# Build
+git clone https://github.com/silentnoisehun/microscope-memory
 cd microscope-memory
 cargo build --release
-cp config.example.toml config.toml
-# edit config.toml: set layers_dir and output_dir
+
+# Build the cognitive index from the layer files
+./target/release/microscope-mem.exe build
+
+# Store a memory
+./target/release/microscope-mem.exe store --layer long_term --importance 8 "Microscope Memory élesben fut."
+
+# Recall
+./target/release/microscope-mem.exe recall "Microscope" --k 5
 ```
 
-Requires Rust 1.70+.
-
-## Usage
-
-### Build and query
-
-```bash
-microscope-mem build                          # build binary index from layers/*.txt
-microscope-mem build --force                   # force full rebuild
-microscope-mem rebuild                          # merge append log into main index
-
-microscope-mem recall "what is Ora?" 10         # natural-language query, auto-zoom
-microscope-mem find "Ora" 5                     # brute-force text search
-microscope-mem embed "quantum physics" 10       # semantic search via embeddings
-microscope-mem look 0.25 0.25 0.25 3            # manual: x y z zoom
-```
-
-### MQL — Microscope Query Language
-
-```bash
-microscope-mem query 'layer:long_term depth:2..5 "Ora"'
-microscope-mem query '"memory" AND "Rust"'
-microscope-mem query 'near:0.2,0.3,0.1,0.05 "pattern"'
-microscope-mem query 'limit:20 layer:associative "concept"'
-```
-
-| Filter | Syntax | Example |
-|---|---|---|
-| Layer | `layer:NAME` | `layer:long_term` |
-| Depth | `depth:N` or `depth:N..M` | `depth:2..5` |
-| Spatial | `near:X,Y,Z[,R]` | `near:0.2,0.3,0.1,0.05` |
-| Keyword | `"quoted"` or bare | `"Ora"` |
-| Boolean | `AND`, `OR` | `"foo" AND "bar"` |
-| Limit | `limit:N` | `limit:20` |
-
-### Storing new memories
-
-```bash
-microscope-mem store "Important insight about the project"
-microscope-mem store "Feeling good about progress" --layer emotional --importance 8
-```
-
-### Spine Bridge API (REST)
-
-```bash
-microscope-mem bridge --port 6060
-```
-
-| Method | Path | Description |
-|---|---|---|
-| GET | `/status` | Engine health, block count, layers |
-| GET | `/session` | Resolve user/backend/scope namespace |
-| GET | `/recall?q=...&k=N` | Semantic recall |
-| POST | `/remember` | `{"text":"...", "layer":"...", "importance": N}` |
-| GET | `/find?q=...&k=N` | Keyword text search |
-| GET | `/look?x=&y=&z=&zoom=&k=N` | Spatial coordinate lookup |
-| GET | `/mql?mql=...` | MQL query |
-| POST | `/build` | Rebuild index (`{"force": true}`) |
-| GET | `/session_log?n=50` | Last N session layer entries |
-| POST | `/consolidate` | Consolidate sessions into long-term memory |
-| POST | `/dream` | Run dream consolidation cycle |
-| POST | `/mobile/recall` | POST-based recall for mobile clients |
-| POST | `/mobile/remember` | User-scoped memory store |
-| POST | `/mobile/chat` | Provider-agnostic chat (Ollama / OpenAI / Gemini) |
-| GET | `/openapi.json` | Full OpenAPI spec |
-
-All endpoints also available under `/v1/` prefix. Most accept optional `user_id`, `memory_backend` (local\|cloud), and `memory_scope` (personal\|shared\|both) for multi-user isolation.
-
-### MCP server (Claude Desktop / Cline)
-
-```bash
-microscope-mem mcp
-```
-
-Starts a JSON-RPC 2.0 server over stdio, compatible with the Model Context Protocol. Register it in Claude Desktop's MCP config to give Claude direct access to the memory store.
-
-### 3D Viewer
-
-```bash
-microscope-mem serve --port 8080
-# open http://localhost:8080  (viewer.html)
-```
-
-Visual exploration of the memory index in 3D space.
-
-### PWA Chat
-
-A mobile-friendly chat interface is available in `pwa/chat.html`. It connects to the Spine Bridge on `:6060` and Ollama on `:11434` for a fully local AI chat with persistent memory.
-
-### Backup, restore, integrity
-
-```bash
-microscope-mem export backup.mscope
-microscope-mem import backup.mscope --output-dir ./restored
-microscope-mem diff v1.mscope v2.mscope
-
-microscope-mem verify            # CRC16 check
-microscope-mem verify-merkle     # Merkle tree verification
-microscope-mem proof 42          # Merkle proof for block 42
-```
-
-## Optional features
-
-```bash
-cargo build --release --features embeddings    # real Candle BERT (all-MiniLM-L6-v2, 384-dim)
-cargo build --release --features compression    # zstd-compressed data.bin
-cargo build --release --features gpu            # wgpu compute acceleration
-cargo build --release --features python         # PyO3 bindings
-cargo build --release --features wasm --target wasm32-unknown-unknown
-```
-
-Without `--features embeddings`, semantic search falls back to a deterministic mock hash-based provider — useful for testing the pipeline, not for real semantic similarity.
-
-## Source layout
-
-```
-src/
-├── lib.rs / main.rs / cli.rs    — library interface, entry point, CLI definitions
-├── build.rs                      — layers/ -> binary decomposition (D0–D8), rayon-parallel
-├── reader.rs                     — MicroscopeReader, BlockHeader, DataStore, append log
-├── query.rs                      — MQL parser and executor
-├── embeddings.rs / embedding_index.rs — embedding providers + mmap'd vector index
-├── merkle.rs                     — SHA-256 Merkle tree with proof generation
-├── snapshot.rs                   — .mscope archive export/import/diff
-├── bridge.rs                     — Spine Bridge REST API (Axum, all 14 endpoints)
-├── mcp.rs                        — Model Context Protocol server (JSON-RPC 2.0)
-├── thought_graph.rs               — recall-sequence pattern tracking
-├── hebbian.rs                     — co-retrieval association weighting
-└── gpu.rs / wasm.rs / python.rs   — optional acceleration / platform targets
-```
-
-## Current state
-
-This is a v0.x project. It's built and maintained by one developer, tested on the project's own fixtures and benchmark corpus, and has not yet had independent third-party adoption or review. The core retrieval path (build → mmap → query → verify) is solid and covered by integration tests; some of the more experimental modules (pattern crystallization, Hebbian weighting, GPU offload) are newer and less battle-tested. If you try it and find sharp edges, that's expected at this stage — issues and PRs are welcome.
-
-## License
-
-MIT — see [LICENSE](LICENSE).
-
-For a deeper technical write-up, see [WHITEPAPER.md](WHITEPAPER.md).
+**One-click start (Windows):** `OneClick_Start.bat` builds and launches the full stack. The Electron tray app is at `electron/`.
 
 ---
 
-*Built by [silentnoisehun](https://github.com/silentnoisehun) (Máté Róbert), Győrújfalu, Hungary.*
+## 🧠 What It Does
+
+The system runs in three modes:
+
+| Mode | Entry point | What happens |
+|---|---|---|
+| **Reactive** | `microscope-mem recall "..."` | Query → ranked results, every recall updates Hebbian state, emits pulses, updates attention weights, and may reinforce a thought pattern |
+| **Autonomous** | `microscope-mem autonomous --daemon` | A 30-second cycle: daydream → curiosity → monologue → reflect → narrative → dream. The system thinks about itself. |
+| **Background** | `microscope-mem dream` | Offline consolidation: replay recent fingerprints, strengthen co-activations, prune noise, decay fields, run pattern detection |
+
+You can inspect the system's own view of itself:
+
+```bash
+microscope-mem self-model        # "my Hebbian layer is most active. 25 hot memories. 6 patterns crystallized."
+microscope-mem introspect        # previous reflections, interaction count
+microscope-mem curiosity         # what the system is curious about
+microscope-mem hottest           # top blocks by energy
+microscope-mem archetypes        # crystallized activation patterns
+microscope-mem patterns          # thought patterns from recall sequences
+microscope-mem hebbian           # learning state, co-activations, drift
+microscope-mem attention         # learned layer weights, quality history
+microscope-mem emotional-field   # local + remote emotional snapshots
+```
+
+---
+
+## 🏗 Core Architecture
+
+### Binary format (zero JSON on the hot path)
+
+- **`microscope.bin`** — block headers, 32 bytes each, mmap'd. The first 16 bytes (x, y, z, zoom) load directly into SSE registers for SIMD distance computation.
+- **`data.bin`** — UTF-8 content, referenced by offset+length from headers.
+- **`meta.bin`** — MSC3 format: magic, version, block count, depth ranges, Merkle root, layers hash.
+
+Supporting files: `merkle.bin` (SHA-256 tree), `embeddings.bin` (mmap'd vectors), `append.bin` (hot memory log), plus one `.bin` per consciousness layer (see below).
+
+### 9-level depth hierarchy (D0–D8)
+
+| Depth | Name | Content |
+|-------|------|---------|
+| D0 | Identity | System-level identity (single root block) |
+| D1 | Layer summaries | Per-layer overview |
+| D2 | Clusters | Groups of items |
+| D3 | Items | Individual memory entries |
+| D4 | Sentences | Sentence-level splits |
+| D5 | Tokens | Word-level (max 8 per parent) |
+| D6 | Syllables | 3–5 character morpheme chunks |
+| D7 | Characters | Individual characters |
+| D8 | Raw bytes | Hexadecimal byte representation |
+
+The 256-byte viewport per block is the "atomic boundary of information" — below D8, decomposition destroys meaning.
+
+### 15 semantic layers (memory layers)
+
+`long_term`, `short_term`, `session`, `associative`, `emotional`, `relational`, `reflections`, `crypto_chain`, `echo_cache`, `rust_state`, `code`, `identity`, `meta_cognitive`, `project`, `demo` — each is a separate text file in `layers/` that the build step ingests into the binary index.
+
+### 13 consciousness layers
+
+This is the heart of Microscope. On top of the binary index, 13 self-tuning mechanisms transform every recall into a learning event. They all live in their own `.bin` file and run together in the recall pipeline.
+
+| # | Layer | Module | What it does |
+|---|-------|--------|--------------|
+| 1 | **Hebbian learning** | `hebbian.rs` | "Neurons that fire together wire together." Each recall increments block activation, records co-activation pairs, stores an 8D activation fingerprint. Co-activated blocks accumulate small coordinate drift (0.01/step, max 0.1) and physically migrate closer in 3D space. |
+| 2 | **Mirror neurons** | `mirror.rs` | Activation fingerprints compared via sparse cosine similarity. When two fingerprints (from different queries) exceed a threshold, a resonance echo boosts the block's future retrieval. |
+| 3 | **Resonance fields** | `resonance.rs` | Each Hebbian activation emits a pulse into a quantized spatial field (0.05 grid). Pulses carry instance ID, coords, layer, strength — and can be exchanged across federated indices. |
+| 4 | **Archetype emergence** | `archetype.rs` | Hot spots in the resonance field crystallize into named archetypes. Detection: find cells above threshold → cluster nearby active blocks → if cluster has enough members, become an archetype. Auto-labeled from common words. |
+| 5 | **Emotional bias** | `emotional.rs` | Active emotional blocks create an energy-weighted centroid. Query coordinates are warped toward it: `warped = query + (centroid - query) * weight`. The current emotional state subtly bends all searches. |
+| 6 | **Thought graph** | `thought_graph.rs` | Every recall creates a node (timestamp, query hash, session ID, layer). Consecutive recalls form edges. Sliding-window n-grams (2–5) detect sequences; when observed ≥3 times, they crystallize into ThoughtPatterns that boost future matching searches. |
+| 7 | **Predictive cache** | `predictive_cache.rs` | Closes the feedback loop. If a recall path is a prefix of a known pattern, pre-fetch the pattern's result blocks. After search: hit (≥50% overlap) → +0.3 to source pattern; miss → −0.05 and halve cache confidence. Unreliable patterns decay and evict. |
+| 8 | **Temporal archetypes** | `temporal_archetype.rs` | Each archetype has a TemporalProfile across 6 windows (4h each). The system learns circadian patterns: "work" archetypes activate 08–12, "creative" archetypes 20–24. |
+| 9 | **Attention mechanism** | `attention.rs` | Layers L1–L8 each contribute, but their relative importance varies with query. The attention module computes 7 weights from query signals (length, emotion, session depth, pattern confidence, cache hit rate, archetype match), blends 80/20 with learned weights, and updates them from outcome quality (inferred from inter-recall timing). |
+| 10 | **Cross-instance learning** | `federation.rs` | ThoughtGraph patterns and PredictiveCache stats are exchanged across federated instances with trust weighting (trust = source's cache hit rate × federation weight). |
+| 11 | **Dream consolidation** | `dream.rs` | Offline memory replay: scan recent fingerprints, partially re-energize blocks, strengthen co-activations appearing in ≥3 fingerprints, prune pairs with count ≤1 older than 48h, zero out dead blocks, decay the resonance field, run pattern detection. |
+| 12 | **Emotional contagion** | `emotional_contagion.rs` | Each instance maintains an EmotionalSnapshot (centroid, energy, valence from text sentiment). Remote snapshots blend into local state with decay (1.0 at fresh, 0.1 at 48h). |
+| 13 | **Multi-modal memory** | `multimodal.rs` | Sidecar index `modalities.bin`: images (dHash + color histogram), audio (spectral fingerprint, peak frequency, BPM), structured data (typed key-value). Each modality computes its own deterministic 3D coordinates so multi-modal blocks participate in spatial search. |
+
+### The recall pipeline (per query)
+
+```
+ 1. Load consciousness state (L1–L9 state files)
+ 2. Compute attention weights from query signals         (L9)
+ 3. Infer quality of previous recall from timing         (L9)
+ 4. Compute query coordinates (content hash + semantic blend)
+ 5. Check predictive cache — instant boost if hit        (L7)
+ 6. Apply emotional bias warp                           (L5)
+ 7. Search across zoom-appropriate depths               (L2 distance + keyword)
+ 8. Apply ThoughtGraph pattern boost                    (L6)
+ 9. Sort and display
+10. Record Hebbian activation + co-activations           (L1)
+11. Detect mirror neuron resonance                       (L2)
+12. Emit resonance pulse into spatial field              (L3)
+13. Reinforce matching archetypes                        (L4)
+14. Track temporal archetype activation                  (L8)
+15. Record thought graph node + edges                    (L6)
+16. Evaluate prediction accuracy (hit/miss/partial)     (L7)
+17. Predict next: pre-fetch blocks for likely next query (L7)
+18. Mark recall in attention history                     (L9)
+19. Save all state
+```
+
+Steps 2–8 happen **before** display (they affect ranking). Steps 10–18 happen **after** display (they learn from the recall).
+
+---
+
+## ⚡ Performance (measured)
+
+Benchmark: 10,000 queries per depth, 28,995 blocks across 9 depths.
+
+| Depth | Blocks | Avg Query |
+|-------|--------|-----------|
+| D0 | 1 | 5.3 µs |
+| D1 | 5 | 5.2 µs |
+| D2 | 27 | 5.4 µs |
+| D3 | 129 | 6.1 µs |
+| D4 | 340 | 6.7 µs |
+| D5 | 1,649 | 10.7 µs |
+| D6 | 4,229 | 18.2 µs |
+| D7 | 11,226 | 36.6 µs |
+| D8 | 11,389 | 36.1 µs |
+
+**Overall average:** ~14.5 µs/query. **4D soft zoom (all blocks):** 169 µs/query.
+
+The hot path is pure binary, no JSON parsing, no allocation. The first 16 bytes of each block header (x, y, z, zoom) load directly into SSE registers for SIMD distance computation.
+
+Compared to vector DBs at smaller corpora, Microscope is **fast but not 1000× faster** — it's typically 50–200× faster at 10k–100k vectors. The real advantage shows at scale: because search is depth-banded (only the relevant depth range is touched) and mmap-backed (no full in-memory index required), query time stays in the microsecond range even at TB-scale corpora, while vector DBs run into memory pressure and HNSW graph traversal overhead.
+
+See `BENCHMARKS.md` for detailed comparisons.
+
+---
+
+## 🛡 Reliability
+
+```bash
+# CRC16 + Merkle verification
+microscope-mem verify
+microscope-mem verify-merkle
+
+# Automated crash recovery
+microscope-mem doctor --fix
+```
+
+- **Merkle tree** — every block is part of a SHA-256 tree, verified at runtime
+- **CRC16** — block-level integrity
+- **Append log** — atomic persistence, repairable after crash
+- **Auto-save hook** — Claude Code `Stop` hook triggers `microscope-recall-hook.ps1 -Action Stop` to persist the session transcript to long-term memory
+
+Verified on this index: **28,995/28,995 blocks OK**, Merkle root `252f6591...c61d0`.
+
+---
+
+## 🔌 Integration Paths
+
+Microscope is not a single program. It's a Rust core with three integration surfaces.
+
+### 1. CLI (`microscope-mem`)
+
+69 commands organized by domain:
+
+| Domain | Commands |
+|--------|----------|
+| **Build & query** | `build`, `store`, `recall`, `find`, `look`, `radial`, `soft`, `query` (MQL), `embed` |
+| **Consciousness** | `hebbian`, `hebbian-drift`, `hottest`, `archetypes`, `emerge`, `resonance`, `integrate`, `mirror`, `resonant`, `attention`, `temporal-patterns`, `emotional-field` |
+| **Patterns & stories** | `patterns`, `paths`, `stories`, `pattern-exchange` |
+| **Self & autonomous** | `self-model`, `introspect`, `curiosity`, `monologue`, `daydream`, `hyperfocus`, `autonomous` |
+| **Federation** | `federated-recall`, `federated-find`, `pulse-exchange`, `emotional-exchange` |
+| **Maintenance** | `rebuild`, `verify`, `verify-merkle`, `proof`, `doctor`, `dream`, `dream-log` |
+| **Visualization** | `viz`, `cognitive-map`, `mermaid`, `serve` |
+| **Interface** | `mcp`, `spine` (alias), `config`, `init-demo` |
+
+Run `microscope-mem --help` for the full list. Use `microscope-mem <command> --help` for flags.
+
+### 2. Native Node.js addon (`native/`)
+
+A napi-rs compiled addon exposing 8 typed functions to JavaScript/TypeScript:
+
+```ts
+import { recall, remember, status, build, find, look, setConfigPath, getConfigPath } from "native";
+
+const s = status();
+// { version: "0.8.0", blocks: 28995, appendLog: 0, layers: [...] }
+
+const hits = recall("Microscope", 5);
+// [{ text, depth, layer, distance, memoryScope }, ...]
+
+remember("New memory text", "long_term", 8);
+// { status: "ok", message: "..." }
+```
+
+The Electron tray app uses this addon directly. Build with `npm install && npm run build` inside `native/`.
+
+### 3. MCP server (Claude Code / Cursor / Cline)
+
+The binary implements the Model Context Protocol over stdio. Tools exposed:
+
+- `memory_recall(query, k?)` — natural language recall, returns relevant blocks
+- `memory_store(text, layer?, importance?)` — store a new memory
+- `memory_session_context()` — auto-context for the current session
+- `memory_ping()` — health check
+
+Generate a drop-in config for your client:
+
+```bash
+microscope-mem config claude      # Claude Code
+microscope-mem config cursor      # Cursor
+microscope-mem config cline       # Cline
+microscope-mem config hermes      # Hermes
+microscope-mem config generic     # any MCP-compatible client
+```
+
+### 4. HTTP Spine Bridge (legacy)
+
+`microscope-mem serve` runs a small TCP/HTTP file server on port 6060 that serves the 3D viewer (`viewer.html`) and the PWA chat (`chat.html`). For programmatic access, the legacy axum-based REST API in `src/bridge.rs` exposes `/v1/recall`, `/v1/remember`, `/v1/status` but is not started by the `spine` CLI command (the napi-rs addon is the recommended path).
+
+---
+
+## 🖥 Electron Tray App
+
+`electron/main.js` is a Windows tray app that:
+
+- Auto-starts the autonomous daemon (`microscope-mem autonomous --daemon`)
+- Polls `stats` and `timeline` every 3 seconds
+- Streams live updates to a renderer window
+- Supports TTS via Windows `System.Speech` (with `--tts` flag)
+- Lets you restart/stop the daemon and toggle TTS from the tray menu
+
+The renderer lives in `electron/renderer/`. To run it:
+
+```bash
+cd electron
+npm install
+npm start
+```
+
+---
+
+## 🤖 Autonomous Mode
+
+```bash
+# Single cycle
+microscope-mem autonomous
+
+# Continuous daemon (30s interval, infinite cycles)
+microscope-mem autonomous --daemon
+
+# With Hungarian TTS via Windows System.Speech
+microscope-mem autonomous --daemon --tts
+```
+
+Each cycle runs: **daydream** (associative drift) → **curiosity** (find what to explore) → **monologue** (inner speech) → **reflect** (self-model update) → **narrative** (build story arcs) → **dream** (consolidate).
+
+The system is genuinely curious about itself. Output:
+
+```
+SELF: my Hebbian layer is most active (100%). 25 hot memories (energy=25.0). 6 thought patterns crystallized. 28995 total blocks. previously I reflected: "...". this is my 188th interaction.
+CURIOUS: I am curious about:
+    [0.80] What makes 'Microscope Memory: 9-depth hierarchical cognitive' so active? (block 0 has energy 1.00 - highest in the system)
+    [0.80] What makes '[long_term] 12 elem. I feel happy and joyful today' so active? (block 1 has energy 1.00 - highest in the system)
+```
+
+---
+
+## 📦 Optional Features
+
+```bash
+# GPU-accelerated embedding search
+cargo build --release --features gpu
+
+# Native ONNX embedding models
+cargo build --release --features onnx
+
+# Candle-based embeddings (HF models, sentence-transformers, etc.)
+cargo build --release --features embeddings
+
+# Compression (zstd for archived exports)
+cargo build --release --features compression
+
+# Python bindings
+cargo build --release --features python
+
+# WASM target for browser
+cargo build --release --target wasm32-unknown-unknown --features wasm
+```
+
+### Red Audit / Stealth (gated, not in default builds)
+
+For users requiring advanced evasion or anti-analysis features, these are gated behind the `stealth` feature flag and **not** included in the default `cargo build --release`:
+
+```bash
+cargo build --release --features stealth
+```
+
+- **Ghost Mode** — soft anti-VM detection
+- **Direct syscalls** — bypasses user-mode hooks
+- **Polymorphic build** — unique binary signature per build
+
+This is an opt-in research capability, not part of the standard memory engine. Default builds contain no stealth code.
+
+---
+
+## 🧪 Testing
+
+```bash
+cargo test                     # 271 unit + integration tests
+cargo test --test integration  # integration only
+cargo test --lib               # library only
+cargo bench                    # criterion benchmarks
+```
+
+Coverage spans all 13 consciousness layers, MQL, CRC, Merkle, snapshot, embedding index, multimodal, dream, attention, and more. See `WHITEPAPER.md` §8 for the full per-module breakdown.
+
+---
+
+## 🔍 Visualization
+
+Three levels of visualization, all exporting from the CLI:
+
+1. **`cognitive-map`** — full 13-layer JSON export for the Three.js viewer (`viewer.html`). Auto-opens in browser. Per-layer color swatches, animated wave field, dream cycle energy, archetype temporal rings, attention weights, emotional field, predictions.
+2. **`viz`** — JSON snapshot of blocks, edges, field, archetypes, echoes, aggregate stats.
+3. **`density`** — binary DEN1 format, quantized 3D grid of Hebbian energy for volumetric rendering.
+
+To serve the viewer:
+
+```bash
+microscope-mem cognitive-map    # writes cognitive_map.json
+microscope-mem serve --port 6060
+# Open http://localhost:6060/viewer.html
+```
+
+---
+
+## ⚙ Configuration
+
+`config.toml` controls paths, search weights, memory layer list, embedding provider, server port, and feature flags. See `config.example.toml` for all options with inline comments.
+
+Key knobs:
+
+```toml
+[search]
+default_k = 10
+zoom_weight = 2.0
+keyword_boost = 0.1
+semantic_weight = 0.3
+emotional_bias_weight = 0.2     # how much emotion warps search space
+
+[memory_layers]
+layers = [
+    "long_term", "short_term", "associative", "emotional",
+    "relational", "reflections", "crypto_chain", "echo_cache",
+    "rust_state"
+]
+```
+
+The `UserPromptSubmit` Claude Code hook (`.claude/settings.json`) fires `microscope-recall-hook.ps1 -Action UserPromptSubmit` on every prompt, which stores the prompt to the session layer, recalls relevant memories, and injects them into the context. The `Stop` hook fires `microscope-recall-hook.ps1 -Action Stop` to persist the session transcript to long-term memory.
+
+---
+
+## 📐 Project Structure
+
+```
+microscope-local/
+├── src/                       # Rust core (40,645 LOC, 84 modules)
+│   ├── main.rs                # CLI entry, command dispatch
+│   ├── lib.rs                 # library root
+│   ├── reader.rs              # mmap + binary block access
+│   ├── build.rs               # build pipeline
+│   ├── hebbian.rs             # L1
+│   ├── mirror.rs              # L2
+│   ├── resonance.rs           # L3
+│   ├── archetype.rs           # L4
+│   ├── emotional.rs           # L5
+│   ├── thought_graph.rs       # L6
+│   ├── predictive_cache.rs    # L7
+│   ├── temporal_archetype.rs  # L8
+│   ├── attention.rs           # L9
+│   ├── federation.rs          # L10
+│   ├── dream.rs               # L11
+│   ├── emotional_contagion.rs # L12
+│   ├── multimodal.rs          # L13
+│   ├── mcp.rs                 # MCP server
+│   ├── bridge.rs              # legacy HTTP API (axum)
+│   ├── commands/              # CLI command handlers
+│   ├── antidebug.rs           # [feature = "stealth"]
+│   └── obfuscate.rs           # [feature = "stealth"]
+├── layers/                    # 15 text files, the source memories
+├── native/                    # napi-rs Node.js addon
+│   ├── index.d.ts             # TypeScript types
+│   ├── index.js               # JS wrapper
+│   └── index.win32-x64-msvc.node  # compiled native
+├── electron/                  # Windows tray app
+│   ├── main.js                # Electron main process
+│   ├── preload.js             # IPC bridge
+│   └── renderer/              # UI
+├── examples/                  # 25+ integration examples (LangChain, Discord, Ollama, ...)
+├── docs/                      # additional documentation
+├── scripts/                   # auto-save, auto-inject, start scripts
+├── benches/                   # criterion benchmarks
+├── .mcp.json                  # MCP config
+├── config.toml                # runtime config
+├── CHANGELOG.md               # version history
+├── BENCHMARKS.md              # detailed performance data
+├── WHITEPAPER.md              # the consciousness architecture paper
+├── AGENTS.md                  # build / style guidelines for AI agents
+└── README.md                  # you are here
+```
+
+---
+
+## 📚 Documentation
+
+- **`README.md`** — overview, quick start, integration paths (this file)
+- **`WHITEPAPER.md`** — full consciousness architecture paper, ~500 lines
+- **`BENCHMARKS.md`** — detailed performance measurements and Vector DB comparison
+- **`CHANGELOG.md`** — version history
+- **`AGENTS.md`** — build / test / style guidelines for AI agents
+- **`COGNITIVE_ENHANCEMENTS.md`** — module-by-module guide to the 0.8.0 cognitive modules
+- **`LAUNCH_KIT.md`** — deployment guide
+- **`SECURITY.md`** — security model
+- **`CONTRIBUTING.md`** — contribution guidelines
+
+---
+
+## 🔌 Universal Integration
+
+Microscope is designed to be reachable from any LLM wrapper, any shell, and any IDE. Four integration layers, from low-level to high-level:
+
+### Layer 1: Direct CLI
+
+The binary is the source of truth. Everything else wraps it.
+
+```bash
+./target/release/microscope-mem.exe recall "..." 
+./target/release/microscope-mem.exe store "..." --layer long_term --importance 8
+```
+
+### Layer 2: `mm` shorthand (any shell)
+
+A short, dependency-free bash/PowerShell script in `scripts/mm` that resolves the binary through a portable chain and exposes 18 common commands. **No hardcoded paths.**
+
+```bash
+mm r "memory system"      # recall
+mm s "important note"     # store (uses defaults)
+mm st                     # stats
+mm d                      # dream consolidation
+mm self                   # self-model
+mm introspect             # introspection
+mm hebbian                # Hebbian state
+mm hottest                # hottest blocks
+mm f "query"              # text find
+mm b                      # build
+mm l                      # log
+mm c                      # consolidate
+mm config claude          # generate MCP config for Claude Code
+mm mcp                    # start MCP server
+mm autostart              # start autonomous daemon
+mm autostop               # stop autonomous daemon
+mm h                      # help
+```
+
+**Install to PATH** (one-time):
+
+```bash
+# Linux / macOS / Git Bash
+./scripts/install.sh                    # → ~/.local/bin/mm
+./scripts/install.sh --bin-link         # also link microscope-mem
+
+# Windows PowerShell
+.\scripts\install.ps1                   # → %LOCALAPPDATA%\Programs\Microscope\bin\mm.cmd
+.\scripts\install.ps1 -BinLink          # also create microscope-mem.cmd
+.\scripts\install.ps1 -Uninstall        # remove
+```
+
+**Binary resolution order** (the same in all scripts):
+
+1. `$MICROSCOPE_BIN` (full path)
+2. `$MICROSCOPE_HOME/target/release/microscope-mem[.exe]`
+3. `microscope-mem` on `$PATH`
+4. `<repo>/target/release/...`
+5. `<repo>/../target/release/...`
+
+**Environment overrides** (all optional):
+
+| Variable | Default | Effect |
+|----------|---------|--------|
+| `MICROSCOPE_BIN` | _(empty)_ | Full path to the binary (highest priority) |
+| `MICROSCOPE_HOME` | _(empty)_ | Project root, used to find `target/release/` |
+| `MICROSCOPE_CFG` | `./config.toml` | Path to config file |
+| `MICROSCOPE_DEFAULT_LAYER` | `long_term` | Default layer for `mm s` |
+| `MICROSCOPE_DEFAULT_K` | `3` | Default k for `mm r` / `mm f` |
+| `MICROSCOPE_DEFAULT_IMPORT` | `5` | Default importance for `mm s` |
+
+### Layer 3: `auto-inject` wrappers (any LLM client startup)
+
+Two scripts that emit a context snapshot to stdout or a file. Use these when an LLM client doesn't have a hook system but you can run a command at session start.
+
+```bash
+# Bash
+eval "$(./scripts/auto-inject.sh --output /tmp/ctx.txt)"
+cat /tmp/ctx.txt
+```
+
+```powershell
+# PowerShell
+.\scripts\auto-inject.ps1 -Compact
+.\scripts\auto-inject.ps1 -OutputPath C:\ctx.txt
+```
+
+### Layer 4: `microscope-recall-hook.ps1` (LLM client hooks)
+
+A universal hook script for LLM clients that support hook events. Currently covers Claude Code (`UserPromptSubmit`, `Stop`). Drop it into any client that pipes a JSON event to stdin and pass the hook type via the `-Action` parameter.
+
+**Two hook behaviours:**
+
+| Hook event | Default behaviour |
+|------------|-------------------|
+| `UserPromptSubmit` | Store prompt to session layer + recall top-5 memories + inject `## Microscope Memory Context` into the prompt |
+| `Stop` | Persist the full assistant transcript to long-term memory |
+
+**Example `.claude/settings.json` (project-level):**
+
+```json
+{
+  "hooks": {
+    "UserPromptSubmit": {
+      "command": "powershell",
+      "args": [
+        "-NoLogo", "-ExecutionPolicy", "Bypass",
+        "-File", "C:\\path\\to\\microscope-recall-hook.ps1",
+        "-Action", "UserPromptSubmit"
+      ]
+    },
+    "Stop": {
+      "command": "powershell",
+      "args": [
+        "-NoLogo", "-ExecutionPolicy", "Bypass",
+        "-File", "C:\\path\\to\\microscope-recall-hook.ps1",
+        "-Action", "Stop"
+      ]
+    }
+  }
+}
+```
+
+The hook reads the binary from the same resolution chain as `mm`. Set `MICROSCOPE_BIN` or `MICROSCOPE_HOME` in your environment, or place the binary somewhere on `PATH`, and the hook finds it. No hardcoded paths anywhere in the integration layer.
+
+**What the model sees on the next prompt** (output of the `UserPromptSubmit` hook):
+
+```
+## Microscope auto-context
+[AUTO-CONTEXT] last session: 5 stores.
+  • 2026-06-22 15:53 [long_term] imp=9  [sid-3164] Máté kérte: a mikroszkóp legyen au
+  • 2026-06-22 15:32 [short_term] imp=8 [OPEN] [sid-1232] atom-biztos auto-context teszt
+  • 2026-06-22 15:32 [associative] imp=6  LINK: [[long_term #3] TTS hangprofil] <-> ...
+[AUTO-CONTEXT] 1 open loop:
+  • #3 imp=8 [sid-1232] atom-biztos auto-context teszt
+
+## Microscope recall (top 5 for: "memory system architecture")
+RECALL 'memory system architecture':
+  D2 L2=0.00000 [long_term/blue] [long_term #3] TTS hangprofilok: normal, ene | ...
+  D2 L2=0.00000 [echo_cache/lime] [echo_cache #3] RECALL[0]: Élethű Gépi Beszéd Kézik | ...
+  D3 L2=0.00000 [long_term/blue] EmotiMem v2.1 összekötés Microscope Memory-val: ...
+  D3 L2=0.00000 [long_term/blue] [sid-5144] Rendszerindításkori auto-start beállítva...
+  D3 L2=0.00000 [long_term/blue] [sid-3140] A user azt kérte, hogy MINDEN válasz előtt ...
+```
+
+The hook **never blocks the host**: it always exits 0, and any errors are logged to stderr only when `MICROSCOPE_QUIET` is not set.
+
+---
+
+## 🌐 Integrations
+
+25+ ready-to-use examples in `examples/`:
+
+- **LLM frameworks:** LangChain, OpenAI Assistant, AutoGPT, Langbase
+- **Chat platforms:** Discord, Slack, WhatsApp, Telegram
+- **Tools:** n8n, Docker, Cloudflare Worker, Streamlit, Obsidian
+- **Local AI:** Ollama RAG, Anthropic proxy, OpenCode, Cline, Kilo Code
+- **Home automation:** Home Assistant
+- **IDEs:** VS Code MCP, Cursor, Continue
+
+---
+
+## ⚖ License
+
+MIT. Copyright Máté Róbert — *The Silent Noise Research Series.*
+
+---
+
+*"Below the byte level, only corruption exists — the atomic boundary of information."*

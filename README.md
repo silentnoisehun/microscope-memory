@@ -113,6 +113,31 @@ This is the heart of Microscope. On top of the binary index, 13 self-tuning mech
 | 12 | **Emotional contagion** | `emotional_contagion.rs` | Each instance maintains an EmotionalSnapshot (centroid, energy, valence from text sentiment). Remote snapshots blend into local state with decay (1.0 at fresh, 0.1 at 48h). |
 | 13 | **Multi-modal memory** | `multimodal.rs` | Sidecar index `modalities.bin`: images (dHash + color histogram), audio (spectral fingerprint, peak frequency, BPM), structured data (typed key-value). Each modality computes its own deterministic 3D coordinates so multi-modal blocks participate in spatial search. |
 
+### Live consciousness stream (3-tier lock-free read path)
+
+The 13 consciousness layers don't only run per-query — they run continuously in a **background stream** (`consciousness_stream.rs`) at 10 Hz (matches the brain's theta band). Every 100 ms the stream decays Hebbian energy, drifts emotions, runs the predictive forward model, and estimates curiosity. The recall hot path then reads from this live state, not from disk — saving ~10 file I/Os per query.
+
+The stream publishes a `SharedSnapshot` that gives readers three performance tiers:
+
+| Tier | Path | Latency | Use case |
+|------|------|---------|----------|
+| **0** Ultra-fast | `read_hot_fields()` (atomic loads) | **~1 ns** | Freshness check, light metrics |
+| **1** Fast | `read_cached_format()` (RwLock + String clone) | **~120 ns** | `memory_consciousness` MCP tool, dashboards |
+| **2** Lock-free | `read()` via seqlock | **~1.2 µs** | Full snapshot for advanced consumers |
+
+**Why three tiers?** A seqlock gives a consistent multi-field snapshot but still costs an atomic sequence check + a struct copy. For callers that only need a single number (e.g. "is the stream still updating?"), the ultra-fast tier skips both. For callers that need a human-readable string, the cached-format tier skips `format!()` entirely — the background cycle pre-builds the string once per tick, and readers just clone it.
+
+Measured on this build (28,492 blocks loaded):
+
+| Operation | Latency |
+|-----------|---------|
+| Atomic hot field read (cycle, surprise, curiosity, predicted_hash) | **1 ns** |
+| Cached format string (`memory_consciousness` MCP tool) | **124 ns** |
+| Seqlock snapshot read (full 96-byte state) | **1,243 ns** |
+| Legacy Mutex+`format!()` baseline | **1,440 ns** |
+
+`tests/consciousness_perf.rs` ships the benchmarks. The `cached_format` is the most surprising: it's **~11× faster** than rebuilding the string from scratch on every call, because the background cycle amortizes the cost across all readers.
+
 ### The recall pipeline (per query)
 
 ```
@@ -158,6 +183,14 @@ Benchmark: 10,000 queries per depth, 28,995 blocks across 9 depths.
 | D8 | 11,389 | 36.1 µs |
 
 **Overall average:** ~14.5 µs/query. **4D soft zoom (all blocks):** 169 µs/query.
+
+**Consciousness stream read (3-tier path):**
+
+| Tier | Latency | Mechanism |
+|------|---------|-----------|
+| Atomic hot fields | **1 ns** | `AtomicU64`/`AtomicU32` loads, no synchronization |
+| Cached format string | **124 ns** | `RwLock<String>` + clone, pre-built by background cycle |
+| Seqlock snapshot | **1.2 µs** | 96-byte `SnapshotData` copy via sequence-locked protocol |
 
 The hot path is pure binary, no JSON parsing, no allocation. The first 16 bytes of each block header (x, y, z, zoom) load directly into SSE registers for SIMD distance computation.
 
@@ -234,6 +267,7 @@ The binary implements the Model Context Protocol over stdio. Tools exposed:
 - `memory_recall(query, k?)` — natural language recall, returns relevant blocks
 - `memory_store(text, layer?, importance?)` — store a new memory
 - `memory_session_context()` — auto-context for the current session
+- `memory_consciousness()` — live consciousness state from the background stream (3-tier lock-free read path, ~120 ns)
 - `memory_ping()` — health check
 
 Generate a drop-in config for your client:

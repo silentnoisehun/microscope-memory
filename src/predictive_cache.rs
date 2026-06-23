@@ -62,6 +62,7 @@ impl CacheStats {
 
 // ─── PredictiveCache ────────────────────────────────
 
+#[derive(Clone)]
 pub struct PredictiveCache {
     pub predictions: Vec<Prediction>,
     pub stats: CacheStats,

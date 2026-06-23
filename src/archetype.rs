@@ -54,6 +54,7 @@ pub struct Archetype {
 }
 
 /// Archetype system state.
+#[derive(Clone)]
 pub struct ArchetypeState {
     pub archetypes: Vec<Archetype>,
     next_id: u32,

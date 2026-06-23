@@ -50,6 +50,7 @@ pub struct BlockResonance {
 }
 
 /// Mirror neuron state — loaded from resonance.bin.
+#[derive(Clone)]
 pub struct MirrorState {
     pub echoes: Vec<ResonanceEcho>,
     pub block_resonance: HashMap<u32, BlockResonance>,

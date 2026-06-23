@@ -76,6 +76,7 @@ pub struct ActivationFingerprint {
 // ─── HebbianState ───────────────────────────────────
 
 /// In-memory Hebbian state, loaded from binary files.
+#[derive(Clone)]
 pub struct HebbianState {
     pub activations: Vec<ActivationRecord>,
     pub coactivations: HashMap<(u32, u32), CoactivationPair>,
@@ -160,7 +161,8 @@ impl HebbianState {
                     // Clock skew or future timestamp — skip to avoid panics
                     continue;
                 }
-                let decay = (-(elapsed_ms / ENERGY_HALF_LIFE_MS) * std::f64::consts::LN_2).exp() as f32;
+                let decay =
+                    (-(elapsed_ms / ENERGY_HALF_LIFE_MS) * std::f64::consts::LN_2).exp() as f32;
                 rec.energy *= decay;
             }
         }

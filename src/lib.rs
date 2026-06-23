@@ -40,6 +40,8 @@ pub mod snapshot;
 #[cfg(feature = "stealth")]
 pub mod syscaller;
 
+#[cfg(not(target_arch = "wasm32"))]
+pub mod consciousness_stream;
 pub mod daydream;
 pub mod dream;
 pub mod emotional_contagion;

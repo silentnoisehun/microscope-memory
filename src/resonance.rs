@@ -57,6 +57,7 @@ pub struct ReceivedPulse {
 }
 
 /// Resonance protocol state.
+#[derive(Clone)]
 pub struct ResonanceState {
     /// Our instance ID.
     pub instance_id: u64,

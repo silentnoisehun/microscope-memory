@@ -85,6 +85,7 @@ const OUTCOME_BYTES: usize = NUM_LAYERS * 4 + 8 + 4; // 28 + 8 + 4 = 40
 
 // ─── AttentionState ─────────────────────────────────
 
+#[derive(Clone)]
 pub struct AttentionState {
     /// Learned optimal weights (running average from good outcomes).
     pub learned_weights: [f32; NUM_LAYERS],
@@ -373,7 +374,11 @@ fn load_attention(path: &Path) -> AttentionState {
             data[offset + 2],
             data[offset + 3],
         ]);
-        let quality = if quality.is_nan() || quality.is_infinite() { 0.5 } else { quality };
+        let quality = if quality.is_nan() || quality.is_infinite() {
+            0.5
+        } else {
+            quality
+        };
         offset += 4;
 
         history.push(AttentionOutcome {

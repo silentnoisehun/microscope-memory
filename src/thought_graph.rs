@@ -68,6 +68,7 @@ pub struct ThoughtPattern {
 
 // ─── ThoughtGraphState ──────────────────────────────
 
+#[derive(Clone)]
 pub struct ThoughtGraphState {
     pub nodes: Vec<ThoughtNode>,
     pub edges: HashMap<(u64, u64), ThoughtEdge>,

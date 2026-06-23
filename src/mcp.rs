@@ -717,6 +717,15 @@ fn handle_tools_list(id: &Value) -> Value {
                         },
                         "required": []
                     }
+                },
+                {
+                    "name": "memory_consciousness",
+                    "description": "Show live consciousness stream state — emotion, surprise, curiosity, predictions, all 13 layers in real-time",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {},
+                        "required": []
+                    }
                 }
             ]
         }
@@ -780,6 +789,7 @@ fn handle_tools_call(id: &Value, request: &Value, config: &Config) -> Value {
         "memory_store_data" => tool_store_data(config, &args),
         "memory_resonant" => tool_resonant(config, &args),
         "memory_autonomous" => tool_autonomous(config, &args),
+        "memory_consciousness" => tool_consciousness(config, &args),
         _ => Err(format!("Unknown tool: {}", tool_name)),
     };
 
@@ -934,10 +944,16 @@ fn tool_recall(config: &Config, args: &Value) -> Result<String, String> {
 
     let (qx, qy, qz) = crate::content_coords_blended(query, "long_term", config.search.semantic_weight);
 
-    let mut attention = crate::attention::AttentionState::load_or_init(output_dir);
-    let hebb_pre = crate::hebbian::HebbianState::load_or_init(output_dir, reader.block_count);
-    let tg_pre = crate::thought_graph::ThoughtGraphState::load_or_init(output_dir);
-    let pc_pre = crate::predictive_cache::PredictiveCache::load_or_init(output_dir);
+    let (mut attention, hebb_pre, tg_pre, pc_pre) = if let Some(stream) = crate::consciousness_stream::global_stream() {
+        let s = stream.lock().unwrap();
+        (s.attention.clone(), s.hebbian.clone(), s.thought_graph.clone(), s.predictive_cache.clone())
+    } else {
+        let attn = crate::attention::AttentionState::load_or_init(output_dir);
+        let hebb = crate::hebbian::HebbianState::load_or_init(output_dir, reader.block_count);
+        let tg = crate::thought_graph::ThoughtGraphState::load_or_init(output_dir);
+        let pc = crate::predictive_cache::PredictiveCache::load_or_init(output_dir);
+        (attn, hebb, tg, pc)
+    };
 
     let emotional_energy = crate::emotional::emotional_field(&reader, &hebb_pre)
         .map(|f| f.total_energy)
@@ -1089,9 +1105,19 @@ fn tool_recall(config: &Config, args: &Value) -> Result<String, String> {
     all_results.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
     let novel = all_results.first().map_or(true, |(d, _, _)| *d > 0.3);
 
-    let mut thought_graph = crate::thought_graph::ThoughtGraphState::load_or_init(output_dir);
-    let mut pred_cache = crate::predictive_cache::PredictiveCache::load_or_init(output_dir);
     let qh_tg = crate::hebbian::query_hash(query);
+    if let Some(stream) = crate::consciousness_stream::global_stream() {
+        crate::consciousness_stream::ConsciousnessStream::feed_query(stream, qh_tg);
+    }
+
+    let (mut thought_graph, mut pred_cache) = if let Some(stream) = crate::consciousness_stream::global_stream() {
+        let s = stream.lock().unwrap();
+        (s.thought_graph.clone(), s.predictive_cache.clone())
+    } else {
+        let tg = crate::thought_graph::ThoughtGraphState::load_or_init(output_dir);
+        let pc = crate::predictive_cache::PredictiveCache::load_or_init(output_dir);
+        (tg, pc)
+    };
 
     if let Some((cached_blocks, confidence)) = pred_cache.check(qh_tg) {
         let boost = confidence * crate::thought_graph::PATTERN_BOOST_WEIGHT * attn.weight(6);
@@ -1229,6 +1255,17 @@ fn tool_recall(config: &Config, args: &Value) -> Result<String, String> {
         let _ = thought_graph.save(output_dir);
         let _ = pred_cache.save(output_dir);
         let _ = attention.save(output_dir);
+
+        if let Some(stream) = crate::consciousness_stream::global_stream() {
+            let mut s = stream.lock().unwrap();
+            s.hebbian = hebb;
+            s.mirror = mirror;
+            s.resonance = resonance;
+            s.archetypes = archetypes;
+            s.thought_graph = thought_graph;
+            s.predictive_cache = pred_cache;
+            s.attention = attention;
+        }
     }
 
     output.push_str(&format!("\n{} results", shown));
@@ -1590,6 +1627,19 @@ fn tool_session_context(config: &Config, args: &Value) -> Result<String, String>
         context.len(),
         if summary.is_empty() { "(none)" } else { summary }
     ))
+}
+
+// ─── Consciousness Tool (Live Stream) ────────────────────
+
+fn tool_consciousness(config: &Config, _args: &Value) -> Result<String, String> {
+    use crate::consciousness_stream::{ConsciousnessStream, global_stream};
+
+    let state = match global_stream() {
+        Some(s) => s.clone(),
+        None => ConsciousnessStream::start(config),
+    };
+
+    Ok(ConsciousnessStream::format(&state))
 }
 
 // ─── Ping Tool (Auto-Context) ────────────────────────────

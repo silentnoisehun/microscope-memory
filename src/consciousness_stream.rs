@@ -236,16 +236,12 @@ impl ConsciousnessStream {
         s.last_query_ms = now;
     }
 
-    /// Get the current stream state as a formatted string.
-    pub fn format(state: &Arc<Mutex<StreamState>>) -> String {
-        let s = state.lock().unwrap();
+    /// Internal format implementation (takes &StreamState reference).
+    pub fn format_internal(s: &StreamState) -> String {
         let emo_intensity = s.emotional_ring.intensity();
         let dominant = s.emotional_ring.dominant();
 
-        // O(1) read of pre-computed total energy — no iter() needed.
-        let total_energy = s.hebbian_total_energy as f64;
-
-        let out = format!(
+        format!(
             "🧠 Consciousness Stream — cycle #{} ({} Hz)\n\
              \x20 Emotion:  intensity={:.3}{}\n\
              \x20 Surprise: {:.3}\n\
@@ -269,7 +265,7 @@ impl ConsciousnessStream {
             s.predicted_query_hash,
             s.predicted_confidence,
             s.hebbian.activations.len(),
-            total_energy,
+            s.hebbian_total_energy as f64,
             s.attention.learned_weights.len(),
             s.resonance.field.len(),
             s.thought_graph.crystallized_count(),
@@ -277,8 +273,13 @@ impl ConsciousnessStream {
             s.predictive_cache.stats.hit_rate() * 100.0,
             s.archetypes.archetypes.len(),
             s.mirror.echoes.len(),
-        );
-        out
+        )
+    }
+
+    /// Get the current stream state as a formatted string.
+    pub fn format(state: &Arc<Mutex<StreamState>>) -> String {
+        let s = state.lock().unwrap();
+        Self::format_internal(&s)
     }
 
     /// Format a snapshot read via seqlock — no Mutex needed on the read path.
@@ -333,8 +334,24 @@ impl ConsciousnessStream {
 /// Publish the current stream state to the lock-free snapshot.
 /// Called once per background cycle. Uses a seqlock so concurrent readers
 /// either see the old or the new version, never a torn mix.
+/// Also updates the cached format string and atomic hot fields for
+/// the ultra-fast read path.
 fn publish_snapshot(s: &StreamState) {
     let snap: &SharedSnapshot = &s.snapshot;
+
+    // Build the formatted string first (while holding Mutex for state access)
+    let formatted = ConsciousnessStream::format_internal(s);
+
+    // Publish cached format and hot fields (no seqlock needed, atomic writes)
+    snap.set_cached_format(formatted);
+    snap.set_hot_fields(
+        s.cycle,
+        s.surprise_level,
+        s.curiosity_level,
+        s.predicted_query_hash,
+    );
+
+    // Now publish the full snapshot via seqlock
     let token = snap.begin_write();
     // SAFETY: We hold the seqlock — the sequence is odd, so any reader
     // who started before us will see the old sequence and retry, and any

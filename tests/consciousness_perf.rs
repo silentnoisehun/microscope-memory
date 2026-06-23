@@ -179,6 +179,91 @@ fn perf_format_seqlock_real() {
 }
 
 #[test]
+fn perf_format_cached_string_empty() {
+    let cfg = empty_config();
+    let state = ConsciousnessStream::start(&cfg);
+    std::thread::sleep(std::time::Duration::from_millis(150));
+    let snapshot: Arc<SharedSnapshot> = {
+        let s = state.lock().unwrap();
+        s.snapshot.clone()
+    };
+
+    let n = 10_000u32;
+    let t0 = Instant::now();
+    let mut last_len = 0usize;
+    for _ in 0..n {
+        let s = snapshot.read_cached_format();
+        last_len = s.len();
+    }
+    let elapsed = t0.elapsed();
+    let per_call_ns = elapsed.as_nanos() as f64 / n as f64;
+    println!(
+        "\n[CACHED/EMPTY] {} calls in {:.2?} → {:.0} ns/call (output {} bytes)",
+        n, elapsed, per_call_ns, last_len
+    );
+    assert!(per_call_ns < 200.0, "cached format too slow: {} ns", per_call_ns);
+}
+
+#[test]
+fn perf_format_cached_string_real() {
+    let cfg = match real_config() {
+        Some(c) => c,
+        None => {
+            println!("\n[CACHED/REAL]   SKIPPED — output/microscope.bin not present");
+            return;
+        }
+    };
+    let state = ConsciousnessStream::start(&cfg);
+    std::thread::sleep(std::time::Duration::from_millis(200));
+    let snapshot: Arc<SharedSnapshot> = {
+        let s = state.lock().unwrap();
+        s.snapshot.clone()
+    };
+
+    let n = 10_000u32;
+    let t0 = Instant::now();
+    let mut last_len = 0usize;
+    for _ in 0..n {
+        let s = snapshot.read_cached_format();
+        last_len = s.len();
+    }
+    let elapsed = t0.elapsed();
+    let per_call_ns = elapsed.as_nanos() as f64 / n as f64;
+    println!(
+        "\n[CACHED/REAL]   {} calls in {:.2?} → {:.0} ns/call (output {} bytes, 28k activations)",
+        n, elapsed, per_call_ns, last_len
+    );
+    assert!(per_call_ns < 200.0, "cached format too slow: {} ns", per_call_ns);
+}
+
+#[test]
+fn perf_hot_fields() {
+    let cfg = empty_config();
+    let state = ConsciousnessStream::start(&cfg);
+    std::thread::sleep(std::time::Duration::from_millis(150));
+    let snapshot: Arc<SharedSnapshot> = {
+        let s = state.lock().unwrap();
+        s.snapshot.clone()
+    };
+
+    let n = 100_000u32;
+    let t0 = Instant::now();
+    let mut last_cycle = 0u64;
+    for _ in 0..n {
+        let (cycle, surprise, curiosity, hash) = snapshot.read_hot_fields();
+        last_cycle = cycle;
+        let _ = (surprise, curiosity, hash);
+    }
+    let elapsed = t0.elapsed();
+    let per_call_ns = elapsed.as_nanos() as f64 / n as f64;
+    println!(
+        "\n[HOT_FIELDS]    {} calls in {:.2?} → {:.0} ns/call (cycle={})",
+        n, elapsed, per_call_ns, last_cycle
+    );
+    assert!(per_call_ns < 50.0, "hot fields too slow: {} ns", per_call_ns);
+}
+
+#[test]
 fn perf_seqlock_under_contention() {
     // One writer thread, one reader thread, 1 second. Measures
     // worst-case read latency (when reader races the writer) and

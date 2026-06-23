@@ -37,7 +37,8 @@
 //! snapshot. This is the "federation without serialization" path.
 
 use std::cell::UnsafeCell;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
+use std::sync::RwLock;
 
 /// Magic number identifying a valid snapshot ("CONS" in little-endian).
 pub const SNAPSHOT_MAGIC: u32 = 0x534E_4F43;
@@ -69,6 +70,19 @@ pub struct SharedSnapshot {
     /// interior mutability behind `&self`. Layout is stable thanks to
     /// `#[repr(C)]` and explicit field types.
     data: UnsafeCell<SnapshotData>,
+
+    // ─── Fast-path fields (not in mmap layout) ───────────
+    /// Pre-formatted consciousness string. Updated by the background cycle.
+    /// Readers clone this in O(1) without any format!() calls.
+    cached_format: RwLock<String>,
+    /// Lock-free cycle counter. Readers can check freshness without seqlock.
+    pub hot_cycle: AtomicU64,
+    /// Lock-free surprise level (f32 stored as u32 bits).
+    pub hot_surprise_bits: AtomicU32,
+    /// Lock-free curiosity level (f32 stored as u32 bits).
+    pub hot_curiosity_bits: AtomicU32,
+    /// Lock-free predicted query hash.
+    pub hot_predicted_hash: AtomicU64,
 }
 
 /// Inner data block. Plain scalars, no atomics — seqlock protects them.
@@ -142,13 +156,18 @@ impl std::fmt::Debug for SharedSnapshot {
 
 impl SharedSnapshot {
     /// Build a zeroed snapshot, ready to be written.
-    pub const fn new_zeroed() -> Self {
+    pub fn new_zeroed() -> Self {
         Self {
             sequence: AtomicU64::new(0),
             magic: SNAPSHOT_MAGIC,
             version: SNAPSHOT_VERSION,
             _pad: [0; 2],
             data: UnsafeCell::new(SnapshotData::zeroed()),
+            cached_format: RwLock::new(String::new()),
+            hot_cycle: AtomicU64::new(0),
+            hot_surprise_bits: AtomicU32::new(0),
+            hot_curiosity_bits: AtomicU32::new(0),
+            hot_predicted_hash: AtomicU64::new(0),
         }
     }
 
@@ -176,6 +195,47 @@ impl SharedSnapshot {
     /// `begin_write` and not yet called `end_write`. Only one writer at a time.
     pub unsafe fn data_mut(&self) -> &mut SnapshotData {
         &mut *self.data.get()
+    }
+
+    // ─── Fast-path read methods ────────────────────────────
+
+    /// Read the pre-formatted consciousness string. O(1) clone, no format!().
+    /// This is the fastest path for the MCP tool: ~50-100ns per call.
+    pub fn read_cached_format(&self) -> String {
+        match self.cached_format.read() {
+            Ok(guard) => guard.clone(),
+            Err(_) => "🧠 Consciousness Stream — (cache poisoned)".to_string(),
+        }
+    }
+
+    /// Read hot fields atomically without seqlock. ~5-20ns.
+    /// Returns (cycle, surprise, curiosity, predicted_hash).
+    pub fn read_hot_fields(&self) -> (u64, f32, f32, u64) {
+        let cycle = self.hot_cycle.load(Ordering::Relaxed);
+        let surprise = f32::from_bits(self.hot_surprise_bits.load(Ordering::Relaxed));
+        let curiosity = f32::from_bits(self.hot_curiosity_bits.load(Ordering::Relaxed));
+        let hash = self.hot_predicted_hash.load(Ordering::Relaxed);
+        (cycle, surprise, curiosity, hash)
+    }
+
+    /// Check if the snapshot is fresh (hot_cycle matches or exceeds expected).
+    pub fn is_fresh(&self, expected_cycle: u64) -> bool {
+        self.hot_cycle.load(Ordering::Relaxed) >= expected_cycle
+    }
+
+    /// Update cached format string. Called by the background cycle.
+    pub fn set_cached_format(&self, s: String) {
+        if let Ok(mut guard) = self.cached_format.write() {
+            *guard = s;
+        }
+    }
+
+    /// Update hot atomic fields. Called by the background cycle.
+    pub fn set_hot_fields(&self, cycle: u64, surprise: f32, curiosity: f32, predicted_hash: u64) {
+        self.hot_cycle.store(cycle, Ordering::Relaxed);
+        self.hot_surprise_bits.store(surprise.to_bits(), Ordering::Relaxed);
+        self.hot_curiosity_bits.store(curiosity.to_bits(), Ordering::Relaxed);
+        self.hot_predicted_hash.store(predicted_hash, Ordering::Relaxed);
     }
 
     /// Read the snapshot. Returns `None` after `SNAPSHOT_MAX_RETRIES` torn reads.

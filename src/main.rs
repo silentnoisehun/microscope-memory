@@ -29,10 +29,6 @@ use std::time::Instant;
 
 use clap::Parser;
 use colored::Colorize;
-#[cfg(feature = "stealth")]
-use windows_sys::Win32::System::SystemInformation::{GetSystemInfo, GetTickCount64, SYSTEM_INFO};
-#[cfg(feature = "stealth")]
-use windows_sys::Win32::System::Threading::GetCurrentProcessId;
 
 // â”€â”€â”€ Command handlers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -204,12 +200,6 @@ fn recall(config: &Config, query: &str, k: usize) {
     let keywords: Vec<&str> = q_lower.split_whitespace().filter(|w| w.len() > 2).collect();
 
     for zoom in zoom_lo..=zoom_hi {
-        // Red Audit: Timing jitter using polymorphic build-time value
-        #[cfg(feature = "stealth")]
-        if zoom > zoom_lo {
-            let delay = crate::obfuscate::POLY_JITTER;
-            std::thread::sleep(std::time::Duration::from_millis(delay));
-        }
         let (start, count) = reader.depth_ranges[zoom as usize];
         let (start, count) = (start as usize, count as usize);
         for i in start..(start + count) {
@@ -449,15 +439,13 @@ fn recall(config: &Config, query: &str, k: usize) {
             &narrative.narrative,
             &narrative.emotion,
         );
-        if narrative.session_count <= 3 || narrative.session_count % 10 == 0 {
+        if narrative.session_count <= 3 || narrative.session_count.is_multiple_of(10) {
             println!("  {} {}", "NARRATIVE:".cyan(), narrative.narrative);
         }
 
         // --- Auto-reflect: every N recalls, the system thinks about itself ---
         if narrative.session_count > 0
-            && (narrative.session_count as usize)
-                % microscope_memory::self_reflect::AUTO_REFLECT_INTERVAL
-                == 0
+            && (narrative.session_count as usize).is_multiple_of(microscope_memory::self_reflect::AUTO_REFLECT_INTERVAL)
         {
             let reflection =
                 microscope_memory::self_reflect::introspect(config, &reader, output_dir);
@@ -468,7 +456,7 @@ fn recall(config: &Config, query: &str, k: usize) {
         }
 
         // --- Auto self-model snapshot: every 10th recall ---
-        if narrative.session_count > 0 && (narrative.session_count as usize) % 10 == 0 {
+        if narrative.session_count > 0 && (narrative.session_count as usize).is_multiple_of(10) {
             let mut self_model = microscope_memory::self_model::SelfModel::load_or_init(output_dir);
             let snap = self_model.take_snapshot(config, &reader, output_dir);
             let change = self_model.describe_change();
@@ -479,7 +467,7 @@ fn recall(config: &Config, query: &str, k: usize) {
         }
 
         // --- Auto curiosity: every 7th recall ---
-        if narrative.session_count > 0 && (narrative.session_count as usize) % 7 == 0 {
+        if narrative.session_count > 0 && (narrative.session_count as usize).is_multiple_of(7) {
             let mut curiosity =
                 microscope_memory::curiosity::CuriosityState::load_or_init(output_dir);
             let queries = curiosity.generate_queries(config, &reader, output_dir);
@@ -496,7 +484,7 @@ fn recall(config: &Config, query: &str, k: usize) {
             let mut nm =
                 microscope_memory::narrative_memory::NarrativeMemory::load_or_init(output_dir);
             if let Some(ep) = nm.build_episode(config, &reader, output_dir, query, &all_results) {
-                if nm.episodes.len() <= 3 || nm.episodes.len() % 5 == 0 {
+                if nm.episodes.len() <= 3 || nm.episodes.len().is_multiple_of(5) {
                     println!(
                         "{}",
                         microscope_memory::narrative_memory::format_episode(&ep)
@@ -506,7 +494,7 @@ fn recall(config: &Config, query: &str, k: usize) {
         }
 
         // --- Auto inner monologue: every 15th recall ---
-        if narrative.session_count > 0 && (narrative.session_count as usize) % 15 == 0 {
+        if narrative.session_count > 0 && (narrative.session_count as usize).is_multiple_of(15) {
             let mut monologue =
                 microscope_memory::inner_monologue::MonologueState::load_or_init(output_dir);
             let entry = monologue.generate_monologue(config, &reader, output_dir);
@@ -1045,34 +1033,8 @@ fn init_demo(config: &Config, force: bool) -> Result<(), String> {
     Ok(())
 }
 
-/// Red Audit: IAT Camouflage. Calls innocent Win32 APIs to make the binary
-/// appear as a legitimate system utility.
-#[cfg(feature = "stealth")]
-fn dummy_legit_calls() {
-    unsafe {
-        let mut info: SYSTEM_INFO = std::mem::zeroed();
-        GetSystemInfo(&mut info);
-        let _ = GetTickCount64();
-        let _ = GetCurrentProcessId();
-        // These don't do anything meaningful for the logic,
-        // but they force the imports into the IAT.
-    }
-}
-
 #[tokio::main]
 async fn main() {
-    #[cfg(feature = "stealth")]
-    {
-        dummy_legit_calls();
-
-        // Phase 3: Soft Anti-VM / Ghost Mode
-        let is_ghost = crate::antidebug::is_sandbox();
-        if is_ghost {
-            // Silently log to stderr only for internal tracking
-            eprintln!("  {} Ghost Mode active.", "INFO:".cyan());
-        }
-    }
-
     let config = Config::load(DEFAULT_CONFIG_PATH).unwrap_or_else(|_| {
         // Redir warning to stderr for MCP compatibility
         eprintln!("  {} Using default configuration", "WARN:".yellow());
@@ -2480,7 +2442,7 @@ async fn main() {
             );
         }
         Cmd::Stories { k } => {
-            let reader = open_reader(&config);
+            let _reader = open_reader(&config);
             let output_dir = Path::new(&config.paths.output_dir);
             let nm = microscope_memory::narrative_memory::NarrativeMemory::load_or_init(output_dir);
             let episodes = nm.recent_episodes(k);
@@ -2504,7 +2466,7 @@ async fn main() {
             }
         }
         Cmd::Daydream { seed, steps } => {
-            let reader = open_reader(&config);
+            let _reader = open_reader(&config);
             let output_dir = Path::new(&config.paths.output_dir);
             let seed_text = if seed.is_empty() {
                 let narrative =
@@ -2526,7 +2488,7 @@ async fn main() {
             }
         }
         Cmd::Hyperfocus { target, focus_type } => {
-            let output_dir = Path::new(&config.paths.output_dir);
+            let _output_dir = Path::new(&config.paths.output_dir);
             let mut hf = microscope_memory::hyperfocus::Hyperfocus::new();
             let intensity = hf.enter_hyperfocus(&target, &focus_type);
             println!(
@@ -2565,7 +2527,7 @@ async fn main() {
                 cycle_interval_secs: interval,
                 tts_enabled: tts,
                 daemon_mode: daemon,
-                max_cycles: max_cycles,
+                max_cycles,
                 ..Default::default()
             };
             microscope_memory::autonomous::print_autonomous_header(&auto_config);
@@ -2584,7 +2546,7 @@ fn print_client_setup(client: &str, config: &microscope_memory::config::Config) 
         .and_then(|p| p.to_str().map(|s| s.to_string()))
         .unwrap_or_else(|| "microscope-mem".to_string());
 
-    let cfg_path = std::path::Path::new(&config.paths.output_dir);
+    let _cfg_path = std::path::Path::new(&config.paths.output_dir);
 
     println!();
     println!(

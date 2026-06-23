@@ -623,7 +623,6 @@ python   = ["pyo3"]
 gpu      = ["wgpu", "bytemuck", "pollster"]
 embeddings = ["candle-core", "candle-nn"]
 compression = ["zstd"]
-stealth  = anti-debug + obfuscation
 ```
 
 ### Build
@@ -716,7 +715,7 @@ field decay (0.8×). CPU: minimális, I/O: append bináris log.
 
 **Q: Hány sor Rust a projekt?**
 
-A: Core engine: ~8 000 sor. Teljes workspace: 38 178 sor (src/*.rs).
+A: Core engine: ~8 000 sor. Teljes workspace: 39 760 sor (src/*.rs).
 
 ---
 
@@ -761,12 +760,9 @@ A: Core engine: ~8 000 sor. Teljes workspace: 38 178 sor (src/*.rs).
 │ viz.rs                                   │   148  │ 3D viewer                    │
 │ impulse_control.rs                       │   157  │ Impulse filtering           │
 │ mental_sandbox.rs                        │   109  │ Pre-action simulation       │
-│ syscaller.rs                             │   130  │ Windows syscalls (stealth)  │
 │ sequential_thinking.rs                    │   121  │ Chain-of-thought reasoning  │
-│ antidebug.rs                             │    50  │ Anti-debug (stealth mode)    │
-│ obfuscate.rs                             │    30  │ Code obfuscation             │
 ├─────────────────────────────────────────┼────────┼────────────────────────────────┤
-│ ÖSSZESEN                                 │ 38 178 │ ~63 fájl                     │
+│ ÖSSZESEN                                 │ 39 760 │ 90 fájl                      │
 └─────────────────────────────────────────┴────────┴────────────────────────────────┘
 ```
 

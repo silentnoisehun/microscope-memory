@@ -41,6 +41,12 @@ pub struct ExplicitMemory {
     pub relationships: HashMap<String, Vec<String>>, // concept -> related concepts
 }
 
+impl Default for ExplicitMemory {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ExplicitMemory {
     pub fn new() -> Self {
         Self {
@@ -110,12 +116,12 @@ impl ExplicitMemory {
 
         self.relationships
             .entry(key1.clone())
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(key2.clone());
 
         self.relationships
             .entry(key2)
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(key1);
     }
 
@@ -148,7 +154,7 @@ impl ExplicitMemory {
     /// Get recent events
     pub fn recent_events(&self, count: usize) -> Vec<&Event> {
         let mut events = self.events.iter().collect::<Vec<_>>();
-        events.sort_by(|a, b| b.timestamp_ms.cmp(&a.timestamp_ms));
+        events.sort_by_key(|b| std::cmp::Reverse(b.timestamp_ms));
         events.into_iter().take(count).collect()
     }
 
@@ -162,7 +168,7 @@ impl ExplicitMemory {
         // Facts
         let fact_count = self.facts.len() as u32;
         data.extend_from_slice(&fact_count.to_le_bytes());
-        for (_, fact) in &self.facts {
+        for fact in self.facts.values() {
             let stmt_bytes = fact.statement.as_bytes();
             data.extend_from_slice(&(stmt_bytes.len() as u16).to_le_bytes());
             data.extend_from_slice(stmt_bytes);
@@ -178,7 +184,7 @@ impl ExplicitMemory {
         // Concepts
         let concept_count = self.concepts.len() as u32;
         data.extend_from_slice(&concept_count.to_le_bytes());
-        for (_, concept) in &self.concepts {
+        for concept in self.concepts.values() {
             let name_bytes = concept.name.as_bytes();
             data.push(name_bytes.len() as u8);
             data.extend_from_slice(name_bytes);

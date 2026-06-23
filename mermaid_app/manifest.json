@@ -1,0 +1,13 @@
+{
+  'name': 'Mermaid PWA - Rongyasz',
+  'short_name': 'Mermaid',
+  'description': 'Rongyasz AI agent + Voice + Diff + Dashboard + Pipeline. Hot-swappable modular PWA.',
+  'start_url': './index.html',
+  'display': 'standalone',
+  'background_color': '#000000',
+  'theme_color': '#00ff9d',
+  'orientation': 'any',
+  'icons': [
+    { 'src': './icon.svg', 'sizes': '512x512', 'type': 'image/svg+xml', 'purpose': 'any maskable' }
+  ]
+}

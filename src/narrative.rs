@@ -53,10 +53,9 @@ impl NarrativeState {
                 let ts = u64::from_le_bytes(data[4..12].try_into().unwrap_or([0; 8]));
                 let count = u64::from_le_bytes(data[12..20].try_into().unwrap_or([0; 8]));
                 let mut emotion = [0.0f32; 21];
-                for i in 0..21 {
+                for (i, e) in emotion.iter_mut().enumerate() {
                     let off = 20 + i * 4;
-                    emotion[i] =
-                        f32::from_le_bytes(data[off..off + 4].try_into().unwrap_or([0u8; 4]));
+                    *e = f32::from_le_bytes(data[off..off + 4].try_into().unwrap_or([0u8; 4]));
                 }
                 let nlen = u16::from_le_bytes(data[104..106].try_into().unwrap_or([0; 2])) as usize;
                 let narrative = if 106 + nlen <= data.len() {
@@ -129,7 +128,6 @@ impl NarrativeState {
 }
 
 /// Meta-kognitív rekonszolidáció: a narratíva visszaírása a memóriába.
-///
 /// Minden generált narratív mondatot elmentünk store_memory-val,
 /// [MetaCognitive] prefix-szel, hogy a rendszer később emlékezzen rá,
 /// miről gondolkodott.
@@ -325,7 +323,7 @@ mod tests {
         emotion[7] = 0.6; // anticipation
         let s = build_narrative(
             &emotion,
-            Some(&["hello".to_string()].as_slice()),
+            Some(["hello".to_string()].as_slice()),
             Some(3),
             Some(5),
             Some("test query"),

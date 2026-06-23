@@ -25,6 +25,12 @@ pub struct MentalSandbox {
     long_term_goals: Vec<String>,
 }
 
+impl Default for MentalSandbox {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MentalSandbox {
     /// Create a new mental sandbox
     pub fn new() -> Self {

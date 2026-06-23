@@ -32,6 +32,12 @@ pub struct Hippocampus {
     pub binding_threshold: f32,
 }
 
+impl Default for Hippocampus {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Hippocampus {
     pub fn new() -> Self {
         Self {

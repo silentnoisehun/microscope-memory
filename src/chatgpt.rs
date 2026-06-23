@@ -9,7 +9,7 @@
 //! Használat:
 //!   microscope-mem import-chatgpt <path> --persona Liora
 
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use std::collections::{HashMap, VecDeque};
 use std::fs;
 use std::path::Path;

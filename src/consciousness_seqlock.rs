@@ -11,8 +11,8 @@
 //! # Why is this useful?
 //!
 //! The hot read path (`ConsciousnessStream::format`) historically needed a
-//! `Mutex` lock + 28k-element sum = ~25 µs. With pre-computed aggregates
-//! + seqlock reads, the cost is bounded by one atomic load + one
+//! `Mutex` lock plus 28k-element sum = ~25 µs. With pre-computed aggregates
+//! plus seqlock reads, the cost is bounded by one atomic load plus one
 //! fixed-size struct copy.
 //!
 //! # Why "impossible but possible"?
@@ -49,9 +49,7 @@ pub const SNAPSHOT_MAX_RETRIES: u32 = 8;
 
 /// 96-byte snapshot of the consciousness stream. All fields are
 /// pre-computed by the writer; readers do no derivation.
-///
 /// `#[repr(C)]` guarantees a stable layout for mmap'd files.
-///
 /// The data fields live inside `UnsafeCell` so the writer can mutate them
 /// through `&self` (required for the seqlock protocol). The seqlock
 /// guarantees readers never see a torn write.
@@ -191,8 +189,10 @@ impl SharedSnapshot {
     /// protocol guarantees no reader can be accessing the data while this
     /// is held (the sequence is odd, so readers retry).
     ///
-    /// SAFETY: Caller must hold the seqlock by having called
-    /// `begin_write` and not yet called `end_write`. Only one writer at a time.
+    /// # Safety
+    ///
+    /// Caller must hold the seqlock by having called `begin_write` and
+    /// not yet called `end_write`. Only one writer at a time.
     #[allow(clippy::mut_from_ref)]
     pub unsafe fn data_mut(&self) -> &mut SnapshotData {
         &mut *self.data.get()
@@ -256,7 +256,7 @@ impl SharedSnapshot {
             // is not currently mutating data. We do a single read of the
             // whole data block; torn reads are detected by the post-read
             // sequence check.
-            let data = unsafe { (*self.data.get()).clone() };
+            let data = unsafe { *self.data.get() };
             std::sync::atomic::fence(Ordering::Acquire);
             let s2 = self.sequence.load(Ordering::Acquire);
             if s1 == s2 && self.magic == SNAPSHOT_MAGIC {

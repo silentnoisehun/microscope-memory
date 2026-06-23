@@ -1,0 +1,29 @@
+services:
+  litellm:
+    container_name: litellm-pipeline
+    image: ghcr.io/berriai/litellm:main-latest
+    ports:
+      - "4000:4000"
+    volumes:
+      - ./litellm_config.yaml:/app/config.yaml
+      - litellm_data:/app/data
+    env_file: .env
+    environment:
+      - LITELLM_MODE=PRODUCTION
+      - LITELLM_LOG=INFO
+    command:
+      - "--config"
+      - "./config.yaml"
+      - "--port"
+      - "4000"
+      - "--num_workers"
+      - "4"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  litellm_data:

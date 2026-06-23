@@ -142,6 +142,12 @@ pub struct Planner {
     next_id: Arc<RwLock<u64>>,
 }
 
+impl Default for Planner {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Planner {
     pub fn new() -> Self {
         Self {
@@ -207,20 +213,19 @@ impl Planner {
             .read()
             .unwrap()
             .values()
-            .filter(|g| status.as_ref().map_or(true, |s| g.status == *s))
+            .filter(|g| status.as_ref().is_none_or(|s| g.status == *s))
             .cloned()
             .collect()
     }
 
     /// Cél lebontása részcélokra (HTN dekompozíció)
-
-    pub fn decompose_goal(&self, goal_id: u64) -> Vec<u64> {
+pub fn decompose_goal(&self, goal_id: u64) -> Vec<u64> {
         let goal = match self.goals.read().unwrap().get(&goal_id) {
             Some(g) => g.clone(),
             None => return vec![],
         };
 
-        let config = self.config.read().unwrap().clone();
+        let _config = self.config.read().unwrap().clone();
 
         let mut sub_ids = Vec::new();
 
@@ -334,14 +339,13 @@ impl Planner {
     }
 
     /// Terv készítése egy célhoz
-
-    pub fn create_plan(&self, goal_id: u64) -> Plan {
+pub fn create_plan(&self, goal_id: u64) -> Plan {
         let goal = match self.goals.read().unwrap().get(&goal_id) {
             Some(g) => g.clone(),
             None => return self.empty_plan(),
         };
 
-        let config = self.config.read().unwrap().clone();
+        let _config = self.config.read().unwrap().clone();
 
         let now = self.now();
 
@@ -390,8 +394,7 @@ impl Planner {
     }
 
     /// Terv végrehajtásának előre léptetése
-
-    pub fn execute_step(&self, plan_id: u64) -> Option<Action> {
+pub fn execute_step(&self, plan_id: u64) -> Option<Action> {
         let mut plans = self.plans.write().unwrap();
 
         let plan = plans.get_mut(&plan_id)?;
@@ -417,8 +420,7 @@ impl Planner {
     }
 
     /// Rollback: visszalépés az utolsó végrehajtott lépésről, ha az sikertelen volt.
-
-    pub fn fail_step(&self, plan_id: u64, reason: &str) -> bool {
+pub fn fail_step(&self, plan_id: u64, reason: &str) -> bool {
         let mut plans = self.plans.write().unwrap();
 
         let plan = match plans.get_mut(&plan_id) {
@@ -439,13 +441,12 @@ impl Planner {
     }
 
     /// Replanning: terv újragenerálás változott körülmények esetén
-
-    pub fn replan(&self, plan_id: u64, reason: &str) -> Option<Plan> {
-        let mut plans = self.plans.write().unwrap();
+pub fn replan(&self, plan_id: u64, reason: &str) -> Option<Plan> {
+        let plans = self.plans.write().unwrap();
 
         let old = plans.get(&plan_id)?.clone();
 
-        let goal = self.goals.read().unwrap().get(&old.goal_id)?.clone();
+        let _goal = self.goals.read().unwrap().get(&old.goal_id)?.clone();
 
         drop(plans);
 
@@ -515,7 +516,7 @@ impl Planner {
     }
 
     fn make_collect_actions(&self) -> Vec<Action> {
-        let mut id = self.nid();
+        let id = self.nid();
 
         vec![
             Action {
@@ -561,7 +562,7 @@ impl Planner {
     }
 
     fn make_analyze_actions(&self) -> Vec<Action> {
-        let mut id = self.nid();
+        let id = self.nid();
 
         vec![
             Action {
@@ -607,7 +608,7 @@ impl Planner {
     }
 
     fn make_execute_actions(&self, goal: &Goal) -> Vec<Action> {
-        let mut id = self.nid();
+        let id = self.nid();
 
         vec![
             Action {
@@ -653,7 +654,7 @@ impl Planner {
     }
 
     fn make_generic_actions(&self, goal: &Goal) -> Vec<Action> {
-        let mut id = self.nid();
+        let id = self.nid();
 
         vec![
             Action {

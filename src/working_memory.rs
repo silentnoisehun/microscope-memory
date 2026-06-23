@@ -164,7 +164,6 @@ impl WorkingMemory {
         if self.items.len() >= self.capacity {
             let mut worst = 0;
             let mut worst_score = f32::MAX;
-            let now = now;
             for (i, item) in self.items.iter().enumerate() {
                 let recency =
                     ((now - item.last_access_ms) as f64 / self.decay_ms as f64).max(0.0) as f32;

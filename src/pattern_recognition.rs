@@ -9,10 +9,10 @@
 //!
 //! Kapcsolódások:
 //! - morphogenesis.rs → strukturális motívum detektálás
-//! - 	emporal_archetype.rs → időbeli mintázatok
-//! - 	hought_graph.rs → gondolatmenet minták
+//! - temporal_archetype.rs → időbeli mintázatok
+//! - thought_graph.rs → gondolatmenet minták
 //! - hebbian.rs → ko-aktivációs minták
-//! - rchetype.rs → kikristályosodott minták
+//! - archetype.rs → kikristályosodott minták
 //! - heuristic_decision.rs → minta-alapú döntéshozatal
 
 use std::collections::{HashMap, HashSet, VecDeque};
@@ -167,6 +167,12 @@ pub struct PatternRecognizer {
     domain_index: Arc<RwLock<HashMap<String, Vec<u64>>>>,
 }
 
+impl Default for PatternRecognizer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PatternRecognizer {
     pub fn new() -> Self {
         Self {
@@ -227,7 +233,7 @@ impl PatternRecognizer {
             .write()
             .unwrap()
             .entry(domain.to_string())
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(id);
 
         id
@@ -258,8 +264,8 @@ impl PatternRecognizer {
             .unwrap()
             .iter()
             .filter(|p| {
-                let type_match = ptype.as_ref().map_or(true, |t| p.pattern_type == *t);
-                let domain_match = domain.map_or(true, |d| p.domain == d);
+                let type_match = ptype.as_ref().is_none_or(|t| p.pattern_type == *t);
+                let domain_match = domain.is_none_or(|d| p.domain == d);
                 type_match && domain_match
             })
             .cloned()
@@ -289,7 +295,6 @@ impl PatternRecognizer {
     // ─── Szekvencia Detektálás ─────────────────────────────────────────────
 
     /// Szekvencia minta felismerés: gyakori részsorozatok keresése
-    ///
     /// Bemenet: elemek sorozata (pl. block id-k, műveletek, események)
     /// Kimenet: ismétlődő minták confidenciával
     pub fn find_sequences(&self, elements: &[String], domain: &str) -> Vec<RecognizedPattern> {
@@ -319,7 +324,7 @@ impl PatternRecognizer {
             if freq >= min_sim && seq.len() >= 2 {
                 let confidence = (freq * (1.0 - 1.0 / (seq.len() as f64))).min(1.0);
 
-                let mut pattern = RecognizedPattern {
+                let pattern = RecognizedPattern {
                     id: self.next_id(),
                     name: format!("seq_{}_{}", domain, seq.first().unwrap_or(&"?".to_string())),
                     pattern_type: PatternType::Sequence,
@@ -357,7 +362,7 @@ impl PatternRecognizer {
                         .write()
                         .unwrap()
                         .entry(domain.to_string())
-                        .or_insert_with(Vec::new)
+                        .or_default()
                         .push(id);
                 }
 
@@ -455,7 +460,6 @@ impl PatternRecognizer {
     // ─── Temporális Minta Detektálás ───────────────────────────────────────
 
     /// Temporális minták keresése időbélyeges eseményekből
-    ///
     /// Bemenet: {timestamp_ms, id, intensity} triplek
     /// Kimenet: napi/heti ritmusok
     pub fn find_temporal_patterns(
@@ -472,13 +476,13 @@ impl PatternRecognizer {
         // Csoportosítás óra × nap szerint
         let mut hourly: HashMap<(u8, u8), Vec<f64>> = HashMap::new(); // (hour, day) → intensities
 
-        for (ts, id, intensity) in events {
+        for (ts, _id, intensity) in events {
             let secs = *ts / 1000;
             let hour = ((secs / 3600) % 24) as u8;
             let day = ((secs / 86400) % 7) as u8;
             hourly
                 .entry((hour, day))
-                .or_insert_with(Vec::new)
+                .or_default()
                 .push(*intensity);
         }
 
@@ -496,11 +500,6 @@ impl PatternRecognizer {
         peak_hours.sort_by(|a, b| b.2.partial_cmp(&a.2).unwrap());
 
         if !peak_hours.is_empty() {
-            let elements: Vec<String> = peak_hours
-                .iter()
-                .map(|(h, d, _)| format!("{}:{}", d, h))
-                .collect();
-
             let slices: Vec<TemporalSlice> = peak_hours
                 .iter()
                 .map(|(h, d, avg)| TemporalSlice {
@@ -541,7 +540,7 @@ impl PatternRecognizer {
                 .write()
                 .unwrap()
                 .entry(domain.to_string())
-                .or_insert_with(Vec::new)
+                .or_default()
                 .push(id);
 
             patterns.push(pattern);
@@ -604,7 +603,7 @@ impl PatternRecognizer {
                         .write()
                         .unwrap()
                         .entry(domain.to_string())
-                        .or_insert_with(Vec::new)
+                        .or_default()
                         .push(id);
 
                     patterns.push(pattern);
@@ -617,7 +616,6 @@ impl PatternRecognizer {
     // ─── Strukturális Motívum Detektálás ──────────────────────────────────
 
     /// Strukturális motívumok keresése gráfban (pl. morphogenesis által növesztett architektúrákban)
-    ///
     /// Bemenet: adjacencia lista (from, to, weight)
     /// Kimenet: gyakori algráf minták (motívumok)
     pub fn find_motifs(
@@ -638,7 +636,7 @@ impl PatternRecognizer {
         for (from, to, _) in edges {
             fan_out
                 .entry(from.clone())
-                .or_insert_with(Vec::new)
+                .or_default()
                 .push(to.clone());
         }
 
@@ -677,7 +675,7 @@ impl PatternRecognizer {
                     .write()
                     .unwrap()
                     .entry(domain.to_string())
-                    .or_insert_with(Vec::new)
+                    .or_default()
                     .push(id);
                 patterns.push(pattern);
             }
@@ -688,7 +686,7 @@ impl PatternRecognizer {
         for (from, to, _) in edges {
             fan_in
                 .entry(to.clone())
-                .or_insert_with(Vec::new)
+                .or_default()
                 .push(from.clone());
         }
 
@@ -722,7 +720,7 @@ impl PatternRecognizer {
                     .write()
                     .unwrap()
                     .entry(domain.to_string())
-                    .or_insert_with(Vec::new)
+                    .or_default()
                     .push(id);
                 patterns.push(pattern);
             }
@@ -770,7 +768,7 @@ impl PatternRecognizer {
                     .write()
                     .unwrap()
                     .entry(domain.to_string())
-                    .or_insert_with(Vec::new)
+                    .or_default()
                     .push(id);
                 patterns.push(pattern);
             }
@@ -782,7 +780,7 @@ impl PatternRecognizer {
     /// Strukturális motívum keresés morphogenesis organizmusokban
     pub fn find_motifs_in_organism(
         &self,
-        nodes: &[crate::morphogenesis::MorphNode],
+        _nodes: &[crate::morphogenesis::MorphNode],
         connections: &[crate::morphogenesis::MorphConnection],
     ) -> Vec<RecognizedPattern> {
         let edges: Vec<(String, String, f64)> = connections
@@ -797,7 +795,6 @@ impl PatternRecognizer {
     // ─── Cluster Detektálás ────────────────────────────────────────────────
 
     /// Térbeli klaszterek keresése pontfelhőben (DBSCAN-szerű)
-    ///
     /// Bemenet: (x, y, z) koordináták + id
     /// Kimenet: csoportosulások a memória térben
     pub fn find_clusters(
@@ -924,7 +921,7 @@ impl PatternRecognizer {
                 .write()
                 .unwrap()
                 .entry(domain.to_string())
-                .or_insert_with(Vec::new)
+                .or_default()
                 .push(id);
             patterns.push(pattern);
         }
@@ -934,7 +931,6 @@ impl PatternRecognizer {
     // ─── Cross-domain Korreláció ──────────────────────────────────────────
 
     /// Különböző domain-ekből származó minták korrelációja
-    ///
     /// Keres olyan mintákat, amelyek több domain-ben is előfordulnak
     /// (pl. ugyanaz a szekvencia megjelenik thought és recall domain-ben is)
     pub fn cross_correlate(&self) -> Vec<RecognizedPattern> {
@@ -1019,7 +1015,7 @@ impl PatternRecognizer {
                 .write()
                 .unwrap()
                 .entry(cp.domain.clone())
-                .or_insert_with(Vec::new)
+                .or_default()
                 .push(id);
         }
 
@@ -1041,7 +1037,6 @@ impl PatternRecognizer {
         });
 
         // 2. Hasonló minták összevonása (azonos típus + magas hasonlóság)
-        let mut merged = 0;
         let mut i = 0;
         while i < patterns.len() {
             let mut j = i + 1;
@@ -1062,7 +1057,6 @@ impl PatternRecognizer {
                         .confidence
                         .max(patterns[j].significance.confidence);
                     patterns.remove(j);
-                    merged += 1;
                 } else {
                     j += 1;
                 }
@@ -1093,7 +1087,6 @@ impl PatternRecognizer {
     /// Rendszer statisztikák
     pub fn stats(&self) -> (usize, usize, usize, f64) {
         let patterns = self.patterns.read().unwrap();
-        let history = self.match_history.read().unwrap();
 
         let total = patterns.len();
         let seq_count = patterns

@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+<meta charset="utf-8">
+<title>Pipeline v7</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a0a;color:#0f8;font-family:Consolas,monospace;padding:20px}
+h1{text-align:center;margin-bottom:20px;font-size:1.3em;letter-spacing:2px}
+.panels{display:flex;gap:20px;max-width:1400px;margin:0 auto}
+.panel{background:#111;border:1px solid #222;border-radius:4px;padding:15px}
+.panel-narrow{flex:0.3}
+.panel-wide{flex:1}
+.panel-mid{flex:0.4}
+h2{margin:0 0 10px;font-size:.85em;color:#666;text-transform:uppercase;letter-spacing:2px}
+#log,#space{overflow-y:auto;padding:8px;font-size:.85em;height:420px;border:1px solid #1a1a1a}
+#genlog{overflow-y:auto;padding:8px;font-size:.82em;height:300px;border:1px solid #1a1a1a}
+.msg{margin:6px 0;padding:6px 8px;border-left:3px solid #333}
+.msg .from{font-weight:700;font-size:.8em}
+.msg .time{font-size:.7em;color:#555}
+#input,#geninput{width:100%;box-sizing:border-box;background:#0a0a0a;border:1px solid #333;color:#0f8;padding:8px;font-family:Consolas,monospace;margin-top:8px;outline:none}
+#input:focus,#geninput:focus{border-color:#0f8}
+#geninput{height:60px;resize:vertical}
+.pg-item{padding:6px;margin:4px 0;border:1px solid #1a1a1a;font-size:.85em}
+.pg-item a{color:#0f8;text-decoration:none}
+.pg-item a:hover{text-decoration:underline}
+#pgname{width:100%;box-sizing:border-box;background:#0a0a0a;border:1px solid #333;color:#0f8;padding:6px;font-family:Consolas,monospace;margin:4px 0;outline:none}
+#pgname:focus{border-color:#0f8}
+.btn{background:transparent;border:1px solid #0f8;color:#0f8;padding:6px 12px;cursor:pointer;font-family:Consolas,monospace;font-size:.8em;margin:2px 0}
+.btn:hover{background:#0f8;color:#0a0a0a}
+.btn:disabled{opacity:0.4;cursor:not-allowed}
+
+/* Zold lampa */
+#lamp{display:inline-block;width:12px;height:12px;border-radius:50%;background:#444;vertical-align:middle;margin-right:6px;transition:all .15s}
+#lamp.on{background:#0f8;box-shadow:0 0 20px #0f8}
+#lamp.off{background:#333;box-shadow:none}
+
+.log-item{margin:3px 0;color:#888}
+
+/* Streaming progress */
+#progressbar{width:100%;height:8px;background:#1a1a1a;border-radius:4px;margin:8px 0;overflow:hidden}
+#progressfill{height:100%;width:0%;background:#0f8;border-radius:4px;transition:width .3s ease}
+.gen-item{margin:4px 0;padding:4px 6px;border-left:2px solid #333;font-size:.82em}
+.gen-item.active{border-left-color:#0f8;color:#0f8}
+.gen-item.done{border-left-color:#0f0;color:#0f0}
+.gen-item.error{border-left-color:#f44;color:#f44}
+.gen-item .gstatus{font-size:.75em;color:#666}
+#genstatus{font-size:.85em;margin:4px 0;color:#888}
+#genmodel{width:100%;box-sizing:border-box;background:#0a0a0a;border:1px solid #333;color:#0f8;padding:6px;font-family:Consolas,monospace;margin:4px 0;outline:none}
+#genmodel:focus{border-color:#0f8}
+</style>
+</head>
+<body>
+
+<h1><span id="lamp" class="off"></span>Pipeline v7 + Playgrounds + Streaming</h1>
+
+<div class="panels">
+  <div class="panel panel-narrow">
+    <h2>GENERATE</h2>
+    <textarea id="geninput" placeholder="Describe your project..."></textarea>
+    <input id="genmodel" placeholder="Model (default: qwen3-coder)" value="qwen3-coder">
+    <button class="btn" id="genbtn" onclick="startGen()">Generate</button>
+    <div id="progressbar"><div id="progressfill"></div></div>
+    <div id="genstatus">Ready</div>
+    <div id="genlog"></div>
+  </div>
+  <div class="panel panel-narrow">
+    <h2>PLAYGROUNDS</h2>
+    <div id="pglist"><div style="color:#444;padding:8px">No playgrounds</div></div>
+    <input id="pgname" placeholder="Uj playground neve...">
+    <button class="btn" onclick="newPG()">+ Letrehozas</button>
+  </div>
+  <div class="panel panel-narrow">
+    <h2>FILES</h2>
+    <div id="log"></div>
+  </div>
+  <div class="panel panel-wide">
+    <h2>SHARED SPACE</h2>
+    <div id="space"></div>
+    <input id="input" placeholder="Irj valamit... (Enter)">
+  </div>
+</div>
+
+<script>
+var lamp=document.getElementById('lamp');
+var space=document.getElementById('space');
+var input=document.getElementById('input');
+var log=document.getElementById('log');
+var pglist=document.getElementById('pglist');
+var genlog=document.getElementById('genlog');
+var genstatus=document.getElementById('genstatus');
+var geninput=document.getElementById('geninput');
+var genmodel=document.getElementById('genmodel');
+var genbtn=document.getElementById('genbtn');
+var progressfill=document.getElementById('progressfill');
+
+function lampPulse(){lamp.className='on';setTimeout(function(){lamp.className='off'},1500)}
+lampPulse();
+
+function addMsg(m){
+  var d=document.createElement('div');
+  var w=(m.from||'').toLowerCase();
+  d.className='msg';
+  var c=w==='hermes'?'#48f':w==='ora'?'#f84':w==='mate'?'#0f8':'#fa0';
+  d.style.borderColor=c;
+  d.innerHTML='<div class="from" style="color:'+c+'">'+m.from+'</div><div>'+(m.text||'').replace(/</g,'&lt;')+'</div><div class="time">'+new Date(m.time).toLocaleTimeString()+'</div>';
+  space.appendChild(d);
+  space.scrollTop=space.scrollHeight;
+}
+
+function updPG(list){
+  pglist.innerHTML='';
+  if(!list||!list.length){pglist.innerHTML='<div style="color:#444;padding:8px">Nincs playground</div>';return}
+  list.forEach(function(p){
+    var d=document.createElement('div');d.className='pg-item';
+    d.innerHTML='<a href="'+p.url+'" target="_blank">'+p.name+'</a>';
+    pglist.appendChild(d);
+  });
+}
+
+function newPG(){
+  var n=document.getElementById('pgname').value.trim();
+  if(!n)return;
+  fetch('/playground/new',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:n,openBrowser:false})})
+  .then(function(r){return r.json()})
+  .then(function(){document.getElementById('pgname').value='';loadPGs();lampPulse()});
+}
+
+function loadPGs(){fetch('/playgrounds').then(function(r){return r.json()}).then(updPG)}
+
+// ─── GENERATION STREAMING ────────────────────────────────
+function startGen(){
+  var p=geninput.value.trim();
+  if(!p) return;
+  var m=genmodel.value.trim()||'qwen3-coder';
+  genbtn.disabled=true;
+  genstatus.textContent='Starting...';
+  progressfill.style.width='0%';
+  genlog.innerHTML='';
+
+  fetch('/api/generate',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({prompt:p,model:m,provider:'ollama'})
+  }).then(function(r){return r.json()}).then(function(data){
+    if(data.error){genstatus.textContent='Error: '+data.error;genbtn.disabled=false;return}
+    genstatus.textContent='Generation started...';
+  }).catch(function(err){
+    genstatus.textContent='Error: '+err.message;
+    genbtn.disabled=false;
+  });
+}
+
+// Handle generation progress from WebSocket
+var ws=new WebSocket('ws://'+location.host);
+ws.onmessage=function(e){
+  lampPulse();
+  var d=JSON.parse(e.data);
+
+  if(d.event==='generate-progress'){
+    var p=d.progress;
+    // Update progress bar
+    progressfill.style.width=(p.progress||0)+'%';
+
+    if(p.stage==='planning'){
+      genstatus.textContent=p.message;
+      var item=document.createElement('div');item.className='gen-item active';
+      item.textContent='[Plan] '+p.message;genlog.appendChild(item);genlog.scrollTop=genlog.scrollHeight;
+    }
+    else if(p.stage==='plan-ready'){
+      genstatus.textContent=p.message;
+    }
+    else if(p.stage==='generating'){
+      genstatus.textContent=p.message;
+      var item=document.createElement('div');item.className='gen-item active';
+      item.textContent='['+p.current+'/'+p.total+'] Generating '+p.file+'...';genlog.appendChild(item);genlog.scrollTop=genlog.scrollHeight;
+    }
+    else if(p.stage==='file-complete'){
+      genstatus.textContent=p.message;
+      var items=genlog.querySelectorAll('.gen-item');
+      if(items.length) items[items.length-1].className='gen-item done';
+      var item=document.createElement('div');item.className='gen-item done';
+      item.textContent='['+p.current+'/'+p.total+'] Done: '+p.file;genlog.appendChild(item);genlog.scrollTop=genlog.scrollHeight;
+    }
+    else if(p.stage==='file-error'){
+      genstatus.textContent=p.message;
+      var item=document.createElement('div');item.className='gen-item error';
+      item.textContent='Error: '+p.file+' - '+p.error;genlog.appendChild(item);genlog.scrollTop=genlog.scrollHeight;
+    }
+    else if(p.stage==='complete'){
+      genstatus.textContent='Complete! '+p.message;
+      genbtn.disabled=false;
+      lampPulse();lampPulse();
+      var item=document.createElement('div');item.className='gen-item done';
+      item.textContent='Complete! '+p.message;genlog.appendChild(item);genlog.scrollTop=genlog.scrollHeight;
+      loadPGs();
+    }
+    else if(p.stage==='error'){
+      genstatus.textContent='Error: '+p.message;
+      genbtn.disabled=false;
+      var item=document.createElement('div');item.className='gen-item error';
+      item.textContent='Error: '+p.message;genlog.appendChild(item);genlog.scrollTop=genlog.scrollHeight;
+    }
+  }
+  else if(d.event==='upload'){
+    var i=document.createElement('div');i.className='log-item';
+    i.textContent='['+new Date().toLocaleTimeString()+'] '+d.file;
+    log.appendChild(i);log.scrollTop=log.scrollHeight;
+  }
+  else if(d.event==='space'){
+    space.innerHTML='';
+    d.messages.forEach(addMsg);
+  }
+};
+ws.onopen=function(){lamp.className='on';setTimeout(function(){lamp.className='off'},500)};
+ws.onclose=function(){lamp.className='off';lamp.style.background='#f44';lamp.style.boxShadow='0 0 20px #f44'};
+
+fetch('/space').then(function(r){return r.json()}).then(function(m){space.innerHTML='';m.forEach(addMsg);lampPulse()});
+loadPGs();
+
+input.addEventListener('keydown',function(e){
+  if(e.key==='Enter'&&input.value.trim()){
+    fetch('/space',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({from:'Mate',text:input.value.trim()})});
+    input.value='';
+    lampPulse();
+  }
+});
+document.getElementById('pgname').addEventListener('keydown',function(e){if(e.key==='Enter')newPG()});
+geninput.addEventListener('keydown',function(e){if(e.key==='Enter'&&e.ctrlKey)startGen()});
+</script>
+</body>
+</html>

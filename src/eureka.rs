@@ -177,7 +177,6 @@ impl EurekaLog {
 // ─── Detection ──────────────────────────────────────
 
 /// Detect eureka moments from recall results.
-///
 /// For each result that is spatially distant from the query but emotionally
 /// similar, compute an insight score. Events above threshold get recorded
 /// and stored as an insight memory.

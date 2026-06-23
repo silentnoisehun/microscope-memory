@@ -121,12 +121,6 @@ pub fn recall(config: &Config, query: &str, k: usize, emotion: Option<[f32; 21]>
     );
 
     for zoom in zoom_lo..=zoom_hi {
-        // Red Audit: Timing jitter using polymorphic build-time value
-        #[cfg(feature = "stealth")]
-        if zoom > zoom_lo {
-            let delay = microscope_memory::obfuscate::POLY_JITTER;
-            std::thread::sleep(std::time::Duration::from_millis(delay));
-        }
         let (start, count) = reader.depth_ranges[zoom as usize];
         let (start, count) = (start as usize, count as usize);
         for i in start..(start + count) {

@@ -1,0 +1,161 @@
+# =============================================================================
+# LiteLLM Proxy — Pipeline Config
+# Multi-provider routing | Round-robin load balancing | Task difficulty routing
+# =============================================================================
+
+model_list:
+  # ─────────────────────────────────────────────
+  # GYORS csoport — egyszerű feladatokhoz
+  # Autocomplete, chat, quick code gen
+  # ─────────────────────────────────────────────
+  - model_name: gyors
+    litellm_params:
+      model: openrouter/openai/gpt-4o-mini
+      api_key: os.environ/OPENROUTER_API_KEY
+      rpm: 1000
+    model_info:
+      mode: completion
+      supports_function_calling: false
+      access_groups: ["gyors"]
+
+  - model_name: gyors
+    litellm_params:
+      model: sambanova/Meta-Llama-3.1-8B-Instruct
+      api_key: os.environ/SAMBANOVA_API_KEY
+      rpm: 500
+    model_info:
+      mode: completion
+      supports_function_calling: false
+      access_groups: ["gyors"]
+
+  # ─────────────────────────────────────────────
+  # ERŐS csoport — közepes feladatokhoz
+  # Kódírás, refaktor, debug
+  # ─────────────────────────────────────────────
+  - model_name: eros
+    litellm_params:
+      model: gemini/gemini-2.0-flash-001
+      api_key: os.environ/GEMINI_API_KEY
+      rpm: 2000
+    model_info:
+      mode: completion
+      supports_function_calling: true
+      access_groups: ["eros", "gyors"]
+
+  - model_name: eros
+    litellm_params:
+      model: nvidia_nim/meta/llama-3.1-70b-instruct
+      api_key: os.environ/NVIDIA_API_KEY
+      rpm: 300
+    model_info:
+      mode: completion
+      supports_function_calling: true
+      access_groups: ["eros"]
+
+  - model_name: eros
+    litellm_params:
+      model: openrouter/anthropic/claude-sonnet-4-20250514
+      api_key: os.environ/OPENROUTER_API_KEY
+      rpm: 500
+    model_info:
+      mode: completion
+      supports_function_calling: true
+      access_groups: ["eros", "ultra"]
+
+  # ─────────────────────────────────────────────
+  # ULTRA csoport — komplex feladatokhoz
+  # Architektúra tervezés, komplex reasoning
+  # ─────────────────────────────────────────────
+  - model_name: ultra
+    litellm_params:
+      model: openrouter/anthropic/claude-opus-4-20250514
+      api_key: os.environ/OPENROUTER_API_KEY
+      rpm: 200
+    model_info:
+      mode: completion
+      supports_function_calling: true
+      access_groups: ["ultra"]
+
+  - model_name: ultra
+    litellm_params:
+      model: nvidia_nim/meta/llama-3.1-405b-instruct
+      api_key: os.environ/NVIDIA_API_KEY
+      rpm: 100
+    model_info:
+      mode: completion
+      supports_function_calling: true
+      access_groups: ["ultra"]
+
+# =============================================================================
+# Router Settings
+# =============================================================================
+router_settings:
+  # Routing stratégia: round-robin a modellek között
+  routing_strategy: "simple-shuffle"
+
+  # Hibakezelés
+  allowed_fails: 3           # hány hiba után vált provider-t
+  num_retries: 2             # újrapróbálkozások száma
+  request_timeout: 600       # másodperc (10 perc)
+  fallbacks:
+    - ultra: [eros]          # ultra hiba → eros
+    - eros: [gyors]          # eros hiba → gyors
+    - gyors: [gyors]         # gyors hiba → másik gyors provider
+
+  # Context window fallback
+  context_window_fallbacks:
+    - ultra: [eros]
+    - eros: [gyors]
+
+  # Cooldown
+  cooldown_time: 30          # másodperc hiba után
+  disable_endpoint_on_failure: false
+
+  # Model grouping
+  model_group_alias:
+    gyors: "Gyors modellek"
+    eros: "Erős modellek"
+    ultra: "Ultra modellek"
+
+# =============================================================================
+# General Settings
+# =============================================================================
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
+  database_url: os.environ/DATABASE_URL
+
+  # Allow user API key authentication
+  allow_user_auth: true
+
+  # Virtual keys
+  key_generation_mode: "virtual"
+
+  # Rate limiting
+  max_request_size_mb: 10
+
+  # Proxy settings
+  proxy_batch_responses: false
+
+  # Alerts (opcionális)
+  # alerting: ["slack"]
+  # slack_webhook_url: os.environ/SLACK_WEBHOOK_URL
+
+# =============================================================================
+# Spend Tracking
+# =============================================================================
+spend_config:
+  # Cost tracking az adatbázisban
+  track_spend_per_user: true
+  track_spend_per_key: true
+  track_spend_per_model: true
+  max_spend_per_key: 100.0   # max $ / kulcs
+  budget_duration: "30d"     # 30 naponta nullázódik
+
+# =============================================================================
+# Logging
+# =============================================================================
+litellm_settings:
+  success_callback: ["langfuse"]    # opcionális monitoring
+  failure_callback: ["sentry"]      # opcionális hibakövetés
+  set_verbose: false
+  disable_endpoint_on_failure: false

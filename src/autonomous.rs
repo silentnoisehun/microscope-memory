@@ -23,7 +23,7 @@ use crate::executive::{Executive, ModuleState};
 use crate::inner_monologue;
 use crate::narrative::NarrativeState;
 use crate::narrative_memory;
-use crate::reader::{store_memory, store_memory_temporary, MicroscopeReader};
+use crate::reader::{store_memory_temporary, MicroscopeReader};
 use crate::self_model::SelfModel;
 use crate::self_reflect;
 
@@ -404,7 +404,7 @@ impl AutonomousEngine {
                 let _ = std::fs::remove_file(&append_path);
                 let msg = "🔄 Rebuild: append log beépítve és törölve".to_string();
                 println!("  {}", msg.green());
-                self.speak(&"Append log újraépítve és törölve.".to_string());
+                self.speak("Append log újraépítve és törölve.");
                 msg
             }
             Err(e) => {
@@ -465,7 +465,7 @@ impl AutonomousEngine {
         }
 
         // Első ciklus: minden modul fut. Utána: interval alapján
-        let should_run = |interval: usize| cycle == 1 || cycle % interval == 0;
+        let should_run = |interval: usize| cycle == 1 || cycle.is_multiple_of(interval);
 
         if should_run(self.config.daydream_interval) {
             self.executive

@@ -480,7 +480,7 @@ fn test_pattern_recognition_motifs() {
         vec![],
     );
     let patterns = recognizer.list_patterns(Some(PatternType::Structural), Some("test_graph"));
-    assert!(patterns.len() >= 1, "Should have structural patterns");
+    assert!(!patterns.is_empty(), "Should have structural patterns");
 }
 
 // ─── Executive Integration ───────────────────────────────

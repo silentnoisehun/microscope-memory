@@ -10,7 +10,6 @@
 //!
 //! A vagus nem felülről lefelé (top-down) kényszerít, hanem autonóm reflexként működik.
 
-use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
@@ -115,6 +114,7 @@ pub enum AlertLevel {
 pub struct VagusNerve {
     state: Arc<RwLock<VagusState>>,
     /// Architektúra szimulátor - stressz teszteléshez
+    #[allow(dead_code)]
     simulator: Arc<ArchitectureSimulator>,
     /// Heurisztikus döntéshozó - reflex döntésekhez
     decision_maker: Arc<RwLock<Option<HeuristicDecisionMaker>>>,

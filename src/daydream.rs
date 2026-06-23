@@ -36,7 +36,6 @@ pub struct DaydreamStep {
 }
 
 /// Daydreaming: asszociatív drift végrehajtása.
-///
 /// 1. Seed: a legutóbbi narratíva (vagy egy query)
 /// 2. Recall a seed-re → top K eredmény
 /// 3. Válasszuk ki a legközelebbi asszociatív blokkot (ami nem a seed)

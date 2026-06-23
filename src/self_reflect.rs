@@ -73,7 +73,7 @@ impl ReflectionState {
     }
 }
 
-pub fn introspect(config: &Config, reader: &MicroscopeReader, output_dir: &Path) -> String {
+pub fn introspect(_config: &Config, reader: &MicroscopeReader, output_dir: &Path) -> String {
     let now_ms = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()

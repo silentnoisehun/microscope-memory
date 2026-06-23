@@ -388,11 +388,11 @@ impl HeuristicDecisionMaker {
     /// Tanulás a döntés kimeneteléből
     fn learn_from_outcome(&self, entry: &DecisionLogEntry, outcome_score: f64) {
         let mut patterns = self.patterns.write().unwrap();
-        let pattern_id = format!("pattern_{}", entry.decision_type.to_string());
+        let pattern_id = format!("pattern_{}", entry.decision_type);
 
         let pattern = patterns.entry(pattern_id).or_insert(HeuristicPattern {
             id: format!("pattern_{}", rand::random::<u32>()),
-            name: format!("{}_pattern", entry.decision_type.to_string()),
+            name: format!("{}_pattern", entry.decision_type),
             pattern_type: entry.decision_type.to_string(),
             context: entry.selected_option.clone(),
             success_rate: 0.5,
@@ -435,9 +435,7 @@ impl HeuristicDecisionMaker {
                     load_pattern: "sine".to_string(),
                     peak_load: 0.7,
                     enable_fault_injection: true,
-                    fault_rate: 0.01,
-                    ..SimulationConfig::default()
-                };
+                    fault_rate: 0.01 };
 
                 let sim_result = self.simulator.run_simulation(&arch.id, &config);
 
@@ -540,7 +538,7 @@ impl HeuristicDecisionMaker {
             let key = format!("{:?}", entry.decision_type);
             pattern_map
                 .entry(key)
-                .or_insert_with(Vec::new)
+                .or_default()
                 .push(entry.outcome_score);
         }
 
@@ -664,8 +662,8 @@ mod tests {
 
     fn create_test_decision_maker() -> HeuristicDecisionMaker {
         let data_dir = Path::new("data");
-        let salience = Arc::new(RwLock::new(SalienceState::load_or_init(&data_dir)));
-        let eureka = Arc::new(RwLock::new(EurekaLog::load_or_init(&data_dir)));
+        let salience = Arc::new(RwLock::new(SalienceState::load_or_init(data_dir)));
+        let eureka = Arc::new(RwLock::new(EurekaLog::load_or_init(data_dir)));
         let meta = Arc::new(RwLock::new(MetaSupervisor::new()));
         let simulator = Arc::new(ArchitectureSimulator::new());
         let kb = Arc::new(KnowledgeBase::new());

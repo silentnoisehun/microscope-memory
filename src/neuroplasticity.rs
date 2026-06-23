@@ -32,6 +32,12 @@ pub struct Neuroplasticity {
     pub plasticity_window_ms: u64,
 }
 
+impl Default for Neuroplasticity {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Neuroplasticity {
     pub fn new() -> Self {
         Self {
@@ -111,7 +117,7 @@ impl Neuroplasticity {
         // Prune unused pathways
         let unused_before = self.pathways.len();
         self.pathways.retain(|_, p| {
-            let age = now.saturating_sub(p.id as u64);
+            let age = now.saturating_sub(p.id);
             p.usage_count > 0 || age < self.plasticity_window_ms
         });
 
@@ -201,7 +207,7 @@ impl Neuroplasticity {
         // Pathways
         let pathway_count = self.pathways.len() as u32;
         data.extend_from_slice(&pathway_count.to_le_bytes());
-        for (_, pathway) in &self.pathways {
+        for pathway in self.pathways.values() {
             data.extend_from_slice(&pathway.id.to_le_bytes());
             data.extend_from_slice(&pathway.strength.to_le_bytes());
             data.extend_from_slice(&pathway.efficiency.to_le_bytes());

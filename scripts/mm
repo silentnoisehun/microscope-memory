@@ -1,0 +1,255 @@
+#!/usr/bin/env bash
+# ════════════════════════════════════════════════════════════════════════════
+# mm — Microscope Memory shorthand CLI
+# ════════════════════════════════════════════════════════════════════════════
+#
+# Usage:
+#   mm r "query" [k]          recall (natural language)
+#   mm s "text" [layer] [i]   store
+#   mm st                     stats
+#   mm d                      dream consolidation
+#   mm f "query" [k]          text find
+#   mm b                      build index
+#   mm l                      log (recent paths)
+#   mm c                      consolidate (rebuild from append log)
+#   mm config [target]        generate MCP config (claude|cursor|cline|hermes|generic)
+#   mm mcp                    start MCP server
+#   mm hebbian                show Hebbian state
+#   mm hottest                show hottest blocks
+#   mm self                   self-model snapshot
+#   mm introspect             introspection
+#   mm autostart              start autonomous daemon
+#   mm autostop               stop autonomous daemon
+#   mm h, mm help             this help
+#
+# Examples:
+#   mm r "memory system"
+#   mm s "important note" long_term 7
+#   mm d
+#
+# ════════════════════════════════════════════════════════════════════════════
+#
+# Resolution order for the binary (no hardcoded paths):
+#   1. $MICROSCOPE_BIN
+#   2. $MICROSCOOPE_HOME/target/release/microscope-mem[.exe]
+#   3. microscope-mem on $PATH
+#   4. <script dir>/../target/release/microscope-mem[.exe]
+#   5. <script dir>/../../target/release/microscope-mem[.exe]
+#
+# Environment overrides:
+#   MICROSCOOPE_BIN     full path to executable
+#   MICROSCOOPE_HOME    project root
+#   MICROSCOOPE_DEFAULT_LAYER     default layer for store (default: long_term)
+#   MICROSCOOPE_DEFAULT_K         default k for recall/find (default: 3)
+#   MICROSCOOPE_DEFAULT_IMPORT    default importance for store (default: 5)
+#
+# ════════════════════════════════════════════════════════════════════════════
+
+set -u
+# Note: not using 'set -e' because individual commands (e.g. 'mm dream' when
+# the index is empty) may legitimately return non-zero. We handle errors
+# per-command instead.
+
+# ─── Locate script dir (works with bash, sh, and symlinks) ──────────────────
+_mm_source="${BASH_SOURCE[0]:-$0}"
+while [ -h "$_mm_source" ]; do
+    _mm_dir=$(cd -P "$(dirname "$_mm_source")" && pwd)
+    _mm_source=$(readlink "$_mm_source")
+    [[ "$_mm_source" != /* ]] && _mm_source="$_mm_dir/$_mm_source"
+done
+SCRIPT_DIR=$(cd -P "$(dirname "$_mm_source")" && pwd)
+
+# ─── Resolve binary ─────────────────────────────────────────────────────────
+resolve_binary() {
+    local bin="${MICROSCOPE_BIN:-}"
+    if [ -n "$bin" ] && [ -x "$bin" ]; then
+        echo "$bin"
+        return 0
+    fi
+
+    local exe="microscope-mem"
+    case "$(uname -s 2>/dev/null || echo Windows)" in
+        MINGW*|CYGWIN*|MSYS*|Windows*) exe="microscope-mem.exe" ;;
+    esac
+
+    local home="${MICROSCOPE_HOME:-}"
+    if [ -n "$home" ]; then
+        if [ -x "$home/target/release/$exe" ]; then
+            echo "$home/target/release/$exe"
+            return 0
+        fi
+    fi
+
+    if command -v microscope-mem >/dev/null 2>&1; then
+        command -v microscope-mem
+        return 0
+    fi
+    if command -v microscope-mem.exe >/dev/null 2>&1; then
+        command -v microscope-mem.exe
+        return 0
+    fi
+
+    for rel in "../target/release" "../../target/release"; do
+        if [ -x "$SCRIPT_DIR/$rel/$exe" ]; then
+            echo "$SCRIPT_DIR/$rel/$exe"
+            return 0
+        fi
+    done
+
+    return 1
+}
+
+MICROSCOPE=$(resolve_binary) || {
+    echo "mm: microscope-mem binary not found." >&2
+    echo "  Set \$MICROSCOPE_BIN or \$MICROSCOPE_HOME, or add microscope-mem to your PATH." >&2
+    echo "  Searched: \$MICROSCOPE_BIN, \$MICROSCOPE_HOME/target/release, \$PATH, $SCRIPT_DIR/../target/release" >&2
+    exit 1
+}
+
+# ─── Defaults ───────────────────────────────────────────────────────────────
+DEFAULT_LAYER=${MICROSCOPE_DEFAULT_LAYER:-long_term}
+DEFAULT_K=${MICROSCOPE_DEFAULT_K:-3}
+DEFAULT_IMPORT=${MICROSCOPE_DEFAULT_IMPORT:-5}
+
+# ─── Help ───────────────────────────────────────────────────────────────────
+print_help() {
+    cat <<EOF
+mm — Microscope Memory shorthand CLI
+
+Commands:
+  r, recall <query> [k]        Natural language recall (semantic) (default k=$DEFAULT_K)
+  s, store <text> [layer] [i]  Store a memory (default layer=$DEFAULT_LAYER, importance=$DEFAULT_IMPORT)
+  st, status                   Memory stats
+  d, dream                     Dream consolidation (offline memory replay + pruning)
+  f, find <query> [k]          Keyword-based text find (default k=$DEFAULT_K)
+  b, build                     Build/rebuild index
+  l, log                       Recent thought paths (log)
+  c, consolidate               Run dream-style consolidation (offline replay + pruning)
+  config [target]              Generate MCP config (default: generic; or: claude|cursor|cline|hermes)
+  mcp                          Start MCP server (for Claude Code / Cursor / Cline)
+  hebbian                      Show Hebbian learning state
+  hottest                      Show hottest blocks (most active in memory)
+  self                         Show system's self-model snapshot
+  introspect                   Introspection (the system thinks about itself)
+  autostart                    Start autonomous daemon (30s cycles: daydream, curiosity, monologue, dream)
+  autostop                     Stop autonomous daemon (cross-platform)
+  h, help                      This help
+
+Environment:
+  MICROSCOPE_BIN       full path to microscope-mem binary
+  MICROSCOPE_HOME      project root (binary lives in \$MICROSCOPE_HOME/target/release)
+  MICROSCOPE_DEFAULT_LAYER  default layer for 'mm s' (default: long_term)
+  MICROSCOPE_DEFAULT_K      default k for 'mm r' / 'mm f' (default: 3)
+  MICROSCOPE_DEFAULT_IMPORT default importance for 'mm s' (default: 5)
+EOF
+}
+
+# ─── No args → help ─────────────────────────────────────────────────────────
+if [ $# -eq 0 ]; then
+    print_help
+    exit 0
+fi
+
+cmd="$1"
+shift
+
+# ─── Dispatch ───────────────────────────────────────────────────────────────
+case "$cmd" in
+    r|recall)
+        [ $# -eq 0 ] && { echo "Usage: mm r <query> [k]" >&2; exit 1; }
+        query="$1"
+        k="${2:-$DEFAULT_K}"
+        "$MICROSCOPE" recall "$query" "$k"
+        ;;
+
+    s|store)
+        [ $# -eq 0 ] && { echo "Usage: mm s <text> [layer] [importance]" >&2; exit 1; }
+        text="$1"
+        layer="${2:-$DEFAULT_LAYER}"
+        importance="${3:-$DEFAULT_IMPORT}"
+        "$MICROSCOPE" store "$text" -l "$layer" -i "$importance"
+        ;;
+
+    st|status)
+        "$MICROSCOPE" stats
+        ;;
+
+    d|dream)
+        "$MICROSCOPE" dream
+        ;;
+
+    f|find)
+        [ $# -eq 0 ] && { echo "Usage: mm f <query> [k]" >&2; exit 1; }
+        query="$1"
+        k="${2:-$DEFAULT_K}"
+        "$MICROSCOPE" find "$query" "$k"
+        ;;
+
+    b|build)
+        "$MICROSCOPE" build
+        ;;
+
+    l|log)
+        "$MICROSCOPE" paths
+        ;;
+
+    c|consolidate)
+        # Real consolidation = dream (offline replay + pruning + Hebbian update).
+        # 'rebuild' only merges the append log into the main index; that's not
+        # consolidation. Use 'mm b' or 'mm rebuild' if you only want append-log merge.
+        "$MICROSCOPE" dream
+        ;;
+
+    config)
+        target="${1:-generic}"
+        "$MICROSCOPE" config "$target"
+        ;;
+
+    mcp)
+        exec "$MICROSCOPE" mcp
+        ;;
+
+    hebbian)
+        "$MICROSCOPE" hebbian
+        ;;
+
+    hottest)
+        "$MICROSCOPE" hottest
+        ;;
+
+    self)
+        "$MICROSCOPE" self-model
+        ;;
+
+    introspect)
+        "$MICROSCOPE" introspect
+        ;;
+
+    autostart)
+        # exec replaces the current shell process so the terminal isn't blocked
+        exec "$MICROSCOPE" autonomous --daemon
+        ;;
+
+    autostop)
+        # Cross-platform daemon stop: pkill on Unix, taskkill on Windows
+        case "$(uname -s 2>/dev/null || echo Windows)" in
+            MINGW*|CYGWIN*|MSYS*|Windows*)
+                taskkill //F //IM microscope-mem.exe 2>/dev/null || true
+                ;;
+            *)
+                pkill -f "microscope-mem.*autonomous" 2>/dev/null || true
+                ;;
+        esac
+        echo "autonomous daemon stop signal sent (if it was running)"
+        ;;
+
+    h|help|--help|-h)
+        print_help
+        ;;
+
+    *)
+        echo "mm: unknown command: $cmd" >&2
+        echo "Run 'mm h' for help." >&2
+        exit 1
+        ;;
+esac

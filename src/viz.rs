@@ -107,7 +107,7 @@ pub fn export_binary_snapshot(
 
     // Edges (top 200 strongest)
     let mut pairs: Vec<_> = hebb.coactivations.values().collect();
-    pairs.sort_by(|a, b| b.count.cmp(&a.count));
+    pairs.sort_by_key(|b| std::cmp::Reverse(b.count));
     pairs.truncate(200);
 
     buf.extend_from_slice(&(pairs.len() as u32).to_le_bytes());

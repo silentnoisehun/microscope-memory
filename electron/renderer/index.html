@@ -1,0 +1,68 @@
+﻿<!DOCTYPE html>
+<html lang="hu">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Microscope Memory</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="app">
+    <!-- Header -->
+    <header>
+      <div class="logo">
+        <span class="icon">🧠</span>
+        <h1>Microscope Memory</h1>
+      </div>
+      <div class="status-badge" id="daemonBadge">⏹ Leállítva</div>
+    </header>
+
+    <!-- Controls -->
+    <section class="controls">
+      <div class="control-group">
+        <button id="btnStart" class="btn btn-primary">▶ Indítás</button>
+        <button id="btnStop" class="btn btn-danger">⏹ Leállítás</button>
+      </div>
+      <div class="control-group">
+        <label class="toggle-label">
+          <span class="toggle-text">🎤 Noémi hang</span>
+          <div class="toggle-switch">
+            <input type="checkbox" id="ttsToggle" />
+            <span class="slider"></span>
+          </div>
+        </label>
+      </div>
+    </section>
+
+    <!-- Stats -->
+    <section class="stats">
+      <div class="stat-card">
+        <div class="stat-value" id="statBlocks">0</div>
+        <div class="stat-label">Blokk</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="statAppend">0</div>
+        <div class="stat-label">Függő entry</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="statData">0 KB</div>
+        <div class="stat-label">Memória</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="statDaemon">⏹</div>
+        <div class="stat-label">Daemon</div>
+      </div>
+    </section>
+
+    <!-- Timeline -->
+    <section class="timeline">
+      <h2>📜 Tevékenység napló</h2>
+      <div id="timelineList" class="timeline-list">
+        <div class="empty">Várakozás az adatokra...</div>
+      </div>
+    </section>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

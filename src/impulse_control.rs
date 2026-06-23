@@ -27,6 +27,12 @@ pub struct ImpulseControl {
     suppression_threshold: f32,
 }
 
+impl Default for ImpulseControl {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ImpulseControl {
     /// Create a new impulse control system
     pub fn new() -> Self {

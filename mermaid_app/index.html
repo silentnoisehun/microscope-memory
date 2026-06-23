@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ORA // Mermaid Unified</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="stylesheet" href="styles/core.css">
+    <link rel="stylesheet" href="styles/chat.css">
+    <link rel="stylesheet" href="styles/voice.css">
+    <link rel="stylesheet" href="styles/diff.css">
+    <link rel="stylesheet" href="styles/dashboard.css">
+    <meta name="theme-color" content="#00ff41">
+</head>
+<body>
+    <div id="app-shell">
+        <!-- Status Bar -->
+        <header id="top-bar">
+            <div class="logo">ORA <span class="version">v1.0</span></div>
+            <div id="connection-status" class="status-dot offline"></div>
+            <div class="system-metrics">
+                <span id="cpu-load">CPU: 0%</span>
+                <span id="vram-load">VRAM: 0/4GB</span>
+                <span id="spine-latency">SPINE: 0ns</span>
+            </div>
+            <button id="settings-toggle">⚙️</button>
+        </header>
+
+        <!-- Main Layout -->
+        <main id="main-container">
+            <!-- Sidebar / Navigation -->
+            <nav id="side-nav">
+                <button data-tab="chat" class="nav-item active">💬 Chat</button>
+                <button data-tab="diff" class="nav-item">📂 Diff</button>
+                <button data-tab="dashboard" class="nav-item">📊 Dash</button>
+                <div class="nav-spacer"></div>
+                <button id="voice-trigger" class="nav-item voice-btn">🎤</button>
+            </nav>
+
+            <!-- Content Area -->
+            <section id="content-viewport">
+                <div id="tab-chat" class="tab-content active">
+                    <div id="chat-messages"></div>
+                    <div id="chat-input-area">
+                        <input type="text" id="user-input" placeholder="Beszélj a Rongyászhoz...">
+                        <button id="send-btn">➔</button>
+                    </div>
+                </div>
+
+                <div id="tab-diff" class="tab-content">
+                    <div id="diff-viewer">
+                        <div class="diff-pane" id="diff-left"></div>
+                        <div class="diff-pane" id="diff-right"></div>
+                    </div>
+                </div>
+
+                <div id="tab-dashboard" class="tab-content">
+                    <div id="dashboard-grid">
+                        <div class="dash-card" id="card-memory">
+                            <h3>Microscope Memory</h3>
+                            <div class="metric-val" id="mem-blocks">0 Blocks</div>
+                            <div class="metric-sub" id="mem-depth">D0-D8 Active</div>
+                        </div>
+                        <div class="dash-card" id="card-alan">
+                            <h3>ALAN Audit</h3>
+                            <div class="metric-val" id="alan-status">Idle</div>
+                            <div class="metric-sub" id="alan-issues">0 Issues Found</div>
+                        </div>
+                        <div class="dash-card" id="card-spine">
+                            <h3>Spine Bus</h3>
+                            <div class="metric-val" id="spine-status">Connected</div>
+                            <div class="metric-sub" id="spine-throughput">0 MB/s</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="tab-settings" class="tab-content"></div>
+            </section>
+        </main>
+
+        <!-- Voice Overlay -->
+        <div id="voice-overlay" class="hidden">
+            <div class="vu-container">
+                <div class="vu-bar" id="vu-left"></div>
+                <div class="vu-bar" id="vu-right"></div>
+            </div>
+            <div class="voice-status">LISTENING...</div>
+        </div>
+
+        <!-- Settings Modal -->
+        <div id="settings-modal" class="hidden">
+            <div class="modal-content">
+                <h2>Settings</h2>
+                <div class="setting-group">
+                    <label>Provider</label>
+                    <select id="api-provider">
+                        <option value="claude">Claude 3.5 Sonnet</option>
+                        <option value="openai">GPT-4o</option>
+                        <option value="ollama">Local GGUF</option>
+                        <option value="gemini">Gemini Pro</option>
+                    </select>
+                </div>
+                <div class="setting-group">
+                    <label>API Key</label>
+                    <input type="password" id="api-key" placeholder="sk-...">
+                </div>
+                <button id="save-settings">Save & Restart</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="modules/core.js"></script>
+</body>
+</html>

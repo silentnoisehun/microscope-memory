@@ -71,6 +71,12 @@ pub struct CodeMemory {
     symbol_index: Arc<RwLock<HashMap<String, Vec<u64>>>>,
 }
 
+impl Default for CodeMemory {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl CodeMemory {
     pub fn new() -> Self {
         Self {
@@ -94,6 +100,7 @@ impl CodeMemory {
             .as_millis() as u64
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn store(
         &self,
         entry_type: CodeEntryType,
@@ -295,7 +302,7 @@ impl CodeMemory {
             *projects.entry(e.project.clone()).or_default() += 1;
         }
         let mut sorted: Vec<_> = projects.into_iter().collect();
-        sorted.sort_by(|a, b| b.1.cmp(&a.1));
+        sorted.sort_by_key(|b| std::cmp::Reverse(b.1));
 
         (total, errors, sorted)
     }

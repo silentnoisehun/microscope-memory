@@ -11,7 +11,6 @@ use colored::Colorize;
 use microscope_memory::config::Config;
 
 /// Create a demo dataset at `layers/demo.txt`.
-///
 /// Returns an error if the file already exists (unless `force` is true).
 pub fn init_demo(config: &Config, force: bool) -> Result<(), String> {
     let layers_dir = Path::new(&config.paths.layers_dir);

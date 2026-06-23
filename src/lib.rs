@@ -1,10 +1,7 @@
 #![recursion_limit = "512"]
-
 //! Microscope Memory library interface.
 //! Re-exports core types and functions for integration tests and external use.
 
-#[cfg(feature = "stealth")]
-pub mod antidebug;
 pub mod archetype;
 pub mod attention;
 pub mod build;
@@ -30,15 +27,11 @@ pub mod bridge;
 pub mod mcp;
 pub mod merkle;
 pub mod mirror;
-#[cfg(feature = "stealth")]
-pub mod obfuscate;
 pub mod query;
 pub mod reader;
 pub mod resonance;
 pub mod sequential_thinking;
 pub mod snapshot;
-#[cfg(feature = "stealth")]
-pub mod syscaller;
 
 #[cfg(not(target_arch = "wasm32"))]
 pub mod consciousness_seqlock;

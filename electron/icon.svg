@@ -1,0 +1,48 @@
+﻿<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0d1117"/>
+      <stop offset="100%" stop-color="#161b22"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#3fb950" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="#3fb950" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <!-- Background circle -->
+  <circle cx="256" cy="256" r="240" fill="url(#bg)" stroke="#30363d" stroke-width="4"/>
+  <circle cx="256" cy="256" r="200" fill="url(#glow)"/>
+  
+  <!-- Brain left hemisphere -->
+  <path d="M256 120 C200 120 140 160 130 220 C120 280 140 340 170 370 C180 380 190 375 195 365 C200 355 195 340 200 330 C205 320 215 325 220 335 C225 345 220 360 225 370 C230 380 240 375 245 365 C250 355 250 340 256 330" 
+        fill="none" stroke="#3fb950" stroke-width="6" stroke-linecap="round"/>
+  
+  <!-- Brain right hemisphere -->
+  <path d="M256 120 C312 120 372 160 382 220 C392 280 372 340 342 370 C332 380 322 375 317 365 C312 355 317 340 312 330 C307 320 297 325 292 335 C287 345 292 360 287 370 C282 380 272 375 267 365 C262 355 262 340 256 330" 
+        fill="none" stroke="#3fb950" stroke-width="6" stroke-linecap="round"/>
+  
+  <!-- Brain top fold -->
+  <path d="M200 180 C220 160 240 150 256 150 C272 150 292 160 312 180" 
+        fill="none" stroke="#3fb950" stroke-width="4" stroke-linecap="round" opacity="0.7"/>
+  
+  <!-- Neural dots -->
+  <circle cx="180" cy="240" r="6" fill="#00d4ff"/>
+  <circle cx="220" cy="280" r="5" fill="#00d4ff"/>
+  <circle cx="260" cy="200" r="5" fill="#00d4ff"/>
+  <circle cx="300" cy="260" r="6" fill="#00d4ff"/>
+  <circle cx="340" cy="220" r="5" fill="#00d4ff"/>
+  <circle cx="200" cy="320" r="4" fill="#00d4ff"/>
+  <circle cx="310" cy="310" r="4" fill="#00d4ff"/>
+  
+  <!-- Neural connections -->
+  <line x1="180" y1="240" x2="220" y2="280" stroke="#00d4ff" stroke-width="1.5" opacity="0.5"/>
+  <line x1="220" y1="280" x2="260" y2="200" stroke="#00d4ff" stroke-width="1.5" opacity="0.5"/>
+  <line x1="260" y1="200" x2="300" y2="260" stroke="#00d4ff" stroke-width="1.5" opacity="0.5"/>
+  <line x1="300" y1="260" x2="340" y2="220" stroke="#00d4ff" stroke-width="1.5" opacity="0.5"/>
+  <line x1="200" y1="320" x2="220" y2="280" stroke="#00d4ff" stroke-width="1.5" opacity="0.5"/>
+  <line x1="310" y1="310" x2="300" y2="260" stroke="#00d4ff" stroke-width="1.5" opacity="0.5"/>
+  
+  <!-- Brain stem -->
+  <path d="M256 330 C256 360 250 380 240 400" fill="none" stroke="#3fb950" stroke-width="5" stroke-linecap="round" opacity="0.6"/>
+  <path d="M256 330 C256 360 262 380 272 400" fill="none" stroke="#3fb950" stroke-width="5" stroke-linecap="round" opacity="0.6"/>
+</svg>

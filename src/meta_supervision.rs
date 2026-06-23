@@ -26,6 +26,12 @@ pub struct MetaSupervisor {
     correction_cooldown_secs: u64,
 }
 
+impl Default for MetaSupervisor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MetaSupervisor {
     /// Create a new meta-supervisor
     pub fn new() -> Self {

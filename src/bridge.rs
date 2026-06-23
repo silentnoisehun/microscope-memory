@@ -972,7 +972,7 @@ async fn session_log(
         .filter(|s| !s.trim().is_empty())
         .collect();
     let total = entries.len();
-    let start = if total > n { total - n } else { 0 };
+    let start = total.saturating_sub(n);
     let recent: Vec<String> = entries[start..]
         .iter()
         .map(|e| crate::safe_truncate(e, 300))

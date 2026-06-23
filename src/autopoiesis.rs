@@ -107,6 +107,12 @@ pub struct AutopoiesisEngine {
     next_id: Arc<RwLock<u64>>,
 }
 
+impl Default for AutopoiesisEngine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl AutopoiesisEngine {
     pub fn new() -> Self {
         Self {
@@ -246,10 +252,8 @@ impl AutopoiesisEngine {
             None => return false,
         };
         let rollbacks = self.rollback_points.read().unwrap();
-        let rp = match rollbacks
-            .iter()
-            .filter(|r| r.module == mutation.target_module)
-            .last()
+        let _rp = match rollbacks
+            .iter().rfind(|r| r.module == mutation.target_module)
         {
             Some(r) => r,
             None => return false,
@@ -285,7 +289,7 @@ impl AutopoiesisEngine {
             .read()
             .unwrap()
             .iter()
-            .filter(|m| status.map_or(true, |s| m.status == *s))
+            .filter(|m| status.is_none_or(|s| m.status == *s))
             .cloned()
             .collect()
     }

@@ -82,7 +82,6 @@ compression = ["zstd"]
 gpu = ["wgpu", "bytemuck", "pollster"]
 embeddings = ["candle-core", "candle-nn", "hf-hub", "tokenizers"]
 onnx = []
-stealth = []
 console_error_panic_hook = []
 
 [dev-dependencies]

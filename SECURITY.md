@@ -6,46 +6,51 @@ Please open a GitHub issue tagged `security`. Do not include exploit details in 
 
 ---
 
-## Optional `stealth` Feature
+## Threat Model
 
-Two modules are compiled only when `--features stealth` is explicitly passed.
-They are **not** included in the default build or on crates.io.
+Microscope Memory is a **single-user, on-device** memory engine. It runs as a
+local CLI / MCP server / Node.js addon and only reads/writes inside its own
+`output/` directory. It does not open network listeners by default and does not
+phone home.
 
-### `src/antidebug.rs` — Soft VM / Sandbox Detection
+| Surface | Exposure |
+|---------|----------|
+| Filesystem | `output/` (configurable via `config.toml`) |
+| Network    | Optional `microscope-mem serve` on `127.0.0.1:6060` (off by default) |
+| Native addon | `native/index.win32-x64-msvc.node` exposes 8 typed functions to JS/TS |
+| MCP server | stdio only, no TCP/UDP listening |
 
-**Purpose:** Detects whether the process is running inside a virtual machine or
-automated sandbox, so that benchmarks and latency-sensitive paths can log a
-warning or refuse to run (avoiding misleading performance numbers in CI VMs).
+## Codebase Hygiene
 
-**What it does:**
-- Reads CPUID bit 31 (hypervisor present flag) — standard, read-only CPU instruction.
-- Checks two well-known Windows registry keys for VirtualBox / VMware Tools.
+- **No `unsafe` outside `consciousness_seqlock.rs`** — the seqlock needs raw
+  pointer access to swap atomics; the rest of the codebase is safe Rust.
+- **Merkle + CRC16 verification** on every block at load time; see
+  `microscope-mem verify` and `microscope-mem verify-merkle`.
+- **Atomic append log** (`append.bin`) — repairs on crash via
+  `microscope-mem doctor --fix`.
+- **No third-party network calls** during build, recall, or dream — all I/O is
+  local file or mmap.
 
-**What it does NOT do:**
-- It does not terminate, crash, or alter the host system.
-- It does not phone home or exfiltrate data.
-- Score threshold ≥ 2 required before any action — a cloud VM with hypervisor
-  but no VBox registry (e.g. AWS EC2) scores 1 and passes through normally.
+## Dependencies of Note
 
-**Scope:** Windows only (`windows-sys` dependency). Dead code on Linux/macOS.
+| Crate | Used for | Risk surface |
+|-------|----------|--------------|
+| `windows-sys` | `VirtualQuery` on Windows for mmap protection check | Read-only memory info |
+| `memmap2`     | mmap the binary index | Standard, no parsing |
+| `reqwest`     | `federation.rs` cross-instance recall (opt-in) | TLS, only to peers you configure |
+| `axum`        | legacy HTTP bridge (not started by `spine` CLI) | Disabled by default |
+| `pyo3`        | Python bindings (only with `--features python`) | Not compiled in default build |
 
-### `src/obfuscate.rs` — Compile-time XOR String Obfuscation
+## What's NOT in the Codebase
 
-**Purpose:** Obfuscates internal constant strings (non-sensitive configuration
-keys and build-time tokens) so that naive `strings` extraction on the binary
-does not reveal internal symbol names.
+For full transparency, the following capabilities are **not** present and are
+not planned:
 
-**What it does:**
-- `xor_str!` macro: XOR-encodes a string literal at compile time.
-- `decrypt()`: reverses the XOR at runtime when the value is needed.
+- No anti-VM, anti-sandbox, or anti-debug detection
+- No direct syscalls or IAT camouflage
+- No code or string obfuscation
+- No polymorphic build signatures
+- No network beaconing or telemetry
+- No process memory reading (`NtReadVirtualMemory` and similar)
 
-**What it does NOT do:**
-- No secrets, API keys, or credentials are stored here.
-- XOR with a fixed key is not cryptographic — it is obfuscation only.
-
-### Relation to MIT License
-
-Both modules are MIT-licensed along with the rest of the project. The `stealth`
-feature is opt-in and intended for use cases where tamper-resistance or
-benchmark integrity matters (e.g. hardware-locked deployments). There is no
-obligation to use it.
+If you find any of the above in the source tree, please open a security issue.

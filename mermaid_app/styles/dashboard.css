@@ -1,0 +1,20 @@
+/* Mermaid PWA - Dashboard Styles */
+#dashboard-tab { display:flex; flex-direction:column; height:100%; overflow:hidden; }
+#dashboard-scroll { flex:1; overflow-y:auto; padding:16px; display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:12px; align-content:start; }
+.dash-card { background:var(--bg-1); border:1px solid var(--border); border-radius:8px; padding:14px; }
+.dash-card h3 { font-size:11px; text-transform:uppercase; color:var(--accent); margin-bottom:8px; letter-spacing:0.5px; }
+.dash-card .value { font-size:24px; font-weight:700; color:var(--fg); }
+.dash-card .sub { font-size:11px; color:var(--fg-2); margin-top:4px; }
+.dash-bar { height:8px; background:var(--bg-2); border-radius:4px; overflow:hidden; margin-top:6px; }
+.dash-bar-fill { height:100%; background:var(--accent); transition:width 0.3s; }
+.dash-bar-fill.d2 { background:var(--accent-2); }
+.dash-bar-fill.d3 { background:var(--warn); }
+.dash-list { font-size:12px; color:var(--fg-1); line-height:1.8; }
+.dash-list .row { display:flex; justify-content:space-between; border-bottom:1px dashed var(--border); padding:2px 0; }
+.dash-list .row:last-child { border-bottom:none; }
+.dash-status { display:inline-block; padding:2px 6px; border-radius:3px; font-size:10px; text-transform:uppercase; }
+.dash-status.ok { background:rgba(0,255,157,0.15); color:var(--ok); }
+.dash-status.warn { background:rgba(255,170,0,0.15); color:var(--warn); }
+.dash-status.err { background:rgba(255,68,68,0.15); color:var(--err); }
+.dash-grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.dash-refresh { font-size:11px; color:var(--fg-2); margin-bottom:8px; }

@@ -225,7 +225,7 @@ impl TimeWindow {
 
 /// Filter entries by time window. For `LastSession`, finds the last gap
 /// > 6 hours between consecutive entries and returns everything after it.
-/// `now_ms` is injected so tests can use a fixed timestamp.
+/// > `now_ms` is injected so tests can use a fixed timestamp.
 pub fn filter(entries: &[TimelineEntry], window: &TimeWindow) -> Vec<TimelineEntry> {
     filter_at(entries, window, now_epoch_ms())
 }
@@ -324,7 +324,7 @@ pub fn format_ts(ms: u64) -> String {
 }
 
 fn is_leap(y: u64) -> bool {
-    (y % 4 == 0 && y % 100 != 0) || y % 400 == 0
+    (y.is_multiple_of(4) && !y.is_multiple_of(100)) || y.is_multiple_of(400)
 }
 
 /// Minimal ISO-8601 parser. Accepts:
@@ -354,7 +354,7 @@ pub fn parse_iso8601_to_epoch_ms(s: &str) -> Option<u64> {
     let (mut h, mut mi, mut sec) = (0u64, 0u64, 0u64);
     if let Some(t) = time_part {
         let tps: Vec<u64> = t.split(':').filter_map(|p| p.parse().ok()).collect();
-        if tps.len() >= 1 {
+        if !tps.is_empty() {
             h = tps[0];
         }
         if tps.len() >= 2 {
@@ -388,8 +388,8 @@ pub fn parse_iso8601_to_epoch_ms(s: &str) -> Option<u64> {
         30,
         31,
     ];
-    for mi_idx in 0..(mo - 1) as usize {
-        days += mdays[mi_idx];
+    for &dm in mdays.iter().take((mo - 1) as usize) {
+        days += dm;
     }
     days += d - 1;
 

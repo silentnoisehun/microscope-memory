@@ -30,6 +30,12 @@ pub struct ImplicitMemory {
     pub conditioning: HashMap<String, f32>, // stimulus -> response strength
 }
 
+impl Default for ImplicitMemory {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ImplicitMemory {
     pub fn new() -> Self {
         Self {

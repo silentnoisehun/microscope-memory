@@ -1,0 +1,29 @@
+{
+  "_comment": "Template for Claude Code hook integration. Run `bash scripts/install-claude-hooks.sh` (or the PowerShell equivalent) to generate .claude/settings.json with your actual project path. The generated file is gitignored.",
+  "hooks": {
+    "UserPromptSubmit": {
+      "command": "powershell.exe",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", "REPLACE_WITH_ABSOLUTE_PATH_TO_microscope-recall-hook.ps1"
+      ]
+    },
+    "PostToolUse": {
+      "command": "powershell.exe",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", "REPLACE_WITH_ABSOLUTE_PATH_TO_microscope-recall-hook.ps1"
+      ]
+    },
+    "Stop": {
+      "command": "powershell.exe",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", "REPLACE_WITH_ABSOLUTE_PATH_TO_microscope-recall-hook.ps1"
+      ]
+    }
+  }
+}

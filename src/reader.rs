@@ -12,19 +12,8 @@ use crate::{
     DEPTH_ENTRY_SIZE, HEADER_SIZE, LAYER_NAMES, META_HEADER_SIZE,
 };
 
-#[cfg(feature = "stealth")]
-use crate::syscaller::nt_query_virtual_memory;
-
 #[cfg(windows)]
-use windows_sys::Win32::System::Memory::{MEMORY_BASIC_INFORMATION, PAGE_GUARD, PAGE_NOACCESS};
-
-#[cfg(windows)]
-#[cfg(not(feature = "stealth"))]
-use windows_sys::Win32::System::Memory::VirtualQuery;
-
-#[cfg(feature = "stealth")]
-#[cfg(windows)]
-use windows_sys::Win32::Foundation::HANDLE;
+use windows_sys::Win32::System::Memory::{MEMORY_BASIC_INFORMATION, PAGE_GUARD, PAGE_NOACCESS, VirtualQuery};
 
 /// Block header: 32 bytes, packed, mmap-ready.
 #[repr(C, packed)]
@@ -125,7 +114,6 @@ pub struct MicroscopeReader {
     pub data: DataStore,
     pub block_count: usize,
     pub depth_ranges: [(u32, u32); 9],
-    pub ghost_mode: bool,
 }
 
 impl MicroscopeReader {
@@ -228,50 +216,24 @@ impl MicroscopeReader {
             data,
             block_count,
             depth_ranges,
-            #[cfg(feature = "stealth")]
-            ghost_mode: crate::antidebug::is_sandbox(),
-            #[cfg(not(feature = "stealth"))]
-            ghost_mode: false,
         })
     }
 
-    /// Red Audit: Verifies that the mmap'ed memory is indeed readable and not guarded.
+    /// Verifies that the mmap'ed memory is indeed readable and not guarded.
     #[cfg(windows)]
     fn verify_mmap_protection(ptr: *const u8, _len: usize) -> Result<(), String> {
         let mut info: MEMORY_BASIC_INFORMATION = unsafe { std::mem::zeroed() };
         let mut _return_len: usize = 0;
 
-        #[cfg(feature = "stealth")]
-        let status = unsafe {
-            nt_query_virtual_memory(
-                -1isize as HANDLE, // Current process
+        let res = unsafe {
+            VirtualQuery(
                 ptr as *const _,
-                0, // MemoryBasicInformation
                 &mut info as *mut _ as *mut _,
                 std::mem::size_of::<MEMORY_BASIC_INFORMATION>(),
-                &mut _return_len,
             )
         };
-        #[cfg(feature = "stealth")]
-        if status != 0 {
-            return Err(format!(
-                "NtQueryVirtualMemory failed with status 0x{:08X}",
-                status
-            ));
-        }
-
-        #[cfg(not(feature = "stealth"))]
-        {
-            let res = unsafe {
-                VirtualQuery(
-                    ptr as *const _,
-                    &mut info as *mut _ as *mut _,
-                    std::mem::size_of::<MEMORY_BASIC_INFORMATION>(),
-                )
-            };
-            if res == 0 {
-                return Err("VirtualQuery failed".to_string());
-            }
+        if res == 0 {
+            return Err("VirtualQuery failed".to_string());
         }
 
         if info.Protect == PAGE_NOACCESS || (info.Protect & PAGE_GUARD) != 0 {
@@ -289,10 +251,6 @@ impl MicroscopeReader {
 
     #[inline(always)]
     pub fn text(&self, i: usize) -> &str {
-        if self.ghost_mode {
-            // Red Audit Phase 3: Ghost Mode protection.
-            // In highly certain sandbox, we could mask data here.
-        }
         let h = self.header(i);
         let start = h.data_offset as usize;
         let end = start + h.data_len as usize;
@@ -764,7 +722,7 @@ fn chrono_stamp(epoch_secs: u64) -> String {
 }
 
 fn is_leap(y: u64) -> bool {
-    (y % 4 == 0 && y % 100 != 0) || y % 400 == 0
+    (y.is_multiple_of(4) && !y.is_multiple_of(100)) || y.is_multiple_of(400)
 }
 
 pub fn store_memory(
@@ -1010,9 +968,11 @@ pub fn emotional_similarity(a: &[f32; 21], b: &[f32; 21]) -> f32 {
     (dot / (na * nb)).clamp(0.0, 1.0)
 }
 
+type EmotionLookup = Box<dyn Fn(usize) -> Option<[f32; 21]>>;
+
 /// Load emotions.bin and return a lookup closure.
 /// emotions.bin format: flat array of [f32; 21] per block index.
-pub fn load_emotion_lookup(output_dir: &Path) -> Option<Box<dyn Fn(usize) -> Option<[f32; 21]>>> {
+pub fn load_emotion_lookup(output_dir: &Path) -> Option<EmotionLookup> {
     let path = output_dir.join("emotions.bin");
     if !path.exists() {
         return None;
@@ -1029,9 +989,9 @@ pub fn load_emotion_lookup(output_dir: &Path) -> Option<Box<dyn Fn(usize) -> Opt
             return None;
         }
         let mut emo = [0.0f32; 21];
-        for i in 0..21 {
+        for (i, e) in emo.iter_mut().enumerate() {
             let bytes: [u8; 4] = data[off + i * 4..off + i * 4 + 4].try_into().ok()?;
-            emo[i] = f32::from_le_bytes(bytes);
+            *e = f32::from_le_bytes(bytes);
         }
         Some(emo)
     }))
@@ -1109,9 +1069,9 @@ pub fn build_emotions_from_log(output_dir: &Path, reader: &MicroscopeReader) -> 
         let _ts = u64::from_le_bytes(ts_bytes);
         i += 8;
         let mut emo = [0.0f32; 21];
-        for j in 0..21 {
+        for e in emo.iter_mut() {
             let bytes: [u8; 4] = data[i..i + 4].try_into().unwrap();
-            emo[j] = f32::from_le_bytes(bytes);
+            *e = f32::from_le_bytes(bytes);
             i += 4;
         }
         let text_len = u32::from_le_bytes(data[i..i + 4].try_into().unwrap()) as usize;

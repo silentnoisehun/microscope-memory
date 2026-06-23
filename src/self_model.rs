@@ -30,7 +30,7 @@ use crate::hebbian::HebbianState;
 use crate::narrative::NarrativeState;
 use crate::reader::MicroscopeReader;
 use crate::self_reflect::ReflectionState;
-use crate::spaced_repetition::SpacedRepetition;
+
 use crate::thought_graph::ThoughtGraphState;
 use colored::Colorize;
 
@@ -62,13 +62,13 @@ impl SelfModelSnapshot {
         let _ver = u16::from_le_bytes(data[pos..pos + 2].try_into().ok()?);
         pos += 2;
         let mut emo = [0.0f32; 21];
-        for i in 0..21 {
-            emo[i] = f32::from_le_bytes(data[pos..pos + 4].try_into().ok()?);
+        for e in emo.iter_mut() {
+            *e = f32::from_le_bytes(data[pos..pos + 4].try_into().ok()?);
             pos += 4;
         }
         let mut attn = [0.0f32; 7];
-        for i in 0..7 {
-            attn[i] = f32::from_le_bytes(data[pos..pos + 4].try_into().ok()?);
+        for a in attn.iter_mut() {
+            *a = f32::from_le_bytes(data[pos..pos + 4].try_into().ok()?);
             pos += 4;
         }
         let he = f32::from_le_bytes(data[pos..pos + 4].try_into().ok()?);
@@ -207,7 +207,7 @@ impl SelfModel {
 
     pub fn take_snapshot(
         &mut self,
-        config: &Config,
+        _config: &Config,
         reader: &MicroscopeReader,
         output_dir: &Path,
     ) -> SelfModelSnapshot {

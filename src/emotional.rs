@@ -13,7 +13,6 @@ const EMOTIONAL_LAYER_ID: u8 = 4;
 
 /// Compute the emotional bias warp for a query point.
 /// Returns warped (x, y, z) coordinates.
-///
 /// The warp pulls the query point toward the centroid of hot emotional blocks,
 /// weighted by their Hebbian energy. With weight=0, the original coords are returned.
 pub fn apply_emotional_bias(

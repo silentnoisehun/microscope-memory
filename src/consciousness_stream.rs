@@ -20,7 +20,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 static GLOBAL_STREAM: OnceLock<Arc<Mutex<StreamState>>> = OnceLock::new();
 
 use crate::archetype::ArchetypeState;
-use crate::attention::{AttentionSignals, AttentionState, AttentionVector};
+use crate::attention::AttentionState;
 use crate::config::Config;
 use crate::consciousness_seqlock::SharedSnapshot;
 use crate::emotional_state::EmotionalStateRing;
@@ -41,6 +41,7 @@ const PREDICT_INTERVAL: u64 = 10; // 1 másodperc
 /// Hány ciklus után jöjjön a decay
 const DECAY_INTERVAL: u64 = 10; // 1 másodperc
 /// Surprise threshold: ha a predikció és a valóság eltérése > ennyi
+#[allow(dead_code)]
 const SURPRISE_THRESHOLD: f32 = 0.3;
 
 // ─── StreamState ───────────────────────────────────
@@ -86,6 +87,7 @@ pub struct StreamState {
 /// Thread-safe wrapper
 pub struct ConsciousnessStream {
     pub state: Arc<Mutex<StreamState>>,
+    #[allow(dead_code)]
     running: Arc<Mutex<bool>>,
 }
 

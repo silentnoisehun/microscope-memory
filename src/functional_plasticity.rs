@@ -32,6 +32,12 @@ pub struct FunctionalPlasticity {
     pub damage_compensation: HashMap<u64, f32>,           // area_id -> compensation strength
 }
 
+impl Default for FunctionalPlasticity {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl FunctionalPlasticity {
     pub fn new() -> Self {
         Self {
@@ -194,7 +200,7 @@ impl FunctionalPlasticity {
         // Areas
         let area_count = self.areas.len() as u32;
         data.extend_from_slice(&area_count.to_le_bytes());
-        for (_, area) in &self.areas {
+        for area in self.areas.values() {
             data.extend_from_slice(&area.id.to_le_bytes());
 
             let name_bytes = area.name.as_bytes();

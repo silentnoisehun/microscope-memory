@@ -90,7 +90,14 @@ pub struct KnowledgeBase {
     type_index: Arc<RwLock<HashMap<KnowledgeEntryType, Vec<String>>>>, // type -> entry_ids
     /// Tanult asszociációk (entry_id -> related_entry_id -> weight)
     associations: Arc<RwLock<HashMap<String, HashMap<String, f64>>>>,
+    #[allow(dead_code)]
     next_id: Arc<RwLock<u64>>,
+}
+
+impl Default for KnowledgeBase {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl KnowledgeBase {
@@ -118,14 +125,14 @@ impl KnowledgeBase {
         for tag in &entry.tags {
             tag_index
                 .entry(tag.clone())
-                .or_insert_with(Vec::new)
+                .or_default()
                 .push(id.clone());
         }
 
         // Indexelés típus szerint
         type_index
             .entry(entry.entry_type.clone())
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(id.clone());
 
         id
@@ -214,7 +221,7 @@ impl KnowledgeBase {
         let mut associations = self.associations.write().unwrap();
         associations
             .entry(from_id.to_string())
-            .or_insert_with(HashMap::new)
+            .or_default()
             .entry(to_id.to_string())
             .and_modify(|w| *w = (*w + weight) / 2.0) // mozgóátlag
             .or_insert(weight);
@@ -597,7 +604,7 @@ pub fn auto_build_from_simulations(
     for arch in architectures {
         if let Some(metrics_list) = simulation_results.get(&arch.id) {
             for metrics in metrics_list {
-                let entry_id = kb.add_from_simulation(arch, metrics);
+                let _entry_id = kb.add_from_simulation(arch, metrics);
 
                 // Bottleneck detektálás -> pitfall
                 if !metrics.bottleneck_components.is_empty() {
@@ -706,7 +713,7 @@ pub fn auto_learn_associations(kb: &KnowledgeBase) {
 
             if !common_tags.is_empty() {
                 let weight =
-                    common_tags.len() as f64 / a.tags.len().max(1).min(b.tags.len().max(1)) as f64;
+                    common_tags.len() as f64 / a.tags.len().clamp(1, b.tags.len().max(1)) as f64;
                 if weight > 0.3 {
                     kb.learn_association(&a.id, &b.id, weight);
                     kb.learn_association(&b.id, &a.id, weight);
@@ -716,11 +723,9 @@ pub fn auto_learn_associations(kb: &KnowledgeBase) {
             // Típus alapján asszociáció (pl. simulation -> pitfall)
             if a.entry_type == KnowledgeEntryType::SimulationResult
                 && b.entry_type == KnowledgeEntryType::KnownPitfall
-            {
-                if a.description.contains(&b.title[..b.title.len().min(20)]) {
+                && a.description.contains(&b.title[..b.title.len().min(20)]) {
                     kb.learn_association(&a.id, &b.id, 0.8);
                 }
-            }
         }
     }
 }

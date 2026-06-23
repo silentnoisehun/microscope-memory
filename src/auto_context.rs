@@ -64,7 +64,7 @@ pub fn build(output_dir: &Path, reader: &crate::reader::MicroscopeReader) -> Aut
             // Rough entry estimate: 4 (magic) + 19 (header) + ~128 (avg text)
             const AVG_ENTRY: u64 = 147;
             let total = meta.len();
-            ctx.append_log_size = ((total / AVG_ENTRY) as usize).max(0);
+            ctx.append_log_size = (total / AVG_ENTRY) as usize;
         }
     }
 

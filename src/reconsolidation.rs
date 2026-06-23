@@ -30,7 +30,6 @@ const STALE_THRESHOLD_MS: u64 = 86_400_000 * 3; // 3 days
 // ─── Reconsolidation ───────────────────────────────
 
 /// Reconsolidate emotion vectors of recalled blocks.
-///
 /// Minden activated blokk emotion vektorát blend-eli a query emotion-nal,
 /// ha a hasonlóság még nem túl magas.
 pub fn reconsolidate_emotions(
@@ -79,10 +78,7 @@ fn reconsolidate_emotions_inner(
         }
 
         // Olvasd ki a jelenlegi emotion vektort
-        let current_emo = match lookup(idx_usize) {
-            Some(e) => e,
-            None => [0.0f32; 21],
-        };
+        let current_emo = lookup(idx_usize).unwrap_or([0.0f32; 21]);
 
         // Ha már nagyon hasonló, hagyd
         let sim = emotional_similarity(query_emotion, &current_emo);
@@ -105,7 +101,7 @@ fn reconsolidate_emotions_inner(
             }
         }
 
-        if let Err(_) = write_emotion(&emotions_path, idx_usize, &new_emo) {
+        if write_emotion(&emotions_path, idx_usize, &new_emo).is_err() {
             continue;
         }
         blended += 1;
@@ -115,7 +111,6 @@ fn reconsolidate_emotions_inner(
 }
 
 /// Spatial reconsolidation: drift blocks toward query coordinates.
-///
 /// Minden activated blokk koordinátáit húzza a query térbeli pozíciója felé,
 /// a HebbianState drift mezőin keresztül (a drift a következő build-nél
 /// beégetődik a header-ekbe).
@@ -187,7 +182,6 @@ pub fn reconsolidate_spatial(
 }
 
 /// Full reconsolidation: emotion + spatial, minden activated blokkra.
-///
 /// Visszaadja a rekonszolidált blokkok számát (emotion + spatial együtt).
 pub fn reconsolidate(
     output_dir: &Path,

@@ -5,9 +5,9 @@
 [![Zero-JSON](https://img.shields.io/badge/Architecture-Zero--JSON-green.svg)](#core-architecture)
 [![MCP](https://img.shields.io/badge/MCP-Native-purple.svg)](#-mcp-server-claude-code--cursor--cline)
 [![Electron](https://img.shields.io/badge/UI-Electron--Tray-blue.svg)](#-electron-tray-app)
-[![Tests](https://img.shields.io/badge/Tests-271%20passing-brightgreen.svg)](#-testing)
+[![Tests](https://img.shields.io/badge/Tests-295%20passing-brightgreen.svg)](#-testing)
 
-![Microscope Memory](unnamed.png)
+![Microscope Memory](microscope-memory-header.png)
 
 **Microscope Memory** is a Rust-native, binary, hierarchical cognitive memory engine with a 13-layer *consciousness architecture* on top. It models memory not as static storage, but as a living, self-organizing structure: every recall is a learning event, every idle moment can trigger dream consolidation, and the system tracks its own state and patterns across sessions.
 
@@ -238,7 +238,7 @@ Microscope is not a single program. It's a Rust core with three integration surf
 
 ### 1. CLI (`microscope-mem`)
 
-69 commands organized by domain:
+79 commands organized by domain:
 
 | Domain | Commands |
 |--------|----------|
@@ -261,7 +261,7 @@ A napi-rs compiled addon exposing 8 typed functions to JavaScript/TypeScript:
 import { recall, remember, status, build, find, look, setConfigPath, getConfigPath } from "native";
 
 const s = status();
-// { version: "0.8.0", blocks: 28995, appendLog: 0, layers: [...] }
+// { version: "0.8.1", blocks: 28995, appendLog: 0, layers: [...] }
 
 const hits = recall("Microscope", 5);
 // [{ text, depth, layer, distance, memoryScope }, ...]
@@ -274,13 +274,17 @@ The Electron tray app uses this addon directly. Build with `npm install && npm r
 
 ### 3. MCP server (Claude Code / Cursor / Cline)
 
-The binary implements the Model Context Protocol over stdio. Tools exposed:
+The binary implements the Model Context Protocol over stdio. ~50 tools exposed, organized by domain:
 
-- `memory_recall(query, k?)` — natural language recall, returns relevant blocks
-- `memory_store(text, layer?, importance?)` — store a new memory
-- `memory_session_context()` — auto-context for the current session
-- `memory_consciousness()` — live consciousness state from the background stream (3-tier lock-free read path, ~120 ns)
-- `memory_ping()` — health check
+| Domain | Tools |
+|--------|-------|
+| **Core** | `memory_recall`, `memory_find`, `memory_look`, `memory_store`, `memory_store_data`, `memory_status`, `memory_ping`, `memory_build`, `memory_mql_query` |
+| **Consciousness** | `memory_consciousness`, `memory_hebbian`, `memory_hottest`, `memory_archetypes`, `memory_resonance`, `memory_mirror`, `memory_attention`, `memory_emotional_field`, `memory_temporal_patterns`, `memory_predictions` |
+| **Patterns** | `memory_patterns`, `memory_paths`, `memory_links`, `memory_modalities`, `memory_fingerprint`, `memory_resonant` |
+| **Self** | `memory_self_model`, `memory_introspect`, `memory_curiosity`, `memory_monologue`, `memory_stories`, `memory_daydream`, `memory_hyperfocus`, `memory_autonomous`, `memory_think` |
+| **Session** | `memory_session_context`, `memory_session_log`, `memory_auto_context`, `memory_timeline`, `memory_loops`, `memory_resolve_loop` |
+| **Embeddings** | `memory_embed`, `memory_similar` |
+| **Maintenance** | `memory_consolidate`, `memory_dream`, `memory_dream_log`, `memory_doctor`, `memory_rebuild`, `memory_radial`, `memory_soft` |
 
 Generate a drop-in config for your client:
 
@@ -366,26 +370,12 @@ cargo build --release --features python
 cargo build --release --target wasm32-unknown-unknown --features wasm
 ```
 
-### Red Audit / Stealth (gated, not in default builds)
-
-For users requiring advanced evasion or anti-analysis features, these are gated behind the `stealth` feature flag and **not** included in the default `cargo build --release`:
-
-```bash
-cargo build --release --features stealth
-```
-
-- **Ghost Mode** — soft anti-VM detection
-- **Direct syscalls** — bypasses user-mode hooks
-- **Polymorphic build** — unique binary signature per build
-
-This is an opt-in research capability, not part of the standard memory engine. Default builds contain no stealth code.
-
 ---
 
 ## 🧪 Testing
 
 ```bash
-cargo test                     # 271 unit + integration tests
+cargo test                     # 295 unit + integration tests
 cargo test --test integration  # integration only
 cargo test --lib               # library only
 cargo bench                    # criterion benchmarks
@@ -443,7 +433,7 @@ The `UserPromptSubmit` Claude Code hook (`.claude/settings.json`) fires `microsc
 
 ```
 microscope-local/
-├── src/                       # Rust core (36,317 LOC, 91 modules)
+├── src/                       # Rust core (39,760 LOC, 90 modules)
 │   ├── main.rs                # CLI entry, command dispatch
 │   ├── lib.rs                 # library root
 │   ├── reader.rs              # mmap + binary block access
@@ -463,9 +453,7 @@ microscope-local/
 │   ├── multimodal.rs          # L13
 │   ├── mcp.rs                 # MCP server
 │   ├── bridge.rs              # legacy HTTP API (axum)
-│   ├── commands/              # CLI command handlers
-│   ├── antidebug.rs           # [feature = "stealth"]
-│   └── obfuscate.rs           # [feature = "stealth"]
+│   └── commands/              # CLI command handlers
 ├── layers/                    # 15 text files, the source memories
 ├── native/                    # napi-rs Node.js addon
 │   ├── index.d.ts             # TypeScript types
@@ -519,7 +507,7 @@ The binary is the source of truth. Everything else wraps it.
 
 ### Layer 2: `mm` shorthand (any shell)
 
-A short, dependency-free bash/PowerShell script in `scripts/mm` that resolves the binary through a portable chain and exposes 18 common commands. **No hardcoded paths.**
+A short, dependency-free bash/PowerShell script in `scripts/mm` that resolves the binary through a portable chain and exposes 16 common commands. **No hardcoded paths.**
 
 ```bash
 mm r "memory system"      # recall

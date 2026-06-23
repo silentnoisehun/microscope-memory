@@ -361,14 +361,14 @@ fn now_ms() -> u64 {
 /// Never touches: identity(0), long_term(1), emotional(4), relational(5),
 /// crypto_chain(7), echo_cache(8), rust_state(9), code(10).
 /// Blocks older than FORGET_AGE_MS with importance < 5 are removed.
+#[allow(dead_code)]
 const FORGET_AGE_MS: u64 = 86_400_000; // 24 hours
 const FORGET_INTERNAL_LAYERS: &[u8] = &[2, 3, 6, 11];
 const FORGET_MIN_IMPORTANCE: u8 = 5;
 
-pub fn forget_old_thoughts(output_dir: &Path, block_count: usize) -> Result<u32, String> {
+pub fn forget_old_thoughts(output_dir: &Path, _block_count: usize) -> Result<u32, String> {
     use crate::{BLOCK_DATA_SIZE, DEPTH_ENTRY_SIZE, HEADER_SIZE, META_HEADER_SIZE};
     use std::fs;
-    use std::io::{Read, Seek, SeekFrom, Write};
 
     let hdr_path = output_dir.join("microscope.bin");
     let dat_path = output_dir.join("data.bin");
@@ -387,7 +387,7 @@ pub fn forget_old_thoughts(output_dir: &Path, block_count: usize) -> Result<u32,
         return Ok(0);
     }
 
-    let t0 = now_ms();
+    let _t0 = now_ms();
     let mut keep_indices: Vec<usize> = Vec::with_capacity(actual_blocks);
     let mut forgotten = 0u32;
 
@@ -466,8 +466,7 @@ pub fn forget_old_thoughts(output_dir: &Path, block_count: usize) -> Result<u32,
     }
 
     let mut running_start = 0u32;
-    for d in 0..9 {
-        let count = depth_counts[d];
+    for &count in &depth_counts[..9] {
         new_meta.extend_from_slice(&running_start.to_le_bytes());
         new_meta.extend_from_slice(&count.to_le_bytes());
         running_start += count;

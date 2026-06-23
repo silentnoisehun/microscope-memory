@@ -304,7 +304,7 @@ impl HebbianState {
     /// Get top-N strongest co-activation pairs.
     pub fn strongest_pairs(&self, n: usize) -> Vec<&CoactivationPair> {
         let mut pairs: Vec<&CoactivationPair> = self.coactivations.values().collect();
-        pairs.sort_by(|a, b| b.count.cmp(&a.count));
+        pairs.sort_by_key(|b| std::cmp::Reverse(b.count));
         pairs.truncate(n);
         pairs
     }

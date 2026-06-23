@@ -1,0 +1,18 @@
+/* Mermaid PWA - Diff Styles */
+#diff-tab { display:flex; flex-direction:column; height:100%; }
+#diff-toolbar { display:flex; gap:8px; padding:8px 12px; background:var(--bg-1); border-bottom:1px solid var(--border); align-items:center; flex-wrap:wrap; }
+#diff-toolbar button { background:var(--bg-2); color:var(--fg-1); border:1px solid var(--border); border-radius:4px; padding:5px 10px; font:inherit; font-size:12px; cursor:pointer; }
+#diff-toolbar button:hover { background:var(--bg-3); color:var(--accent); border-color:var(--accent-dim); }
+#diff-toolbar label { font-size:11px; color:var(--fg-2); }
+#diff-panes { flex:1; display:grid; grid-template-columns:1fr 1fr; gap:1px; background:var(--border); overflow:hidden; }
+.diff-pane { background:var(--bg); display:flex; flex-direction:column; overflow:hidden; }
+.diff-pane-header { background:var(--bg-1); border-bottom:1px solid var(--border); padding:6px 10px; font-size:11px; color:var(--fg-2); text-transform:uppercase; }
+.diff-pane-body { flex:1; overflow:auto; padding:8px 12px; font-size:12px; line-height:1.5; white-space:pre-wrap; word-wrap:break-word; }
+.diff-line { display:block; padding:0 4px; }
+.diff-line.add { background:rgba(0,255,157,0.10); color:var(--ok); }
+.diff-line.del { background:rgba(255,68,68,0.10); color:var(--err); }
+.diff-line.same { color:var(--fg-1); }
+.diff-line.ctx { color:var(--fg-2); }
+#diff-input { width:100%; height:100%; background:var(--bg); color:var(--fg); border:none; padding:8px 12px; font:inherit; font-size:12px; resize:none; outline:none; line-height:1.5; }
+#diff-stats { padding:6px 12px; background:var(--bg-1); border-top:1px solid var(--border); font-size:11px; color:var(--fg-2); display:flex; gap:12px; }
+#diff-stats .adds { color:var(--ok); }

@@ -149,7 +149,7 @@ impl MonologueState {
                 .iter()
                 .take(2)
                 .filter(|(_, v)| *v > 0.1)
-                .map(|(i, v)| format!("{}", labels[*i]))
+                .map(|(i, _v)| labels[*i].to_string())
                 .collect();
             if !top.is_empty() {
                 emo_desc = format!("I feel {}", top.join(" and "));

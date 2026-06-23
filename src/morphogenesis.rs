@@ -57,7 +57,6 @@ use std::sync::{Arc, RwLock};
 // ─── Növekedési Minták ───────────────────────────────────────────────────────
 
 /// Növekedési algoritmus típusok
-
 #[derive(Debug, Clone, Copy, PartialEq, Hash)]
 
 pub enum GrowthPattern {
@@ -78,7 +77,6 @@ pub enum GrowthPattern {
 }
 
 /// Csomópont típusok a kinőtt struktúrában
-
 #[derive(Debug, Clone, PartialEq, Hash)]
 
 pub enum NodeType {
@@ -111,7 +109,6 @@ pub enum NodeType {
 }
 
 /// Kapcsolat típusa
-
 #[derive(Debug, Clone, PartialEq, Hash)]
 
 pub enum ConnectionType {
@@ -131,7 +128,6 @@ pub enum ConnectionType {
 // ─── Core Adatszerkezetek ───────────────────────────────────────────────────
 
 /// Seed — kiinduló "mag" a növekedéshez
-
 #[derive(Debug, Clone)]
 
 pub struct Seed {
@@ -180,7 +176,6 @@ impl Seed {
 }
 
 /// Morfogén koncentráció mező — biológiai "illat" gradiensek
-
 #[derive(Debug, Clone)]
 
 pub struct MorphogenField {
@@ -199,6 +194,12 @@ pub struct MorphogenField {
     pub evaporation_rate: f64,
 }
 
+impl Default for MorphogenField {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MorphogenField {
     pub fn new() -> Self {
         Self {
@@ -215,7 +216,6 @@ impl MorphogenField {
     }
 
     /// Koncentráció lekérése egy adott pontban (tricubic interpoláció)
-
     pub fn concentration_at(&self, x: f64, y: f64, z: f64) -> f64 {
         let gx = x.floor() as i32;
 
@@ -265,7 +265,6 @@ impl MorphogenField {
     }
 
     /// Új attraktor hozzáadása
-
     pub fn add_attractor(&mut self, x: f64, y: f64, z: f64, strength: f64) {
         self.attractors.push((x, y, z, strength));
 
@@ -275,7 +274,6 @@ impl MorphogenField {
     }
 
     /// Gradiens diffúzió egy lépése
-
     pub fn diffuse(&mut self) {
         let old = self.gradients.clone();
 
@@ -304,7 +302,6 @@ impl MorphogenField {
     }
 
     /// Párologtatás (gyenge gradiensek eltüntetése)
-
     pub fn evaporate(&mut self) {
         self.gradients.retain(|_, v| {
             *v *= 1.0 - self.evaporation_rate;
@@ -315,7 +312,6 @@ impl MorphogenField {
 }
 
 /// Növekedési konfigurációs paraméterek
-
 #[derive(Debug, Clone)]
 
 pub struct GrowthConfig {
@@ -453,7 +449,6 @@ impl GrowthConfig {
 }
 
 /// Csomópont a kinőtt struktúrában
-
 #[derive(Debug, Clone)]
 
 pub struct MorphNode {
@@ -477,7 +472,6 @@ pub struct MorphNode {
 }
 
 /// Kapcsolat két csomópont között
-
 #[derive(Debug, Clone)]
 
 pub struct MorphConnection {
@@ -503,7 +497,6 @@ pub struct MorphConnection {
 }
 
 /// Növekedési statisztikák
-
 #[derive(Debug, Clone)]
 
 pub struct GrowthMetrics {
@@ -525,7 +518,6 @@ pub struct GrowthMetrics {
 }
 
 /// Organizmus — a teljes kinőtt struktúra
-
 #[derive(Debug, Clone)]
 
 pub struct Organism {
@@ -580,7 +572,6 @@ impl Organism {
     }
 
     /// Statisztikák számítása
-
     pub fn calculate_metrics(&mut self) -> GrowthMetrics {
         let node_count = self.nodes.len();
 
@@ -650,13 +641,11 @@ impl Organism {
     }
 
     /// Energia szint ellenőrzése
-
     pub fn is_alive(&self) -> bool {
         self.nodes.iter().any(|n| n.energy > 0.0)
     }
 
     /// Életkor növelése
-
     pub fn age_one_cycle(&mut self) {
         self.age_cycles += 1;
 
@@ -683,15 +672,9 @@ fn random_direction() -> (f64, f64, f64) {
 }
 
 /// Mycelium (gombafonalszerű) növekedés
-
-///
-
 /// Indul egy seed-ből, hifák nőnek ki véletlen irányokba elágazva.
-
 /// A hifák követik a morfogén gradienseket.
-
 /// Két hifa találkozásakor anastomosis (fúzió) történhet.
-
 pub fn mycelium_growth(seed: &Seed, field: &MorphogenField, config: &GrowthConfig) -> Organism {
     let mut organism = Organism::new(
         &format!("mycelium_{}", rand::random::<u32>()),
@@ -976,15 +959,9 @@ pub fn mycelium_growth(seed: &Seed, field: &MorphogenField, config: &GrowthConfi
 }
 
 /// Kapilláris fraktál-elágazás
-
-///
-
 /// Hierarchikus elágazás: gyökér → artéria → arteriole → kapilláris.
-
 /// Minden elágazásnál a kapacitás oszlik meg az ágak között.
-
 /// A kapilláris szinten történik az adatcsere (leaf node-ok).
-
 pub fn capillary_growth(seed: &Seed, field: &MorphogenField, config: &GrowthConfig) -> Organism {
     let mut organism = Organism::new(
         &format!("capillary_{}", rand::random::<u32>()),
@@ -1021,6 +998,7 @@ pub fn capillary_growth(seed: &Seed, field: &MorphogenField, config: &GrowthConf
 
     // Rekurzív elágazás építése
 
+    #[allow(clippy::too_many_arguments)]
     fn branch(
         organism: &mut Organism,
 
@@ -1107,7 +1085,7 @@ pub fn capillary_growth(seed: &Seed, field: &MorphogenField, config: &GrowthConf
 
         // 3D: néha Z irányba is
 
-        let use_z = if depth > 2 && depth % 2 == 0 {
+        let use_z = if depth > 2 && depth.is_multiple_of(2) {
             [
                 (angle.cos(), 0.0, angle.sin()),
                 (0.0, angle.cos(), angle.sin()),
@@ -1271,19 +1249,11 @@ pub fn capillary_growth(seed: &Seed, field: &MorphogenField, config: &GrowthConf
 }
 
 /// Nyálkpenész (Physarum polycephalum) szimuláció
-
-///
-
 /// Rács alapú szimuláció: részecskék mozognak a rácson, nyomot hagynak maguk után.
-
 /// A nyom vonzza a többi részecskét (autokatalízis).
-
 /// A párolgás gyengíti a régi nyomokat.
-
 /// Tápanyag források = seed pozíciók.
-
 /// Az eredmény: optimális útvonal hálózat a források között.
-
 pub fn slime_mold_growth(seed: &Seed, field: &MorphogenField, config: &GrowthConfig) -> Organism {
     let mut organism = Organism::new(
         &format!("slime_{}", rand::random::<u32>()),
@@ -1433,12 +1403,12 @@ pub fn slime_mold_growth(seed: &Seed, field: &MorphogenField, config: &GrowthCon
 
         // Párolgás
 
-        for y in 0..grid_size {
-            for x in 0..grid_size {
-                trail[y][x] *= 1.0 - config.trail_evaporation;
+        for row in trail.iter_mut() {
+            for cell in row.iter_mut() {
+                *cell *= 1.0 - config.trail_evaporation;
 
-                if trail[y][x] < 0.01 {
-                    trail[y][x] = 0.0;
+                if *cell < 0.01 {
+                    *cell = 0.0;
                 }
             }
         }
@@ -1454,9 +1424,9 @@ pub fn slime_mold_growth(seed: &Seed, field: &MorphogenField, config: &GrowthCon
 
     // Erős nyomokból node-ok
 
-    for y in 0..grid_size {
-        for x in 0..grid_size {
-            if trail[y][x] > 0.15 {
+    for (y, row) in trail.iter().enumerate() {
+        for (x, &cell) in row.iter().enumerate() {
+            if cell > 0.15 {
                 let node_id = next_id;
 
                 next_id += 1;
@@ -1541,15 +1511,9 @@ pub fn slime_mold_growth(seed: &Seed, field: &MorphogenField, config: &GrowthCon
 }
 
 /// L-system fraktál növekedés
-
-///
-
 /// Turtle-graphics szimuláció 3D-ben.
-
 /// Axióma + produkciós szabályok iteratív alkalmazása.
-
 /// Minden szimbólum egy node típust és növekedési irányt reprezentál.
-
 pub fn fractal_growth(seed: &Seed, _field: &MorphogenField, config: &GrowthConfig) -> Organism {
     let mut organism = Organism::new(
         &format!("fractal_{}", rand::random::<u32>()),
@@ -1793,7 +1757,6 @@ pub fn fractal_growth(seed: &Seed, _field: &MorphogenField, config: &GrowthConfi
 // ─── Fitness Célok ───────────────────────────────────────────────────────────
 
 /// Fitness célok az evolúciós szelekcióhoz
-
 #[derive(Debug, Clone, PartialEq)]
 
 pub enum FitnessObjective {
@@ -1817,7 +1780,6 @@ pub enum FitnessObjective {
 }
 
 /// Fitness eredmény
-
 #[derive(Debug, Clone)]
 
 pub struct FitnessResult {
@@ -1835,7 +1797,6 @@ pub struct FitnessResult {
 }
 
 /// Fitness függvény kiértékelése
-
 pub fn evaluate_fitness(organism: &Organism, objective: &FitnessObjective) -> FitnessResult {
     let metrics = organism.metrics.as_ref().cloned().unwrap_or_else(|| {
         let mut o = organism.clone();
@@ -1923,7 +1884,7 @@ pub fn evaluate_fitness(organism: &Organism, objective: &FitnessObjective) -> Fi
     };
 
     FitnessResult {
-        score: (score * fractal_efficiency).max(0.0).min(1.0),
+        score: (score * fractal_efficiency * (1.0 - complexity_penalty)).clamp(0.0, 1.0),
 
         latency_score,
 
@@ -1943,7 +1904,6 @@ pub fn evaluate_fitness(organism: &Organism, objective: &FitnessObjective) -> Fi
 // ─── Morphogenesis Engine ────────────────────────────────────────────────────
 
 /// A fő morfogenetikus motor
-
 pub struct MorphogenesisEngine {
     /// Konfiguráció
     pub config: Arc<RwLock<GrowthConfig>>,
@@ -1961,9 +1921,14 @@ pub struct MorphogenesisEngine {
     pub evolution_history: Arc<RwLock<Vec<f64>>>,
 }
 
+impl Default for MorphogenesisEngine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MorphogenesisEngine {
     /// Létrehoz egy új motort
-
     pub fn new() -> Self {
         Self {
             config: Arc::new(RwLock::new(GrowthConfig::default())),
@@ -1979,19 +1944,16 @@ impl MorphogenesisEngine {
     }
 
     /// Konfiguráció beállítása
-
     pub fn set_config(&self, config: GrowthConfig) {
         *self.config.write().unwrap() = config;
     }
 
     /// Morfogén mező beállítása
-
     pub fn set_field(&self, field: MorphogenField) {
         *self.field.write().unwrap() = field;
     }
 
     /// Organizmus növesztése egy seed-ből
-
     pub fn grow_from_seed(&self, seed: &Seed, pattern: Option<GrowthPattern>) -> Organism {
         let config = self.config.read().unwrap().clone();
 
@@ -2033,21 +1995,12 @@ impl MorphogenesisEngine {
     }
 
     /// Populáció evolúciója generációkon keresztül
-
-    ///
-
     /// Minden generáció:
-
     /// 1. Fitness kiértékelés
-
     /// 2. Szelekció (legjobb N marad)
-
     /// 3. Keresztezés (seed paraméterek keverése)
-
     /// 4. Mutáció (növekedési paraméterek véletlenszerű változtatása)
-
     /// 5. Új organizmusok növesztése
-
     pub fn evolve_population(
         &self,
 
@@ -2203,7 +2156,6 @@ impl MorphogenesisEngine {
     }
 
     /// Pruning: gyenge ágak eltávolítása
-
     pub fn prune_weak(&self, organism: &mut Organism, threshold: f64) -> usize {
         let before = organism.connections.len();
 
@@ -2227,7 +2179,6 @@ impl MorphogenesisEngine {
     }
 
     /// Topológiai elemzés
-
     pub fn analyze_topology(organism: &Organism) -> HashMap<String, f64> {
         let mut analysis = HashMap::new();
 
@@ -2296,7 +2247,6 @@ impl MorphogenesisEngine {
     }
 
     /// Legjobb organizmus lekérése
-
     pub fn get_best_organism(&self) -> Option<Organism> {
         let organisms = self.organisms.read().unwrap();
 
@@ -2307,7 +2257,6 @@ impl MorphogenesisEngine {
     }
 
     /// Evolúciós történet lekérése
-
     pub fn evolution_summary(&self) -> Vec<(u32, f64)> {
         let history = self.evolution_history.read().unwrap();
 
@@ -2322,7 +2271,6 @@ impl MorphogenesisEngine {
 // ─── Expresszió: Organizmus → Architecture leképezés ────────────────────────
 
 /// Organizmus kifejezése szimulálható Architecture-vé
-
 pub fn express_as_architecture(organism: &Organism) -> crate::architecture_simulator::Architecture {
     let mut components = std::collections::HashMap::new();
 
@@ -2409,7 +2357,7 @@ pub fn express_as_architecture(organism: &Organism) -> crate::architecture_simul
 
         connections,
 
-        version: organism.generation as u32,
+        version: organism.generation,
 
         cohesion_score: organism.fitness_score,
     }
@@ -2418,15 +2366,9 @@ pub fn express_as_architecture(organism: &Organism) -> crate::architecture_simul
 // ─── Integráció: Vagus trigger ──────────────────────────────────────────────
 
 /// Vagus stressz szint alapján kompenzatórikus növekedés triggerelése
-
-///
-
 /// Ha a vagus tónus egy kritikus szint alá esik (magas stressz),
-
 /// a morphogenesis automatikusan új struktúrákat növeszt,
-
 /// hogy tehermentesítse a szűk keresztmetszeteket.
-
 pub fn trigger_from_vagus(
     vagus_tone: &crate::vagus::VagusTone,
 
@@ -2488,13 +2430,8 @@ pub fn trigger_from_vagus(
 // ─── Integráció: Neuroplasticity térkép ─────────────────────────────────────
 
 /// Organizmus struktúra leképezése neuroplasztikus útvonalakra
-
-///
-
 /// Minden MorphConnection egy szinaptikus kapcsolattá alakul.
-
 /// Az erős kapcsolatok magasabb súlyt kapnak.
-
 pub fn map_to_neuroplasticity(organism: &Organism) -> Vec<(u32, u32, f32)> {
     organism
         .connections
@@ -2508,7 +2445,7 @@ pub fn map_to_neuroplasticity(organism: &Organism) -> Vec<(u32, u32, f32)> {
             (
                 c.from_node as u32,
                 c.to_node as u32,
-                weight.min(1.0).max(0.0),
+                weight.clamp(0.0, 1.0),
             )
         })
         .collect()
@@ -2517,19 +2454,11 @@ pub fn map_to_neuroplasticity(organism: &Organism) -> Vec<(u32, u32, f32)> {
 // ─── Integráció: Federation fingerprint export ──────────────────────────────
 
 /// Fingerprint generálása federation rezonanciához
-
-///
-
 /// A fingerprint tartalmazza:
-
 /// - Növekedési minta típusa
-
 /// - Node-ok és kapcsolatok számának tömörített hash-e
-
 /// - Fitness score
-
 /// - Topológiai jellemzők (átlagos fokszám, sűrűség, fraktál dimenzió)
-
 pub fn export_fingerprint(organism: &Organism) -> Vec<u8> {
     use std::hash::{Hash, Hasher};
 
@@ -2680,7 +2609,6 @@ impl fmt::Display for Organism {
 // ─── Segédfüggvények ─────────────────────────────────────────────────────────
 
 /// Több organizmus egyesítése egy nagyobb struktúrába
-
 pub fn merge_organisms(organisms: &[Organism]) -> Option<Organism> {
     if organisms.is_empty() {
         return None;
@@ -2728,7 +2656,6 @@ pub fn merge_organisms(organisms: &[Organism]) -> Option<Organism> {
 }
 
 /// Organizmus struktúra egyszerűsítése (redundáns node-ok összevonása)
-
 pub fn simplify_organism(organism: &mut Organism) -> usize {
     let _before = organism.nodes.len();
 
@@ -2805,7 +2732,6 @@ impl NodeType {
 // ─── Tesztek ─────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
-
 mod tests {
 
     use super::*;
@@ -3094,7 +3020,7 @@ mod tests {
 
         assert!(merged.is_some());
 
-        assert!(merged.unwrap().nodes.len() > 0);
+        assert!(!merged.unwrap().nodes.is_empty());
     }
 
     #[test]

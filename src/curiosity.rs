@@ -124,7 +124,7 @@ impl CuriosityState {
 
     pub fn generate_queries(
         &mut self,
-        config: &Config,
+        _config: &Config,
         reader: &MicroscopeReader,
         output_dir: &Path,
     ) -> Vec<CuriosityQuery> {
@@ -210,7 +210,7 @@ impl CuriosityState {
         for p in patterns {
             new_queries.push(CuriosityQuery {
                 timestamp_ms: now_ms,
-                query: format!("What connects the blocks in this thought pattern?"),
+                query: "What connects the blocks in this thought pattern?".to_string(),
                 reason: format!(
                     "thought pattern with {} blocks, frequency {}",
                     p.result_blocks.len(),
@@ -223,7 +223,7 @@ impl CuriosityState {
         // 5. General curiosity about system state
         new_queries.push(CuriosityQuery {
             timestamp_ms: now_ms,
-            query: format!("How am I changing over time?"),
+            query: "How am I changing over time?".to_string(),
             reason: format!(
                 "{} total blocks, {} hot memories, {} due for review",
                 reader.block_count,

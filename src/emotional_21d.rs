@@ -21,10 +21,9 @@ impl EmotionalState21D {
             if let Ok(data) = fs::read(path) {
                 if data.len() >= STATE_SIZE && &data[0..4] == MAGIC {
                     let mut vector = [0.0f32; 21];
-                    for i in 0..21 {
+                    for (i, v) in vector.iter_mut().enumerate() {
                         let off = 4 + i * 4;
-                        vector[i] =
-                            f32::from_le_bytes(data[off..off + 4].try_into().unwrap_or([0u8; 4]));
+                        *v = f32::from_le_bytes(data[off..off + 4].try_into().unwrap_or([0u8; 4]));
                     }
                     // Sanitize: replace any NaN with 0.0 to prevent NaN propagation
                     for v in &mut vector {

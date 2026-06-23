@@ -131,7 +131,7 @@ impl ArchitectureGenerator {
 
         // 2. Azonosítsuk a bevált komponens típusokat
         let mut component_type_weights: HashMap<ComponentType, f64> = HashMap::new();
-        let mut connection_patterns: Vec<(String, String, f64)> = Vec::new();
+        let mut _connection_patterns: Vec<(String, String, f64)> = Vec::new();
 
         for result in &relevant_entries {
             let entry = &result.entry;
@@ -149,9 +149,9 @@ impl ArchitectureGenerator {
                             .or_insert(0.0) += 0.2;
                     }
                 }
-                KnowledgeEntryType::SimulationResult => {
+                KnowledgeEntryType::SimulationResult
                     // Magas stabilitású architektúrák komponensei
-                    if entry.confidence > 0.8 {
+                    if entry.confidence > 0.8 => {
                         *component_type_weights
                             .entry(ComponentType::Software)
                             .or_insert(0.0) += 0.2;
@@ -159,15 +159,13 @@ impl ArchitectureGenerator {
                             .entry(ComponentType::Storage)
                             .or_insert(0.0) += 0.1;
                     }
-                }
-                KnowledgeEntryType::KnownPitfall => {
+                KnowledgeEntryType::KnownPitfall
                     // Buktatók -> csökkentjük a súlyt
-                    if entry.tags.contains(&"bottleneck".to_string()) {
+                    if entry.tags.contains(&"bottleneck".to_string()) => {
                         *component_type_weights
                             .entry(ComponentType::Storage)
                             .or_insert(0.0) -= 0.1;
                     }
-                }
                 _ => {}
             }
         }
@@ -210,7 +208,7 @@ impl ArchitectureGenerator {
                 let from = &comp_ids[i % comp_ids.len()];
                 let to = &comp_ids[(i + 1) % comp_ids.len()];
                 let bandwidth = 1000.0 + rand::random::<f64>() * 9000.0;
-                let protocol = if i % 2 == 0 { "HTTP/2" } else { "gRPC" };
+                let protocol = if i.is_multiple_of(2) { "HTTP/2" } else { "gRPC" };
 
                 connections.push(Connection {
                     from: from.clone(),
@@ -243,9 +241,7 @@ impl ArchitectureGenerator {
                 load_pattern: "sine".to_string(),
                 peak_load: 0.7,
                 enable_fault_injection: true,
-                fault_rate: 0.01,
-                ..SimulationConfig::default()
-            };
+                fault_rate: 0.01 };
 
             let sim_result = self.simulator.run_simulation(&arch.id, &config);
 
@@ -363,9 +359,7 @@ impl ArchitectureGenerator {
                 load_pattern: "sine".to_string(),
                 peak_load: 0.7,
                 enable_fault_injection: true,
-                fault_rate: 0.01,
-                ..SimulationConfig::default()
-            };
+                fault_rate: 0.01 };
 
             let sim_result = self.simulator.run_simulation(&optimized.id, &config);
             let score = self.calculate_proposal_score(&optimized, &sim_result, params);
@@ -470,9 +464,7 @@ impl ArchitectureGenerator {
                 load_pattern: "sine".to_string(),
                 peak_load: 0.7,
                 enable_fault_injection: true,
-                fault_rate: 0.01,
-                ..SimulationConfig::default()
-            };
+                fault_rate: 0.01 };
 
             let sim_result = self.simulator.run_simulation(&arch.id, &config);
             let score = self.calculate_proposal_score(&arch, &sim_result, params);
@@ -576,9 +568,7 @@ impl ArchitectureGenerator {
                     load_pattern: "sine".to_string(),
                     peak_load: 0.7,
                     enable_fault_injection: true,
-                    fault_rate: 0.01,
-                    ..SimulationConfig::default()
-                };
+                    fault_rate: 0.01 };
 
                 let sim_result = self.simulator.run_simulation(&arch.id, &config);
                 let score = self.calculate_proposal_score(arch, &sim_result, params);
@@ -627,9 +617,7 @@ impl ArchitectureGenerator {
                 load_pattern: "sine".to_string(),
                 peak_load: 0.7,
                 enable_fault_injection: true,
-                fault_rate: 0.01,
-                ..SimulationConfig::default()
-            };
+                fault_rate: 0.01 };
 
             let sim_result = self.simulator.run_simulation(&arch.id, &config);
             let score = self.calculate_proposal_score(arch, &sim_result, params);
@@ -708,7 +696,7 @@ impl ArchitectureGenerator {
             }
         }
 
-        score.max(0.0).min(1.0)
+        score.clamp(0.0, 1.0)
     }
 
     /// Javasolt fejlesztések generálása
@@ -828,7 +816,7 @@ mod tests {
         let gen = create_test_generator();
         gen.set_params(GenerationParams {
             strategy: GenerationStrategy::Novel,
-            ..GenerationParams::default()
+            ..Default::default()
         });
         let proposals = gen.generate("test requirements");
         assert!(!proposals.is_empty());
@@ -845,7 +833,7 @@ mod tests {
             mutation_rate: 1.0,
             target_latency_ms: 1000.0,
             target_throughput: 1.0,
-            ..GenerationParams::default()
+            ..Default::default()
         });
         let proposals = gen.generate("test");
         assert!(!proposals.is_empty());

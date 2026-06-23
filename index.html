@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang='hu'>
+<head>
+  <meta charset='UTF-8'>
+  <meta name='viewport' content='width=device-width, initial-scale=1.0, viewport-fit=cover'>
+  <meta name='theme-color' content='#000000'>
+  <meta name='description' content='Mermaid PWA - Rongyász AI agent, voice, diff, dashboard. Microscope Memory frontend.'>
+  <title>Mermaid PWA — Rongyász</title>
+  <link rel='manifest' href='./manifest.json'>
+  <link rel='icon' href='./icon.svg' type='image/svg+xml'>
+  <link rel='stylesheet' href='./styles/core.css'>
+  <link rel='stylesheet' href='./styles/chat.css'>
+  <link rel='stylesheet' href='./styles/voice.css'>
+  <link rel='stylesheet' href='./styles/diff.css'>
+  <link rel='stylesheet' href='./styles/dashboard.css'>
+  <link rel='stylesheet' href='./styles/settings.css'>
+</head>
+<body>
+  <header id='header'>
+    <div id='logo'>
+      <span id='logo-dot'></span>
+      <span>Mermaid PWA</span>
+      <span id='status-text'>offline</span>
+    </div>
+    <div id='header-right'>
+      <button id='btn-chat' class='active'>Chat</button>
+      <button id='btn-voice'>Voice</button>
+      <button id='btn-diff'>Diff</button>
+      <button id='btn-dashboard'>Dashboard</button>
+      <button id='btn-pipeline'>Pipeline</button>
+      <button id='btn-settings' title='Settings'>⚙</button>
+    </div>
+  </header>
+
+  <main id='main'>
+    <div id='tabs'>
+      <button class='tab-btn active' data-tab='chat'>Chat</button>
+      <button class='tab-btn' data-tab='voice'>Voice</button>
+      <button class='tab-btn' data-tab='diff'>Diff</button>
+      <button class='tab-btn' data-tab='dashboard'>Dashboard</button>
+      <button class='tab-btn' data-tab='pipeline'>Pipeline</button>
+      <button class='tab-btn' data-tab='settings'>Settings</button>
+    </div>
+
+    <div id='chat-tab' class='tab-content active'>
+      <div id='chat-messages'></div>
+      <div id='chat-input-row'>
+        <textarea id='chat-input' placeholder='Irj a Rongyásznak... (Shift+Enter uj sor)' rows='1'></textarea>
+        <button id='chat-mic' title='Voice input (magyar)'>🎤 Mic</button>
+        <button id='chat-send'>Küld</button>
+      </div>
+    </div>
+
+    <div id='voice-tab' class='tab-content'></div>
+    <div id='diff-tab' class='tab-content'></div>
+    <div id='dashboard-tab' class='tab-content'></div>
+    <div id='pipeline-tab' class='tab-content'></div>
+    <div id='settings-tab' class='tab-content'></div>
+  </main>
+
+  <footer id='footer'>
+    <div id='vu-mini'></div>
+    <div id='connection-state'><span class='dot'></span><span>disconnected</span></div>
+  </footer>
+
+  <script type='module'>
+    import { initMermaid } from './modules/core.js';
+    initMermaid();
+  </script>
+</body>
+</html>

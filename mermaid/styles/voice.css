@@ -1,0 +1,15 @@
+/* Mermaid PWA - Voice Styles */
+#voice-panel { display:flex; flex-direction:column; gap:12px; padding:16px; height:100%; overflow-y:auto; }
+.voice-section { background:var(--bg-1); border:1px solid var(--border); border-radius:8px; padding:12px; }
+.voice-section h3 { font-size:12px; text-transform:uppercase; color:var(--accent); margin-bottom:8px; letter-spacing:0.5px; }
+#vu-container { display:flex; gap:4px; align-items:flex-end; height:60px; background:var(--bg-2); border:1px solid var(--border); border-radius:4px; padding:8px; }
+.vu-bar { flex:1; background:var(--accent); border-radius:2px 2px 0 0; min-height:2px; transition:height 0.05s ease-out; }
+.vu-bar.peak { background:var(--warn); }
+.voice-row { display:flex; gap:8px; align-items:center; margin-top:8px; }
+.voice-row label { flex:0 0 100px; font-size:12px; color:var(--fg-1); }
+.voice-row input, .voice-row select { flex:1; background:var(--bg-2); color:var(--fg); border:1px solid var(--border); border-radius:4px; padding:6px 8px; font:inherit; font-size:12px; }
+.voice-btn { background:var(--bg-2); color:var(--accent); border:1px solid var(--border); border-radius:6px; padding:8px 12px; font:inherit; font-size:12px; cursor:pointer; transition:all 0.15s; }
+.voice-btn:hover { background:var(--bg-3); border-color:var(--accent); }
+.voice-btn.active { background:var(--accent-dim); border-color:var(--accent); color:var(--accent); }
+.voice-btn.recording { background:var(--err); color:var(--bg); border-color:var(--err); animation:pulse 1s infinite; }
+.voice-status { font-size:11px; color:var(--fg-2); margin-top:4px; }

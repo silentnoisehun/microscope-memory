@@ -17,6 +17,12 @@ pub struct PredictiveProcessor {
     pub model_accuracy: f32, // 0.0-1.0
 }
 
+impl Default for PredictiveProcessor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PredictiveProcessor {
     pub fn new() -> Self {
         Self {
@@ -32,7 +38,7 @@ impl PredictiveProcessor {
         let mut predicted = pattern.to_vec();
 
         // Extend pattern with predicted next elements
-        if pattern.len() > 0 {
+        if !pattern.is_empty() {
             let last = pattern[pattern.len() - 1];
             predicted.push(last.wrapping_add(1));
             predicted.push(last.wrapping_add(2));
@@ -73,7 +79,7 @@ impl PredictiveProcessor {
 
         let mut diff = 0u32;
         for i in 0..len {
-            diff = diff.wrapping_add((predicted[i] ^ actual[i]) as u32);
+            diff = diff.wrapping_add(predicted[i] ^ actual[i]);
         }
         ((diff as f32) / (len as f32 * 256.0)).min(1.0)
     }
@@ -99,6 +105,12 @@ pub struct IntuitionPattern {
 pub struct IntuitionSystem {
     pub patterns: HashMap<u64, IntuitionPattern>,
     pub fast_decisions: Vec<(String, f32)>, // (decision, speed_ms)
+}
+
+impl Default for IntuitionSystem {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl IntuitionSystem {
@@ -173,6 +185,12 @@ pub struct UnconsciousSolver {
     pub incubating: Vec<IncubatedProblem>,
     pub solutions: HashMap<u64, String>,
     pub incubation_time_ms: u64, // how long to let problems simmer
+}
+
+impl Default for UnconsciousSolver {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl UnconsciousSolver {
@@ -277,6 +295,12 @@ pub struct AdvancedCognition {
     pub predictor: PredictiveProcessor,
     pub intuition: IntuitionSystem,
     pub solver: UnconsciousSolver,
+}
+
+impl Default for AdvancedCognition {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl AdvancedCognition {

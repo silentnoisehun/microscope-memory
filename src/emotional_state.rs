@@ -12,6 +12,7 @@
 //! - ring_buffer: [[f32; 21]; 10] (840 bytes)
 //! - last_update: u64 (8 bytes)
 //! - total_updates: u64 (8 bytes)
+//!
 //! Total: 952 bytes
 
 use std::fs;
@@ -69,7 +70,7 @@ impl EmotionalStateRing {
     pub fn save(&self, output_dir: &Path) -> Result<(), String> {
         let path = output_dir.join("emotional_state.bin");
         let tmp_path = output_dir.join("emotional_state.bin.tmp");
-        fs::write(&tmp_path, &self.to_bytes())
+        fs::write(&tmp_path, self.to_bytes())
             .map_err(|e| format!("save emotional_state.bin: {}", e))?;
         fs::rename(&tmp_path, &path).map_err(|e| format!("rename emotional_state.bin: {}", e))
     }
@@ -81,8 +82,8 @@ impl EmotionalStateRing {
         let blend = (BLEND_FACTOR * imp_factor).min(1.0);
 
         // Blend: current * (1 - blend) + incoming * blend
-        for i in 0..21 {
-            self.current[i] = self.current[i] * (1.0 - blend) + emotion[i] * blend;
+        for (cur, &inc) in self.current.iter_mut().zip(emotion.iter()) {
+            *cur = *cur * (1.0 - blend) + inc * blend;
         }
 
         // Push into ring buffer
@@ -123,7 +124,7 @@ impl EmotionalStateRing {
     pub fn dominant(&self) -> Option<(&'static str, f32)> {
         let mut best: Option<(usize, f32)> = None;
         for (i, &v) in self.current.iter().enumerate() {
-            if v > 0.05 && best.map_or(true, |(_, b)| v > b) {
+            if v > 0.05 && best.is_none_or(|(_, b)| v > b) {
                 best = Some((i, v));
             }
         }
@@ -145,13 +146,13 @@ impl EmotionalStateRing {
             } else {
                 0
             };
-            for j in 0..21 {
-                avg[j] += self.ring[idx][j];
+            for (j, val) in avg.iter_mut().enumerate() {
+                *val += self.ring[idx][j];
             }
         }
         let n = self.count as f32;
-        for j in 0..21 {
-            avg[j] /= n;
+        for val in avg.iter_mut() {
+            *val /= n;
         }
         avg
     }
@@ -179,8 +180,8 @@ impl EmotionalStateRing {
     fn from_bytes(data: &[u8]) -> Self {
         let mut pos = 4; // skip magic
         let mut current = [0.0f32; 21];
-        for i in 0..21 {
-            current[i] = f32::from_le_bytes(data[pos..pos + 4].try_into().unwrap_or([0u8; 4]));
+        for c in current.iter_mut() {
+            *c = f32::from_le_bytes(data[pos..pos + 4].try_into().unwrap_or([0u8; 4]));
             pos += 4;
         }
         let head = u32::from_le_bytes(data[pos..pos + 4].try_into().unwrap_or([0u8; 4])) as usize;
@@ -188,9 +189,9 @@ impl EmotionalStateRing {
         let count = u32::from_le_bytes(data[pos..pos + 4].try_into().unwrap_or([0u8; 4])) as usize;
         pos += 4;
         let mut ring = vec![[0.0f32; 21]; RING_SIZE];
-        for i in 0..RING_SIZE {
-            for j in 0..21 {
-                ring[i][j] = f32::from_le_bytes(data[pos..pos + 4].try_into().unwrap_or([0u8; 4]));
+        for slot in ring.iter_mut() {
+            for v in slot.iter_mut() {
+                *v = f32::from_le_bytes(data[pos..pos + 4].try_into().unwrap_or([0u8; 4]));
                 pos += 4;
             }
         }

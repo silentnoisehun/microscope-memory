@@ -1123,12 +1123,12 @@ fn tool_recall(config: &Config, args: &Value) -> Result<String, String> {
                     .iter()
                     .any(|(_, ri, rim)| *rim && *ri == linked_idx);
                 if !found {
-                    let boost = *sim as f32 * 0.12;
+                    let boost = *sim * 0.12;
                     all_results.push((boost, linked_idx, true));
                 } else {
                     for (dist, ri, rim) in &mut all_results {
                         if *rim && *ri == linked_idx {
-                            *dist = (*dist - *sim as f32 * 0.08).max(0.0);
+                            *dist = (*dist - *sim * 0.08).max(0.0);
                             break;
                         }
                     }
@@ -1138,7 +1138,7 @@ fn tool_recall(config: &Config, args: &Value) -> Result<String, String> {
     }
 
     all_results.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
-    let novel = all_results.first().map_or(true, |(d, _, _)| *d > 0.3);
+    let novel = all_results.first().is_none_or(|(d, _, _)| *d > 0.3);
 
     let qh_tg = crate::hebbian::query_hash(query);
     if let Some(stream) = crate::consciousness_stream::global_stream() {
@@ -1297,10 +1297,8 @@ fn tool_recall(config: &Config, args: &Value) -> Result<String, String> {
             }
         }
         // Associative: link top-3 results that share keywords
-        for i in 0..all_results.len().min(3) {
-            let (_, idx_a, is_a) = all_results[i];
-            for j in (i + 1)..all_results.len().min(5) {
-                let (_, idx_b, is_b) = all_results[j];
+        for (i, &(_, idx_a, is_a)) in all_results.iter().take(3).enumerate() {
+            for &(_, idx_b, is_b) in all_results.iter().take(5).skip(i + 1) {
                 let text_a = if is_a { reader.text(idx_a) } else { "" };
                 let text_b = if is_b { reader.text(idx_b) } else { "" };
                 if !text_a.is_empty() && !text_b.is_empty() {
@@ -1518,7 +1516,7 @@ fn tool_session_log(config: &Config, args: &Value) -> Result<String, String> {
         .collect();
 
     let total = entries.len();
-    let start = if total > n { total - n } else { 0 };
+    let start = total.saturating_sub(n);
     let recent: Vec<&&str> = entries[start..].iter().rev().collect();
 
     let now_secs = std::time::SystemTime::now()
@@ -1589,8 +1587,8 @@ fn ebbinghaus_decay(entry: &str, now_secs: u64) -> &'static str {
         30,
         31,
     ];
-    for mi in 0..(mo - 1) as usize {
-        days += mdays[mi];
+    for &d in mdays.iter().take((mo - 1) as usize) {
+        days += d as u64;
     }
     days += d - 1;
     let entry_secs = days * 86400 + h * 3600 + m * 60;
@@ -1614,7 +1612,7 @@ fn ebbinghaus_decay(entry: &str, now_secs: u64) -> &'static str {
 }
 
 fn is_leap_yr(y: u64) -> bool {
-    (y % 4 == 0 && y % 100 != 0) || y % 400 == 0
+    (y.is_multiple_of(4) && !y.is_multiple_of(100)) || y.is_multiple_of(400)
 }
 
 fn tool_consolidate(config: &Config, _args: &Value) -> Result<String, String> {
@@ -1961,7 +1959,7 @@ fn tool_radial(config: &Config, args: &Value) -> Result<String, String> {
     );
 
     if let Some(ref primary) = result_set.primary {
-        output.push_str(&format!("PRIMARY:\n"));
+        output.push_str("PRIMARY:\n");
         if primary.is_main {
             let h = reader.header(primary.block_idx);
             let text = reader.text(primary.block_idx);
@@ -2345,7 +2343,7 @@ fn tool_monologue(config: &Config, _args: &Value) -> Result<String, String> {
 
 fn tool_stories(config: &Config, args: &Value) -> Result<String, String> {
     let k = args.get("k").and_then(|v| v.as_u64()).unwrap_or(5) as usize;
-    let reader = MicroscopeReader::open(config)?;
+    let _reader = MicroscopeReader::open(config)?;
     let output_dir = Path::new(&config.paths.output_dir);
     let nm = crate::narrative_memory::NarrativeMemory::load_or_init(output_dir);
 
@@ -2426,7 +2424,7 @@ fn tool_hyperfocus(config: &Config, args: &Value) -> Result<String, String> {
         .unwrap_or("research");
 
     let reader = MicroscopeReader::open(config)?;
-    let output_dir = Path::new(&config.paths.output_dir);
+    let _output_dir = Path::new(&config.paths.output_dir);
 
     // Store hyperfocus intent
     let focus_text = format!("[HYPERFOCUS:{}] Target: {}", focus_type, target);
@@ -2490,7 +2488,7 @@ fn tool_emotional_field(config: &Config, _args: &Value) -> Result<String, String
     // Emotional state ring
     let ring = crate::EmotionalStateRing::load_or_init(output_dir);
     if ring.is_active() {
-        output.push_str(&format!("\nEmotional State Ring:\n"));
+        output.push_str("\nEmotional State Ring:\n");
         output.push_str(&format!("  Intensity: {:.3}\n", ring.intensity()));
         if let Some((name, val)) = ring.dominant() {
             output.push_str(&format!("  Dominant: {} ({:.3})\n", name, val));
@@ -2922,7 +2920,7 @@ fn tool_temporal_patterns(config: &Config, _args: &Value) -> Result<String, Stri
 
 fn tool_modalities(config: &Config, _args: &Value) -> Result<String, String> {
     let reader = MicroscopeReader::open(config)?;
-    let output_dir = Path::new(&config.paths.output_dir);
+    let _output_dir = Path::new(&config.paths.output_dir);
 
     let mut output = format!(
         "Multimodal Index:\n\

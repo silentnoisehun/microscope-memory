@@ -22,6 +22,12 @@ pub struct Hyperfocus {
     pub resource_concentration: f32, // how much goes to focus (0.5-1.0)
 }
 
+impl Default for Hyperfocus {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Hyperfocus {
     pub fn new() -> Self {
         Self {

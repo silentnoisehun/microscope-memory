@@ -72,8 +72,7 @@ impl SpacedBlock {
         } else {
             // SM-2: update ease factor
             self.ease_factor = (self.ease_factor + (0.1 - (5.0 - q) * (0.08 + (5.0 - q) * 0.02)))
-                .max(MIN_EASE)
-                .min(MAX_EASE);
+                .clamp(MIN_EASE, MAX_EASE);
 
             if self.recall_count <= 1 {
                 self.interval_days = 1.0;

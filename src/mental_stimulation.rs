@@ -22,6 +22,12 @@ pub struct MentalStimulation {
     pub novelty_threshold: f32, // trigger new experiences when engagement drops below this
 }
 
+impl Default for MentalStimulation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MentalStimulation {
     pub fn new() -> Self {
         Self {

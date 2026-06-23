@@ -19,7 +19,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::config::Config;
 use crate::reader::MicroscopeReader;
-use crate::thought_graph::ThoughtGraphState;
+
 use colored::Colorize;
 
 const MAX_STR_LEN: usize = 512;
@@ -94,8 +94,8 @@ impl NarrativeEpisode {
             indices.push(idx);
         }
         let mut emo = [0.0f32; 21];
-        for i in 0..21 {
-            emo[i] = f32::from_le_bytes(data[pos..pos + 4].try_into().ok()?);
+        for e in emo.iter_mut() {
+            *e = f32::from_le_bytes(data[pos..pos + 4].try_into().ok()?);
             pos += 4;
         }
         Some(Self {
@@ -159,7 +159,7 @@ impl NarrativeMemory {
 
     pub fn build_episode(
         &mut self,
-        config: &Config,
+        _config: &Config,
         reader: &MicroscopeReader,
         output_dir: &Path,
         query: &str,

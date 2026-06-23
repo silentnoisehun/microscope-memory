@@ -32,6 +32,12 @@ pub struct StructuralPlasticity {
     pub neurogenesis_events: u32,
 }
 
+impl Default for StructuralPlasticity {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl StructuralPlasticity {
     pub fn new() -> Self {
         Self {
@@ -171,7 +177,7 @@ impl StructuralPlasticity {
             .iter()
             .map(|(id, n)| (*id, n.specialization.as_str(), n.dendrite.branch_count))
             .collect();
-        specialized.sort_by(|a, b| b.2.cmp(&a.2));
+        specialized.sort_by_key(|b| std::cmp::Reverse(b.2));
         specialized
     }
 
@@ -185,7 +191,7 @@ impl StructuralPlasticity {
         // Neurons
         let neuron_count = self.neurons.len() as u32;
         data.extend_from_slice(&neuron_count.to_le_bytes());
-        for (_, neuron) in &self.neurons {
+        for neuron in self.neurons.values() {
             data.extend_from_slice(&neuron.id.to_le_bytes());
 
             let blocks_count = neuron.blocks.len() as u16;

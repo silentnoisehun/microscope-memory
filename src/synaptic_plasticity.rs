@@ -25,6 +25,12 @@ pub struct SynapticPlasticity {
     pub total_updates: u32,
 }
 
+impl Default for SynapticPlasticity {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SynapticPlasticity {
     pub fn new() -> Self {
         Self {
@@ -379,11 +385,7 @@ impl SynapticPlasticity {
 
     /// Calculate simple distance between blocks
     fn distance(&self, a: u32, b: u32) -> u32 {
-        if a > b {
-            a - b
-        } else {
-            b - a
-        }
+        a.abs_diff(b)
     }
 
     /// Time-dependent plasticity: high at start, decreases with practice, increases with new strategy
@@ -404,7 +406,7 @@ impl SynapticPlasticity {
             };
 
             // Phase 2: Consolidation (low plasticity, 10-50 practices)
-            let consolidation_decay = if practice_count >= 10 && practice_count < 50 {
+            let consolidation_decay = if (10..50).contains(&practice_count) {
                 0.05 * (50 - practice_count) as f32 / 40.0 // 0.0625 → 0.05
             } else if practice_count >= 50 {
                 0.02 // Very low

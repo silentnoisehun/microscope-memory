@@ -157,6 +157,12 @@ pub struct ArchitectureSimulator {
     learned_patterns: Arc<RwLock<HashMap<String, f64>>>,
 }
 
+impl Default for ArchitectureSimulator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ArchitectureSimulator {
     /// Létrehoz egy új szimulátort
     pub fn new() -> Self {
@@ -220,7 +226,7 @@ impl ArchitectureSimulator {
 
         let steps = (config.duration_secs * 1000.0 / config.time_step_ms) as u64;
         let mut latencies: Vec<f64> = Vec::new();
-        let mut current_load = 0.0_f64;
+        let mut current_load: f64;
         let mut component_loads: HashMap<String, Vec<f64>> = HashMap::new();
 
         // Inicializáljuk a komponens terheléseket
@@ -339,7 +345,7 @@ impl ArchitectureSimulator {
         let mut results = self.simulation_results.write().unwrap();
         results
             .entry(arch_id.to_string())
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(metrics.clone());
 
         // Tanulás a szimulációból
@@ -434,7 +440,7 @@ impl ArchitectureSimulator {
         let mut stress_results = self.stress_test_results.write().unwrap();
         stress_results
             .entry(arch_id.to_string())
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(result.clone());
 
         Some(result)

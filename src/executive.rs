@@ -87,6 +87,12 @@ pub struct Executive {
     module_queue: Arc<RwLock<VecDeque<String>>>,
 }
 
+impl Default for Executive {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Executive {
     pub fn new() -> Self {
         Self {
@@ -177,7 +183,7 @@ impl Executive {
     }
 
     pub fn update_resources(&self, f: impl Fn(&mut CognitiveResources)) {
-        f(&mut *self.resources.write().unwrap());
+        f(&mut self.resources.write().unwrap());
     }
 
     pub fn schedule(&self) -> ExecutionPlan {
@@ -186,7 +192,7 @@ impl Executive {
             .values()
             .filter(|m| m.state == ModuleState::Idle || m.state == ModuleState::Running)
             .collect();
-        sorted.sort_by(|a, b| b.priority.cmp(&a.priority));
+        sorted.sort_by_key(|b| std::cmp::Reverse(b.priority));
         let order: Vec<String> = sorted.iter().map(|m| m.id.clone()).collect();
         let energy: f64 = sorted.iter().map(|m| m.energy_cost).sum();
         let plan = ExecutionPlan {
@@ -321,10 +327,10 @@ impl Executive {
                         .then_with(|| b.priority.cmp(&a.priority))
                 });
             } else {
-                candidates.sort_by(|a, b| b.priority.cmp(&a.priority));
+                candidates.sort_by_key(|b| std::cmp::Reverse(b.priority));
             }
         } else {
-            candidates.sort_by(|a, b| b.priority.cmp(&a.priority));
+            candidates.sort_by_key(|b| std::cmp::Reverse(b.priority));
         }
         Some(candidates[0].id.clone())
     }

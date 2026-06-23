@@ -1,4 +1,4 @@
-﻿//! Pattern Recognition — minta felismerő és tanuló rendszer a Microscope Memory számára
+//! Pattern Recognition — minta felismerő és tanuló rendszer a Microscope Memory számára
 //!
 //! Képes:
 //! - Szekvenciális minták detektálására (gyakori gondolatmenetek)
@@ -89,7 +89,11 @@ pub enum PatternTemplate {
     /// Strukturális: adjacency list minta
     Structural(Vec<(String, String, f64)>),
     /// Cluster: középpont + sugár + elemek
-    Cluster { center: (f64, f64, f64), radius: f64, elements: Vec<String> },
+    Cluster {
+        center: (f64, f64, f64),
+        radius: f64,
+        elements: Vec<String>,
+    },
     /// Minták kombinációja
     Composite(Vec<u64>),
 }
@@ -198,7 +202,14 @@ impl PatternRecognizer {
     // ─── Pattern Register ─────────────────────────────────────────────────
 
     /// Új minta regisztrálása
-    pub fn register_pattern(&self, name: &str, ptype: PatternType, template: PatternTemplate, domain: &str, tags: Vec<String>) -> u64 {
+    pub fn register_pattern(
+        &self,
+        name: &str,
+        ptype: PatternType,
+        template: PatternTemplate,
+        domain: &str,
+        tags: Vec<String>,
+    ) -> u64 {
         let id = self.next_id();
         let pattern = RecognizedPattern {
             id,
@@ -212,7 +223,9 @@ impl PatternRecognizer {
         };
 
         self.patterns.write().unwrap().push(pattern);
-        self.domain_index.write().unwrap()
+        self.domain_index
+            .write()
+            .unwrap()
             .entry(domain.to_string())
             .or_insert_with(Vec::new)
             .push(id);
@@ -235,8 +248,15 @@ impl PatternRecognizer {
     }
 
     /// Minták listázása típus szerint
-    pub fn list_patterns(&self, ptype: Option<PatternType>, domain: Option<&str>) -> Vec<RecognizedPattern> {
-        self.patterns.read().unwrap().iter()
+    pub fn list_patterns(
+        &self,
+        ptype: Option<PatternType>,
+        domain: Option<&str>,
+    ) -> Vec<RecognizedPattern> {
+        self.patterns
+            .read()
+            .unwrap()
+            .iter()
             .filter(|p| {
                 let type_match = ptype.as_ref().map_or(true, |t| p.pattern_type == *t);
                 let domain_match = domain.map_or(true, |d| p.domain == d);
@@ -248,14 +268,20 @@ impl PatternRecognizer {
 
     /// Minta keresés név alapján
     pub fn find_pattern(&self, name: &str) -> Option<RecognizedPattern> {
-        self.patterns.read().unwrap().iter()
+        self.patterns
+            .read()
+            .unwrap()
+            .iter()
             .find(|p| p.name == name)
             .cloned()
     }
 
     /// Minta lekérése ID alapján
     pub fn get_pattern(&self, id: u64) -> Option<RecognizedPattern> {
-        self.patterns.read().unwrap().iter()
+        self.patterns
+            .read()
+            .unwrap()
+            .iter()
             .find(|p| p.id == id)
             .cloned()
     }
@@ -272,14 +298,16 @@ impl PatternRecognizer {
         let min_sim = config.min_similarity;
         let mut patterns = Vec::new();
 
-        if elements.len() < 2 { return patterns; }
+        if elements.len() < 2 {
+            return patterns;
+        }
 
         // Gyakori 2-3-4 hosszúságú részsorozatok
         let mut seq_counts: HashMap<Vec<String>, u64> = HashMap::new();
 
         for len in 2..=window.min(elements.len()).min(5) {
             for i in 0..=elements.len().saturating_sub(len) {
-                let subseq: Vec<String> = elements[i..i+len].to_vec();
+                let subseq: Vec<String> = elements[i..i + len].to_vec();
                 *seq_counts.entry(subseq).or_insert(0) += 1;
             }
         }
@@ -317,13 +345,17 @@ impl PatternRecognizer {
                 let exists = self.patterns.read().unwrap().iter().any(|p| {
                     if let PatternTemplate::Sequence(ref existing) = p.template {
                         existing == seq
-                    } else { false }
+                    } else {
+                        false
+                    }
                 });
 
                 if !exists {
                     let id = pattern.id;
                     self.patterns.write().unwrap().push(pattern.clone());
-                    self.domain_index.write().unwrap()
+                    self.domain_index
+                        .write()
+                        .unwrap()
                         .entry(domain.to_string())
                         .or_insert_with(Vec::new)
                         .push(id);
@@ -333,7 +365,12 @@ impl PatternRecognizer {
             }
         }
 
-        patterns.sort_by(|a, b| b.significance.confidence.partial_cmp(&a.significance.confidence).unwrap());
+        patterns.sort_by(|a, b| {
+            b.significance
+                .confidence
+                .partial_cmp(&a.significance.confidence)
+                .unwrap()
+        });
         patterns
     }
 
@@ -346,7 +383,9 @@ impl PatternRecognizer {
         for pattern in self.patterns.read().unwrap().iter() {
             if let PatternTemplate::Sequence(ref pattern_seq) = pattern.template {
                 // Részsorozat keresés (pattern hosszabb lehet)
-                if pattern_seq.len() > sequence.len() { continue; }
+                if pattern_seq.len() > sequence.len() {
+                    continue;
+                }
 
                 for i in 0..=sequence.len().saturating_sub(pattern_seq.len()) {
                     let window = &sequence[i..i + pattern_seq.len()];
@@ -355,18 +394,32 @@ impl PatternRecognizer {
                     if sim >= config.min_similarity {
                         matches.push(PatternMatch {
                             pattern_id: pattern.id,
-                            target_description: format!("{:?}..{:?}", window.first().unwrap_or(&"".to_string()), window.last().unwrap_or(&"".to_string())),
+                            target_description: format!(
+                                "{:?}..{:?}",
+                                window.first().unwrap_or(&"".to_string()),
+                                window.last().unwrap_or(&"".to_string())
+                            ),
                             similarity: sim,
                             timestamp_ms: now,
                             matched_elements: window.to_vec(),
-                            details: format!("Matched sequence pattern '{}' ({})", pattern.name, pattern.domain),
+                            details: format!(
+                                "Matched sequence pattern '{}' ({})",
+                                pattern.name, pattern.domain
+                            ),
                         });
 
                         // Frissítés: frequency növelés
-                        if let Some(p) = self.patterns.write().unwrap().iter_mut().find(|p| p.id == pattern.id) {
+                        if let Some(p) = self
+                            .patterns
+                            .write()
+                            .unwrap()
+                            .iter_mut()
+                            .find(|p| p.id == pattern.id)
+                        {
                             p.significance.frequency += 1;
                             p.significance.last_matched_ms = now;
-                            p.significance.avg_similarity = p.significance.avg_similarity * 0.7 + sim * 0.3;
+                            p.significance.avg_similarity =
+                                p.significance.avg_similarity * 0.7 + sim * 0.3;
                             p.significance.confidence = (p.significance.confidence + 0.05).min(1.0);
                         }
                     }
@@ -380,14 +433,20 @@ impl PatternRecognizer {
 
     /// Két szekvencia hasonlósága (Levenshtein normalizált)
     fn sequence_similarity(&self, a: &[String], b: &[String]) -> f64 {
-        if a.is_empty() && b.is_empty() { return 1.0; }
-        if a.is_empty() || b.is_empty() { return 0.0; }
+        if a.is_empty() && b.is_empty() {
+            return 1.0;
+        }
+        if a.is_empty() || b.is_empty() {
+            return 0.0;
+        }
 
         let max_len = a.len().max(b.len()) as f64;
         let mut matches = 0u64;
 
         for i in 0..a.len().min(b.len()) {
-            if a[i] == b[i] { matches += 1; }
+            if a[i] == b[i] {
+                matches += 1;
+            }
         }
 
         matches as f64 / max_len
@@ -399,8 +458,14 @@ impl PatternRecognizer {
     ///
     /// Bemenet: {timestamp_ms, id, intensity} triplek
     /// Kimenet: napi/heti ritmusok
-    pub fn find_temporal_patterns(&self, events: &[(u64, String, f64)], domain: &str) -> Vec<RecognizedPattern> {
-        if events.is_empty() { return Vec::new(); }
+    pub fn find_temporal_patterns(
+        &self,
+        events: &[(u64, String, f64)],
+        domain: &str,
+    ) -> Vec<RecognizedPattern> {
+        if events.is_empty() {
+            return Vec::new();
+        }
         let config = self.config.read().unwrap().clone();
         let mut patterns = Vec::new();
 
@@ -411,12 +476,16 @@ impl PatternRecognizer {
             let secs = *ts / 1000;
             let hour = ((secs / 3600) % 24) as u8;
             let day = ((secs / 86400) % 7) as u8;
-            hourly.entry((hour, day)).or_insert_with(Vec::new).push(*intensity);
+            hourly
+                .entry((hour, day))
+                .or_insert_with(Vec::new)
+                .push(*intensity);
         }
 
         // Mintázatok keresése
         // 1. Csúcsidők (magas aktivitású órák)
-        let mut peak_hours: Vec<(u8, u8, f64)> = hourly.iter()
+        let mut peak_hours: Vec<(u8, u8, f64)> = hourly
+            .iter()
             .map(|((h, d), intensities)| {
                 let avg: f64 = intensities.iter().sum::<f64>() / intensities.len() as f64;
                 (*h, *d, avg)
@@ -427,11 +496,13 @@ impl PatternRecognizer {
         peak_hours.sort_by(|a, b| b.2.partial_cmp(&a.2).unwrap());
 
         if !peak_hours.is_empty() {
-            let elements: Vec<String> = peak_hours.iter()
+            let elements: Vec<String> = peak_hours
+                .iter()
                 .map(|(h, d, _)| format!("{}:{}", d, h))
                 .collect();
 
-            let slices: Vec<TemporalSlice> = peak_hours.iter()
+            let slices: Vec<TemporalSlice> = peak_hours
+                .iter()
                 .map(|(h, d, avg)| TemporalSlice {
                     hour: *h,
                     day_of_week: *d,
@@ -466,7 +537,9 @@ impl PatternRecognizer {
 
             let id = pattern.id;
             self.patterns.write().unwrap().push(pattern.clone());
-            self.domain_index.write().unwrap()
+            self.domain_index
+                .write()
+                .unwrap()
                 .entry(domain.to_string())
                 .or_insert_with(Vec::new)
                 .push(id);
@@ -483,7 +556,8 @@ impl PatternRecognizer {
         ];
 
         for (part_name, start_h, end_h) in &day_parts {
-            let count: usize = hourly.iter()
+            let count: usize = hourly
+                .iter()
                 .filter(|((h, _), _)| *h >= *start_h && *h <= *end_h)
                 .map(|(_, v)| v.len())
                 .sum();
@@ -492,13 +566,17 @@ impl PatternRecognizer {
                 let total_events: usize = events.len();
                 let ratio = count as f64 / total_events as f64;
                 if ratio > 0.4 {
-                    let slices: Vec<TemporalSlice> = hourly.iter()
+                    let slices: Vec<TemporalSlice> = hourly
+                        .iter()
                         .filter(|((h, _), _)| *h >= *start_h && *h <= *end_h)
                         .map(|((h, d), intensities)| {
                             let avg = intensities.iter().sum::<f64>() / intensities.len() as f64;
                             TemporalSlice {
-                                hour: *h, day_of_week: *d, frequency: intensities.len() as f64,
-                                avg_intensity: avg, activity_ids: Vec::new(),
+                                hour: *h,
+                                day_of_week: *d,
+                                frequency: intensities.len() as f64,
+                                avg_intensity: avg,
+                                activity_ids: Vec::new(),
                             }
                         })
                         .collect();
@@ -522,7 +600,9 @@ impl PatternRecognizer {
 
                     let id = pattern.id;
                     self.patterns.write().unwrap().push(pattern.clone());
-                    self.domain_index.write().unwrap()
+                    self.domain_index
+                        .write()
+                        .unwrap()
                         .entry(domain.to_string())
                         .or_insert_with(Vec::new)
                         .push(id);
@@ -540,17 +620,26 @@ impl PatternRecognizer {
     ///
     /// Bemenet: adjacencia lista (from, to, weight)
     /// Kimenet: gyakori algráf minták (motívumok)
-    pub fn find_motifs(&self, edges: &[(String, String, f64)], domain: &str) -> Vec<RecognizedPattern> {
+    pub fn find_motifs(
+        &self,
+        edges: &[(String, String, f64)],
+        domain: &str,
+    ) -> Vec<RecognizedPattern> {
         let config = self.config.read().unwrap().clone();
         let mut patterns = Vec::new();
 
-        if edges.is_empty() { return patterns; }
+        if edges.is_empty() {
+            return patterns;
+        }
 
         // Gyakori 2-3-4 node-os algráfok (motívumok)
         // 1. Fan-out: egy node → több node
         let mut fan_out: HashMap<String, Vec<String>> = HashMap::new();
         for (from, to, _) in edges {
-            fan_out.entry(from.clone()).or_insert_with(Vec::new).push(to.clone());
+            fan_out
+                .entry(from.clone())
+                .or_insert_with(Vec::new)
+                .push(to.clone());
         }
 
         for (node, targets) in &fan_out {
@@ -584,7 +673,9 @@ impl PatternRecognizer {
 
                 let id = pattern.id;
                 self.patterns.write().unwrap().push(pattern.clone());
-                self.domain_index.write().unwrap()
+                self.domain_index
+                    .write()
+                    .unwrap()
                     .entry(domain.to_string())
                     .or_insert_with(Vec::new)
                     .push(id);
@@ -595,7 +686,10 @@ impl PatternRecognizer {
         // 2. Fan-in: több node → egy node
         let mut fan_in: HashMap<String, Vec<String>> = HashMap::new();
         for (from, to, _) in edges {
-            fan_in.entry(to.clone()).or_insert_with(Vec::new).push(from.clone());
+            fan_in
+                .entry(to.clone())
+                .or_insert_with(Vec::new)
+                .push(from.clone());
         }
 
         for (node, sources) in &fan_in {
@@ -624,7 +718,9 @@ impl PatternRecognizer {
 
                 let id = pattern.id;
                 self.patterns.write().unwrap().push(pattern.clone());
-                self.domain_index.write().unwrap()
+                self.domain_index
+                    .write()
+                    .unwrap()
                     .entry(domain.to_string())
                     .or_insert_with(Vec::new)
                     .push(id);
@@ -646,7 +742,11 @@ impl PatternRecognizer {
                     id: self.next_id(),
                     name: format!("hub_{}", node),
                     pattern_type: PatternType::Structural,
-                    template: PatternTemplate::Structural(vec![(node.clone(), "__hub__".to_string(), *degree as f64)]),
+                    template: PatternTemplate::Structural(vec![(
+                        node.clone(),
+                        "__hub__".to_string(),
+                        *degree as f64,
+                    )]),
                     significance: PatternSignificance {
                         confidence: (*degree as f64 / 20.0).min(1.0) * 0.4,
                         frequency: *degree as u64,
@@ -666,7 +766,9 @@ impl PatternRecognizer {
 
                 let id = pattern.id;
                 self.patterns.write().unwrap().push(pattern.clone());
-                self.domain_index.write().unwrap()
+                self.domain_index
+                    .write()
+                    .unwrap()
                     .entry(domain.to_string())
                     .or_insert_with(Vec::new)
                     .push(id);
@@ -678,8 +780,13 @@ impl PatternRecognizer {
     }
 
     /// Strukturális motívum keresés morphogenesis organizmusokban
-    pub fn find_motifs_in_organism(&self, nodes: &[crate::morphogenesis::MorphNode], connections: &[crate::morphogenesis::MorphConnection]) -> Vec<RecognizedPattern> {
-        let edges: Vec<(String, String, f64)> = connections.iter()
+    pub fn find_motifs_in_organism(
+        &self,
+        nodes: &[crate::morphogenesis::MorphNode],
+        connections: &[crate::morphogenesis::MorphConnection],
+    ) -> Vec<RecognizedPattern> {
+        let edges: Vec<(String, String, f64)> = connections
+            .iter()
             .filter(|c| c.is_active)
             .map(|c| (c.from_node.to_string(), c.to_node.to_string(), c.weight))
             .collect();
@@ -693,11 +800,17 @@ impl PatternRecognizer {
     ///
     /// Bemenet: (x, y, z) koordináták + id
     /// Kimenet: csoportosulások a memória térben
-    pub fn find_clusters(&self, points: &[(f64, f64, f64, String)], domain: &str) -> Vec<RecognizedPattern> {
+    pub fn find_clusters(
+        &self,
+        points: &[(f64, f64, f64, String)],
+        domain: &str,
+    ) -> Vec<RecognizedPattern> {
         let config = self.config.read().unwrap().clone();
         let mut patterns = Vec::new();
 
-        if points.is_empty() { return patterns; }
+        if points.is_empty() {
+            return patterns;
+        }
 
         let eps = config.cluster_radius;
         let min_pts = 3;
@@ -705,14 +818,18 @@ impl PatternRecognizer {
         let mut clusters: Vec<Vec<usize>> = Vec::new();
 
         for i in 0..points.len() {
-            if visited.contains(&i) { continue; }
+            if visited.contains(&i) {
+                continue;
+            }
 
-            let mut neighbors: Vec<usize> = points.iter().enumerate()
+            let mut neighbors: Vec<usize> = points
+                .iter()
+                .enumerate()
                 .filter(|(j, _)| {
                     let dist = ((points[i].0 - points[*j].0).powi(2)
-                              + (points[i].1 - points[*j].1).powi(2)
-                              + (points[i].2 - points[*j].2).powi(2))
-                              .sqrt();
+                        + (points[i].1 - points[*j].1).powi(2)
+                        + (points[i].2 - points[*j].2).powi(2))
+                    .sqrt();
                     dist <= eps
                 })
                 .map(|(j, _)| j)
@@ -726,17 +843,21 @@ impl PatternRecognizer {
             // Cluster kiterjesztése
             let mut cluster: Vec<usize> = Vec::new();
             while let Some(seed) = neighbors.pop() {
-                if visited.contains(&seed) { continue; }
+                if visited.contains(&seed) {
+                    continue;
+                }
                 visited.insert(seed);
                 cluster.push(seed);
 
-                let seed_neighbors: Vec<usize> = points.iter().enumerate()
+                let seed_neighbors: Vec<usize> = points
+                    .iter()
+                    .enumerate()
                     .filter(|(j, _)| !visited.contains(j))
                     .filter(|(j, _)| {
                         let dist = ((points[seed].0 - points[*j].0).powi(2)
-                                  + (points[seed].1 - points[*j].1).powi(2)
-                                  + (points[seed].2 - points[*j].2).powi(2))
-                                  .sqrt();
+                            + (points[seed].1 - points[*j].1).powi(2)
+                            + (points[seed].2 - points[*j].2).powi(2))
+                        .sqrt();
                         dist <= eps
                     })
                     .map(|(j, _)| j)
@@ -752,7 +873,8 @@ impl PatternRecognizer {
 
         // Cluster minták létrehozása
         for (ci, cluster) in clusters.iter().enumerate() {
-            let cluster_points: Vec<&(f64, f64, f64, String)> = cluster.iter().map(|&i| &points[i]).collect();
+            let cluster_points: Vec<&(f64, f64, f64, String)> =
+                cluster.iter().map(|&i| &points[i]).collect();
 
             // Középpont
             let cx = cluster_points.iter().map(|p| p.0).sum::<f64>() / cluster_points.len() as f64;
@@ -760,12 +882,15 @@ impl PatternRecognizer {
             let cz = cluster_points.iter().map(|p| p.2).sum::<f64>() / cluster_points.len() as f64;
 
             // Átlagos távolság a középponttól
-            let avg_dist: f64 = cluster_points.iter()
+            let avg_dist: f64 = cluster_points
+                .iter()
                 .map(|p| ((p.0 - cx).powi(2) + (p.1 - cy).powi(2) + (p.2 - cz).powi(2)).sqrt())
-                .sum::<f64>() / cluster_points.len() as f64;
+                .sum::<f64>()
+                / cluster_points.len() as f64;
 
             let element_ids: Vec<String> = cluster_points.iter().map(|p| p.3.clone()).collect();
-            let density = cluster.len() as f64 / (avg_dist * avg_dist * 4.0 * std::f64::consts::PI).max(0.01);
+            let density =
+                cluster.len() as f64 / (avg_dist * avg_dist * 4.0 * std::f64::consts::PI).max(0.01);
 
             let pattern = RecognizedPattern {
                 id: self.next_id(),
@@ -795,7 +920,9 @@ impl PatternRecognizer {
 
             let id = pattern.id;
             self.patterns.write().unwrap().push(pattern.clone());
-            self.domain_index.write().unwrap()
+            self.domain_index
+                .write()
+                .unwrap()
                 .entry(domain.to_string())
                 .or_insert_with(Vec::new)
                 .push(id);
@@ -817,7 +944,9 @@ impl PatternRecognizer {
         let patterns = self.patterns.read().unwrap();
         let domains: Vec<String> = self.domain_index.read().unwrap().keys().cloned().collect();
 
-        if domains.len() < 2 { return Vec::new(); }
+        if domains.len() < 2 {
+            return Vec::new();
+        }
 
         // Domain párok keresése, ahol hasonló minták vannak
         for i in 0..domains.len() {
@@ -825,13 +954,17 @@ impl PatternRecognizer {
                 let d1 = &domains[i];
                 let d2 = &domains[j];
 
-                let p1: Vec<&RecognizedPattern> = patterns.iter().filter(|p| p.domain == *d1).collect();
-                let p2: Vec<&RecognizedPattern> = patterns.iter().filter(|p| p.domain == *d2).collect();
+                let p1: Vec<&RecognizedPattern> =
+                    patterns.iter().filter(|p| p.domain == *d1).collect();
+                let p2: Vec<&RecognizedPattern> =
+                    patterns.iter().filter(|p| p.domain == *d2).collect();
 
                 for pat1 in &p1 {
                     for pat2 in &p2 {
                         // Csak azonos típusú mintákat korrelálunk
-                        if pat1.pattern_type != pat2.pattern_type { continue; }
+                        if pat1.pattern_type != pat2.pattern_type {
+                            continue;
+                        }
 
                         let sim = match (&pat1.template, &pat2.template) {
                             (PatternTemplate::Sequence(s1), PatternTemplate::Sequence(s2)) => {
@@ -845,7 +978,8 @@ impl PatternRecognizer {
                             _ => 0.0,
                         };
 
-                        if sim > config.min_similarity * 1.2 { // szigorúbb küszöb
+                        if sim > config.min_similarity * 1.2 {
+                            // szigorúbb küszöb
                             let composite_id = self.next_id();
                             let composite = RecognizedPattern {
                                 id: composite_id,
@@ -854,7 +988,8 @@ impl PatternRecognizer {
                                 template: PatternTemplate::Composite(vec![pat1.id, pat2.id]),
                                 significance: PatternSignificance {
                                     confidence: sim * 0.8,
-                                    frequency: pat1.significance.frequency + pat2.significance.frequency,
+                                    frequency: pat1.significance.frequency
+                                        + pat2.significance.frequency,
                                     last_matched_ms: self.now_ms(),
                                     avg_similarity: sim,
                                     learning_rate: config.learning_rate,
@@ -880,7 +1015,9 @@ impl PatternRecognizer {
         for cp in &composite_patterns {
             let id = cp.id;
             self.patterns.write().unwrap().push(cp.clone());
-            self.domain_index.write().unwrap()
+            self.domain_index
+                .write()
+                .unwrap()
                 .entry(cp.domain.clone())
                 .or_insert_with(Vec::new)
                 .push(id);
@@ -898,7 +1035,10 @@ impl PatternRecognizer {
         let before = patterns.len();
 
         // 1. Alacsony confidence-ű minták eltávolítása
-        patterns.retain(|p| p.significance.confidence >= config.min_confidence || p.significance.frequency >= config.confirmation_threshold);
+        patterns.retain(|p| {
+            p.significance.confidence >= config.min_confidence
+                || p.significance.frequency >= config.confirmation_threshold
+        });
 
         // 2. Hasonló minták összevonása (azonos típus + magas hasonlóság)
         let mut merged = 0;
@@ -917,7 +1057,10 @@ impl PatternRecognizer {
 
                 if should_merge {
                     patterns[i].significance.frequency += patterns[j].significance.frequency;
-                    patterns[i].significance.confidence = patterns[i].significance.confidence.max(patterns[j].significance.confidence);
+                    patterns[i].significance.confidence = patterns[i]
+                        .significance
+                        .confidence
+                        .max(patterns[j].significance.confidence);
                     patterns.remove(j);
                     merged += 1;
                 } else {
@@ -930,9 +1073,15 @@ impl PatternRecognizer {
         // 3. Max patterns limit
         while patterns.len() > config.max_patterns {
             // Leggyengébb eltávolítása
-            let min_pos = (0..patterns.len()).min_by(|&a, &b| {
-                patterns[a].significance.confidence.partial_cmp(&patterns[b].significance.confidence).unwrap()
-            }).unwrap_or(0);
+            let min_pos = (0..patterns.len())
+                .min_by(|&a, &b| {
+                    patterns[a]
+                        .significance
+                        .confidence
+                        .partial_cmp(&patterns[b].significance.confidence)
+                        .unwrap()
+                })
+                .unwrap_or(0);
             patterns.remove(min_pos);
         }
 
@@ -947,18 +1096,33 @@ impl PatternRecognizer {
         let history = self.match_history.read().unwrap();
 
         let total = patterns.len();
-        let seq_count = patterns.iter().filter(|p| p.pattern_type == PatternType::Sequence).count();
-        let struct_count = patterns.iter().filter(|p| p.pattern_type == PatternType::Structural).count();
+        let seq_count = patterns
+            .iter()
+            .filter(|p| p.pattern_type == PatternType::Sequence)
+            .count();
+        let struct_count = patterns
+            .iter()
+            .filter(|p| p.pattern_type == PatternType::Structural)
+            .count();
         let avg_confidence = if total > 0 {
-            patterns.iter().map(|p| p.significance.confidence).sum::<f64>() / total as f64
-        } else { 0.0 };
+            patterns
+                .iter()
+                .map(|p| p.significance.confidence)
+                .sum::<f64>()
+                / total as f64
+        } else {
+            0.0
+        };
 
         (total, seq_count, struct_count, avg_confidence)
     }
 
     /// Friss egyezések lekérése
     pub fn recent_matches(&self, k: usize) -> Vec<PatternMatch> {
-        self.match_history.read().unwrap().iter()
+        self.match_history
+            .read()
+            .unwrap()
+            .iter()
             .rev()
             .take(k)
             .cloned()
@@ -982,7 +1146,9 @@ impl PatternRecognizer {
 
     /// Domain szerinti minta szám
     pub fn domain_pattern_count(&self, domain: &str) -> usize {
-        self.domain_index.read().unwrap()
+        self.domain_index
+            .read()
+            .unwrap()
             .get(domain)
             .map(|ids| ids.len())
             .unwrap_or(0)
@@ -1007,8 +1173,15 @@ impl std::fmt::Display for PatternType {
 
 impl std::fmt::Display for RecognizedPattern {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Pattern #{} [{}] '{}' — {} ({:.1}% confidence, {} freq)",
-            self.id, self.pattern_type, self.name, self.domain,
-            self.significance.confidence * 100.0, self.significance.frequency)
+        write!(
+            f,
+            "Pattern #{} [{}] '{}' — {} ({:.1}% confidence, {} freq)",
+            self.id,
+            self.pattern_type,
+            self.name,
+            self.domain,
+            self.significance.confidence * 100.0,
+            self.significance.frequency
+        )
     }
 }

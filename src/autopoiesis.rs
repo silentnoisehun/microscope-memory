@@ -1,4 +1,4 @@
-﻿//! Autopoiesis — önmódosító kód rendszer
+//! Autopoiesis — önmódosító kód rendszer
 //!
 //! Képes:
 //! - Forráskód generálás és módosítás Template alapján
@@ -32,11 +32,20 @@ pub enum MutationType {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum MutationStatus { Proposed, InProgress, Compiled, Tested, Active, RolledBack, Failed(String) }
+pub enum MutationStatus {
+    Proposed,
+    InProgress,
+    Compiled,
+    Tested,
+    Active,
+    RolledBack,
+    Failed(String),
+}
 
 #[derive(Debug, Clone)]
 pub struct Mutation {
-    pub id: u64, pub name: String,
+    pub id: u64,
+    pub name: String,
     pub mutation_type: MutationType,
     pub target_module: String,
     pub source_code: String,
@@ -52,16 +61,21 @@ pub struct Mutation {
 
 #[derive(Debug, Clone)]
 pub struct SourceTemplate {
-    pub name: String, pub target_module: String,
-    pub template: String, pub variables: Vec<String>,
+    pub name: String,
+    pub target_module: String,
+    pub template: String,
+    pub variables: Vec<String>,
     pub description: String,
 }
 
 #[derive(Debug, Clone)]
 pub struct RollbackPoint {
-    pub id: u64, pub timestamp_ms: u64,
-    pub module: String, pub version: u32,
-    pub snapshot: Vec<u8>, pub reason: String,
+    pub id: u64,
+    pub timestamp_ms: u64,
+    pub module: String,
+    pub version: u32,
+    pub snapshot: Vec<u8>,
+    pub reason: String,
 }
 
 #[derive(Debug, Clone)]
@@ -75,8 +89,13 @@ pub struct AutopoiesisConfig {
 
 impl Default for AutopoiesisConfig {
     fn default() -> Self {
-        Self { max_mutations: 100, require_signature: false,
-            auto_rollback_on_failure: true, max_rollback_depth: 10, test_before_activate: true }
+        Self {
+            max_mutations: 100,
+            require_signature: false,
+            auto_rollback_on_failure: true,
+            max_rollback_depth: 10,
+            test_before_activate: true,
+        }
     }
 }
 
@@ -99,15 +118,35 @@ impl AutopoiesisEngine {
         }
     }
 
-    fn nid(&self) -> u64 { let mut id = self.next_id.write().unwrap(); let n = *id; *id += 1; n }
-    fn now(&self) -> u64 { SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_millis() as u64 }
+    fn nid(&self) -> u64 {
+        let mut id = self.next_id.write().unwrap();
+        let n = *id;
+        *id += 1;
+        n
+    }
+    fn now(&self) -> u64 {
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis() as u64
+    }
 
     // ─── Template Management ─────────────────────────────────────────────
 
-    pub fn register_template(&self, name: &str, target_module: &str, template: &str, variables: Vec<String>, desc: &str) {
+    pub fn register_template(
+        &self,
+        name: &str,
+        target_module: &str,
+        template: &str,
+        variables: Vec<String>,
+        desc: &str,
+    ) {
         self.templates.write().unwrap().push(SourceTemplate {
-            name: name.to_string(), target_module: target_module.to_string(),
-            template: template.to_string(), variables, description: desc.to_string(),
+            name: name.to_string(),
+            target_module: target_module.to_string(),
+            template: template.to_string(),
+            variables,
+            description: desc.to_string(),
         });
     }
 
@@ -116,7 +155,11 @@ impl AutopoiesisEngine {
     }
 
     /// Template alapján kód generálás
-    pub fn generate_from_template(&self, template_name: &str, var_values: &HashMap<String, String>) -> Option<String> {
+    pub fn generate_from_template(
+        &self,
+        template_name: &str,
+        var_values: &HashMap<String, String>,
+    ) -> Option<String> {
         let templates = self.templates.read().unwrap();
         let tmpl = templates.iter().find(|t| t.name == template_name)?;
         let mut code = tmpl.template.clone();
@@ -129,14 +172,30 @@ impl AutopoiesisEngine {
     // ─── Mutation Management ─────────────────────────────────────────────
 
     /// Új mutáció javaslata
-    pub fn propose_mutation(&self, name: &str, mtype: MutationType, target: &str, code: &str, reason: &str, author: &str) -> u64 {
+    pub fn propose_mutation(
+        &self,
+        name: &str,
+        mtype: MutationType,
+        target: &str,
+        code: &str,
+        reason: &str,
+        author: &str,
+    ) -> u64 {
         let id = self.nid();
         let mutation = Mutation {
-            id, name: name.to_string(), mutation_type: mtype,
-            target_module: target.to_string(), source_code: code.to_string(),
-            version: self.current_version(target), status: MutationStatus::Proposed,
-            reason: reason.to_string(), created_ms: self.now(), applied_ms: None,
-            rollback_version: 0, signature: vec![], author: author.to_string(),
+            id,
+            name: name.to_string(),
+            mutation_type: mtype,
+            target_module: target.to_string(),
+            source_code: code.to_string(),
+            version: self.current_version(target),
+            status: MutationStatus::Proposed,
+            reason: reason.to_string(),
+            created_ms: self.now(),
+            applied_ms: None,
+            rollback_version: 0,
+            signature: vec![],
+            author: author.to_string(),
         };
         self.mutations.write().unwrap().push(mutation);
         id
@@ -146,14 +205,20 @@ impl AutopoiesisEngine {
     pub fn apply_mutation(&self, id: u64) -> bool {
         let config = self.config.read().unwrap().clone();
         let mut mutations = self.mutations.write().unwrap();
-        let mutation = match mutations.iter_mut().find(|m| m.id == id && m.status == MutationStatus::Proposed) {
-            Some(m) => m, None => return false,
+        let mutation = match mutations
+            .iter_mut()
+            .find(|m| m.id == id && m.status == MutationStatus::Proposed)
+        {
+            Some(m) => m,
+            None => return false,
         };
 
         // Snapshot készítés rollback-hez
         let rp = RollbackPoint {
-            id: self.nid(), timestamp_ms: self.now(),
-            module: mutation.target_module.clone(), version: mutation.version,
+            id: self.nid(),
+            timestamp_ms: self.now(),
+            module: mutation.target_module.clone(),
+            version: mutation.version,
             snapshot: mutation.source_code.as_bytes().to_vec(),
             reason: format!("Before applying: {}", mutation.name),
         };
@@ -176,15 +241,29 @@ impl AutopoiesisEngine {
     /// Rollback: visszaállítás egy korábbi verzióra
     pub fn rollback(&self, mutation_id: u64) -> bool {
         let mutations = self.mutations.read().unwrap();
-        let mutation = match mutations.iter().find(|m| m.id == mutation_id) { Some(m) => m, None => return false };
+        let mutation = match mutations.iter().find(|m| m.id == mutation_id) {
+            Some(m) => m,
+            None => return false,
+        };
         let rollbacks = self.rollback_points.read().unwrap();
-        let rp = match rollbacks.iter()
+        let rp = match rollbacks
+            .iter()
             .filter(|r| r.module == mutation.target_module)
-            .last() { Some(r) => r, None => return false };
+            .last()
+        {
+            Some(r) => r,
+            None => return false,
+        };
 
         // Függőben lévő mutáció visszaállítása
         drop(mutations);
-        if let Some(m) = self.mutations.write().unwrap().iter_mut().find(|m| m.id == mutation_id) {
+        if let Some(m) = self
+            .mutations
+            .write()
+            .unwrap()
+            .iter_mut()
+            .find(|m| m.id == mutation_id)
+        {
             m.status = MutationStatus::RolledBack;
         }
 
@@ -193,29 +272,48 @@ impl AutopoiesisEngine {
 
     /// Mutáció státuszának ellenőrzése
     pub fn mutation_status(&self, id: u64) -> Option<MutationStatus> {
-        self.mutations.read().unwrap().iter().find(|m| m.id == id).map(|m| m.status.clone())
+        self.mutations
+            .read()
+            .unwrap()
+            .iter()
+            .find(|m| m.id == id)
+            .map(|m| m.status.clone())
     }
 
     pub fn list_mutations(&self, status: Option<&MutationStatus>) -> Vec<Mutation> {
-        self.mutations.read().unwrap().iter()
+        self.mutations
+            .read()
+            .unwrap()
+            .iter()
             .filter(|m| status.map_or(true, |s| m.status == *s))
-            .cloned().collect()
+            .cloned()
+            .collect()
     }
 
     fn current_version(&self, module: &str) -> u32 {
-        self.mutations.read().unwrap().iter()
+        self.mutations
+            .read()
+            .unwrap()
+            .iter()
             .filter(|m| m.target_module == module)
-            .map(|m| m.version).max().unwrap_or(0)
+            .map(|m| m.version)
+            .max()
+            .unwrap_or(0)
     }
 
     // ─── Planning Integration ────────────────────────────────────────────
 
     /// Planning által kért javítás: cél → mutáció
     pub fn propose_fix(&self, goal_name: &str, target_module: &str, description: &str) -> u64 {
-        let code = format!("// TODO: {} — generated by autopoiesis for '{}'\n// Target: {}\n", description, goal_name, target_module);
+        let code = format!(
+            "// TODO: {} — generated by autopoiesis for '{}'\n// Target: {}\n",
+            description, goal_name, target_module
+        );
         self.propose_mutation(
             &format!("fix_{}_{}", target_module, self.nid()),
-            MutationType::Modification, target_module, &code,
+            MutationType::Modification,
+            target_module,
+            &code,
             &format!("Planning goal: {} — {}", goal_name, description),
             "planning",
         )
@@ -225,8 +323,15 @@ impl AutopoiesisEngine {
 
     pub fn stats(&self) -> (usize, usize, usize, usize) {
         let m = self.mutations.read().unwrap();
-        (m.len(), m.iter().filter(|m| m.status == MutationStatus::Active).count(),
-         m.iter().filter(|m| m.status == MutationStatus::RolledBack).count(),
-         self.rollback_points.read().unwrap().len())
+        (
+            m.len(),
+            m.iter()
+                .filter(|m| m.status == MutationStatus::Active)
+                .count(),
+            m.iter()
+                .filter(|m| m.status == MutationStatus::RolledBack)
+                .count(),
+            self.rollback_points.read().unwrap().len(),
+        )
     }
 }

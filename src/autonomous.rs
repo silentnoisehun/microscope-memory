@@ -15,10 +15,10 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use colored::Colorize;
 
+use crate::build;
 use crate::config::Config;
 use crate::daydream;
 use crate::dream;
-use crate::build;
 use crate::executive::{Executive, ModuleState};
 use crate::inner_monologue;
 use crate::narrative::NarrativeState;
@@ -102,20 +102,55 @@ impl AutonomousEngine {
         let executive = Executive::new();
 
         // Regisztráljuk a kognitív modulokat az Executive-ban
-        executive.register_module("daydream", "Daydream - asszociatív drift", 60, 0.3,
-            vec!["creative".to_string(), "exploration".to_string()]);
-        executive.register_module("curiosity", "Curiosity - proaktív kíváncsiság", 70, 0.2,
-            vec!["exploration".to_string(), "learning".to_string()]);
-        executive.register_module("monologue", "Inner Monologue - belső gondolkodás", 50, 0.4,
-            vec!["reflection".to_string(), "planning".to_string()]);
-        executive.register_module("reflect", "Self-Reflection - önvizsgálat", 80, 0.3,
-            vec!["reflection".to_string(), "meta".to_string()]);
-        executive.register_module("narrative", "Narrative Memory - történetépítés", 40, 0.2,
-            vec!["memory".to_string(), "story".to_string()]);
-        executive.register_module("dream", "Dream Consolidation - álom", 30, 0.5,
-            vec!["maintenance".to_string(), "pruning".to_string()]);
-        executive.register_module("self_model", "Self-Model - önkép", 90, 0.2,
-            vec!["meta".to_string(), "identity".to_string()]);
+        executive.register_module(
+            "daydream",
+            "Daydream - asszociatív drift",
+            60,
+            0.3,
+            vec!["creative".to_string(), "exploration".to_string()],
+        );
+        executive.register_module(
+            "curiosity",
+            "Curiosity - proaktív kíváncsiság",
+            70,
+            0.2,
+            vec!["exploration".to_string(), "learning".to_string()],
+        );
+        executive.register_module(
+            "monologue",
+            "Inner Monologue - belső gondolkodás",
+            50,
+            0.4,
+            vec!["reflection".to_string(), "planning".to_string()],
+        );
+        executive.register_module(
+            "reflect",
+            "Self-Reflection - önvizsgálat",
+            80,
+            0.3,
+            vec!["reflection".to_string(), "meta".to_string()],
+        );
+        executive.register_module(
+            "narrative",
+            "Narrative Memory - történetépítés",
+            40,
+            0.2,
+            vec!["memory".to_string(), "story".to_string()],
+        );
+        executive.register_module(
+            "dream",
+            "Dream Consolidation - álom",
+            30,
+            0.5,
+            vec!["maintenance".to_string(), "pruning".to_string()],
+        );
+        executive.register_module(
+            "self_model",
+            "Self-Model - önkép",
+            90,
+            0.2,
+            vec!["meta".to_string(), "identity".to_string()],
+        );
 
         Self {
             config: auto_config,
@@ -125,8 +160,10 @@ impl AutonomousEngine {
         }
     }
 
-                    fn speak(&self, text: &str) {
-        if !self.config.tts_enabled { return; }
+    fn speak(&self, text: &str) {
+        if !self.config.tts_enabled {
+            return;
+        }
         let safe_text = text.replace('"', " ").replace("\n", " ");
         let ts = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -135,7 +172,16 @@ impl AutonomousEngine {
         let filename = format!("tts_{}.mp3", ts);
         // Edge TTS - headless MP3 generalas, megvárjuk
         let gen = std::process::Command::new("python")
-            .args(["-m", "edge_tts", "--voice", "hu-HU-NoemiNeural", "--text", &safe_text, "--write-media", &filename])
+            .args([
+                "-m",
+                "edge_tts",
+                "--voice",
+                "hu-HU-NoemiNeural",
+                "--text",
+                &safe_text,
+                "--write-media",
+                &filename,
+            ])
             .output();
         match gen {
             Ok(_) => {
@@ -173,15 +219,25 @@ impl AutonomousEngine {
         match daydream::daydream(config, &seed, 3) {
             Ok(result) => {
                 let formatted = daydream::format_daydream(&result, false);
-                let summary = format!("🧠 Daydream: {} lépés, érzelmi eltolódás: {:.2}",
-                    result.steps.len(), result.total_emotion_shift);
+                let summary = format!(
+                    "🧠 Daydream: {} lépés, érzelmi eltolódás: {:.2}",
+                    result.steps.len(),
+                    result.total_emotion_shift
+                );
                 println!("  {}", summary.cyan());
                 println!("{}", formatted);
 
-                self.store_result(config, &format!("Daydream: {} | {}", seed, result.final_narrative),
-                    "associative", 4);
-                self.speak(&format!("Daydream kész. {} lépés, érzelmi eltolódás: {:.2}",
-                    result.steps.len(), result.total_emotion_shift));
+                self.store_result(
+                    config,
+                    &format!("Daydream: {} | {}", seed, result.final_narrative),
+                    "associative",
+                    4,
+                );
+                self.speak(&format!(
+                    "Daydream kész. {} lépés, érzelmi eltolódás: {:.2}",
+                    result.steps.len(),
+                    result.total_emotion_shift
+                ));
                 summary
             }
             Err(e) => {
@@ -207,15 +263,21 @@ impl AutonomousEngine {
         }
 
         let top = &queries[0];
-        let msg = format!("🤔 Curiosity: \"{}\" (score: {:.2}, ok: {})",
-            top.query, top.score, top.reason);
+        let msg = format!(
+            "🤔 Curiosity: \"{}\" (score: {:.2}, ok: {})",
+            top.query, top.score, top.reason
+        );
         println!("  {}", msg.cyan());
         for q in queries.iter().take(3) {
             println!("    └─ [{}] {} ({:.2})", q.reason, q.query, q.score);
         }
 
-        self.store_result(config, &format!("Curiosity: {} (score: {:.2})", top.query, top.score),
-            "short_term", 3);
+        self.store_result(
+            config,
+            &format!("Curiosity: {} (score: {:.2})", top.query, top.score),
+            "short_term",
+            3,
+        );
         self.speak(&format!("Kíváncsi vagyok: {}", top.query));
         msg
     }
@@ -234,8 +296,12 @@ impl AutonomousEngine {
         println!("{}", formatted);
 
         let mono_text = entry.steps.join(" | ");
-        self.store_result(config, &format!("Inner Monologue: {}", mono_text),
-            "reflections", 5);
+        self.store_result(
+            config,
+            &format!("Inner Monologue: {}", mono_text),
+            "reflections",
+            5,
+        );
         if let Some(first) = entry.steps.first() {
             self.speak(&format!("Belső monológ: {}", first));
         }
@@ -253,8 +319,12 @@ impl AutonomousEngine {
         println!("  {}", msg.cyan());
         println!("{}", formatted);
 
-        self.store_result(config, &format!("Self-Reflection: {}", reflection),
-            "reflections", 6);
+        self.store_result(
+            config,
+            &format!("Self-Reflection: {}", reflection),
+            "reflections",
+            6,
+        );
         self.speak(&format!("Önreflexió: {}", reflection));
         msg
     }
@@ -266,14 +336,23 @@ impl AutonomousEngine {
         };
         // Végzünk egy recall-t, hogy legyenek eredményeink
         let results = reader.find_text("autonomous memory", 10);
-        let results_slice: Vec<(f32, usize, bool)> = results.iter()
-            .map(|(d, i)| (*d as f32, *i, true))
-            .collect();
+        let results_slice: Vec<(f32, usize, bool)> =
+            results.iter().map(|(d, i)| (*d as f32, *i, true)).collect();
 
         let mut nm = narrative_memory::NarrativeMemory::load_or_init(output_dir);
-        if let Some(ep) = nm.build_episode(config, &reader, output_dir, "autonomous cycle", &results_slice) {
+        if let Some(ep) = nm.build_episode(
+            config,
+            &reader,
+            output_dir,
+            "autonomous cycle",
+            &results_slice,
+        ) {
             let formatted = narrative_memory::format_episode(&ep);
-            let msg = format!("📖 Történet: {} ({} blokk)", ep.title, ep.block_indices.len());
+            let msg = format!(
+                "📖 Történet: {} ({} blokk)",
+                ep.title,
+                ep.block_indices.len()
+            );
             println!("  {}", msg.cyan());
             println!("{}", formatted);
             self.speak(&format!("Új történet: {}. {}", ep.title, ep.summary));
@@ -298,8 +377,10 @@ impl AutonomousEngine {
                     cycle.forgotten_blocks,
                     cycle.energy_before, cycle.energy_after);
                 println!("  {}", msg.cyan());
-                self.speak(&format!("Álom konszolidáció kész. {} elfelejtve. Energia: {:.2} -> {:.2}",
-                    cycle.forgotten_blocks, cycle.energy_before, cycle.energy_after));
+                self.speak(&format!(
+                    "Álom konszolidáció kész. {} elfelejtve. Energia: {:.2} -> {:.2}",
+                    cycle.forgotten_blocks, cycle.energy_before, cycle.energy_after
+                ));
                 msg
             }
             Err(e) => {
@@ -343,12 +424,16 @@ impl AutonomousEngine {
         let snap = self_model.take_snapshot(config, &reader, output_dir);
         let change = self_model.describe_change();
         let formatted = crate::self_model::format_self_model(&snap, &change);
-        let msg = format!("🧬 Önkép: {} blokk, {} minta, {} archeotípus",
-            snap.block_count, snap.pattern_count, snap.archetype_count);
+        let msg = format!(
+            "🧬 Önkép: {} blokk, {} minta, {} archeotípus",
+            snap.block_count, snap.pattern_count, snap.archetype_count
+        );
         println!("  {}", msg.cyan());
         println!("{}", formatted);
-        self.speak(&format!("Önkép frissítve. {} blokk, {} minta.",
-            snap.block_count, snap.pattern_count));
+        self.speak(&format!(
+            "Önkép frissítve. {} blokk, {} minta.",
+            snap.block_count, snap.pattern_count
+        ));
         msg
     }
 
@@ -383,49 +468,62 @@ impl AutonomousEngine {
         let should_run = |interval: usize| cycle == 1 || cycle % interval == 0;
 
         if should_run(self.config.daydream_interval) {
-            self.executive.set_module_state("daydream", ModuleState::Running);
+            self.executive
+                .set_module_state("daydream", ModuleState::Running);
             let out = self.run_daydream(config, output_dir);
-            self.executive.set_module_state("daydream", ModuleState::Idle);
+            self.executive
+                .set_module_state("daydream", ModuleState::Idle);
             outputs.push(out);
         }
 
         if should_run(self.config.curiosity_interval) {
-            self.executive.set_module_state("curiosity", ModuleState::Running);
+            self.executive
+                .set_module_state("curiosity", ModuleState::Running);
             let out = self.run_curiosity(config, output_dir);
-            self.executive.set_module_state("curiosity", ModuleState::Idle);
+            self.executive
+                .set_module_state("curiosity", ModuleState::Idle);
             outputs.push(out);
         }
 
         if should_run(self.config.monologue_interval) {
-            self.executive.set_module_state("monologue", ModuleState::Running);
+            self.executive
+                .set_module_state("monologue", ModuleState::Running);
             let out = self.run_monologue(config, output_dir);
-            self.executive.set_module_state("monologue", ModuleState::Idle);
+            self.executive
+                .set_module_state("monologue", ModuleState::Idle);
             outputs.push(out);
         }
 
         if should_run(self.config.reflect_interval) {
-            self.executive.set_module_state("reflect", ModuleState::Running);
+            self.executive
+                .set_module_state("reflect", ModuleState::Running);
             let out = self.run_reflect(config, output_dir);
-            self.executive.set_module_state("reflect", ModuleState::Idle);
+            self.executive
+                .set_module_state("reflect", ModuleState::Idle);
             outputs.push(out);
         }
 
         if should_run(self.config.narrative_interval) {
-            self.executive.set_module_state("narrative", ModuleState::Running);
+            self.executive
+                .set_module_state("narrative", ModuleState::Running);
             let out = self.run_narrative(config, output_dir);
-            self.executive.set_module_state("narrative", ModuleState::Idle);
+            self.executive
+                .set_module_state("narrative", ModuleState::Idle);
             outputs.push(out);
         }
 
         if should_run(self.config.self_model_interval) {
-            self.executive.set_module_state("self_model", ModuleState::Running);
+            self.executive
+                .set_module_state("self_model", ModuleState::Running);
             let out = self.run_self_model(config, output_dir);
-            self.executive.set_module_state("self_model", ModuleState::Idle);
+            self.executive
+                .set_module_state("self_model", ModuleState::Idle);
             outputs.push(out);
         }
 
         if should_run(self.config.dream_interval) {
-            self.executive.set_module_state("dream", ModuleState::Running);
+            self.executive
+                .set_module_state("dream", ModuleState::Running);
             let out = self.run_dream(config, output_dir);
             self.executive.set_module_state("dream", ModuleState::Idle);
             outputs.push(out);
@@ -433,23 +531,39 @@ impl AutonomousEngine {
 
         // Executive statok kiírása
         let (mod_count, running, energy, attention) = self.executive.stats();
-        println!("  {} Modulok: {} | Fut: {} | Energia: {:.1}% | Figyelem: {:.1}%",
-            "📊".cyan(), mod_count, running, energy * 100.0, attention * 100.0);
+        println!(
+            "  {} Modulok: {} | Fut: {} | Energia: {:.1}% | Figyelem: {:.1}%",
+            "📊".cyan(),
+            mod_count,
+            running,
+            energy * 100.0,
+            attention * 100.0
+        );
 
         // Minden ciklus végén: append log rebuild (ha van mit)
         let rebuild_out = self.run_rebuild(config, output_dir);
         outputs.push(rebuild_out);
 
         // Tároljuk a ciklus összefoglalót
-        let summary = format!("Autonomous cycle #{}: {} modules executed. Energy: {:.1}%, Attention: {:.1}%",
-            cycle, outputs.len(), energy * 100.0, attention * 100.0);
+        let summary = format!(
+            "Autonomous cycle #{}: {} modules executed. Energy: {:.1}%, Attention: {:.1}%",
+            cycle,
+            outputs.len(),
+            energy * 100.0,
+            attention * 100.0
+        );
         self.store_result(config, &summary, "session", 3);
 
         if !outputs.is_empty() {
-            self.speak(&format!("Ciklus {} kész. {} aktivitás.", cycle, outputs.len()));
+            self.speak(&format!(
+                "Ciklus {} kész. {} aktivitás.",
+                cycle,
+                outputs.len()
+            ));
         }
 
-        self.last_outputs.push_back(format!("#{}: {} aktivitás", cycle, outputs.len()));
+        self.last_outputs
+            .push_back(format!("#{}: {} aktivitás", cycle, outputs.len()));
         if self.last_outputs.len() > 20 {
             self.last_outputs.pop_front();
         }
@@ -462,26 +576,69 @@ impl AutonomousEngine {
         let interval = Duration::from_secs(self.config.cycle_interval_secs);
         let max = self.config.max_cycles.unwrap_or(usize::MAX);
 
-        println!("{}", "╔══════════════════════════════════════════════════════╗".cyan());
-        println!("{}", "║     🧠 MICROSCOPE MEMORY — AUTONÓM MÓD            ║".cyan().bold());
-        println!("{}", "╠══════════════════════════════════════════════════════╣".cyan());
+        println!(
+            "{}",
+            "╔══════════════════════════════════════════════════════╗".cyan()
+        );
+        println!(
+            "{}",
+            "║     🧠 MICROSCOPE MEMORY — AUTONÓM MÓD            ║"
+                .cyan()
+                .bold()
+        );
+        println!(
+            "{}",
+            "╠══════════════════════════════════════════════════════╣".cyan()
+        );
         println!("  Ciklus: {} másodperc", self.config.cycle_interval_secs);
-        println!("  TTS: {}", if self.config.tts_enabled { "✅ BE" } else { "❌ KI" });
-        println!("  Daemon: {}", if self.config.daemon_mode { "✅" } else { "❌" });
-        println!("  Max ciklus: {}", if max == usize::MAX { "végtelen".to_string() } else { max.to_string() });
-        println!("{}", "╚══════════════════════════════════════════════════════╝".cyan());
+        println!(
+            "  TTS: {}",
+            if self.config.tts_enabled {
+                "✅ BE"
+            } else {
+                "❌ KI"
+            }
+        );
+        println!(
+            "  Daemon: {}",
+            if self.config.daemon_mode {
+                "✅"
+            } else {
+                "❌"
+            }
+        );
+        println!(
+            "  Max ciklus: {}",
+            if max == usize::MAX {
+                "végtelen".to_string()
+            } else {
+                max.to_string()
+            }
+        );
+        println!(
+            "{}",
+            "╚══════════════════════════════════════════════════════╝".cyan()
+        );
         println!();
 
         loop {
             if self.cycle_count >= max {
-                println!("  {} Elértük a maximális ciklusszámot ({})", "✓".green(), max);
+                println!(
+                    "  {} Elértük a maximális ciklusszámot ({})",
+                    "✓".green(),
+                    max
+                );
                 break;
             }
 
             self.run_cycle(config);
 
             if self.config.daemon_mode {
-                println!("  {} Várakozás {} másodperc...", "⏳".cyan(), interval.as_secs());
+                println!(
+                    "  {} Várakozás {} másodperc...",
+                    "⏳".cyan(),
+                    interval.as_secs()
+                );
                 std::thread::sleep(interval);
             } else {
                 break;
@@ -513,18 +670,60 @@ fn chrono_or_now() -> String {
 
 /// Formázott kimenet az autonóm mód indításakor
 pub fn print_autonomous_header(config: &AutonomousConfig) {
-    println!("{}", "╔══════════════════════════════════════════════════════╗".cyan());
-    println!("{}", "║     🧠 MICROSCOPE MEMORY — AUTONÓM MÓD            ║".cyan().bold());
-    println!("{}", "╠══════════════════════════════════════════════════════╣".cyan());
+    println!(
+        "{}",
+        "╔══════════════════════════════════════════════════════╗".cyan()
+    );
+    println!(
+        "{}",
+        "║     🧠 MICROSCOPE MEMORY — AUTONÓM MÓD            ║"
+            .cyan()
+            .bold()
+    );
+    println!(
+        "{}",
+        "╠══════════════════════════════════════════════════════╣".cyan()
+    );
     println!("  Ciklus idő:     {} másodperc", config.cycle_interval_secs);
-    println!("  Daydream:       minden {} ciklus", config.daydream_interval);
-    println!("  Curiosity:      minden {} ciklus", config.curiosity_interval);
-    println!("  Monológ:        minden {} ciklus", config.monologue_interval);
-    println!("  Önreflexió:     minden {} ciklus", config.reflect_interval);
-    println!("  Történet:       minden {} ciklus", config.narrative_interval);
-    println!("  Önkép:          minden {} ciklus", config.self_model_interval);
+    println!(
+        "  Daydream:       minden {} ciklus",
+        config.daydream_interval
+    );
+    println!(
+        "  Curiosity:      minden {} ciklus",
+        config.curiosity_interval
+    );
+    println!(
+        "  Monológ:        minden {} ciklus",
+        config.monologue_interval
+    );
+    println!(
+        "  Önreflexió:     minden {} ciklus",
+        config.reflect_interval
+    );
+    println!(
+        "  Történet:       minden {} ciklus",
+        config.narrative_interval
+    );
+    println!(
+        "  Önkép:          minden {} ciklus",
+        config.self_model_interval
+    );
     println!("  Álom:           minden {} ciklus", config.dream_interval);
-    println!("  TTS:            {}", if config.tts_enabled { "✅ BE" } else { "❌ KI" });
-    println!("  Daemon mód:     {}", if config.daemon_mode { "✅" } else { "❌" });
-    println!("{}", "╚══════════════════════════════════════════════════════╝".cyan());
+    println!(
+        "  TTS:            {}",
+        if config.tts_enabled {
+            "✅ BE"
+        } else {
+            "❌ KI"
+        }
+    );
+    println!(
+        "  Daemon mód:     {}",
+        if config.daemon_mode { "✅" } else { "❌" }
+    );
+    println!(
+        "{}",
+        "╚══════════════════════════════════════════════════════╝".cyan()
+    );
 }

@@ -8,7 +8,7 @@ use std::path::Path;
 #[derive(Clone, Debug)]
 pub struct Fact {
     pub statement: String,
-    pub confidence: f32,    // 0.0-1.0
+    pub confidence: f32, // 0.0-1.0
     pub source: String,
     pub timestamp_ms: u64,
     pub access_count: u32,
@@ -54,7 +54,8 @@ impl ExplicitMemory {
     /// Store a declarative fact
     pub fn store_fact(&mut self, statement: &str, source: &str, confidence: f32) {
         let key = statement.to_lowercase();
-        self.facts.entry(key.clone())
+        self.facts
+            .entry(key.clone())
             .and_modify(|f| {
                 f.access_count += 1;
                 f.confidence = (f.confidence + confidence) / 2.0;
@@ -71,13 +72,16 @@ impl ExplicitMemory {
 
     /// Define a concept
     pub fn define_concept(&mut self, name: &str, definition: &str, abstraction: f32) {
-        self.concepts.insert(name.to_lowercase(), Concept {
-            name: name.to_string(),
-            definition: definition.to_string(),
-            examples: Vec::new(),
-            related_concepts: Vec::new(),
-            abstraction_level: abstraction.clamp(0.0, 1.0),
-        });
+        self.concepts.insert(
+            name.to_lowercase(),
+            Concept {
+                name: name.to_string(),
+                definition: definition.to_string(),
+                examples: Vec::new(),
+                related_concepts: Vec::new(),
+                abstraction_level: abstraction.clamp(0.0, 1.0),
+            },
+        );
     }
 
     /// Add example to concept
@@ -103,12 +107,14 @@ impl ExplicitMemory {
     pub fn relate_concepts(&mut self, concept1: &str, concept2: &str) {
         let key1 = concept1.to_lowercase();
         let key2 = concept2.to_lowercase();
-        
-        self.relationships.entry(key1.clone())
+
+        self.relationships
+            .entry(key1.clone())
             .or_insert_with(Vec::new)
             .push(key2.clone());
-        
-        self.relationships.entry(key2)
+
+        self.relationships
+            .entry(key2)
             .or_insert_with(Vec::new)
             .push(key1);
     }
@@ -130,7 +136,9 @@ impl ExplicitMemory {
 
     /// Get all facts sorted by confidence
     pub fn high_confidence_facts(&self, min_confidence: f32) -> Vec<&Fact> {
-        let mut facts: Vec<_> = self.facts.values()
+        let mut facts: Vec<_> = self
+            .facts
+            .values()
             .filter(|f| f.confidence >= min_confidence)
             .collect();
         facts.sort_by(|a, b| b.confidence.partial_cmp(&a.confidence).unwrap());
@@ -178,7 +186,7 @@ impl ExplicitMemory {
             data.extend_from_slice(&(def_bytes.len() as u16).to_le_bytes());
             data.extend_from_slice(def_bytes);
             data.extend_from_slice(&concept.abstraction_level.to_le_bytes());
-            
+
             let ex_count = concept.examples.len() as u8;
             data.push(ex_count);
             for example in &concept.examples {
@@ -226,84 +234,125 @@ impl ExplicitMemory {
 
         // Read facts
         if idx + 4 <= data.len() {
-            let fact_count = u32::from_le_bytes([data[idx], data[idx+1], data[idx+2], data[idx+3]]) as usize;
+            let fact_count =
+                u32::from_le_bytes([data[idx], data[idx + 1], data[idx + 2], data[idx + 3]])
+                    as usize;
             idx += 4;
 
             for _ in 0..fact_count {
-                if idx + 2 > data.len() { break; }
-                let stmt_len = u16::from_le_bytes([data[idx], data[idx+1]]) as usize;
+                if idx + 2 > data.len() {
+                    break;
+                }
+                let stmt_len = u16::from_le_bytes([data[idx], data[idx + 1]]) as usize;
                 idx += 2;
 
-                if idx + stmt_len > data.len() { break; }
-                let statement = String::from_utf8_lossy(&data[idx..idx+stmt_len]).to_string();
+                if idx + stmt_len > data.len() {
+                    break;
+                }
+                let statement = String::from_utf8_lossy(&data[idx..idx + stmt_len]).to_string();
                 idx += stmt_len;
 
-                if idx + 4 > data.len() { break; }
-                let confidence = f32::from_le_bytes([data[idx], data[idx+1], data[idx+2], data[idx+3]]);
+                if idx + 4 > data.len() {
+                    break;
+                }
+                let confidence =
+                    f32::from_le_bytes([data[idx], data[idx + 1], data[idx + 2], data[idx + 3]]);
                 idx += 4;
 
-                if idx >= data.len() { break; }
+                if idx >= data.len() {
+                    break;
+                }
                 let src_len = data[idx] as usize;
                 idx += 1;
 
-                if idx + src_len > data.len() { break; }
-                let source = String::from_utf8_lossy(&data[idx..idx+src_len]).to_string();
+                if idx + src_len > data.len() {
+                    break;
+                }
+                let source = String::from_utf8_lossy(&data[idx..idx + src_len]).to_string();
                 idx += src_len;
 
-                if idx + 13 > data.len() { break; }
-                let timestamp_ms = u64::from_le_bytes([data[idx], data[idx+1], data[idx+2], data[idx+3],
-                                                     data[idx+4], data[idx+5], data[idx+6], data[idx+7]]);
+                if idx + 13 > data.len() {
+                    break;
+                }
+                let timestamp_ms = u64::from_le_bytes([
+                    data[idx],
+                    data[idx + 1],
+                    data[idx + 2],
+                    data[idx + 3],
+                    data[idx + 4],
+                    data[idx + 5],
+                    data[idx + 6],
+                    data[idx + 7],
+                ]);
                 idx += 8;
 
-                let access_count = u32::from_le_bytes([data[idx], data[idx+1], data[idx+2], data[idx+3]]);
+                let access_count =
+                    u32::from_le_bytes([data[idx], data[idx + 1], data[idx + 2], data[idx + 3]]);
                 idx += 4;
 
                 let verified = data[idx] != 0;
                 idx += 1;
 
-                facts.insert(statement.to_lowercase(), Fact {
-                    statement,
-                    confidence,
-                    source,
-                    timestamp_ms,
-                    access_count,
-                    verified,
-                });
+                facts.insert(
+                    statement.to_lowercase(),
+                    Fact {
+                        statement,
+                        confidence,
+                        source,
+                        timestamp_ms,
+                        access_count,
+                        verified,
+                    },
+                );
             }
         }
 
         // Read concepts (simplified)
         if idx + 4 <= data.len() {
-            let concept_count = u32::from_le_bytes([data[idx], data[idx+1], data[idx+2], data[idx+3]]) as usize;
+            let concept_count =
+                u32::from_le_bytes([data[idx], data[idx + 1], data[idx + 2], data[idx + 3]])
+                    as usize;
             idx += 4;
-            
+
             for _ in 0..concept_count {
-                if idx >= data.len() { break; }
+                if idx >= data.len() {
+                    break;
+                }
                 let name_len = data[idx] as usize;
                 idx += 1;
 
-                if idx + name_len + 6 > data.len() { break; }
-                let name = String::from_utf8_lossy(&data[idx..idx+name_len]).to_string();
+                if idx + name_len + 6 > data.len() {
+                    break;
+                }
+                let name = String::from_utf8_lossy(&data[idx..idx + name_len]).to_string();
                 idx += name_len;
 
-                let def_len = u16::from_le_bytes([data[idx], data[idx+1]]) as usize;
+                let def_len = u16::from_le_bytes([data[idx], data[idx + 1]]) as usize;
                 idx += 2;
 
-                if idx + def_len > data.len() { break; }
-                let definition = String::from_utf8_lossy(&data[idx..idx+def_len]).to_string();
+                if idx + def_len > data.len() {
+                    break;
+                }
+                let definition = String::from_utf8_lossy(&data[idx..idx + def_len]).to_string();
                 idx += def_len;
 
-                if idx + 4 > data.len() { break; }
-                let abstraction_level = f32::from_le_bytes([data[idx], data[idx+1], data[idx+2], data[idx+3]]);
+                if idx + 4 > data.len() {
+                    break;
+                }
+                let abstraction_level =
+                    f32::from_le_bytes([data[idx], data[idx + 1], data[idx + 2], data[idx + 3]]);
                 idx += 4;
 
-                concepts.insert(name.clone(), Concept {
-                    name,
-                    definition,
-                    examples: Vec::new(),
-                    related_concepts: Vec::new(),
-                    abstraction_level,
-                });
+                concepts.insert(
+                    name.clone(),
+                    Concept {
+                        name,
+                        definition,
+                        examples: Vec::new(),
+                        related_concepts: Vec::new(),
+                        abstraction_level,
+                    },
+                );
             }
         }
 

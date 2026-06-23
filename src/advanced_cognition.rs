@@ -7,14 +7,14 @@ use std::collections::HashMap;
 pub struct Prediction {
     pub pattern: Vec<u32>,
     pub confidence: f32,
-    pub error: f32,           // prediction error
+    pub error: f32, // prediction error
     pub timestamp_ms: u64,
 }
 
 pub struct PredictiveProcessor {
     pub predictions: Vec<Prediction>,
     pub error_history: Vec<f32>,
-    pub model_accuracy: f32,  // 0.0-1.0
+    pub model_accuracy: f32, // 0.0-1.0
 }
 
 impl PredictiveProcessor {
@@ -30,7 +30,7 @@ impl PredictiveProcessor {
     pub fn predict(&mut self, pattern: &[u32]) -> (Vec<u32>, f32) {
         let confidence = self.model_accuracy;
         let mut predicted = pattern.to_vec();
-        
+
         // Extend pattern with predicted next elements
         if pattern.len() > 0 {
             let last = pattern[pattern.len() - 1];
@@ -59,15 +59,18 @@ impl PredictiveProcessor {
             if self.error_history.len() > 20 {
                 self.error_history.remove(0);
             }
-            let avg_error: f32 = self.error_history.iter().sum::<f32>() / self.error_history.len() as f32;
+            let avg_error: f32 =
+                self.error_history.iter().sum::<f32>() / self.error_history.len() as f32;
             self.model_accuracy = (1.0 - avg_error).max(0.1);
         }
     }
 
     fn calculate_error(predicted: &[u32], actual: &[u32]) -> f32 {
         let len = predicted.len().min(actual.len());
-        if len == 0 { return 1.0; }
-        
+        if len == 0 {
+            return 1.0;
+        }
+
         let mut diff = 0u32;
         for i in 0..len {
             diff = diff.wrapping_add((predicted[i] ^ actual[i]) as u32);
@@ -95,7 +98,7 @@ pub struct IntuitionPattern {
 
 pub struct IntuitionSystem {
     pub patterns: HashMap<u64, IntuitionPattern>,
-    pub fast_decisions: Vec<(String, f32)>,  // (decision, speed_ms)
+    pub fast_decisions: Vec<(String, f32)>, // (decision, speed_ms)
 }
 
 impl IntuitionSystem {
@@ -109,8 +112,10 @@ impl IntuitionSystem {
     /// Learn pattern for future intuitive decisions
     pub fn learn_pattern(&mut self, pattern: &[u32], decision: &str, successful: bool) {
         let hash = Self::pattern_hash(pattern);
-        
-        let pattern_entry = self.patterns.entry(hash)
+
+        let pattern_entry = self
+            .patterns
+            .entry(hash)
             .or_insert_with(|| IntuitionPattern {
                 pattern_hash: hash,
                 confidence: 0.5,
@@ -132,10 +137,11 @@ impl IntuitionSystem {
     /// Make intuitive decision (fast, pattern-based)
     pub fn intuitive_decision(&mut self, pattern: &[u32]) -> Option<(String, f32)> {
         let hash = Self::pattern_hash(pattern);
-        
+
         if let Some(entry) = self.patterns.get(&hash) {
-            if entry.confidence > 0.6 {  // High confidence threshold
-                self.fast_decisions.push((entry.decision.clone(), 5.0));  // 5ms decision time
+            if entry.confidence > 0.6 {
+                // High confidence threshold
+                self.fast_decisions.push((entry.decision.clone(), 5.0)); // 5ms decision time
                 return Some((entry.decision.clone(), entry.confidence));
             }
         }
@@ -166,7 +172,7 @@ pub struct IncubatedProblem {
 pub struct UnconsciousSolver {
     pub incubating: Vec<IncubatedProblem>,
     pub solutions: HashMap<u64, String>,
-    pub incubation_time_ms: u64,  // how long to let problems simmer
+    pub incubation_time_ms: u64, // how long to let problems simmer
 }
 
 impl UnconsciousSolver {
@@ -174,14 +180,14 @@ impl UnconsciousSolver {
         Self {
             incubating: Vec::new(),
             solutions: HashMap::new(),
-            incubation_time_ms: 5000,  // 5 seconds default
+            incubation_time_ms: 5000, // 5 seconds default
         }
     }
 
     /// Start incubating a problem (send to background)
     pub fn incubate(&mut self, problem_desc: &str) -> u64 {
         let problem_id = Self::problem_hash(problem_desc);
-        
+
         self.incubating.push(IncubatedProblem {
             problem_id,
             problem_desc: problem_desc.to_string(),
@@ -198,20 +204,25 @@ impl UnconsciousSolver {
     /// Background processing (happens passively)
     pub fn background_process(&mut self) {
         let now = Self::now_ms();
-        
+
         for problem in &mut self.incubating {
             if !problem.solution_found {
                 problem.background_processing_count += 1;
-                
+
                 let incubation_time = now.saturating_sub(problem.incubation_start_ms);
-                
+
                 // Solution emerges after incubation period
-                if incubation_time > self.incubation_time_ms && problem.background_processing_count > 3 {
+                if incubation_time > self.incubation_time_ms
+                    && problem.background_processing_count > 3
+                {
                     // Generate insight (simple heuristic)
-                    problem.solution = Some(format!("Insight: Approach {} differently", 
-                        problem.background_processing_count));
+                    problem.solution = Some(format!(
+                        "Insight: Approach {} differently",
+                        problem.background_processing_count
+                    ));
                     problem.solution_found = true;
-                    problem.insight_strength = 0.5 + (problem.background_processing_count as f32 * 0.05).min(0.4);
+                    problem.insight_strength =
+                        0.5 + (problem.background_processing_count as f32 * 0.05).min(0.4);
                 }
             }
         }
@@ -219,9 +230,13 @@ impl UnconsciousSolver {
 
     /// Retrieve solution from background processing
     pub fn retrieve_solution(&mut self, problem_id: u64) -> Option<(String, f32)> {
-        if let Some(pos) = self.incubating.iter().position(|p| p.problem_id == problem_id) {
+        if let Some(pos) = self
+            .incubating
+            .iter()
+            .position(|p| p.problem_id == problem_id)
+        {
             let problem = self.incubating.remove(pos);
-            
+
             if problem.solution_found {
                 if let Some(solution) = problem.solution {
                     self.solutions.insert(problem_id, solution.clone());
@@ -234,7 +249,8 @@ impl UnconsciousSolver {
 
     /// Check if solution is ready
     pub fn is_ready(&self, problem_id: u64) -> bool {
-        self.incubating.iter()
+        self.incubating
+            .iter()
             .find(|p| p.problem_id == problem_id)
             .map(|p| p.solution_found)
             .unwrap_or(false)
@@ -275,9 +291,10 @@ impl AdvancedCognition {
     /// Process in integrated way
     pub fn process_cycle(&mut self) {
         self.solver.background_process();
-        
+
         // Let intuition contribute to predictions
-        self.predictor.model_accuracy = (self.predictor.model_accuracy * 0.9 + 
-                                         self.intuition.patterns.len() as f32 * 0.001).min(1.0);
+        self.predictor.model_accuracy = (self.predictor.model_accuracy * 0.9
+            + self.intuition.patterns.len() as f32 * 0.001)
+            .min(1.0);
     }
 }

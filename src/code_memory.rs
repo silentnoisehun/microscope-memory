@@ -1,4 +1,4 @@
-﻿//! Code Memory — dedikált kódmemória réteg kódoló agentek számára
+//! Code Memory — dedikált kódmemória réteg kódoló agentek számára
 //!
 //! Claude Code, Cline, Kilo Code, OpenCode és más kódoló agentek
 //! memória rétege. Tárolja és visszakeresi:
@@ -81,42 +81,97 @@ impl CodeMemory {
         }
     }
 
-    fn nid(&self) -> u64 { let mut id = self.next_id.write().unwrap(); let n = *id; *id += 1; n }
-    fn now(&self) -> u64 { SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_millis() as u64 }
+    fn nid(&self) -> u64 {
+        let mut id = self.next_id.write().unwrap();
+        let n = *id;
+        *id += 1;
+        n
+    }
+    fn now(&self) -> u64 {
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis() as u64
+    }
 
-    pub fn store(&self, entry_type: CodeEntryType, title: &str, code: &str, file_path: &str, language: &str, project: &str, symbols: Vec<String>, tags: Vec<String>) -> u64 {
+    pub fn store(
+        &self,
+        entry_type: CodeEntryType,
+        title: &str,
+        code: &str,
+        file_path: &str,
+        language: &str,
+        project: &str,
+        symbols: Vec<String>,
+        tags: Vec<String>,
+    ) -> u64 {
         let id = self.nid();
         let entry = CodeEntry {
-            id, entry_type, title: title.to_string(), code: code.to_string(),
-            file_path: file_path.to_string(), language: language.to_string(),
-            project: project.to_string(), symbols: symbols.clone(), tags,
-            solution: None, created_ms: self.now(), access_count: 0,
+            id,
+            entry_type,
+            title: title.to_string(),
+            code: code.to_string(),
+            file_path: file_path.to_string(),
+            language: language.to_string(),
+            project: project.to_string(),
+            symbols: symbols.clone(),
+            tags,
+            solution: None,
+            created_ms: self.now(),
+            access_count: 0,
         };
 
         self.entries.write().unwrap().push(entry);
 
         // Indexek
-        self.project_index.write().unwrap().entry(project.to_string()).or_default().push(id);
+        self.project_index
+            .write()
+            .unwrap()
+            .entry(project.to_string())
+            .or_default()
+            .push(id);
         for sym in &symbols {
-            self.symbol_index.write().unwrap().entry(sym.to_lowercase()).or_default().push(id);
+            self.symbol_index
+                .write()
+                .unwrap()
+                .entry(sym.to_lowercase())
+                .or_default()
+                .push(id);
         }
 
         id
     }
 
-    pub fn store_error_solution(&self, error: &str, solution: &str, file_path: &str, language: &str, project: &str) -> u64 {
+    pub fn store_error_solution(
+        &self,
+        error: &str,
+        solution: &str,
+        file_path: &str,
+        language: &str,
+        project: &str,
+    ) -> u64 {
         let id = self.nid();
         let entry = CodeEntry {
-            id, entry_type: CodeEntryType::ErrorSolution,
+            id,
+            entry_type: CodeEntryType::ErrorSolution,
             title: format!("Error: {}", error.chars().take(80).collect::<String>()),
-            code: error.to_string(), file_path: file_path.to_string(),
-            language: language.to_string(), project: project.to_string(),
-            symbols: vec![], tags: vec!["error".to_string(), "solution".to_string()],
+            code: error.to_string(),
+            file_path: file_path.to_string(),
+            language: language.to_string(),
+            project: project.to_string(),
+            symbols: vec![],
+            tags: vec!["error".to_string(), "solution".to_string()],
             solution: Some(solution.to_string()),
-            created_ms: self.now(), access_count: 0,
+            created_ms: self.now(),
+            access_count: 0,
         };
         self.entries.write().unwrap().push(entry);
-        self.project_index.write().unwrap().entry(project.to_string()).or_default().push(id);
+        self.project_index
+            .write()
+            .unwrap()
+            .entry(project.to_string())
+            .or_default()
+            .push(id);
         id
     }
 
@@ -129,24 +184,40 @@ impl CodeMemory {
             let mut score = 0.0;
 
             // Kulcsszó egyezés
-            if entry.title.to_lowercase().contains(&q) { score += 3.0; }
-            if entry.code.to_lowercase().contains(&q) { score += 2.0; }
-            if let Some(ref sol) = entry.solution { if sol.to_lowercase().contains(&q) { score += 2.0; } }
+            if entry.title.to_lowercase().contains(&q) {
+                score += 3.0;
+            }
+            if entry.code.to_lowercase().contains(&q) {
+                score += 2.0;
+            }
+            if let Some(ref sol) = entry.solution {
+                if sol.to_lowercase().contains(&q) {
+                    score += 2.0;
+                }
+            }
 
             // Szimbólum egyezés
             for sym in &entry.symbols {
-                if sym.to_lowercase().contains(&q) { score += 2.0; }
+                if sym.to_lowercase().contains(&q) {
+                    score += 2.0;
+                }
             }
 
             // Szűrők
             if let Some(ref lang) = query.language {
-                if entry.language != *lang { score -= 1.0; }
+                if entry.language != *lang {
+                    score -= 1.0;
+                }
             }
             if let Some(ref etype) = query.entry_type {
-                if entry.entry_type != *etype { score -= 1.0; }
+                if entry.entry_type != *etype {
+                    score -= 1.0;
+                }
             }
             if let Some(ref proj) = query.project {
-                if entry.project != *proj { score -= 0.5; }
+                if entry.project != *proj {
+                    score -= 0.5;
+                }
             }
 
             // Access count boost
@@ -160,11 +231,14 @@ impl CodeMemory {
         scored.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
         scored.truncate(query.k);
 
-        scored.into_iter().map(|(_, e)| {
-            let mut entry = e.clone();
-            entry.access_count += 1;
-            entry
-        }).collect()
+        scored
+            .into_iter()
+            .map(|(_, e)| {
+                let mut entry = e.clone();
+                entry.access_count += 1;
+                entry
+            })
+            .collect()
     }
 
     pub fn recall_by_symbol(&self, symbol: &str) -> Vec<CodeEntry> {
@@ -173,7 +247,10 @@ impl CodeMemory {
         let ids: Vec<u64> = sym_idx.get(&sym).cloned().unwrap_or_default();
 
         let entries = self.entries.read().unwrap();
-        ids.iter().filter_map(|id| entries.iter().find(|e| e.id == *id)).cloned().collect()
+        ids.iter()
+            .filter_map(|id| entries.iter().find(|e| e.id == *id))
+            .cloned()
+            .collect()
     }
 
     pub fn recall_by_project(&self, project: &str) -> Vec<CodeEntry> {
@@ -181,22 +258,37 @@ impl CodeMemory {
         let ids: Vec<u64> = proj_idx.get(project).cloned().unwrap_or_default();
 
         let entries = self.entries.read().unwrap();
-        ids.iter().filter_map(|id| entries.iter().find(|e| e.id == *id)).cloned().collect()
+        ids.iter()
+            .filter_map(|id| entries.iter().find(|e| e.id == *id))
+            .cloned()
+            .collect()
     }
 
     pub fn list_by_type(&self, etype: CodeEntryType) -> Vec<CodeEntry> {
         let entries = self.entries.read().unwrap();
-        entries.iter().filter(|e| e.entry_type == etype).cloned().collect()
+        entries
+            .iter()
+            .filter(|e| e.entry_type == etype)
+            .cloned()
+            .collect()
     }
 
     pub fn get(&self, id: u64) -> Option<CodeEntry> {
-        self.entries.read().unwrap().iter().find(|e| e.id == id).cloned()
+        self.entries
+            .read()
+            .unwrap()
+            .iter()
+            .find(|e| e.id == id)
+            .cloned()
     }
 
     pub fn stats(&self) -> (usize, usize, Vec<(String, usize)>) {
         let entries = self.entries.read().unwrap();
         let total = entries.len();
-        let errors = entries.iter().filter(|e| e.entry_type == CodeEntryType::ErrorSolution).count();
+        let errors = entries
+            .iter()
+            .filter(|e| e.entry_type == CodeEntryType::ErrorSolution)
+            .count();
 
         let mut projects: HashMap<String, usize> = HashMap::new();
         for e in entries.iter() {
@@ -224,4 +316,3 @@ impl std::fmt::Display for CodeEntryType {
         }
     }
 }
-

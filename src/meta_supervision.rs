@@ -1,9 +1,9 @@
 //! Meta-cognitive supervision system for continuous performance evaluation and strategy correction.
 //! Monitors system behavior and adjusts operational parameters in real-time.
 
+use std::collections::VecDeque;
 use std::sync::{Arc, RwLock};
 use std::time::{SystemTime, UNIX_EPOCH};
-use std::collections::VecDeque;
 
 /// Performance metrics for system evaluation
 #[derive(Debug, Clone)]
@@ -59,11 +59,11 @@ impl MetaSupervisor {
             .as_secs();
 
         // Calculate overall score (weighted average)
-        let overall_score = 0.3 * (1.0 - (response_time_ms / 1000.0).min(1.0)) +
-                           0.2 * (1.0 - (memory_usage_mb / 1000.0).min(1.0)) +
-                           0.2 * attention_efficiency +
-                           0.2 * goal_progress +
-                           0.1 * (1.0 - error_rate);
+        let overall_score = 0.3 * (1.0 - (response_time_ms / 1000.0).min(1.0))
+            + 0.2 * (1.0 - (memory_usage_mb / 1000.0).min(1.0))
+            + 0.2 * attention_efficiency
+            + 0.2 * goal_progress
+            + 0.1 * (1.0 - error_rate);
 
         let metrics = PerformanceMetrics {
             timestamp,
@@ -88,7 +88,7 @@ impl MetaSupervisor {
     /// Evaluate system performance and suggest corrections
     pub fn evaluate_and_correct(&mut self) -> Option<String> {
         let history = self.metrics_history.read().unwrap();
-        
+
         if history.is_empty() {
             return None;
         }
@@ -105,7 +105,8 @@ impl MetaSupervisor {
 
         // Get average of last 10 metrics
         let recent: Vec<&PerformanceMetrics> = history.iter().rev().take(10).collect();
-        let avg_score: f32 = recent.iter().map(|m| m.overall_score).sum::<f32>() / recent.len() as f32;
+        let avg_score: f32 =
+            recent.iter().map(|m| m.overall_score).sum::<f32>() / recent.len() as f32;
 
         let (warning_threshold, alert_threshold, critical_threshold) = self.performance_thresholds;
 
@@ -148,20 +149,23 @@ impl MetaSupervisor {
     /// Analyze trends in performance metrics
     pub fn analyze_trends(&self) -> (f32, f32) {
         let history = self.metrics_history.read().unwrap();
-        
+
         if history.len() < 2 {
             return (0.0, 0.0);
         }
 
         let first_half: Vec<&PerformanceMetrics> = history.iter().take(history.len() / 2).collect();
-        let second_half: Vec<&PerformanceMetrics> = history.iter().skip(history.len() / 2).collect();
+        let second_half: Vec<&PerformanceMetrics> =
+            history.iter().skip(history.len() / 2).collect();
 
         if first_half.is_empty() || second_half.is_empty() {
             return (0.0, 0.0);
         }
 
-        let first_avg: f32 = first_half.iter().map(|m| m.overall_score).sum::<f32>() / first_half.len() as f32;
-        let second_avg: f32 = second_half.iter().map(|m| m.overall_score).sum::<f32>() / second_half.len() as f32;
+        let first_avg: f32 =
+            first_half.iter().map(|m| m.overall_score).sum::<f32>() / first_half.len() as f32;
+        let second_avg: f32 =
+            second_half.iter().map(|m| m.overall_score).sum::<f32>() / second_half.len() as f32;
 
         let trend = second_avg - first_avg;
         let volatility = self.calculate_volatility(&history);
@@ -177,10 +181,12 @@ impl MetaSupervisor {
 
         let scores: Vec<f32> = history.iter().map(|m| m.overall_score).collect();
         let mean = scores.iter().sum::<f32>() / scores.len() as f32;
-        
-        let variance = scores.iter()
+
+        let variance = scores
+            .iter()
             .map(|&score| (score - mean).powi(2))
-            .sum::<f32>() / scores.len() as f32;
+            .sum::<f32>()
+            / scores.len() as f32;
 
         variance.sqrt()
     }
@@ -188,7 +194,7 @@ impl MetaSupervisor {
     /// Get performance summary
     pub fn get_summary(&self) -> (f32, f32, f32) {
         let history = self.metrics_history.read().unwrap();
-        
+
         if history.is_empty() {
             return (0.0, 0.0, 0.0);
         }
@@ -223,9 +229,14 @@ pub fn generate_report(supervisor: &MetaSupervisor) -> String {
         warning,
         alert,
         critical,
-        if current_score >= warning { "Optimal" }
-        else if current_score >= alert { "Warning" }
-        else if current_score >= critical { "Alert" }
-        else { "Critical" }
+        if current_score >= warning {
+            "Optimal"
+        } else if current_score >= alert {
+            "Warning"
+        } else if current_score >= critical {
+            "Alert"
+        } else {
+            "Critical"
+        }
     )
 }

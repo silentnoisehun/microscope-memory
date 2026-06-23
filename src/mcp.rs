@@ -914,7 +914,9 @@ fn tool_recall(config: &Config, args: &Value) -> Result<String, String> {
     // Parse optional 21D emotion vector for emotional recall
     let query_emotion: Option<[f32; 21]> = args.get("emotion").and_then(|v: &Value| {
         let arr = v.as_array()?;
-        if arr.len() != 21 { return None; }
+        if arr.len() != 21 {
+            return None;
+        }
         let mut emo = [0.0f32; 21];
         for (i, val) in arr.iter().enumerate() {
             emo[i] = val.as_f64().unwrap_or(0.0) as f32;
@@ -942,18 +944,25 @@ fn tool_recall(config: &Config, args: &Value) -> Result<String, String> {
         }
     });
 
-    let (qx, qy, qz) = crate::content_coords_blended(query, "long_term", config.search.semantic_weight);
+    let (qx, qy, qz) =
+        crate::content_coords_blended(query, "long_term", config.search.semantic_weight);
 
-    let (mut attention, hebb_pre, tg_pre, pc_pre) = if let Some(stream) = crate::consciousness_stream::global_stream() {
-        let s = stream.lock().unwrap();
-        (s.attention.clone(), s.hebbian.clone(), s.thought_graph.clone(), s.predictive_cache.clone())
-    } else {
-        let attn = crate::attention::AttentionState::load_or_init(output_dir);
-        let hebb = crate::hebbian::HebbianState::load_or_init(output_dir, reader.block_count);
-        let tg = crate::thought_graph::ThoughtGraphState::load_or_init(output_dir);
-        let pc = crate::predictive_cache::PredictiveCache::load_or_init(output_dir);
-        (attn, hebb, tg, pc)
-    };
+    let (mut attention, hebb_pre, tg_pre, pc_pre) =
+        if let Some(stream) = crate::consciousness_stream::global_stream() {
+            let s = stream.lock().unwrap();
+            (
+                s.attention.clone(),
+                s.hebbian.clone(),
+                s.thought_graph.clone(),
+                s.predictive_cache.clone(),
+            )
+        } else {
+            let attn = crate::attention::AttentionState::load_or_init(output_dir);
+            let hebb = crate::hebbian::HebbianState::load_or_init(output_dir, reader.block_count);
+            let tg = crate::thought_graph::ThoughtGraphState::load_or_init(output_dir);
+            let pc = crate::predictive_cache::PredictiveCache::load_or_init(output_dir);
+            (attn, hebb, tg, pc)
+        };
 
     let emotional_energy = crate::emotional::emotional_field(&reader, &hebb_pre)
         .map(|f| f.total_energy)
@@ -979,9 +988,8 @@ fn tool_recall(config: &Config, args: &Value) -> Result<String, String> {
     let attn = attention.compute_attention(&attn_signals);
 
     let emotional_weight = config.search.emotional_bias_weight * attn.weight(4);
-    let (qx, qy, qz) = crate::emotional::apply_emotional_bias(
-        qx, qy, qz, emotional_weight, &reader, &hebb_pre,
-    );
+    let (qx, qy, qz) =
+        crate::emotional::apply_emotional_bias(qx, qy, qz, emotional_weight, &reader, &hebb_pre);
 
     let (zoom_lo, zoom_hi) = match query.len() {
         0..=8 => (0u8, 2u8),
@@ -990,7 +998,8 @@ fn tool_recall(config: &Config, args: &Value) -> Result<String, String> {
     };
 
     let q_lower = query.to_lowercase();
-    let mut keyword_list: Vec<String> = q_lower.split_whitespace()
+    let mut keyword_list: Vec<String> = q_lower
+        .split_whitespace()
         .filter(|w| w.len() > 2)
         .map(|s| s.to_string())
         .collect();
@@ -998,11 +1007,20 @@ fn tool_recall(config: &Config, args: &Value) -> Result<String, String> {
     let session_path = Path::new(&config.paths.layers_dir).join("session.txt");
     if session_path.exists() {
         if let Ok(sess) = std::fs::read_to_string(&session_path) {
-            let recent: Vec<&str> = sess.split("\n\n").filter(|s| !s.trim().is_empty()).collect();
-            let context_start = if recent.len() > 5 { recent.len() - 5 } else { 0 };
+            let recent: Vec<&str> = sess
+                .split("\n\n")
+                .filter(|s| !s.trim().is_empty())
+                .collect();
+            let context_start = if recent.len() > 5 {
+                recent.len() - 5
+            } else {
+                0
+            };
             for entry in &recent[context_start..] {
                 for word in entry.split_whitespace() {
-                    let w = word.trim_matches(|c: char| !c.is_alphanumeric()).to_lowercase();
+                    let w = word
+                        .trim_matches(|c: char| !c.is_alphanumeric())
+                        .to_lowercase();
                     if w.len() > 3 && !keyword_list.contains(&w) {
                         keyword_list.push(w);
                     }
@@ -1013,9 +1031,9 @@ fn tool_recall(config: &Config, args: &Value) -> Result<String, String> {
     let keywords: Vec<&str> = keyword_list.iter().map(|s| s.as_str()).collect();
 
     // Load emotions.bin lookup for main-index emotional recall
-    let emotion_lookup = query_emotion.as_ref().and_then(|_| {
-        crate::load_emotion_lookup(output_dir)
-    });
+    let emotion_lookup = query_emotion
+        .as_ref()
+        .and_then(|_| crate::load_emotion_lookup(output_dir));
 
     let mut all_results: Vec<(f32, usize, bool)> = Vec::new();
 
@@ -1033,10 +1051,18 @@ fn tool_recall(config: &Config, args: &Value) -> Result<String, String> {
                 let spatial_dist = dx * dx + dy * dy + dz * dz;
                 let boost = keyword_hits as f32 * 0.1;
                 // Emotional similarity boost (if query emotion AND emotions.bin data available)
-                let emo_boost = query_emotion.as_ref().and_then(|qe| {
-                    emotion_lookup.as_ref().and_then(|lookup| lookup(i))
-                        .map(|block_emo| crate::emotional_similarity(qe, &block_emo) * emotional_recall_weight)
-                }).unwrap_or(0.0);
+                let emo_boost = query_emotion
+                    .as_ref()
+                    .and_then(|qe| {
+                        emotion_lookup
+                            .as_ref()
+                            .and_then(|lookup| lookup(i))
+                            .map(|block_emo| {
+                                crate::emotional_similarity(qe, &block_emo)
+                                    * emotional_recall_weight
+                            })
+                    })
+                    .unwrap_or(0.0);
                 let layer_imp = match h.layer_id {
                     li if LAYER_NAMES.get(li as usize) == Some(&"session") => 8.0,
                     li if LAYER_NAMES.get(li as usize) == Some(&"short_term") => 6.0,
@@ -1058,10 +1084,14 @@ fn tool_recall(config: &Config, args: &Value) -> Result<String, String> {
         let dz = entry.z - qz;
         let dist = dx * dx + dy * dy + dz * dz;
         let text_lower = entry.text.to_lowercase();
-        let keyword_hits = keywords.iter().filter(|&&kw| text_lower.contains(kw)).count();
+        let keyword_hits = keywords
+            .iter()
+            .filter(|&&kw| text_lower.contains(kw))
+            .count();
         let boost = keyword_hits as f32 * 0.1;
         // Emotional boost from inline append entry emotion
-        let emo_boost = query_emotion.as_ref()
+        let emo_boost = query_emotion
+            .as_ref()
             .map(|qe| crate::emotional_similarity(qe, &entry.emotion) * emotional_recall_weight)
             .unwrap_or(0.0);
         if dist < 0.1 || keyword_hits > 0 || emo_boost > 0.0 {
@@ -1081,12 +1111,17 @@ fn tool_recall(config: &Config, args: &Value) -> Result<String, String> {
             let text = if is_main {
                 reader.text(idx).to_string()
             } else {
-                appended.get(idx - 1_000_000).map(|e| e.text.clone()).unwrap_or_default()
+                appended
+                    .get(idx - 1_000_000)
+                    .map(|e| e.text.clone())
+                    .unwrap_or_default()
             };
             let similar = lt.find_similar(&text, 5);
             for (linked_idx, sim) in &similar {
                 let linked_idx = *linked_idx as usize;
-                let found = all_results.iter().any(|(_, ri, rim)| *rim && *ri == linked_idx);
+                let found = all_results
+                    .iter()
+                    .any(|(_, ri, rim)| *rim && *ri == linked_idx);
                 if !found {
                     let boost = *sim as f32 * 0.12;
                     all_results.push((boost, linked_idx, true));
@@ -1110,14 +1145,15 @@ fn tool_recall(config: &Config, args: &Value) -> Result<String, String> {
         crate::consciousness_stream::ConsciousnessStream::feed_query(stream, qh_tg);
     }
 
-    let (mut thought_graph, mut pred_cache) = if let Some(stream) = crate::consciousness_stream::global_stream() {
-        let s = stream.lock().unwrap();
-        (s.thought_graph.clone(), s.predictive_cache.clone())
-    } else {
-        let tg = crate::thought_graph::ThoughtGraphState::load_or_init(output_dir);
-        let pc = crate::predictive_cache::PredictiveCache::load_or_init(output_dir);
-        (tg, pc)
-    };
+    let (mut thought_graph, mut pred_cache) =
+        if let Some(stream) = crate::consciousness_stream::global_stream() {
+            let s = stream.lock().unwrap();
+            (s.thought_graph.clone(), s.predictive_cache.clone())
+        } else {
+            let tg = crate::thought_graph::ThoughtGraphState::load_or_init(output_dir);
+            let pc = crate::predictive_cache::PredictiveCache::load_or_init(output_dir);
+            (tg, pc)
+        };
 
     if let Some((cached_blocks, confidence)) = pred_cache.check(qh_tg) {
         let boost = confidence * crate::thought_graph::PATTERN_BOOST_WEIGHT * attn.weight(6);
@@ -1129,7 +1165,8 @@ fn tool_recall(config: &Config, args: &Value) -> Result<String, String> {
         }
     }
 
-    let pattern_boosts: HashMap<u32, f32> = thought_graph.pattern_boost(qh_tg).into_iter().collect();
+    let pattern_boosts: HashMap<u32, f32> =
+        thought_graph.pattern_boost(qh_tg).into_iter().collect();
     if !pattern_boosts.is_empty() {
         let tg_scale = attn.weight(5);
         for (dist, idx, is_main) in &mut all_results {
@@ -1164,7 +1201,10 @@ fn tool_recall(config: &Config, args: &Value) -> Result<String, String> {
             let layer = LAYER_NAMES.get(h.layer_id as usize).unwrap_or(&"?");
             output.push_str(&format!(
                 "[D{} {} dist={:.3}] {}\n",
-                h.depth, layer, dist, crate::safe_truncate(text, 150)
+                h.depth,
+                layer,
+                dist,
+                crate::safe_truncate(text, 150)
             ));
         } else {
             let ai = idx - 1_000_000;
@@ -1172,14 +1212,17 @@ fn tool_recall(config: &Config, args: &Value) -> Result<String, String> {
                 let layer = LAYER_NAMES.get(entry.layer_id as usize).unwrap_or(&"?");
                 output.push_str(&format!(
                     "[APPEND {} dist={:.3}] {}\n",
-                    layer, dist, crate::safe_truncate(&entry.text, 150)
+                    layer,
+                    dist,
+                    crate::safe_truncate(&entry.text, 150)
                 ));
             }
         }
         shown += 1;
     }
 
-    let activated: Vec<(u32, f32)> = all_results.iter()
+    let activated: Vec<(u32, f32)> = all_results
+        .iter()
         .filter(|(_, _, is_main)| *is_main)
         .take(k)
         .map(|(score, idx, _)| (*idx as u32, *score))
@@ -1194,19 +1237,24 @@ fn tool_recall(config: &Config, args: &Value) -> Result<String, String> {
         hebb.record_activation(&activated, qh);
 
         let mut resonance = crate::resonance::ResonanceState::load_or_init(output_dir);
-        let headers: Vec<(f32, f32, f32)> = activated.iter().map(|&(idx, _)| {
-            let h = reader.header(idx as usize);
-            (h.x, h.y, h.z)
-        }).collect();
+        let headers: Vec<(f32, f32, f32)> = activated
+            .iter()
+            .map(|&(idx, _)| {
+                let h = reader.header(idx as usize);
+                (h.x, h.y, h.z)
+            })
+            .collect();
         resonance.emit_pulse(&activated, qh, &headers, 1);
 
         let mut archetypes = crate::archetype::ArchetypeState::load_or_init(output_dir);
-        let mut temporal = crate::temporal_archetype::TemporalArchetypeState::load_or_init(output_dir);
+        let mut temporal =
+            crate::temporal_archetype::TemporalArchetypeState::load_or_init(output_dir);
         let _ = archetypes.match_archetype(&activated);
         temporal.decay();
         archetypes.reinforce(&activated);
 
-        let dominant_layer = activated.first()
+        let dominant_layer = activated
+            .first()
             .map(|&(idx, _)| reader.header(idx as usize).layer_id)
             .unwrap_or(0);
         thought_graph.record_recall(qh, &activated, dominant_layer);
@@ -1221,12 +1269,27 @@ fn tool_recall(config: &Config, args: &Value) -> Result<String, String> {
 
         // Echo cache: store top-k recall results for fast re-access
         for (i, (_, idx, is_main)) in all_results.iter().enumerate() {
-            if i >= 3 { break; }
+            if i >= 3 {
+                break;
+            }
             let text = if *is_main {
-                format!("RECALL[{}]: {} -> {}", i, query, crate::safe_truncate(reader.text(*idx), 180))
+                format!(
+                    "RECALL[{}]: {} -> {}",
+                    i,
+                    query,
+                    crate::safe_truncate(reader.text(*idx), 180)
+                )
             } else {
-                appended.get(idx - 1_000_000)
-                    .map(|e| format!("RECALL[{}]: {} -> {}", i, query, crate::safe_truncate(&e.text, 180)))
+                appended
+                    .get(idx - 1_000_000)
+                    .map(|e| {
+                        format!(
+                            "RECALL[{}]: {} -> {}",
+                            i,
+                            query,
+                            crate::safe_truncate(&e.text, 180)
+                        )
+                    })
                     .unwrap_or_default()
             };
             if !text.is_empty() {
@@ -1236,12 +1299,15 @@ fn tool_recall(config: &Config, args: &Value) -> Result<String, String> {
         // Associative: link top-3 results that share keywords
         for i in 0..all_results.len().min(3) {
             let (_, idx_a, is_a) = all_results[i];
-            for j in (i+1)..all_results.len().min(5) {
+            for j in (i + 1)..all_results.len().min(5) {
                 let (_, idx_b, is_b) = all_results[j];
                 let text_a = if is_a { reader.text(idx_a) } else { "" };
                 let text_b = if is_b { reader.text(idx_b) } else { "" };
                 if !text_a.is_empty() && !text_b.is_empty() {
-                    let link = format!("LINK: [{:.40}] <-> [{:.40}] via '{}'", text_a, text_b, query);
+                    let link = format!(
+                        "LINK: [{:.40}] <-> [{:.40}] via '{}'",
+                        text_a, text_b, query
+                    );
                     let _ = store_memory(config, &link, "associative", 6);
                 }
             }
@@ -1460,11 +1526,20 @@ fn tool_session_log(config: &Config, args: &Value) -> Result<String, String> {
         .unwrap_or_default()
         .as_secs();
 
-    let mut output = format!("Session Memory — {} total interactions, showing last {}:\n\n", total, recent.len());
+    let mut output = format!(
+        "Session Memory — {} total interactions, showing last {}:\n\n",
+        total,
+        recent.len()
+    );
     for (i, entry) in recent.iter().enumerate() {
         let num = total - start - i;
         let decay = ebbinghaus_decay(entry, now_secs);
-        output.push_str(&format!("{} {}| {}\n", num, decay, crate::safe_truncate(entry, 300)));
+        output.push_str(&format!(
+            "{} {}| {}\n",
+            num,
+            decay,
+            crate::safe_truncate(entry, 300)
+        ));
     }
 
     Ok(output)
@@ -1472,7 +1547,11 @@ fn tool_session_log(config: &Config, args: &Value) -> Result<String, String> {
 
 fn ebbinghaus_decay(entry: &str, now_secs: u64) -> &'static str {
     let ts_str = if entry.starts_with('[') {
-        entry.split(']').next().unwrap_or("").trim_start_matches('[')
+        entry
+            .split(']')
+            .next()
+            .unwrap_or("")
+            .trim_start_matches('[')
     } else {
         return "█ forgotten";
     };
@@ -1496,19 +1575,42 @@ fn ebbinghaus_decay(entry: &str, now_secs: u64) -> &'static str {
         days += if is_leap_yr(yr) { 366 } else { 365 };
     }
     let leap = is_leap_yr(y);
-    let mdays = [31, if leap { 29 } else { 28 }, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    let mdays = [
+        31,
+        if leap { 29 } else { 28 },
+        31,
+        30,
+        31,
+        30,
+        31,
+        31,
+        30,
+        31,
+        30,
+        31,
+    ];
     for mi in 0..(mo - 1) as usize {
         days += mdays[mi];
     }
     days += d - 1;
     let entry_secs = days * 86400 + h * 3600 + m * 60;
-    let age_hours = if now_secs > entry_secs { (now_secs - entry_secs) / 3600 } else { 0 };
+    let age_hours = if now_secs > entry_secs {
+        (now_secs - entry_secs) / 3600
+    } else {
+        0
+    };
 
-    if age_hours < 1 { "░ FRESH" }
-    else if age_hours < 24 { "░ recent" }
-    else if age_hours < 72 { "▒ fading" }
-    else if age_hours < 168 { "▓ old" }
-    else { "█ forgotten" }
+    if age_hours < 1 {
+        "░ FRESH"
+    } else if age_hours < 24 {
+        "░ recent"
+    } else if age_hours < 72 {
+        "▒ fading"
+    } else if age_hours < 168 {
+        "▓ old"
+    } else {
+        "█ forgotten"
+    }
 }
 
 fn is_leap_yr(y: u64) -> bool {
@@ -1522,7 +1624,10 @@ fn tool_consolidate(config: &Config, _args: &Value) -> Result<String, String> {
     } else {
         return Ok("Session memory is empty.".to_string());
     };
-    let entries: Vec<&str> = content.split("\n\n").filter(|s| !s.trim().is_empty()).collect();
+    let entries: Vec<&str> = content
+        .split("\n\n")
+        .filter(|s| !s.trim().is_empty())
+        .collect();
     if entries.len() < 3 {
         return Ok("Not enough entries to consolidate (need 3+).".to_string());
     }
@@ -1530,7 +1635,9 @@ fn tool_consolidate(config: &Config, _args: &Value) -> Result<String, String> {
     let mut groups: HashMap<String, Vec<String>> = HashMap::new();
     for entry in &entries {
         let sid = if entry.contains("[sid-") {
-            entry.split("[sid-").nth(1)
+            entry
+                .split("[sid-")
+                .nth(1)
                 .and_then(|s| s.split(']').next())
                 .map(|s| format!("sid-{}", s))
                 .unwrap_or_else(|| "nosid".to_string())
@@ -1545,7 +1652,8 @@ fn tool_consolidate(config: &Config, _args: &Value) -> Result<String, String> {
         if group.len() < 2 {
             continue;
         }
-        let top_topics: Vec<String> = group.iter()
+        let top_topics: Vec<String> = group
+            .iter()
             .take(5)
             .map(|e| {
                 let parts: Vec<&str> = e.split("] ").collect();
@@ -1561,7 +1669,17 @@ fn tool_consolidate(config: &Config, _args: &Value) -> Result<String, String> {
         );
         summaries.push(summary);
 
-        store_memory(config, &format!("[{}] CONSOLIDATED: {} interactions from {}", sid, group.len(), top_topics.join(", ")), "long_term", 8)?;
+        store_memory(
+            config,
+            &format!(
+                "[{}] CONSOLIDATED: {} interactions from {}",
+                sid,
+                group.len(),
+                top_topics.join(", ")
+            ),
+            "long_term",
+            8,
+        )?;
     }
 
     let mut output = format!("Consolidated {} session groups:\n\n", summaries.len());
@@ -1632,7 +1750,7 @@ fn tool_session_context(config: &Config, args: &Value) -> Result<String, String>
 // ─── Consciousness Tool (Live Stream) ────────────────────
 
 fn tool_consciousness(config: &Config, _args: &Value) -> Result<String, String> {
-    use crate::consciousness_stream::{ConsciousnessStream, global_stream};
+    use crate::consciousness_stream::{global_stream, ConsciousnessStream};
 
     let state = match global_stream() {
         Some(s) => s.clone(),
@@ -1664,7 +1782,8 @@ fn tool_ping(config: &Config, args: &Value) -> Result<String, String> {
     let append_path = output_dir.join("append.bin");
     let appended = read_append_log(&append_path);
 
-    let (qx, qy, qz) = crate::content_coords_blended(query, "long_term", config.search.semantic_weight);
+    let (qx, qy, qz) =
+        crate::content_coords_blended(query, "long_term", config.search.semantic_weight);
 
     let mut all_results: Vec<(f32, usize)> = Vec::new();
 
@@ -1700,12 +1819,17 @@ fn tool_ping(config: &Config, args: &Value) -> Result<String, String> {
         let text = if *idx < 1_000_000 {
             reader.text(*idx).to_string()
         } else {
-            appended.get(*idx - 1_000_000)
+            appended
+                .get(*idx - 1_000_000)
                 .map(|e| e.text.clone())
                 .unwrap_or_default()
         };
         if !text.is_empty() {
-            output.push_str(&format!("  [{:.3}] {}\n", dist, crate::safe_truncate(&text, 120)));
+            output.push_str(&format!(
+                "  [{:.3}] {}\n",
+                dist,
+                crate::safe_truncate(&text, 120)
+            ));
             shown += 1;
         }
     }
@@ -1729,7 +1853,10 @@ fn tool_auto_context(config: &Config, _args: &Value) -> Result<String, String> {
 // ─── Timeline Tool ──────────────────────────────────
 
 fn tool_timeline(config: &Config, args: &Value) -> Result<String, String> {
-    let window = args.get("window").and_then(|v| v.as_str()).unwrap_or("last_session");
+    let window = args
+        .get("window")
+        .and_then(|v| v.as_str())
+        .unwrap_or("last_session");
     let k = args.get("k").and_then(|v| v.as_u64()).unwrap_or(20) as usize;
 
     let path = Path::new(&config.paths.output_dir).join("timeline.bin");
@@ -1759,7 +1886,11 @@ fn tool_timeline(config: &Config, args: &Value) -> Result<String, String> {
             e.depth,
             layer_name,
             e.importance,
-            if status_label.is_empty() { String::new() } else { format!(" [{}]", status_label) },
+            if status_label.is_empty() {
+                String::new()
+            } else {
+                format!(" [{}]", status_label)
+            },
             crate::safe_truncate(&e.text, 100)
         ));
     }
@@ -1794,7 +1925,10 @@ fn tool_loops(config: &Config, args: &Value) -> Result<String, String> {
 // ─── Resolve Loop Tool ──────────────────────────────
 
 fn tool_resolve_loop(config: &Config, args: &Value) -> Result<String, String> {
-    let id = args.get("id").and_then(|v| v.as_u64()).ok_or("Missing required parameter: id")?;
+    let id = args
+        .get("id")
+        .and_then(|v| v.as_u64())
+        .ok_or("Missing required parameter: id")?;
     let dir = Path::new(&config.paths.output_dir);
     match crate::open_loops::resolve(dir, id) {
         Ok(true) => Ok(format!("Loop #{} resolved.", id)),
@@ -1809,7 +1943,10 @@ fn tool_radial(config: &Config, args: &Value) -> Result<String, String> {
     let x = args.get("x").and_then(|v| v.as_f64()).ok_or("Missing: x")? as f32;
     let y = args.get("y").and_then(|v| v.as_f64()).ok_or("Missing: y")? as f32;
     let z = args.get("z").and_then(|v| v.as_f64()).ok_or("Missing: z")? as f32;
-    let depth = args.get("depth").and_then(|v| v.as_u64()).ok_or("Missing: depth")? as u8;
+    let depth = args
+        .get("depth")
+        .and_then(|v| v.as_u64())
+        .ok_or("Missing: depth")? as u8;
     let radius = args.get("radius").and_then(|v| v.as_f64()).unwrap_or(0.1) as f32;
     let k = args.get("k").and_then(|v| v.as_u64()).unwrap_or(10) as usize;
 
@@ -1818,7 +1955,10 @@ fn tool_radial(config: &Config, args: &Value) -> Result<String, String> {
     let append_path = Path::new(&config.paths.output_dir).join("append.bin");
     let appended = read_append_log(&append_path);
 
-    let mut output = format!("Radial ({:.2},{:.2},{:.2}) D{} r={:.3}:\n\n", x, y, z, depth, radius);
+    let mut output = format!(
+        "Radial ({:.2},{:.2},{:.2}) D{} r={:.3}:\n\n",
+        x, y, z, depth, radius
+    );
 
     if let Some(ref primary) = result_set.primary {
         output.push_str(&format!("PRIMARY:\n"));
@@ -1826,10 +1966,21 @@ fn tool_radial(config: &Config, args: &Value) -> Result<String, String> {
             let h = reader.header(primary.block_idx);
             let text = reader.text(primary.block_idx);
             let layer = LAYER_NAMES.get(h.layer_id as usize).unwrap_or(&"?");
-            output.push_str(&format!("  [D{} {} dist={:.3}] {}\n", h.depth, layer, primary.dist_sq, crate::safe_truncate(text, 150)));
+            output.push_str(&format!(
+                "  [D{} {} dist={:.3}] {}\n",
+                h.depth,
+                layer,
+                primary.dist_sq,
+                crate::safe_truncate(text, 150)
+            ));
         } else if let Some(entry) = appended.get(primary.block_idx) {
             let layer = LAYER_NAMES.get(entry.layer_id as usize).unwrap_or(&"?");
-            output.push_str(&format!("  [APPEND {} dist={:.3}] {}\n", layer, primary.dist_sq, crate::safe_truncate(&entry.text, 150)));
+            output.push_str(&format!(
+                "  [APPEND {} dist={:.3}] {}\n",
+                layer,
+                primary.dist_sq,
+                crate::safe_truncate(&entry.text, 150)
+            ));
         }
     }
 
@@ -1840,15 +1991,31 @@ fn tool_radial(config: &Config, args: &Value) -> Result<String, String> {
                 let h = reader.header(n.block_idx);
                 let text = reader.text(n.block_idx);
                 let layer = LAYER_NAMES.get(h.layer_id as usize).unwrap_or(&"?");
-                output.push_str(&format!("  [D{} {} dist={:.3} w={:.3}] {}\n", h.depth, layer, n.dist_sq, n.weight, crate::safe_truncate(text, 100)));
+                output.push_str(&format!(
+                    "  [D{} {} dist={:.3} w={:.3}] {}\n",
+                    h.depth,
+                    layer,
+                    n.dist_sq,
+                    n.weight,
+                    crate::safe_truncate(text, 100)
+                ));
             } else if let Some(entry) = appended.get(n.block_idx) {
                 let layer = LAYER_NAMES.get(entry.layer_id as usize).unwrap_or(&"?");
-                output.push_str(&format!("  [APPEND {} dist={:.3}] {}\n", layer, n.dist_sq, crate::safe_truncate(&entry.text, 100)));
+                output.push_str(&format!(
+                    "  [APPEND {} dist={:.3}] {}\n",
+                    layer,
+                    n.dist_sq,
+                    crate::safe_truncate(&entry.text, 100)
+                ));
             }
         }
     }
 
-    output.push_str(&format!("\n{} within radius, {} shown", result_set.total_within_radius, result_set.all().len()));
+    output.push_str(&format!(
+        "\n{} within radius, {} shown",
+        result_set.total_within_radius,
+        result_set.all().len()
+    ));
     Ok(output)
 }
 
@@ -1858,7 +2025,10 @@ fn tool_soft(config: &Config, args: &Value) -> Result<String, String> {
     let x = args.get("x").and_then(|v| v.as_f64()).ok_or("Missing: x")? as f32;
     let y = args.get("y").and_then(|v| v.as_f64()).ok_or("Missing: y")? as f32;
     let z = args.get("z").and_then(|v| v.as_f64()).ok_or("Missing: z")? as f32;
-    let zoom = args.get("zoom").and_then(|v| v.as_u64()).ok_or("Missing: zoom")? as u8;
+    let zoom = args
+        .get("zoom")
+        .and_then(|v| v.as_u64())
+        .ok_or("Missing: zoom")? as u8;
     let k = args.get("k").and_then(|v| v.as_u64()).unwrap_or(10) as usize;
 
     let reader = MicroscopeReader::open(config)?;
@@ -1868,19 +2038,40 @@ fn tool_soft(config: &Config, args: &Value) -> Result<String, String> {
     let appended = read_append_log(&append_path);
 
     if results.is_empty() {
-        return Ok(format!("Soft ({:.2},{:.2},{:.2}) zoom={}: no results", x, y, z, zoom));
+        return Ok(format!(
+            "Soft ({:.2},{:.2},{:.2}) zoom={}: no results",
+            x, y, z, zoom
+        ));
     }
 
-    let mut output = format!("Soft 4D ({:.2},{:.2},{:.2}) zoom={}: {} results\n\n", x, y, z, zoom, results.len());
+    let mut output = format!(
+        "Soft 4D ({:.2},{:.2},{:.2}) zoom={}: {} results\n\n",
+        x,
+        y,
+        z,
+        zoom,
+        results.len()
+    );
     for (dist, idx, is_main) in &results {
         if *is_main {
             let h = reader.header(*idx);
             let text = reader.text(*idx);
             let layer = LAYER_NAMES.get(h.layer_id as usize).unwrap_or(&"?");
-            output.push_str(&format!("[D{} {} dist={:.3}] {}\n", h.depth, layer, dist, crate::safe_truncate(text, 150)));
+            output.push_str(&format!(
+                "[D{} {} dist={:.3}] {}\n",
+                h.depth,
+                layer,
+                dist,
+                crate::safe_truncate(text, 150)
+            ));
         } else if let Some(entry) = appended.get(*idx) {
             let layer = LAYER_NAMES.get(entry.layer_id as usize).unwrap_or(&"?");
-            output.push_str(&format!("[APPEND {} dist={:.3}] {}\n", layer, dist, crate::safe_truncate(&entry.text, 150)));
+            output.push_str(&format!(
+                "[APPEND {} dist={:.3}] {}\n",
+                layer,
+                dist,
+                crate::safe_truncate(&entry.text, 150)
+            ));
         }
     }
     Ok(output)
@@ -1889,7 +2080,10 @@ fn tool_soft(config: &Config, args: &Value) -> Result<String, String> {
 // ─── Think Tool ─────────────────────────────────────
 
 fn tool_think(config: &Config, args: &Value) -> Result<String, String> {
-    let query = args.get("query").and_then(|v| v.as_str()).ok_or("Missing: query")?;
+    let query = args
+        .get("query")
+        .and_then(|v| v.as_str())
+        .ok_or("Missing: query")?;
     let max_steps = args.get("max_steps").and_then(|v| v.as_u64()).unwrap_or(5) as usize;
 
     let reader = MicroscopeReader::open(config)?;
@@ -1938,7 +2132,10 @@ fn tool_hebbian(config: &Config, _args: &Value) -> Result<String, String> {
         for pair in top {
             let text_a = crate::safe_truncate(reader.text(pair.block_a as usize), 30);
             let text_b = crate::safe_truncate(reader.text(pair.block_b as usize), 30);
-            output.push_str(&format!("  {}x  [{}] <-> [{}]\n", pair.count, text_a, text_b));
+            output.push_str(&format!(
+                "  {}x  [{}] <-> [{}]\n",
+                pair.count, text_a, text_b
+            ));
         }
     }
     Ok(output)
@@ -1965,8 +2162,13 @@ fn tool_hottest(config: &Config, args: &Value) -> Result<String, String> {
         let rec = &hebb.activations[*idx];
         output.push_str(&format!(
             "E={:.3} D{} [{}] count={} drift=({:.3},{:.3},{:.3}) {}\n",
-            energy, h.depth, layer, rec.activation_count,
-            rec.drift_x, rec.drift_y, rec.drift_z,
+            energy,
+            h.depth,
+            layer,
+            rec.activation_count,
+            rec.drift_x,
+            rec.drift_y,
+            rec.drift_z,
             crate::safe_truncate(text, 80)
         ));
     }
@@ -1985,11 +2187,13 @@ fn tool_archetypes(config: &Config, _args: &Value) -> Result<String, String> {
          ==========\n\
          Emerged:            {}\n\
          Total members:      {}\n",
-        stats.archetype_count,
-        stats.total_members,
+        stats.archetype_count, stats.total_members,
     );
     if let (Some(label), Some(str)) = (&stats.strongest_label, stats.strongest_strength) {
-        output.push_str(&format!("Strongest:          '{}' (str={:.3})\n", label, str));
+        output.push_str(&format!(
+            "Strongest:          '{}' (str={:.3})\n",
+            label, str
+        ));
     }
 
     if !arc.archetypes.is_empty() {
@@ -1997,7 +2201,11 @@ fn tool_archetypes(config: &Config, _args: &Value) -> Result<String, String> {
         for a in &arc.archetypes {
             output.push_str(&format!(
                 "  #{} '{}' str={:.3} members={} reinforced={}x\n",
-                a.id, a.label, a.strength, a.members.len(), a.reinforcement_count,
+                a.id,
+                a.label,
+                a.strength,
+                a.members.len(),
+                a.reinforcement_count,
             ));
         }
     }
@@ -2016,7 +2224,11 @@ fn tool_patterns(config: &Config, args: &Value) -> Result<String, String> {
         "Thought Graph:\n\
          =============\n\
          nodes={} edges={} patterns={} (crystallized={}) session=#{}\n",
-        stats.node_count, stats.edge_count, stats.pattern_count, stats.crystallized, stats.current_session_id,
+        stats.node_count,
+        stats.edge_count,
+        stats.pattern_count,
+        stats.crystallized,
+        stats.current_session_id,
     );
 
     let top = tg.top_patterns(k);
@@ -2025,13 +2237,20 @@ fn tool_patterns(config: &Config, args: &Value) -> Result<String, String> {
     } else {
         output.push_str("\nTop patterns:\n");
         for (i, p) in top.iter().enumerate() {
-            let seq_str: Vec<String> = p.sequence.iter()
+            let seq_str: Vec<String> = p
+                .sequence
+                .iter()
                 .map(|h| format!("{:04x}", h & 0xFFFF))
                 .collect();
             let crystallized = if p.frequency >= 3 { "*" } else { " " };
             output.push_str(&format!(
                 "{}#{} {} freq={} str={:.2} blocks={}\n",
-                crystallized, i + 1, seq_str.join(" → "), p.frequency, p.strength, p.result_blocks.len()
+                crystallized,
+                i + 1,
+                seq_str.join(" → "),
+                p.frequency,
+                p.strength,
+                p.result_blocks.len()
             ));
         }
     }
@@ -2062,10 +2281,17 @@ fn tool_attention(config: &Config, _args: &Value) -> Result<String, String> {
     }
 
     if !attn.history.is_empty() {
-        let recent: Vec<&crate::attention::AttentionOutcome> = attn.history.iter().rev().take(5).collect();
+        let recent: Vec<&crate::attention::AttentionOutcome> =
+            attn.history.iter().rev().take(5).collect();
         output.push_str("\nRecent outcomes:\n");
         for o in recent {
-            let symbol = if o.quality >= 0.7 { "+" } else if o.quality <= 0.3 { "-" } else { "~" };
+            let symbol = if o.quality >= 0.7 {
+                "+"
+            } else if o.quality <= 0.3 {
+                "-"
+            } else {
+                "~"
+            };
             output.push_str(&format!("  {} quality={:.2}\n", symbol, o.quality));
         }
     }
@@ -2127,7 +2353,11 @@ fn tool_stories(config: &Config, args: &Value) -> Result<String, String> {
         return Ok("No narrative episodes yet — recall some memories first.".to_string());
     }
 
-    let mut output = format!("Narrative Episodes (last {} of {}):\n\n", k, nm.episodes.len());
+    let mut output = format!(
+        "Narrative Episodes (last {} of {}):\n\n",
+        k,
+        nm.episodes.len()
+    );
     for ep in nm.episodes.iter().rev().take(k) {
         output.push_str(&crate::narrative_memory::format_episode(ep));
         output.push_str("\n---\n");
@@ -2156,7 +2386,11 @@ fn tool_daydream(config: &Config, args: &Value) -> Result<String, String> {
         seed.to_string()
     };
 
-    let mut output = format!("Daydream (seed: '{}', steps: {}):\n\n", crate::safe_truncate(&seed_text, 50), steps);
+    let mut output = format!(
+        "Daydream (seed: '{}', steps: {}):\n\n",
+        crate::safe_truncate(&seed_text, 50),
+        steps
+    );
     let mut current = seed_text;
 
     for step in 0..steps {
@@ -2169,7 +2403,11 @@ fn tool_daydream(config: &Config, args: &Value) -> Result<String, String> {
         }
         let (_, idx, _) = results[0];
         let next_text = reader.text(idx);
-        output.push_str(&format!("  Step {}: {}\n", step + 1, crate::safe_truncate(next_text, 120)));
+        output.push_str(&format!(
+            "  Step {}: {}\n",
+            step + 1,
+            crate::safe_truncate(next_text, 120)
+        ));
         current = next_text.to_string();
     }
     Ok(output)
@@ -2178,8 +2416,14 @@ fn tool_daydream(config: &Config, args: &Value) -> Result<String, String> {
 // ─── Hyperfocus Tool ────────────────────────────────
 
 fn tool_hyperfocus(config: &Config, args: &Value) -> Result<String, String> {
-    let target = args.get("target").and_then(|v| v.as_str()).ok_or("Missing: target")?;
-    let focus_type = args.get("focus_type").and_then(|v| v.as_str()).unwrap_or("research");
+    let target = args
+        .get("target")
+        .and_then(|v| v.as_str())
+        .ok_or("Missing: target")?;
+    let focus_type = args
+        .get("focus_type")
+        .and_then(|v| v.as_str())
+        .unwrap_or("research");
 
     let reader = MicroscopeReader::open(config)?;
     let output_dir = Path::new(&config.paths.output_dir);
@@ -2208,7 +2452,13 @@ fn tool_hyperfocus(config: &Config, args: &Value) -> Result<String, String> {
             let h = reader.header(*idx);
             let text = reader.text(*idx);
             let layer = LAYER_NAMES.get(h.layer_id as usize).unwrap_or(&"?");
-            output.push_str(&format!("  [D{} {} dist={:.3}] {}\n", h.depth, layer, dist, crate::safe_truncate(text, 120)));
+            output.push_str(&format!(
+                "  [D{} {} dist={:.3}] {}\n",
+                h.depth,
+                layer,
+                dist,
+                crate::safe_truncate(text, 120)
+            ));
         }
     }
     Ok(output)
@@ -2226,7 +2476,10 @@ fn tool_emotional_field(config: &Config, _args: &Value) -> Result<String, String
     match crate::emotional::emotional_field(&reader, &hebb) {
         Some(field) => {
             output.push_str(&format!("Total energy: {:.3}\n", field.total_energy));
-            output.push_str(&format!("Centroid: ({:.3}, {:.3}, {:.3})\n", field.centroid.0, field.centroid.1, field.centroid.2));
+            output.push_str(&format!(
+                "Centroid: ({:.3}, {:.3}, {:.3})\n",
+                field.centroid.0, field.centroid.1, field.centroid.2
+            ));
             output.push_str(&format!("Active blocks: {}\n", field.active_blocks));
         }
         None => {
@@ -2250,9 +2503,15 @@ fn tool_emotional_field(config: &Config, _args: &Value) -> Result<String, String
 // ─── Embed Tool ─────────────────────────────────────
 
 fn tool_embed(config: &Config, args: &Value) -> Result<String, String> {
-    let query = args.get("query").and_then(|v| v.as_str()).ok_or("Missing: query")?;
+    let query = args
+        .get("query")
+        .and_then(|v| v.as_str())
+        .ok_or("Missing: query")?;
     let k = args.get("k").and_then(|v| v.as_u64()).unwrap_or(10) as usize;
-    let metric = args.get("metric").and_then(|v| v.as_str()).unwrap_or("cosine");
+    let metric = args
+        .get("metric")
+        .and_then(|v| v.as_str())
+        .unwrap_or("cosine");
 
     use crate::embedding_index::EmbeddingIndex;
     use crate::embeddings::{EmbeddingProvider, MockEmbeddingProvider};
@@ -2262,7 +2521,8 @@ fn tool_embed(config: &Config, args: &Value) -> Result<String, String> {
     let emb_path = output_dir.join("embeddings.bin");
 
     let provider: Box<dyn EmbeddingProvider> = Box::new(MockEmbeddingProvider::new(128));
-    let query_embedding = provider.embed(query)
+    let query_embedding = provider
+        .embed(query)
         .map_err(|e| format!("Embedding failed: {}", e))?;
 
     let mut output = format!("Semantic Search '{}' (metric: {}):\n\n", query, metric);
@@ -2276,7 +2536,13 @@ fn tool_embed(config: &Config, args: &Value) -> Result<String, String> {
             let h = reader.header(block_idx);
             let text = reader.text(block_idx);
             let layer = LAYER_NAMES.get(h.layer_id as usize).unwrap_or(&"?");
-            output.push_str(&format!("[D{} {} sim={:.3}] {}\n", h.depth, layer, sim, crate::safe_truncate(text, 120)));
+            output.push_str(&format!(
+                "[D{} {} sim={:.3}] {}\n",
+                h.depth,
+                layer,
+                sim,
+                crate::safe_truncate(text, 120)
+            ));
         }
     } else {
         // On-the-fly search
@@ -2284,12 +2550,14 @@ fn tool_embed(config: &Config, args: &Value) -> Result<String, String> {
         for i in 0..reader.block_count {
             let text = reader.text(i);
             if let Ok(block_emb) = provider.embed(text) {
-                let similarity: f32 = block_emb.iter()
+                let similarity: f32 = block_emb
+                    .iter()
                     .zip(query_embedding.iter())
                     .map(|(a, b)| a * b)
                     .sum::<f32>()
-                    / (block_emb.iter().map(|v| v*v).sum::<f32>().sqrt()
-                       * query_embedding.iter().map(|v| v*v).sum::<f32>().sqrt() + 1e-10);
+                    / (block_emb.iter().map(|v| v * v).sum::<f32>().sqrt()
+                        * query_embedding.iter().map(|v| v * v).sum::<f32>().sqrt()
+                        + 1e-10);
                 if similarity > 0.5 {
                     results.push((similarity, i));
                 }
@@ -2305,7 +2573,13 @@ fn tool_embed(config: &Config, args: &Value) -> Result<String, String> {
             let h = reader.header(idx);
             let text = reader.text(idx);
             let layer = LAYER_NAMES.get(h.layer_id as usize).unwrap_or(&"?");
-            output.push_str(&format!("[D{} {} sim={:.3}] {}\n", h.depth, layer, sim, crate::safe_truncate(text, 120)));
+            output.push_str(&format!(
+                "[D{} {} sim={:.3}] {}\n",
+                h.depth,
+                layer,
+                sim,
+                crate::safe_truncate(text, 120)
+            ));
         }
     }
     Ok(output)
@@ -2314,7 +2588,10 @@ fn tool_embed(config: &Config, args: &Value) -> Result<String, String> {
 // ─── Similar Tool ───────────────────────────────────
 
 fn tool_similar(config: &Config, args: &Value) -> Result<String, String> {
-    let text = args.get("text").and_then(|v| v.as_str()).ok_or("Missing: text")?;
+    let text = args
+        .get("text")
+        .and_then(|v| v.as_str())
+        .ok_or("Missing: text")?;
     let k = args.get("k").and_then(|v| v.as_u64()).unwrap_or(5) as usize;
 
     let reader = MicroscopeReader::open(config)?;
@@ -2324,15 +2601,28 @@ fn tool_similar(config: &Config, args: &Value) -> Result<String, String> {
 
     let results = table.find_similar(text, k);
     if results.is_empty() {
-        return Ok(format!("No structurally similar blocks found for '{}'", crate::safe_truncate(text, 40)));
+        return Ok(format!(
+            "No structurally similar blocks found for '{}'",
+            crate::safe_truncate(text, 40)
+        ));
     }
 
-    let mut output = format!("Structurally similar to '{}':\n\n", crate::safe_truncate(text, 40));
+    let mut output = format!(
+        "Structurally similar to '{}':\n\n",
+        crate::safe_truncate(text, 40)
+    );
     for (idx, sim) in &results {
         let h = reader.header(*idx as usize);
         let bt = reader.text(*idx as usize);
         let layer = LAYER_NAMES.get(h.layer_id as usize).unwrap_or(&"?");
-        output.push_str(&format!("#{} D{} [{}] sim={:.3} {}\n", idx, h.depth, layer, sim, crate::safe_truncate(bt, 100)));
+        output.push_str(&format!(
+            "#{} D{} [{}] sim={:.3} {}\n",
+            idx,
+            h.depth,
+            layer,
+            sim,
+            crate::safe_truncate(bt, 100)
+        ));
     }
     Ok(output)
 }
@@ -2340,7 +2630,10 @@ fn tool_similar(config: &Config, args: &Value) -> Result<String, String> {
 // ─── Links Tool ─────────────────────────────────────
 
 fn tool_links(config: &Config, args: &Value) -> Result<String, String> {
-    let block_index = args.get("block_index").and_then(|v| v.as_u64()).ok_or("Missing: block_index")? as usize;
+    let block_index = args
+        .get("block_index")
+        .and_then(|v| v.as_u64())
+        .ok_or("Missing: block_index")? as usize;
 
     let reader = MicroscopeReader::open(config)?;
     let output_dir = Path::new(&config.paths.output_dir);
@@ -2354,7 +2647,10 @@ fn tool_links(config: &Config, args: &Value) -> Result<String, String> {
 
     let mut output = format!(
         "Links for Block #{} D{} [{}] {}\n\n",
-        block_index, h.depth, layer, crate::safe_truncate(text, 60)
+        block_index,
+        h.depth,
+        layer,
+        crate::safe_truncate(text, 60)
     );
 
     if links.is_empty() {
@@ -2366,7 +2662,11 @@ fn tool_links(config: &Config, args: &Value) -> Result<String, String> {
             let tl = LAYER_NAMES.get(th.layer_id as usize).unwrap_or(&"?");
             output.push_str(&format!(
                 "  -> #{} D{} [{}] sim={:.3} {}\n",
-                target, th.depth, tl, sim, crate::safe_truncate(tt, 80)
+                target,
+                th.depth,
+                tl,
+                sim,
+                crate::safe_truncate(tt, 80)
             ));
         }
     }
@@ -2381,7 +2681,9 @@ fn tool_fingerprint(config: &Config, _args: &Value) -> Result<String, String> {
 
     let texts: Vec<&str> = (0..reader.block_count).map(|i| reader.text(i)).collect();
     let table = crate::fingerprint::LinkTable::build(&texts);
-    table.save(output_dir).map_err(|e| format!("Failed to save fingerprints: {}", e))?;
+    table
+        .save(output_dir)
+        .map_err(|e| format!("Failed to save fingerprints: {}", e))?;
 
     let stats = table.stats();
     Ok(format!(
@@ -2416,12 +2718,19 @@ fn tool_dream_log(config: &Config, args: &Value) -> Result<String, String> {
     let count = data.len() / entry_size;
     let shown = count.min(k);
 
-    let mut output = format!("Dream Log — {} cycles recorded, showing last {}:\n\n", count, shown);
+    let mut output = format!(
+        "Dream Log — {} cycles recorded, showing last {}:\n\n",
+        count, shown
+    );
     for i in (count - shown)..count {
         let offset = i * entry_size;
         if offset + 8 <= data.len() {
-            let ts = u64::from_le_bytes(data[offset..offset+8].try_into().unwrap_or([0; 8]));
-            output.push_str(&format!("  Cycle #{}: ts={}\n", i, crate::timeline::format_ts(ts)));
+            let ts = u64::from_le_bytes(data[offset..offset + 8].try_into().unwrap_or([0; 8]));
+            output.push_str(&format!(
+                "  Cycle #{}: ts={}\n",
+                i,
+                crate::timeline::format_ts(ts)
+            ));
         }
     }
     Ok(output)
@@ -2467,9 +2776,7 @@ fn tool_mirror(config: &Config, _args: &Value) -> Result<String, String> {
          Resonance echoes:   {}\n\
          Resonant blocks:    {}\n\
          Avg similarity:     {:.3}\n",
-        stats.total_echoes,
-        stats.resonant_blocks,
-        stats.avg_similarity,
+        stats.total_echoes, stats.resonant_blocks, stats.avg_similarity,
     );
 
     if let Some((idx, strength)) = stats.strongest_block {
@@ -2477,7 +2784,9 @@ fn tool_mirror(config: &Config, _args: &Value) -> Result<String, String> {
         let text = reader.text(idx as usize);
         output.push_str(&format!(
             "Strongest:          block #{} (str={:.3}) {}\n",
-            idx, strength, crate::safe_truncate(text, 60)
+            idx,
+            strength,
+            crate::safe_truncate(text, 60)
         ));
     }
 
@@ -2486,7 +2795,10 @@ fn tool_mirror(config: &Config, _args: &Value) -> Result<String, String> {
         for echo in mirror.echoes.iter().rev().take(5) {
             output.push_str(&format!(
                 "  sim={:.3} shared={} blocks trigger={:x} echo={:x}\n",
-                echo.similarity, echo.shared_blocks.len(), echo.trigger_hash, echo.echo_hash,
+                echo.similarity,
+                echo.shared_blocks.len(),
+                echo.trigger_hash,
+                echo.echo_hash,
             ));
         }
     }
@@ -2524,7 +2836,11 @@ fn tool_predictions(config: &Config, _args: &Value) -> Result<String, String> {
         for (i, p) in cache.predictions.iter().enumerate() {
             output.push_str(&format!(
                 "  #{} hash={:04x} blocks={} conf={:.0}% pattern=#{}\n",
-                i + 1, p.predicted_query_hash & 0xFFFF, p.blocks.len(), p.confidence * 100.0, p.pattern_id
+                i + 1,
+                p.predicted_query_hash & 0xFFFF,
+                p.blocks.len(),
+                p.confidence * 100.0,
+                p.pattern_id
             ));
         }
     }
@@ -2546,15 +2862,20 @@ fn tool_paths(config: &Config, args: &Value) -> Result<String, String> {
     let mut output = format!("Thought Paths (last {} sessions):\n\n", sessions);
     for (si, session) in recent.iter().enumerate() {
         if let Some(first) = session.first() {
-            let path_str: Vec<String> = session.iter()
+            let path_str: Vec<String> = session
+                .iter()
                 .map(|n| format!("{:04x}", n.query_hash & 0xFFFF))
                 .collect();
             output.push_str(&format!(
                 "Session #{} ({} recalls): {}\n",
-                first.session_id, session.len(), path_str.join(" → ")
+                first.session_id,
+                session.len(),
+                path_str.join(" → ")
             ));
         }
-        if si >= sessions { break; }
+        if si >= sessions {
+            break;
+        }
     }
     Ok(output)
 }
@@ -2575,7 +2896,8 @@ fn tool_temporal_patterns(config: &Config, _args: &Value) -> Result<String, Stri
         output.push_str("(no temporal data yet)\n");
     } else {
         for p in &temporal.profiles {
-            let dominant = p.dominant_window()
+            let dominant = p
+                .dominant_window()
                 .map(|w| crate::temporal_archetype::WINDOW_LABELS[w])
                 .unwrap_or("?");
             output.push_str(&format!(
@@ -2657,7 +2979,10 @@ fn tool_rebuild(config: &Config, _args: &Value) -> Result<String, String> {
 // ─── Store Data Tool ────────────────────────────────
 
 fn tool_store_data(config: &Config, args: &Value) -> Result<String, String> {
-    let pairs = args.get("pairs").and_then(|v| v.as_object()).ok_or("Missing: pairs")?;
+    let pairs = args
+        .get("pairs")
+        .and_then(|v| v.as_object())
+        .ok_or("Missing: pairs")?;
     let importance = args.get("importance").and_then(|v| v.as_u64()).unwrap_or(5) as u8;
 
     let mut stored = Vec::new();
@@ -2696,7 +3021,11 @@ fn tool_resonant(config: &Config, args: &Value) -> Result<String, String> {
         let layer = LAYER_NAMES.get(h.layer_id as usize).unwrap_or(&"?");
         output.push_str(&format!(
             "S={:.3} D{} [{}] echoes={} {}\n",
-            res.strength, h.depth, layer, res.echo_count, crate::safe_truncate(text, 80)
+            res.strength,
+            h.depth,
+            layer,
+            res.echo_count,
+            crate::safe_truncate(text, 80)
         ));
     }
     Ok(output)
@@ -2706,7 +3035,10 @@ fn tool_resonant(config: &Config, args: &Value) -> Result<String, String> {
 
 fn tool_autonomous(config: &Config, args: &Value) -> Result<String, String> {
     let tts = args.get("tts").and_then(|v| v.as_bool()).unwrap_or(false);
-    let daemon = args.get("daemon").and_then(|v| v.as_bool()).unwrap_or(false);
+    let daemon = args
+        .get("daemon")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
     let interval = args.get("interval").and_then(|v| v.as_u64()).unwrap_or(30);
     let max_cycles = args.get("max_cycles").and_then(|v| v.as_u64());
 
@@ -2740,7 +3072,11 @@ fn tool_autonomous(config: &Config, args: &Value) -> Result<String, String> {
     output.push_str("Daydream:\n");
     for (dist, idx, _) in daydream_results.iter().take(3) {
         let text = reader.text(*idx);
-        output.push_str(&format!("  [dist={:.3}] {}\n", dist, crate::safe_truncate(text, 100)));
+        output.push_str(&format!(
+            "  [dist={:.3}] {}\n",
+            dist,
+            crate::safe_truncate(text, 100)
+        ));
     }
 
     // Curiosity
@@ -2756,15 +3092,21 @@ fn tool_autonomous(config: &Config, args: &Value) -> Result<String, String> {
     // Monologue
     let mut monologue = crate::inner_monologue::MonologueState::load_or_init(output_dir);
     let entry = monologue.generate_monologue(config, &reader, output_dir);
-    output.push_str(&format!("\nMonologue:\n  {}\n", crate::safe_truncate(&entry.steps.join("\n  "), 200)));
+    output.push_str(&format!(
+        "\nMonologue:\n  {}\n",
+        crate::safe_truncate(&entry.steps.join("\n  "), 200)
+    ));
 
     // Dream
     match crate::dream::dream_consolidate(output_dir, reader.block_count) {
         Ok(cycle) => {
             output.push_str(&format!(
                 "\nDream: {}ms, {} strengthened, {} pruned, energy {:.3}→{:.3}\n",
-                cycle.duration_ms, cycle.strengthened_pairs, cycle.pruned_pairs,
-                cycle.energy_before, cycle.energy_after,
+                cycle.duration_ms,
+                cycle.strengthened_pairs,
+                cycle.pruned_pairs,
+                cycle.energy_before,
+                cycle.energy_after,
             ));
         }
         Err(e) => {
@@ -2773,7 +3115,10 @@ fn tool_autonomous(config: &Config, args: &Value) -> Result<String, String> {
     }
 
     if daemon {
-        output.push_str(&format!("\nDaemon mode: cycling every {}s. Use CLI to stop.", interval));
+        output.push_str(&format!(
+            "\nDaemon mode: cycling every {}s. Use CLI to stop.",
+            interval
+        ));
     }
 
     Ok(output)

@@ -9,8 +9,8 @@ use std::path::Path;
 pub struct SynapticConnection {
     pub from_block: u32,
     pub to_block: u32,
-    pub weight: f32,           // 0.0-1.0, synaptic strength
-    pub frequency: u32,        // co-activation count
+    pub weight: f32,    // 0.0-1.0, synaptic strength
+    pub frequency: u32, // co-activation count
     pub last_activated_ms: u64,
     pub plasticity_score: f32, // capacity to change
 }
@@ -18,10 +18,10 @@ pub struct SynapticConnection {
 #[derive(Clone, Debug)]
 pub struct NeuralPathway {
     pub id: u64,
-    pub nodes: Vec<u32>,       // blocks in sequence
-    pub strength: f32,         // pathway activation strength
-    pub efficiency: f32,       // speed of activation (inverse latency)
-    pub usage_count: u32,      // how often used
+    pub nodes: Vec<u32>,         // blocks in sequence
+    pub strength: f32,           // pathway activation strength
+    pub efficiency: f32,         // speed of activation (inverse latency)
+    pub usage_count: u32,        // how often used
     pub specialized_for: String, // domain/context
 }
 
@@ -47,7 +47,8 @@ impl Neuroplasticity {
         let key = (from, to);
         let now = Self::now_ms();
 
-        self.synapses.entry(key)
+        self.synapses
+            .entry(key)
             .and_modify(|s| {
                 s.frequency += 1;
                 let delta = if success { 0.05 } else { -0.02 };
@@ -68,7 +69,8 @@ impl Neuroplasticity {
     pub fn strengthen_pathway(&mut self, nodes: Vec<u32>, domain: &str) -> u64 {
         let pathway_id = Self::pathway_hash(&nodes);
 
-        self.pathways.entry(pathway_id)
+        self.pathways
+            .entry(pathway_id)
             .and_modify(|p| {
                 p.usage_count += 1;
                 p.strength = (p.strength + 0.1).min(1.0);
@@ -122,9 +124,7 @@ impl Neuroplasticity {
             return 0.0;
         }
 
-        let weak_synapses = self.synapses.values()
-            .filter(|s| s.weight < 0.3)
-            .count() as f32;
+        let weak_synapses = self.synapses.values().filter(|s| s.weight < 0.3).count() as f32;
         let total = self.synapses.len() as f32;
 
         (weak_synapses / total).min(1.0)
@@ -161,11 +161,15 @@ impl Neuroplasticity {
             0.0
         };
         let plasticity = self.calculate_plasticity();
-        let strong_pathways = self.pathways.values()
-            .filter(|p| p.strength > 0.7)
-            .count();
+        let strong_pathways = self.pathways.values().filter(|p| p.strength > 0.7).count();
 
-        (synapse_count, pathway_count, avg_weight, plasticity, strong_pathways)
+        (
+            synapse_count,
+            pathway_count,
+            avg_weight,
+            plasticity,
+            strong_pathways,
+        )
     }
 
     /// Get strongest pathways
@@ -236,84 +240,136 @@ impl Neuroplasticity {
 
         // Read synapses
         if idx + 4 <= data.len() {
-            let synapse_count = u32::from_le_bytes([data[idx], data[idx+1], data[idx+2], data[idx+3]]) as usize;
+            let synapse_count =
+                u32::from_le_bytes([data[idx], data[idx + 1], data[idx + 2], data[idx + 3]])
+                    as usize;
             idx += 4;
 
             for _ in 0..synapse_count {
-                if idx + 36 > data.len() { break; }
+                if idx + 36 > data.len() {
+                    break;
+                }
 
-                let from = u32::from_le_bytes([data[idx], data[idx+1], data[idx+2], data[idx+3]]);
+                let from =
+                    u32::from_le_bytes([data[idx], data[idx + 1], data[idx + 2], data[idx + 3]]);
                 idx += 4;
-                let to = u32::from_le_bytes([data[idx], data[idx+1], data[idx+2], data[idx+3]]);
+                let to =
+                    u32::from_le_bytes([data[idx], data[idx + 1], data[idx + 2], data[idx + 3]]);
                 idx += 4;
-                let weight = f32::from_le_bytes([data[idx], data[idx+1], data[idx+2], data[idx+3]]);
+                let weight =
+                    f32::from_le_bytes([data[idx], data[idx + 1], data[idx + 2], data[idx + 3]]);
                 idx += 4;
-                let frequency = u32::from_le_bytes([data[idx], data[idx+1], data[idx+2], data[idx+3]]);
+                let frequency =
+                    u32::from_le_bytes([data[idx], data[idx + 1], data[idx + 2], data[idx + 3]]);
                 idx += 4;
-                let last_activated_ms = u64::from_le_bytes([data[idx], data[idx+1], data[idx+2], data[idx+3],
-                                                           data[idx+4], data[idx+5], data[idx+6], data[idx+7]]);
+                let last_activated_ms = u64::from_le_bytes([
+                    data[idx],
+                    data[idx + 1],
+                    data[idx + 2],
+                    data[idx + 3],
+                    data[idx + 4],
+                    data[idx + 5],
+                    data[idx + 6],
+                    data[idx + 7],
+                ]);
                 idx += 8;
-                let plasticity_score = f32::from_le_bytes([data[idx], data[idx+1], data[idx+2], data[idx+3]]);
+                let plasticity_score =
+                    f32::from_le_bytes([data[idx], data[idx + 1], data[idx + 2], data[idx + 3]]);
                 idx += 4;
 
-                synapses.insert((from, to), SynapticConnection {
-                    from_block: from,
-                    to_block: to,
-                    weight,
-                    frequency,
-                    last_activated_ms,
-                    plasticity_score,
-                });
+                synapses.insert(
+                    (from, to),
+                    SynapticConnection {
+                        from_block: from,
+                        to_block: to,
+                        weight,
+                        frequency,
+                        last_activated_ms,
+                        plasticity_score,
+                    },
+                );
             }
         }
 
         // Read pathways
         if idx + 4 <= data.len() {
-            let pathway_count = u32::from_le_bytes([data[idx], data[idx+1], data[idx+2], data[idx+3]]) as usize;
+            let pathway_count =
+                u32::from_le_bytes([data[idx], data[idx + 1], data[idx + 2], data[idx + 3]])
+                    as usize;
             idx += 4;
 
             for _ in 0..pathway_count {
-                if idx + 30 > data.len() { break; }
+                if idx + 30 > data.len() {
+                    break;
+                }
 
-                let id = u64::from_le_bytes([data[idx], data[idx+1], data[idx+2], data[idx+3],
-                                           data[idx+4], data[idx+5], data[idx+6], data[idx+7]]);
+                let id = u64::from_le_bytes([
+                    data[idx],
+                    data[idx + 1],
+                    data[idx + 2],
+                    data[idx + 3],
+                    data[idx + 4],
+                    data[idx + 5],
+                    data[idx + 6],
+                    data[idx + 7],
+                ]);
                 idx += 8;
 
-                let strength = f32::from_le_bytes([data[idx], data[idx+1], data[idx+2], data[idx+3]]);
+                let strength =
+                    f32::from_le_bytes([data[idx], data[idx + 1], data[idx + 2], data[idx + 3]]);
                 idx += 4;
-                let efficiency = f32::from_le_bytes([data[idx], data[idx+1], data[idx+2], data[idx+3]]);
+                let efficiency =
+                    f32::from_le_bytes([data[idx], data[idx + 1], data[idx + 2], data[idx + 3]]);
                 idx += 4;
-                let usage_count = u32::from_le_bytes([data[idx], data[idx+1], data[idx+2], data[idx+3]]);
+                let usage_count =
+                    u32::from_le_bytes([data[idx], data[idx + 1], data[idx + 2], data[idx + 3]]);
                 idx += 4;
 
-                if idx >= data.len() { break; }
+                if idx >= data.len() {
+                    break;
+                }
                 let spec_len = data[idx] as usize;
                 idx += 1;
 
-                if idx + spec_len > data.len() { break; }
-                let specialized_for = String::from_utf8_lossy(&data[idx..idx+spec_len]).to_string();
+                if idx + spec_len > data.len() {
+                    break;
+                }
+                let specialized_for =
+                    String::from_utf8_lossy(&data[idx..idx + spec_len]).to_string();
                 idx += spec_len;
 
-                if idx + 2 > data.len() { break; }
-                let node_count = u16::from_le_bytes([data[idx], data[idx+1]]) as usize;
+                if idx + 2 > data.len() {
+                    break;
+                }
+                let node_count = u16::from_le_bytes([data[idx], data[idx + 1]]) as usize;
                 idx += 2;
 
                 let mut nodes = Vec::new();
                 for _ in 0..node_count {
-                    if idx + 4 > data.len() { break; }
-                    let node = u32::from_le_bytes([data[idx], data[idx+1], data[idx+2], data[idx+3]]);
+                    if idx + 4 > data.len() {
+                        break;
+                    }
+                    let node = u32::from_le_bytes([
+                        data[idx],
+                        data[idx + 1],
+                        data[idx + 2],
+                        data[idx + 3],
+                    ]);
                     nodes.push(node);
                     idx += 4;
                 }
 
-                pathways.insert(id, NeuralPathway {
+                pathways.insert(
                     id,
-                    nodes,
-                    strength,
-                    efficiency,
-                    usage_count,
-                    specialized_for,
-                });
+                    NeuralPathway {
+                        id,
+                        nodes,
+                        strength,
+                        efficiency,
+                        usage_count,
+                        specialized_for,
+                    },
+                );
             }
         }
 

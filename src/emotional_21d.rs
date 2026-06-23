@@ -23,9 +23,8 @@ impl EmotionalState21D {
                     let mut vector = [0.0f32; 21];
                     for i in 0..21 {
                         let off = 4 + i * 4;
-                        vector[i] = f32::from_le_bytes(
-                            data[off..off + 4].try_into().unwrap_or([0u8; 4]),
-                        );
+                        vector[i] =
+                            f32::from_le_bytes(data[off..off + 4].try_into().unwrap_or([0u8; 4]));
                     }
                     // Sanitize: replace any NaN with 0.0 to prevent NaN propagation
                     for v in &mut vector {
@@ -37,7 +36,9 @@ impl EmotionalState21D {
                 }
             }
         }
-        Self { vector: [0.0f32; 21] }
+        Self {
+            vector: [0.0f32; 21],
+        }
     }
 
     /// Save to file.
@@ -57,7 +58,13 @@ impl EmotionalState21D {
 /// The first 3 components of the emotion vector are used as the bias direction,
 /// scaled by the overall emotional intensity.
 pub fn emotion_21d_bias(state: &EmotionalState21D) -> (f32, f32, f32) {
-    let intensity: f32 = state.vector.iter().map(|x| x * x).sum::<f32>().sqrt().min(1.0);
+    let intensity: f32 = state
+        .vector
+        .iter()
+        .map(|x| x * x)
+        .sum::<f32>()
+        .sqrt()
+        .min(1.0);
     // Defense-in-depth: if intensity is NaN, return zero bias
     if intensity.is_nan() {
         return (0.0, 0.0, 0.0);

@@ -1,8 +1,8 @@
 //! Mental sandbox for pre-action scenario simulation.
 //! Provides a safe environment to test different action paths before committing.
 
-use std::sync::{Arc, RwLock};
 use std::collections::HashMap;
+use std::sync::{Arc, RwLock};
 
 /// Represents a simulated scenario with its outcome
 #[derive(Debug, Clone)]
@@ -43,11 +43,11 @@ impl MentalSandbox {
     /// Simulate a scenario before real action
     pub fn simulate_scenario(&self, description: &str, actions: Vec<&str>) -> Scenario {
         let id = format!("scenario_{}", rand::random::<u32>());
-        
+
         // Simple heuristic scoring based on goal alignment
         let goal_alignment = self.calculate_goal_alignment(description);
         let complexity_factor = actions.len() as f32 * 0.1;
-        
+
         let scenario = Scenario {
             id: id.clone(),
             description: description.to_string(),
@@ -83,7 +83,7 @@ impl MentalSandbox {
 
         let keywords = description.to_lowercase();
         let mut matches = 0.0;
-        
+
         for goal in &self.long_term_goals {
             let goal_lower = goal.to_lowercase();
             if keywords.contains(&goal_lower) {
@@ -97,8 +97,9 @@ impl MentalSandbox {
     /// Get the best scenario based on risk/reward ratio
     pub fn get_best_scenario(&self) -> Option<Scenario> {
         let scenarios = self.scenarios.read().unwrap();
-        
-        scenarios.values()
+
+        scenarios
+            .values()
             .max_by(|a, b| {
                 let a_score = a.reward_potential / (a.risk_score + 0.01);
                 let b_score = b.reward_potential / (b.risk_score + 0.01);
@@ -115,8 +116,12 @@ impl MentalSandbox {
 }
 
 /// Run multiple scenario simulations in parallel
-pub fn run_parallel_simulations(sandbox: &MentalSandbox, scenario_descriptions: &[(&str, Vec<&str>)]) -> Vec<Scenario> {
-    scenario_descriptions.iter()
+pub fn run_parallel_simulations(
+    sandbox: &MentalSandbox,
+    scenario_descriptions: &[(&str, Vec<&str>)],
+) -> Vec<Scenario> {
+    scenario_descriptions
+        .iter()
         .map(|(desc, actions)| sandbox.simulate_scenario(desc, actions.clone()))
         .collect()
 }

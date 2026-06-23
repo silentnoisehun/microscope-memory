@@ -1,4 +1,4 @@
-﻿//! Self-Model Module for Microscope Memory.
+//! Self-Model Module for Microscope Memory.
 //!
 //! Builds and maintains a model of the system'\''s own cognitive state.
 //! Tracks changes over time: "who am I now, and how have I changed?"
@@ -53,25 +53,64 @@ pub struct SelfModelSnapshot {
 
 impl SelfModelSnapshot {
     pub fn from_bytes(data: &[u8]) -> Option<Self> {
-        if data.len() < 150 || &data[0..4] != b"SLF1" { return None; }
+        if data.len() < 150 || &data[0..4] != b"SLF1" {
+            return None;
+        }
         let mut pos = 4;
-        let ts = u64::from_le_bytes(data[pos..pos+8].try_into().ok()?); pos += 8;
-        let _ver = u16::from_le_bytes(data[pos..pos+2].try_into().ok()?); pos += 2;
+        let ts = u64::from_le_bytes(data[pos..pos + 8].try_into().ok()?);
+        pos += 8;
+        let _ver = u16::from_le_bytes(data[pos..pos + 2].try_into().ok()?);
+        pos += 2;
         let mut emo = [0.0f32; 21];
-        for i in 0..21 { emo[i] = f32::from_le_bytes(data[pos..pos+4].try_into().ok()?); pos += 4; }
+        for i in 0..21 {
+            emo[i] = f32::from_le_bytes(data[pos..pos + 4].try_into().ok()?);
+            pos += 4;
+        }
         let mut attn = [0.0f32; 7];
-        for i in 0..7 { attn[i] = f32::from_le_bytes(data[pos..pos+4].try_into().ok()?); pos += 4; }
-        let he = f32::from_le_bytes(data[pos..pos+4].try_into().ok()?); pos += 4;
-        let hc = u32::from_le_bytes(data[pos..pos+4].try_into().ok()?); pos += 4;
-        let ac = u32::from_le_bytes(data[pos..pos+4].try_into().ok()?); pos += 4;
-        let pc = u32::from_le_bytes(data[pos..pos+4].try_into().ok()?); pos += 4;
-        let bc = u32::from_le_bytes(data[pos..pos+4].try_into().ok()?); pos += 4;
-        let sc = u64::from_le_bytes(data[pos..pos+8].try_into().ok()?); pos += 8;
-        let nlen = u16::from_le_bytes(data[pos..pos+2].try_into().unwrap_or([0;2])) as usize; pos += 2;
-        let narr = if nlen > 0 { String::from_utf8_lossy(&data[pos..pos+nlen]).to_string() } else { String::new() }; pos += nlen;
-        let rlen = u16::from_le_bytes(data[pos..pos+2].try_into().unwrap_or([0;2])) as usize; pos += 2;
-        let refl = if rlen > 0 { String::from_utf8_lossy(&data[pos..pos+rlen]).to_string() } else { String::new() };
-        Some(Self { timestamp_ms: ts, emotional: emo, attention_weights: attn, hebbian_energy: he, hot_count: hc, archetype_count: ac, pattern_count: pc, block_count: bc, session_count: sc, narrative: narr, reflection: refl })
+        for i in 0..7 {
+            attn[i] = f32::from_le_bytes(data[pos..pos + 4].try_into().ok()?);
+            pos += 4;
+        }
+        let he = f32::from_le_bytes(data[pos..pos + 4].try_into().ok()?);
+        pos += 4;
+        let hc = u32::from_le_bytes(data[pos..pos + 4].try_into().ok()?);
+        pos += 4;
+        let ac = u32::from_le_bytes(data[pos..pos + 4].try_into().ok()?);
+        pos += 4;
+        let pc = u32::from_le_bytes(data[pos..pos + 4].try_into().ok()?);
+        pos += 4;
+        let bc = u32::from_le_bytes(data[pos..pos + 4].try_into().ok()?);
+        pos += 4;
+        let sc = u64::from_le_bytes(data[pos..pos + 8].try_into().ok()?);
+        pos += 8;
+        let nlen = u16::from_le_bytes(data[pos..pos + 2].try_into().unwrap_or([0; 2])) as usize;
+        pos += 2;
+        let narr = if nlen > 0 {
+            String::from_utf8_lossy(&data[pos..pos + nlen]).to_string()
+        } else {
+            String::new()
+        };
+        pos += nlen;
+        let rlen = u16::from_le_bytes(data[pos..pos + 2].try_into().unwrap_or([0; 2])) as usize;
+        pos += 2;
+        let refl = if rlen > 0 {
+            String::from_utf8_lossy(&data[pos..pos + rlen]).to_string()
+        } else {
+            String::new()
+        };
+        Some(Self {
+            timestamp_ms: ts,
+            emotional: emo,
+            attention_weights: attn,
+            hebbian_energy: he,
+            hot_count: hc,
+            archetype_count: ac,
+            pattern_count: pc,
+            block_count: bc,
+            session_count: sc,
+            narrative: narr,
+            reflection: refl,
+        })
     }
 
     pub fn to_bytes(&self) -> Vec<u8> {
@@ -83,8 +122,12 @@ impl SelfModelSnapshot {
         buf.extend_from_slice(b"SLF1");
         buf.extend_from_slice(&self.timestamp_ms.to_le_bytes());
         buf.extend_from_slice(&1u16.to_le_bytes()); // version
-        for v in self.emotional { buf.extend_from_slice(&v.to_le_bytes()); }
-        for v in self.attention_weights { buf.extend_from_slice(&v.to_le_bytes()); }
+        for v in self.emotional {
+            buf.extend_from_slice(&v.to_le_bytes());
+        }
+        for v in self.attention_weights {
+            buf.extend_from_slice(&v.to_le_bytes());
+        }
         buf.extend_from_slice(&self.hebbian_energy.to_le_bytes());
         buf.extend_from_slice(&self.hot_count.to_le_bytes());
         buf.extend_from_slice(&self.archetype_count.to_le_bytes());
@@ -112,9 +155,23 @@ impl SelfModel {
         if let Ok(data) = fs::read(&path) {
             let mut pos = 0;
             while pos + 4 <= data.len() {
-                if &data[pos..pos+4] == b"SLF1" {
+                if &data[pos..pos + 4] == b"SLF1" {
                     if let Some(snap) = SelfModelSnapshot::from_bytes(&data[pos..]) {
-                        let size = 4 + 8 + 2 + 84 + 28 + 4 + 4 + 4 + 4 + 4 + 8 + 2 + snap.narrative.len().min(MAX_STR_LEN) + 2 + snap.reflection.len().min(MAX_STR_LEN);
+                        let size = 4
+                            + 8
+                            + 2
+                            + 84
+                            + 28
+                            + 4
+                            + 4
+                            + 4
+                            + 4
+                            + 4
+                            + 8
+                            + 2
+                            + snap.narrative.len().min(MAX_STR_LEN)
+                            + 2
+                            + snap.reflection.len().min(MAX_STR_LEN);
                         pos += size;
                         snapshots.push(snap);
                         continue;
@@ -124,8 +181,16 @@ impl SelfModel {
             }
         }
         let current = snapshots.last().cloned();
-        let previous = if snapshots.len() >= 2 { snapshots.get(snapshots.len() - 2).cloned() } else { None };
-        Self { snapshots, current, previous }
+        let previous = if snapshots.len() >= 2 {
+            snapshots.get(snapshots.len() - 2).cloned()
+        } else {
+            None
+        };
+        Self {
+            snapshots,
+            current,
+            previous,
+        }
     }
 
     pub fn save(&self, output_dir: &Path) -> Result<(), String> {
@@ -140,8 +205,16 @@ impl SelfModel {
         Ok(())
     }
 
-    pub fn take_snapshot(&mut self, config: &Config, reader: &MicroscopeReader, output_dir: &Path) -> SelfModelSnapshot {
-        let now_ms = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_millis() as u64;
+    pub fn take_snapshot(
+        &mut self,
+        config: &Config,
+        reader: &MicroscopeReader,
+        output_dir: &Path,
+    ) -> SelfModelSnapshot {
+        let now_ms = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis() as u64;
         let hebb = HebbianState::load_or_init(output_dir, reader.block_count);
         let attention = AttentionState::load_or_init(output_dir);
         let archetypes = ArchetypeState::load_or_init(output_dir);
@@ -186,19 +259,38 @@ impl SelfModel {
                         changes.push(format!("{} {} by {:.2}", label, dir, diff.abs()));
                     }
                 }
-                let attn_labels = ["Hebbian", "Mirror", "Resonance", "Archetype", "Emotional", "ThoughtGraph", "PredictiveCache"];
+                let attn_labels = [
+                    "Hebbian",
+                    "Mirror",
+                    "Resonance",
+                    "Archetype",
+                    "Emotional",
+                    "ThoughtGraph",
+                    "PredictiveCache",
+                ];
                 for (i, label) in attn_labels.iter().enumerate() {
                     let diff = cur.attention_weights[i] - prev.attention_weights[i];
                     if diff.abs() > 0.05 {
                         let dir = if diff > 0.0 { "up" } else { "down" };
-                        changes.push(format!("{} focus {} by {:.0}%", label, dir, diff.abs() * 100.0));
+                        changes.push(format!(
+                            "{} focus {} by {:.0}%",
+                            label,
+                            dir,
+                            diff.abs() * 100.0
+                        ));
                     }
                 }
                 if cur.hot_count != prev.hot_count {
-                    changes.push(format!("hot memories: {} -> {}", prev.hot_count, cur.hot_count));
+                    changes.push(format!(
+                        "hot memories: {} -> {}",
+                        prev.hot_count, cur.hot_count
+                    ));
                 }
                 if cur.block_count != prev.block_count {
-                    changes.push(format!("blocks: {} -> {}", prev.block_count, cur.block_count));
+                    changes.push(format!(
+                        "blocks: {} -> {}",
+                        prev.block_count, cur.block_count
+                    ));
                 }
                 if changes.is_empty() {
                     "I am stable, no significant changes.".to_string()
@@ -214,14 +306,41 @@ impl SelfModel {
 
 pub fn format_self_model(snap: &SelfModelSnapshot, change_desc: &str) -> String {
     let labels = crate::reader::EMOTION_DIMS;
-    let mut emotions: Vec<(usize, f32)> = snap.emotional.iter().enumerate().map(|(i, &v)| (i, v)).collect();
+    let mut emotions: Vec<(usize, f32)> = snap
+        .emotional
+        .iter()
+        .enumerate()
+        .map(|(i, &v)| (i, v))
+        .collect();
     emotions.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
-    let top_emo: Vec<String> = emotions.iter().take(3).filter(|(_, v)| *v > 0.1).map(|(i, v)| format!("{}={:.2}", labels[*i], v)).collect();
+    let top_emo: Vec<String> = emotions
+        .iter()
+        .take(3)
+        .filter(|(_, v)| *v > 0.1)
+        .map(|(i, v)| format!("{}={:.2}", labels[*i], v))
+        .collect();
 
-    let attn_labels = ["Hebbian", "Mirror", "Resonance", "Archetype", "Emotional", "ThoughtGraph", "PredictiveCache"];
-    let mut attn: Vec<(usize, f32)> = snap.attention_weights.iter().enumerate().map(|(i, &w)| (i, w)).collect();
+    let attn_labels = [
+        "Hebbian",
+        "Mirror",
+        "Resonance",
+        "Archetype",
+        "Emotional",
+        "ThoughtGraph",
+        "PredictiveCache",
+    ];
+    let mut attn: Vec<(usize, f32)> = snap
+        .attention_weights
+        .iter()
+        .enumerate()
+        .map(|(i, &w)| (i, w))
+        .collect();
     attn.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
-    let top_attn: Vec<String> = attn.iter().take(3).map(|(i, w)| format!("{}={:.0}%", attn_labels[*i], w * 100.0)).collect();
+    let top_attn: Vec<String> = attn
+        .iter()
+        .take(3)
+        .map(|(i, w)| format!("{}={:.0}%", attn_labels[*i], w * 100.0))
+        .collect();
 
     format!(
         "  {} SELF-MODEL snapshot\n\
@@ -233,7 +352,10 @@ pub fn format_self_model(snap: &SelfModelSnapshot, change_desc: &str) -> String 
         "SELF:".cyan().bold(),
         top_emo.join(", "),
         top_attn.join(", "),
-        snap.hot_count, snap.archetype_count, snap.pattern_count, snap.block_count,
+        snap.hot_count,
+        snap.archetype_count,
+        snap.pattern_count,
+        snap.block_count,
         change_desc,
         crate::safe_truncate(&snap.reflection, 80),
     )

@@ -8,12 +8,12 @@ use std::path::Path;
 #[derive(Clone, Debug)]
 pub struct FunctionalArea {
     pub id: u64,
-    pub name: String,                  // "vision", "language", "motor", etc.
-    pub blocks: Vec<u32>,              // blocks assigned to this area
+    pub name: String,     // "vision", "language", "motor", etc.
+    pub blocks: Vec<u32>, // blocks assigned to this area
     pub primary_domain: String,
     pub cross_modal_connections: Vec<u64>, // connected to other areas
-    pub plasticity_index: f32,         // 0.0-1.0, how adaptive this area is
-    pub compensation_level: f32,       // how much it compensates for damage
+    pub plasticity_index: f32,             // 0.0-1.0, how adaptive this area is
+    pub compensation_level: f32,           // how much it compensates for damage
 }
 
 #[derive(Clone, Debug)]
@@ -29,7 +29,7 @@ pub struct FunctionalPlasticity {
     pub areas: HashMap<u64, FunctionalArea>,
     pub sensorimotor_maps: Vec<SensoriMotorMap>,
     pub crossmodal_connections: HashMap<(u64, u64), f32>, // (area1, area2) -> strength
-    pub damage_compensation: HashMap<u64, f32>, // area_id -> compensation strength
+    pub damage_compensation: HashMap<u64, f32>,           // area_id -> compensation strength
 }
 
 impl FunctionalPlasticity {
@@ -77,7 +77,11 @@ impl FunctionalPlasticity {
 
     /// Remap sensorimotor pathway (plasticity in action)
     pub fn remap_pathway(&mut self, old_input: u32, new_input: u32) -> bool {
-        if let Some(map) = self.sensorimotor_maps.iter_mut().find(|m| m.input_block == old_input) {
+        if let Some(map) = self
+            .sensorimotor_maps
+            .iter_mut()
+            .find(|m| m.input_block == old_input)
+        {
             map.input_block = new_input;
             map.remapping_count += 1;
             map.efficiency = (map.efficiency + 0.05).min(1.0);
@@ -90,8 +94,10 @@ impl FunctionalPlasticity {
     pub fn connect_areas(&mut self, area1_id: u64, area2_id: u64) -> bool {
         if self.areas.contains_key(&area1_id) && self.areas.contains_key(&area2_id) {
             let strength = 0.3;
-            self.crossmodal_connections.insert((area1_id, area2_id), strength);
-            self.crossmodal_connections.insert((area2_id, area1_id), strength);
+            self.crossmodal_connections
+                .insert((area1_id, area2_id), strength);
+            self.crossmodal_connections
+                .insert((area2_id, area1_id), strength);
 
             if let Some(a1) = self.areas.get_mut(&area1_id) {
                 a1.cross_modal_connections.push(area2_id);
@@ -122,14 +128,15 @@ impl FunctionalPlasticity {
         } else {
             Vec::new()
         };
-        
+
         // Trigger compensation from connected areas
         for connected_id in connected {
             let comp_strength = (severity * 0.7).min(1.0);
             self.damage_compensation.insert(connected_id, comp_strength);
 
             if let Some(conn_area) = self.areas.get_mut(&connected_id) {
-                conn_area.compensation_level = (conn_area.compensation_level + comp_strength).min(1.0);
+                conn_area.compensation_level =
+                    (conn_area.compensation_level + comp_strength).min(1.0);
                 conn_area.plasticity_index = (conn_area.plasticity_index + 0.1).min(1.0);
             }
         }
@@ -160,14 +167,17 @@ impl FunctionalPlasticity {
 
     /// Get areas by domain
     pub fn areas_by_domain(&self, domain: &str) -> Vec<&FunctionalArea> {
-        self.areas.values()
+        self.areas
+            .values()
             .filter(|a| a.primary_domain == domain)
             .collect()
     }
 
     /// Get most plastic areas
     pub fn most_plastic(&self, k: usize) -> Vec<(&str, f32)> {
-        let mut areas: Vec<_> = self.areas.values()
+        let mut areas: Vec<_> = self
+            .areas
+            .values()
             .map(|a| (a.name.as_str(), a.plasticity_index))
             .collect();
         areas.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
@@ -186,7 +196,7 @@ impl FunctionalPlasticity {
         data.extend_from_slice(&area_count.to_le_bytes());
         for (_, area) in &self.areas {
             data.extend_from_slice(&area.id.to_le_bytes());
-            
+
             let name_bytes = area.name.as_bytes();
             data.push(name_bytes.len() as u8);
             data.extend_from_slice(name_bytes);
@@ -243,88 +253,138 @@ impl FunctionalPlasticity {
 
         // Read areas
         if idx + 4 <= data.len() {
-            let area_count = u32::from_le_bytes([data[idx], data[idx+1], data[idx+2], data[idx+3]]) as usize;
+            let area_count =
+                u32::from_le_bytes([data[idx], data[idx + 1], data[idx + 2], data[idx + 3]])
+                    as usize;
             idx += 4;
 
             for _ in 0..area_count {
-                if idx + 18 > data.len() { break; }
+                if idx + 18 > data.len() {
+                    break;
+                }
 
-                let id = u64::from_le_bytes([data[idx], data[idx+1], data[idx+2], data[idx+3],
-                                           data[idx+4], data[idx+5], data[idx+6], data[idx+7]]);
+                let id = u64::from_le_bytes([
+                    data[idx],
+                    data[idx + 1],
+                    data[idx + 2],
+                    data[idx + 3],
+                    data[idx + 4],
+                    data[idx + 5],
+                    data[idx + 6],
+                    data[idx + 7],
+                ]);
                 idx += 8;
 
-                if idx >= data.len() { break; }
+                if idx >= data.len() {
+                    break;
+                }
                 let name_len = data[idx] as usize;
                 idx += 1;
 
-                if idx + name_len > data.len() { break; }
-                let name = String::from_utf8_lossy(&data[idx..idx+name_len]).to_string();
+                if idx + name_len > data.len() {
+                    break;
+                }
+                let name = String::from_utf8_lossy(&data[idx..idx + name_len]).to_string();
                 idx += name_len;
 
-                if idx >= data.len() { break; }
+                if idx >= data.len() {
+                    break;
+                }
                 let domain_len = data[idx] as usize;
                 idx += 1;
 
-                if idx + domain_len > data.len() { break; }
-                let primary_domain = String::from_utf8_lossy(&data[idx..idx+domain_len]).to_string();
+                if idx + domain_len > data.len() {
+                    break;
+                }
+                let primary_domain =
+                    String::from_utf8_lossy(&data[idx..idx + domain_len]).to_string();
                 idx += domain_len;
 
-                if idx + 12 > data.len() { break; }
-                let plasticity_index = f32::from_le_bytes([data[idx], data[idx+1], data[idx+2], data[idx+3]]);
+                if idx + 12 > data.len() {
+                    break;
+                }
+                let plasticity_index =
+                    f32::from_le_bytes([data[idx], data[idx + 1], data[idx + 2], data[idx + 3]]);
                 idx += 4;
-                let compensation_level = f32::from_le_bytes([data[idx], data[idx+1], data[idx+2], data[idx+3]]);
+                let compensation_level =
+                    f32::from_le_bytes([data[idx], data[idx + 1], data[idx + 2], data[idx + 3]]);
                 idx += 4;
 
-                let block_count = u16::from_le_bytes([data[idx], data[idx+1]]) as usize;
+                let block_count = u16::from_le_bytes([data[idx], data[idx + 1]]) as usize;
                 idx += 2;
 
                 let mut blocks = Vec::new();
                 for _ in 0..block_count {
-                    if idx + 4 > data.len() { break; }
-                    let block = u32::from_le_bytes([data[idx], data[idx+1], data[idx+2], data[idx+3]]);
+                    if idx + 4 > data.len() {
+                        break;
+                    }
+                    let block = u32::from_le_bytes([
+                        data[idx],
+                        data[idx + 1],
+                        data[idx + 2],
+                        data[idx + 3],
+                    ]);
                     blocks.push(block);
                     idx += 4;
                 }
 
-                areas.insert(id, FunctionalArea {
+                areas.insert(
                     id,
-                    name,
-                    blocks,
-                    primary_domain,
-                    cross_modal_connections: Vec::new(),
-                    plasticity_index,
-                    compensation_level,
-                });
+                    FunctionalArea {
+                        id,
+                        name,
+                        blocks,
+                        primary_domain,
+                        cross_modal_connections: Vec::new(),
+                        plasticity_index,
+                        compensation_level,
+                    },
+                );
             }
         }
 
         // Read sensorimotor maps
         if idx + 4 <= data.len() {
-            let map_count = u32::from_le_bytes([data[idx], data[idx+1], data[idx+2], data[idx+3]]) as usize;
+            let map_count =
+                u32::from_le_bytes([data[idx], data[idx + 1], data[idx + 2], data[idx + 3]])
+                    as usize;
             idx += 4;
 
             for _ in 0..map_count {
-                if idx + 20 > data.len() { break; }
+                if idx + 20 > data.len() {
+                    break;
+                }
 
-                let input_block = u32::from_le_bytes([data[idx], data[idx+1], data[idx+2], data[idx+3]]);
+                let input_block =
+                    u32::from_le_bytes([data[idx], data[idx + 1], data[idx + 2], data[idx + 3]]);
                 idx += 4;
 
-                let strength = f32::from_le_bytes([data[idx], data[idx+1], data[idx+2], data[idx+3]]);
+                let strength =
+                    f32::from_le_bytes([data[idx], data[idx + 1], data[idx + 2], data[idx + 3]]);
                 idx += 4;
 
-                let efficiency = f32::from_le_bytes([data[idx], data[idx+1], data[idx+2], data[idx+3]]);
+                let efficiency =
+                    f32::from_le_bytes([data[idx], data[idx + 1], data[idx + 2], data[idx + 3]]);
                 idx += 4;
 
-                let remapping_count = u32::from_le_bytes([data[idx], data[idx+1], data[idx+2], data[idx+3]]);
+                let remapping_count =
+                    u32::from_le_bytes([data[idx], data[idx + 1], data[idx + 2], data[idx + 3]]);
                 idx += 4;
 
-                let out_count = u16::from_le_bytes([data[idx], data[idx+1]]) as usize;
+                let out_count = u16::from_le_bytes([data[idx], data[idx + 1]]) as usize;
                 idx += 2;
 
                 let mut output_blocks = Vec::new();
                 for _ in 0..out_count {
-                    if idx + 4 > data.len() { break; }
-                    let out = u32::from_le_bytes([data[idx], data[idx+1], data[idx+2], data[idx+3]]);
+                    if idx + 4 > data.len() {
+                        break;
+                    }
+                    let out = u32::from_le_bytes([
+                        data[idx],
+                        data[idx + 1],
+                        data[idx + 2],
+                        data[idx + 3],
+                    ]);
                     output_blocks.push(out);
                     idx += 4;
                 }

@@ -1,4 +1,4 @@
-﻿//! Working Memory — korlátos puffer 7±2 item, gyors decay (30mp), primacy/recency boost, auto-konszolidáció.
+//! Working Memory — korlátos puffer 7±2 item, gyors decay (30mp), primacy/recency boost, auto-konszolidáció.
 //!
 //! Binary format: WKM1 (Working Memory v1)
 //!   [W,K,M,1] magic (4 bytes)
@@ -13,11 +13,11 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 // ─── Constants ─────────────────────────────────────────
 const DEFAULT_CAPACITY: usize = 7; // Miller-törvény: 7±2
-const DECAY_MS: u64 = 30_000;      // 30 mp alatt felejt
+const DECAY_MS: u64 = 30_000; // 30 mp alatt felejt
 const CONSOLIDATE_ACCESS_THRESHOLD: u32 = 3; // 3 hozzáférés után konszolidáció
-const PRIMACY_BOOST: f32 = 0.15;   // első elem boost
-const RECENCY_BOOST: f32 = 0.10;   // utolsó elem boost
-// ─── Types ─────────────────────────────────────────────
+const PRIMACY_BOOST: f32 = 0.15; // első elem boost
+const RECENCY_BOOST: f32 = 0.10; // utolsó elem boost
+                                 // ─── Types ─────────────────────────────────────────────
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum MemoryType {
@@ -52,7 +52,7 @@ pub struct WorkingMemory {
 pub struct WorkingMemoryStats {
     pub item_count: usize,
     pub capacity: usize,
-    pub hot_items: usize,   // access_count >= 2
+    pub hot_items: usize, // access_count >= 2
     pub decay_ms: u64,
     pub consolidation_candidates: usize, // access_count >= CONSOLIDATE_ACCESS_THRESHOLD
 }
@@ -68,41 +68,64 @@ impl WorkingMemory {
                 let mut items = Vec::with_capacity(count);
                 let mut off = 10;
                 for _ in 0..count {
-                    if off + 2 > data.len() { break; }
-                    let text_len = u16::from_le_bytes([data[off], data[off+1]]) as usize;
+                    if off + 2 > data.len() {
+                        break;
+                    }
+                    let text_len = u16::from_le_bytes([data[off], data[off + 1]]) as usize;
                     off += 2;
-                    if off + text_len > data.len() { break; }
-                    let text = String::from_utf8_lossy(&data[off..off+text_len]).to_string();
+                    if off + text_len > data.len() {
+                        break;
+                    }
+                    let text = String::from_utf8_lossy(&data[off..off + text_len]).to_string();
                     off += text_len;
-                    if off + 37 > data.len() { break; }
-                    let ts = u64::from_le_bytes(data[off..off+8].try_into().unwrap());
-                    let la = u64::from_le_bytes(data[off+8..off+16].try_into().unwrap());
-                    let imp = f32::from_le_bytes(data[off+16..off+20].try_into().unwrap());
-                    let dr = f32::from_le_bytes(data[off+20..off+24].try_into().unwrap());
-                    let sp = data[off+24];
-                    let mt = match data[off+25] {
+                    if off + 37 > data.len() {
+                        break;
+                    }
+                    let ts = u64::from_le_bytes(data[off..off + 8].try_into().unwrap());
+                    let la = u64::from_le_bytes(data[off + 8..off + 16].try_into().unwrap());
+                    let imp = f32::from_le_bytes(data[off + 16..off + 20].try_into().unwrap());
+                    let dr = f32::from_le_bytes(data[off + 20..off + 24].try_into().unwrap());
+                    let sp = data[off + 24];
+                    let mt = match data[off + 25] {
                         0 => MemoryType::Episodic,
                         1 => MemoryType::Semantic,
                         2 => MemoryType::Implicit,
                         3 => MemoryType::Explicit,
                         _ => MemoryType::Episodic,
                     };
-                    let ac = u32::from_le_bytes(data[off+26..off+30].try_into().unwrap());
-                    let ll = data[off+30] as usize;
+                    let ac = u32::from_le_bytes(data[off + 26..off + 30].try_into().unwrap());
+                    let ll = data[off + 30] as usize;
                     off += 31;
                     let layer = if off + ll <= data.len() {
-                        String::from_utf8_lossy(&data[off..off+ll]).to_string()
-                    } else { String::new() };
+                        String::from_utf8_lossy(&data[off..off + ll]).to_string()
+                    } else {
+                        String::new()
+                    };
                     off += ll;
                     items.push(WorkingMemoryItem {
-                        text, timestamp_ms: ts, last_access_ms: la, importance: imp,
-                        decay_rate: dr, serial_pos: sp, memory_type: mt, access_count: ac, layer,
+                        text,
+                        timestamp_ms: ts,
+                        last_access_ms: la,
+                        importance: imp,
+                        decay_rate: dr,
+                        serial_pos: sp,
+                        memory_type: mt,
+                        access_count: ac,
+                        layer,
                     });
                 }
-                return WorkingMemory { items, capacity, decay_ms };
+                return WorkingMemory {
+                    items,
+                    capacity,
+                    decay_ms,
+                };
             }
         }
-        WorkingMemory { items: Vec::new(), capacity: DEFAULT_CAPACITY, decay_ms: DECAY_MS }
+        WorkingMemory {
+            items: Vec::new(),
+            capacity: DEFAULT_CAPACITY,
+            decay_ms: DECAY_MS,
+        }
     }
 
     /// Mentés WKM1 binary formátumba.
@@ -143,8 +166,13 @@ impl WorkingMemory {
             let mut worst_score = f32::MAX;
             let now = now;
             for (i, item) in self.items.iter().enumerate() {
-                let recency = ((now - item.last_access_ms) as f64 / self.decay_ms as f64).max(0.0) as f32;
-                let age_weight = if recency > 1.0 { 0.1 } else { 1.0 - recency * 0.9 };
+                let recency =
+                    ((now - item.last_access_ms) as f64 / self.decay_ms as f64).max(0.0) as f32;
+                let age_weight = if recency > 1.0 {
+                    0.1
+                } else {
+                    1.0 - recency * 0.9
+                };
                 let score = item.importance * age_weight;
                 if score < worst_score {
                     worst_score = score;
@@ -199,7 +227,9 @@ impl WorkingMemory {
     /// Find item by text substring (linear scan).
     pub fn find(&self, query: &str) -> Option<usize> {
         let lower = query.to_lowercase();
-        self.items.iter().position(|item| item.text.to_lowercase().contains(&lower))
+        self.items
+            .iter()
+            .position(|item| item.text.to_lowercase().contains(&lower))
     }
 
     /// Consolidate high-access items: returns the items that qualify.
@@ -220,7 +250,11 @@ impl WorkingMemory {
     /// Compute working memory stats.
     pub fn stats(&self) -> WorkingMemoryStats {
         let hot = self.items.iter().filter(|i| i.access_count >= 2).count();
-        let cons_candidates = self.items.iter().filter(|i| i.access_count >= CONSOLIDATE_ACCESS_THRESHOLD).count();
+        let cons_candidates = self
+            .items
+            .iter()
+            .filter(|i| i.access_count >= CONSOLIDATE_ACCESS_THRESHOLD)
+            .count();
         WorkingMemoryStats {
             item_count: self.items.len(),
             capacity: self.capacity,
@@ -267,7 +301,11 @@ mod tests {
 
     #[test]
     fn test_eviction_when_full() {
-        let mut wm = WorkingMemory { items: vec![], capacity: 3, decay_ms: 30000 };
+        let mut wm = WorkingMemory {
+            items: vec![],
+            capacity: 3,
+            decay_ms: 30000,
+        };
         wm.push("a", 1.0, "st", MemoryType::Episodic);
         wm.push("b", 1.0, "st", MemoryType::Episodic);
         wm.push("c", 1.0, "st", MemoryType::Episodic);
@@ -277,7 +315,11 @@ mod tests {
 
     #[test]
     fn test_access_bumps_count() {
-        let mut wm = WorkingMemory { items: vec![], capacity: 7, decay_ms: 30000 };
+        let mut wm = WorkingMemory {
+            items: vec![],
+            capacity: 7,
+            decay_ms: 30000,
+        };
         wm.push("test", 5.0, "st", MemoryType::Episodic);
         wm.access(0);
         assert_eq!(wm.items[0].access_count, 1);
@@ -285,7 +327,11 @@ mod tests {
 
     #[test]
     fn test_decay_removes_old() {
-        let mut wm = WorkingMemory { items: vec![], capacity: 7, decay_ms: 1 }; // 1ms decay
+        let mut wm = WorkingMemory {
+            items: vec![],
+            capacity: 7,
+            decay_ms: 1,
+        }; // 1ms decay
         wm.push("old", 5.0, "st", MemoryType::Episodic);
         std::thread::sleep(std::time::Duration::from_millis(5));
         wm.decay();
@@ -294,7 +340,11 @@ mod tests {
 
     #[test]
     fn test_stats() {
-        let mut wm = WorkingMemory { items: vec![], capacity: 5, decay_ms: 30000 };
+        let mut wm = WorkingMemory {
+            items: vec![],
+            capacity: 5,
+            decay_ms: 30000,
+        };
         wm.push("a", 5.0, "st", MemoryType::Episodic);
         wm.push("b", 3.0, "lt", MemoryType::Semantic);
         let s = wm.stats();
@@ -319,7 +369,11 @@ mod tests {
 
     #[test]
     fn test_clear() {
-        let mut wm = WorkingMemory { items: vec![], capacity: 7, decay_ms: 30000 };
+        let mut wm = WorkingMemory {
+            items: vec![],
+            capacity: 7,
+            decay_ms: 30000,
+        };
         wm.push("x", 5.0, "st", MemoryType::Episodic);
         wm.clear();
         assert!(wm.items.is_empty());

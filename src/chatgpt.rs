@@ -1,4 +1,4 @@
-﻿//! ChatGPT Export Importer — Microscope Memory számára
+//! ChatGPT Export Importer — Microscope Memory számára
 //!
 //! Képes:
 //! - ChatGPT konverzációs export JSON feldolgozása
@@ -9,10 +9,10 @@
 //! Használat:
 //!   microscope-mem import-chatgpt <path> --persona Liora
 
+use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
 use std::fs;
 use std::path::Path;
-use serde::{Deserialize, Serialize};
 
 // ─── ChatGPT Export Adatszerkezetek ─────────────────────────────────────────
 
@@ -70,8 +70,8 @@ pub struct MessageContent {
 #[derive(Debug, Clone)]
 pub struct ProcessedMessage {
     pub conversation_title: String,
-    pub role: String,          // "user" | "assistant"
-    pub sender_name: String,   // Szilvi vagy Liora
+    pub role: String,        // "user" | "assistant"
+    pub sender_name: String, // Szilvi vagy Liora
     pub text: String,
     pub timestamp_ms: u64,
     pub message_index: usize,
@@ -111,8 +111,7 @@ impl ChatGPTImporter {
 
         // A ChatGPT export lehet tömbfájl vagy a {conversations: [...]} formátum
         let conversations: Vec<Conversation> = if content.trim().starts_with('[') {
-            serde_json::from_str(&content)
-                .map_err(|e| format!("JSON parse hiba (tömb): {}", e))?
+            serde_json::from_str(&content).map_err(|e| format!("JSON parse hiba (tömb): {}", e))?
         } else {
             let export: ChatGPTExport = serde_json::from_str(&content)
                 .map_err(|e| format!("JSON parse hiba (objektum): {}", e))?;
@@ -156,7 +155,8 @@ impl ChatGPTImporter {
             path.reverse();
 
             // Szűrés: csak a user/assistant üzenetek
-            let conv_messages: Vec<ProcessedMessage> = path.iter()
+            let conv_messages: Vec<ProcessedMessage> = path
+                .iter()
                 .filter_map(|nid| {
                     let node = mapping.get(nid)?;
                     let msg = node.message.as_ref()?;
@@ -166,20 +166,27 @@ impl ChatGPTImporter {
                     // Csak user és assistant
                     if role != "user" && role != "assistant" {
                         // Try "system" or others - only take user/assistant
-                        if role != "system" { return None; }
+                        if role != "system" {
+                            return None;
+                        }
                     }
 
                     let content = msg.content.as_ref()?;
-                    let text = content.parts.as_ref()
+                    let text = content
+                        .parts
+                        .as_ref()
                         .and_then(|parts| {
-                            parts.first()
+                            parts
+                                .first()
                                 .and_then(|p| p.as_str())
                                 .map(|s| s.to_string())
                         })
                         .or_else(|| content.text.clone())
                         .unwrap_or_default();
 
-                    if text.trim().is_empty() { return None; }
+                    if text.trim().is_empty() {
+                        return None;
+                    }
 
                     let ts = (msg.create_time.unwrap_or(0.0) * 1000.0) as u64;
                     let sender = if role == "assistant" {
@@ -220,9 +227,12 @@ impl ChatGPTImporter {
             Ok(m) => m,
             Err(e) => {
                 return ImportResult {
-                    conversations_found: 0, total_messages: 0,
-                    user_messages: 0, ai_messages: 0,
-                    total_size_bytes: 0, errors: vec![e],
+                    conversations_found: 0,
+                    total_messages: 0,
+                    user_messages: 0,
+                    ai_messages: 0,
+                    total_size_bytes: 0,
+                    errors: vec![e],
                     import_duration_ms: start.elapsed().as_millis() as u64,
                 };
             }
@@ -238,18 +248,30 @@ impl ChatGPTImporter {
             }
 
             // Tárolás Microscope Memory-ba
-            let layer = if msg.role == "assistant" { "long_term" } else { "short_term" };
+            let layer = if msg.role == "assistant" {
+                "long_term"
+            } else {
+                "short_term"
+            };
             let importance = if msg.role == "assistant" { 8 } else { 6 };
             let store_text = format!(
                 "[{} | {}] {}: {}",
-                msg.conversation_title, msg.sender_name,
-                if msg.role == "assistant" { &self.persona_name } else { &self.user_name },
+                msg.conversation_title,
+                msg.sender_name,
+                if msg.role == "assistant" {
+                    &self.persona_name
+                } else {
+                    &self.user_name
+                },
                 msg.text
             );
 
             let cmd = format!(
                 "{} store -l {} -i {} \"{}\"",
-                microscope_binary, layer, importance, store_text.replace('\"', "\\\"")
+                microscope_binary,
+                layer,
+                importance,
+                store_text.replace('\"', "\\\"")
             );
 
             // Futtatás (egyszerű: syscall)
@@ -259,11 +281,18 @@ impl ChatGPTImporter {
                 .output()
                 .is_err()
             {
-                errors.push(format!("Hiba üzenet tárolásakor: {}", msg.text.chars().take(50).collect::<String>()));
+                errors.push(format!(
+                    "Hiba üzenet tárolásakor: {}",
+                    msg.text.chars().take(50).collect::<String>()
+                ));
             }
 
             total_messages += 1;
-            if msg.role == "assistant" { ai_msgs += 1; } else { user_msgs += 1; }
+            if msg.role == "assistant" {
+                ai_msgs += 1;
+            } else {
+                user_msgs += 1;
+            }
         }
 
         let file_size = fs::metadata(path).map(|m| m.len() as usize).unwrap_or(0);

@@ -1,8 +1,8 @@
 //! Impulse control system for filtering incoming stimuli and suppressing irrelevant thoughts.
 //! Implements a gating mechanism based on attention priority and long-term goals.
 
-use std::sync::{Arc, RwLock};
 use std::collections::HashSet;
+use std::sync::{Arc, RwLock};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Represents an incoming stimulus that needs filtering
@@ -11,8 +11,8 @@ pub struct Stimulus {
     pub id: String,
     pub content: String,
     pub source: String,
-    pub urgency: f32,      // 0.0-1.0
-    pub relevance: f32,    // 0.0-1.0
+    pub urgency: f32,   // 0.0-1.0
+    pub relevance: f32, // 0.0-1.0
     pub timestamp: u64,
     pub suppressed: bool,
 }
@@ -50,7 +50,10 @@ impl ImpulseControl {
 
     /// Add a suppression pattern (keywords to automatically suppress)
     pub fn add_suppression_pattern(&mut self, pattern: &str) {
-        self.suppression_patterns.write().unwrap().insert(pattern.to_lowercase());
+        self.suppression_patterns
+            .write()
+            .unwrap()
+            .insert(pattern.to_lowercase());
     }
 
     /// Filter a stimulus based on attention gates and goals
@@ -150,9 +153,10 @@ impl ImpulseControl {
 /// Batch filter multiple stimuli
 pub fn batch_filter_stimuli(
     control: &mut ImpulseControl,
-    stimuli: &[(&str, &str, f32)]
+    stimuli: &[(&str, &str, f32)],
 ) -> Vec<Stimulus> {
-    stimuli.iter()
+    stimuli
+        .iter()
         .map(|(content, source, urgency)| control.filter_stimulus(content, source, *urgency))
         .collect()
 }

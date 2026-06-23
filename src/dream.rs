@@ -150,11 +150,7 @@ impl DreamState {
                 .iter()
                 .map(|c| c.pruned_activations as u64)
                 .sum(),
-            total_forgotten_blocks: self
-                .cycles
-                .iter()
-                .map(|c| c.forgotten_blocks as u64)
-                .sum(),
+            total_forgotten_blocks: self.cycles.iter().map(|c| c.forgotten_blocks as u64).sum(),
             total_strengthened: self
                 .cycles
                 .iter()
@@ -234,19 +230,22 @@ pub fn dream_consolidate(output_dir: &Path, block_count: usize) -> Result<DreamC
     for ((a, b), appearances) in &pair_appearances {
         if *appearances >= STRENGTHEN_MIN_APPEARANCES {
             // Check emotional coherence for extra boost
-            let coherence_mult = emotion_lookup.as_ref().and_then(|lookup| {
-                lookup(*a as usize).and_then(|ea| {
-                    lookup(*b as usize).map(|eb| {
-                        let sim = emotional_similarity(&ea, &eb);
-                        if sim > 0.4 {
-                            coherence_boosted += 1;
-                            1.0 + sim * 0.5 // up to 1.5x extra boost
-                        } else {
-                            1.0
-                        }
+            let coherence_mult = emotion_lookup
+                .as_ref()
+                .and_then(|lookup| {
+                    lookup(*a as usize).and_then(|ea| {
+                        lookup(*b as usize).map(|eb| {
+                            let sim = emotional_similarity(&ea, &eb);
+                            if sim > 0.4 {
+                                coherence_boosted += 1;
+                                1.0 + sim * 0.5 // up to 1.5x extra boost
+                            } else {
+                                1.0
+                            }
+                        })
                     })
                 })
-            }).unwrap_or(1.0);
+                .unwrap_or(1.0);
 
             if let Some(pair) = hebb.coactivations.get_mut(&(*a, *b)) {
                 pair.count = (pair.count as f32 * STRENGTHEN_MULTIPLIER * coherence_mult) as u32;
@@ -356,8 +355,6 @@ fn now_ms() -> u64 {
 
 // ─── Tests ──────────────────────────────────────────
 
-
-
 // ─── Forgetting ─────────────────────────────────────────
 /// Forget old internal thoughts (autonomous mode outputs).
 /// Only targets internal layers: short_term(2), associative(3), reflections(6), session(11).
@@ -369,45 +366,42 @@ const FORGET_INTERNAL_LAYERS: &[u8] = &[2, 3, 6, 11];
 const FORGET_MIN_IMPORTANCE: u8 = 5;
 
 pub fn forget_old_thoughts(output_dir: &Path, block_count: usize) -> Result<u32, String> {
+    use crate::{BLOCK_DATA_SIZE, DEPTH_ENTRY_SIZE, HEADER_SIZE, META_HEADER_SIZE};
     use std::fs;
-    use std::io::{Read, Write, Seek, SeekFrom};
-    use crate::{HEADER_SIZE, BLOCK_DATA_SIZE, META_HEADER_SIZE, DEPTH_ENTRY_SIZE};
-    
+    use std::io::{Read, Seek, SeekFrom, Write};
+
     let hdr_path = output_dir.join("microscope.bin");
     let dat_path = output_dir.join("data.bin");
     let meta_path = output_dir.join("meta.bin");
-    
+
     if !hdr_path.exists() || !dat_path.exists() || !meta_path.exists() {
         return Ok(0); // Nothing to do if files don't exist
     }
-    
-    let headers = fs::read(&hdr_path)
-        .map_err(|e| format!("read microscope.bin: {}", e))?;
-    let data = fs::read(&dat_path)
-        .map_err(|e| format!("read data.bin: {}", e))?;
-    let meta = fs::read(&meta_path)
-        .map_err(|e| format!("read meta.bin: {}", e))?;
-    
+
+    let headers = fs::read(&hdr_path).map_err(|e| format!("read microscope.bin: {}", e))?;
+    let data = fs::read(&dat_path).map_err(|e| format!("read data.bin: {}", e))?;
+    let meta = fs::read(&meta_path).map_err(|e| format!("read meta.bin: {}", e))?;
+
     let actual_blocks = headers.len() / HEADER_SIZE;
     if actual_blocks == 0 {
         return Ok(0);
     }
-    
+
     let t0 = now_ms();
     let mut keep_indices: Vec<usize> = Vec::with_capacity(actual_blocks);
     let mut forgotten = 0u32;
-    
+
     for i in 0..actual_blocks {
         let off = i * HEADER_SIZE;
         if off + HEADER_SIZE > headers.len() {
             break;
         }
-        
+
         // Read layer_id (byte 12 in header: after x(4), y(4), z(4))
         let layer_id = headers[off + 12];
         // Read importance (byte 13 in header)
         let importance = headers[off + 13];
-        
+
         // Check if this is an internal thought that should be forgotten
         if FORGET_INTERNAL_LAYERS.contains(&layer_id) && importance < FORGET_MIN_IMPORTANCE {
             // We don't have a direct timestamp in the header, so we estimate
@@ -417,22 +411,22 @@ pub fn forget_old_thoughts(output_dir: &Path, block_count: usize) -> Result<u32,
             forgotten += 1;
             continue; // Skip this block
         }
-        
+
         keep_indices.push(i);
     }
-    
+
     if forgotten == 0 {
         return Ok(0);
     }
-    
+
     // Rewrite microscope.bin with only kept headers
     let mut new_headers = Vec::with_capacity(keep_indices.len() * HEADER_SIZE);
     let mut new_data = Vec::with_capacity(keep_indices.len() * BLOCK_DATA_SIZE);
-    
+
     for &idx in &keep_indices {
         let hdr_off = idx * HEADER_SIZE;
         let dat_off = idx * BLOCK_DATA_SIZE;
-        
+
         new_headers.extend_from_slice(&headers[hdr_off..hdr_off + HEADER_SIZE]);
         if dat_off + BLOCK_DATA_SIZE <= data.len() {
             new_data.extend_from_slice(&data[dat_off..dat_off + BLOCK_DATA_SIZE]);
@@ -440,20 +434,18 @@ pub fn forget_old_thoughts(output_dir: &Path, block_count: usize) -> Result<u32,
             new_data.extend_from_slice(&[0u8; BLOCK_DATA_SIZE]);
         }
     }
-    
+
     let hdr_tmp = output_dir.join("microscope.bin.tmp");
     let dat_tmp = output_dir.join("data.bin.tmp");
-    fs::write(&hdr_tmp, &new_headers)
-        .map_err(|e| format!("write microscope.bin: {}", e))?;
-    fs::write(&dat_tmp, &new_data)
-        .map_err(|e| format!("write data.bin: {}", e))?;
+    fs::write(&hdr_tmp, &new_headers).map_err(|e| format!("write microscope.bin: {}", e))?;
+    fs::write(&dat_tmp, &new_data).map_err(|e| format!("write data.bin: {}", e))?;
     fs::rename(&hdr_tmp, &hdr_path).map_err(|e| format!("rename microscope.bin: {}", e))?;
     fs::rename(&dat_tmp, &dat_path).map_err(|e| format!("rename data.bin: {}", e))?;
-    
+
     // Rebuild meta.bin with new block count and depth ranges
     let n = keep_indices.len();
     let mut new_meta = Vec::with_capacity(META_HEADER_SIZE + 9 * DEPTH_ENTRY_SIZE);
-    
+
     // Copy original magic and version (first 8 bytes)
     if meta.len() >= 8 {
         new_meta.extend_from_slice(&meta[..8]);
@@ -462,7 +454,7 @@ pub fn forget_old_thoughts(output_dir: &Path, block_count: usize) -> Result<u32,
     }
     // Write new block count (u32 at offset 8)
     new_meta.extend_from_slice(&(n as u32).to_le_bytes());
-    
+
     // Compute depth ranges from kept headers
     let mut depth_counts = [0u32; 9];
     for &idx in &keep_indices {
@@ -472,7 +464,7 @@ pub fn forget_old_thoughts(output_dir: &Path, block_count: usize) -> Result<u32,
             depth_counts[depth as usize] += 1;
         }
     }
-    
+
     let mut running_start = 0u32;
     for d in 0..9 {
         let count = depth_counts[d];
@@ -480,20 +472,22 @@ pub fn forget_old_thoughts(output_dir: &Path, block_count: usize) -> Result<u32,
         new_meta.extend_from_slice(&count.to_le_bytes());
         running_start += count;
     }
-    
+
     // Copy remaining meta data (merkle root, etc.) if available
     let meta_tail_start = META_HEADER_SIZE + 9 * DEPTH_ENTRY_SIZE;
     if meta_tail_start < meta.len() {
         new_meta.extend_from_slice(&meta[meta_tail_start..]);
     }
-    
+
     let meta_tmp = output_dir.join("meta.bin.tmp");
-    fs::write(&meta_tmp, &new_meta)
-        .map_err(|e| format!("write meta.bin: {}", e))?;
+    fs::write(&meta_tmp, &new_meta).map_err(|e| format!("write meta.bin: {}", e))?;
     fs::rename(&meta_tmp, &meta_path).map_err(|e| format!("rename meta.bin: {}", e))?;
-    
-    println!("  [FORGET] {} belső gondolat elfelejtve ({} blokk maradt)", forgotten, n);
-    
+
+    println!(
+        "  [FORGET] {} belső gondolat elfelejtve ({} blokk maradt)",
+        forgotten, n
+    );
+
     Ok(forgotten)
 }
 

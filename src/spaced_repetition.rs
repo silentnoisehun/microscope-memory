@@ -80,7 +80,8 @@ impl SpacedBlock {
             } else if self.recall_count == 2 {
                 self.interval_days = 6.0;
             } else {
-                self.interval_days = (self.interval_days * self.ease_factor).min(365.0 * 5.0); // max 5 year
+                self.interval_days = (self.interval_days * self.ease_factor).min(365.0 * 5.0);
+                // max 5 year
             }
         }
     }
@@ -115,17 +116,27 @@ impl SpacedRepetition {
                 let mut blocks = Vec::with_capacity(count);
                 let mut off = 8;
                 for _ in 0..count {
-                    if off + rec_size > data.len() { break; }
-                    let block_idx = u32::from_le_bytes(data[off..off+4].try_into().unwrap());
-                    let recall_count = u16::from_le_bytes(data[off+4..off+6].try_into().unwrap());
-                    let last_recall_ms = u64::from_le_bytes(data[off+6..off+14].try_into().unwrap());
-                    let interval_days = f32::from_le_bytes(data[off+14..off+18].try_into().unwrap());
-                    let ease_factor = f32::from_le_bytes(data[off+18..off+22].try_into().unwrap());
-                    let importance = data[off+22];
+                    if off + rec_size > data.len() {
+                        break;
+                    }
+                    let block_idx = u32::from_le_bytes(data[off..off + 4].try_into().unwrap());
+                    let recall_count =
+                        u16::from_le_bytes(data[off + 4..off + 6].try_into().unwrap());
+                    let last_recall_ms =
+                        u64::from_le_bytes(data[off + 6..off + 14].try_into().unwrap());
+                    let interval_days =
+                        f32::from_le_bytes(data[off + 14..off + 18].try_into().unwrap());
+                    let ease_factor =
+                        f32::from_le_bytes(data[off + 18..off + 22].try_into().unwrap());
+                    let importance = data[off + 22];
                     off += rec_size;
                     blocks.push(SpacedBlock {
-                        block_idx, recall_count, last_recall_ms,
-                        interval_days, ease_factor, importance,
+                        block_idx,
+                        recall_count,
+                        last_recall_ms,
+                        interval_days,
+                        ease_factor,
+                        importance,
                     });
                 }
                 return SpacedRepetition { blocks };
@@ -187,7 +198,9 @@ impl SpacedRepetition {
     /// Spacing boost adott blokkhoz a recall scoring-hoz.
     pub fn spacing_boost(&self, block_idx: u32) -> f32 {
         let now = now_ms();
-        self.find(block_idx).map(|b| b.spacing_boost(now)).unwrap_or(0.0)
+        self.find(block_idx)
+            .map(|b| b.spacing_boost(now))
+            .unwrap_or(0.0)
     }
 
     /// Hány due blokk van?
@@ -198,7 +211,10 @@ impl SpacedRepetition {
 
     /// Hány "mastered" blokk (recall_count >= 15)?
     pub fn mastered_count(&self) -> usize {
-        self.blocks.iter().filter(|b| b.recall_count >= MASTERED_THRESHOLD).count()
+        self.blocks
+            .iter()
+            .filter(|b| b.recall_count >= MASTERED_THRESHOLD)
+            .count()
     }
 
     /// Statisztikák.
@@ -207,17 +223,29 @@ impl SpacedRepetition {
         SpacedStats {
             total_blocks: self.blocks.len(),
             due: self.blocks.iter().filter(|b| b.is_due(now)).count(),
-            mastered: self.blocks.iter().filter(|b| b.recall_count >= MASTERED_THRESHOLD).count(),
-            fresh: self.blocks.iter().filter(|b| now.saturating_sub(b.last_recall_ms) < FRESH_WINDOW_MS).count(),
-            avg_ease: self.blocks.iter().map(|b| b.ease_factor).sum::<f32>() / self.blocks.len().max(1) as f32,
-            avg_interval: self.blocks.iter().map(|b| b.interval_days).sum::<f32>() / self.blocks.len().max(1) as f32,
+            mastered: self
+                .blocks
+                .iter()
+                .filter(|b| b.recall_count >= MASTERED_THRESHOLD)
+                .count(),
+            fresh: self
+                .blocks
+                .iter()
+                .filter(|b| now.saturating_sub(b.last_recall_ms) < FRESH_WINDOW_MS)
+                .count(),
+            avg_ease: self.blocks.iter().map(|b| b.ease_factor).sum::<f32>()
+                / self.blocks.len().max(1) as f32,
+            avg_interval: self.blocks.iter().map(|b| b.interval_days).sum::<f32>()
+                / self.blocks.len().max(1) as f32,
         }
     }
 
     /// Listázd a due blokkokat block_idx szerint.
     pub fn due_blocks(&self) -> Vec<u32> {
         let now = now_ms();
-        let mut due: Vec<u32> = self.blocks.iter()
+        let mut due: Vec<u32> = self
+            .blocks
+            .iter()
             .filter(|b| b.is_due(now))
             .map(|b| b.block_idx)
             .collect();
@@ -260,8 +288,12 @@ mod tests {
     fn test_sm2_interval_growth() {
         let _sr = SpacedRepetition { blocks: vec![] };
         let mut block = SpacedBlock {
-            block_idx: 0, recall_count: 0, last_recall_ms: 1000,
-            interval_days: 1.0, ease_factor: 2.5, importance: 5,
+            block_idx: 0,
+            recall_count: 0,
+            last_recall_ms: 1000,
+            interval_days: 1.0,
+            ease_factor: 2.5,
+            importance: 5,
         };
         // 1st recall (quality=4)
         block.record_recall(4, 2000);
@@ -280,8 +312,12 @@ mod tests {
     #[test]
     fn test_poor_quality_resets() {
         let mut block = SpacedBlock {
-            block_idx: 0, recall_count: 2, last_recall_ms: 1000,
-            interval_days: 10.0, ease_factor: 2.5, importance: 5,
+            block_idx: 0,
+            recall_count: 2,
+            last_recall_ms: 1000,
+            interval_days: 10.0,
+            ease_factor: 2.5,
+            importance: 5,
         };
         block.record_recall(1, 2000); // poor quality → reset
         assert!((block.interval_days - 1.0).abs() < 0.01);
@@ -308,10 +344,12 @@ mod tests {
     fn test_due_detection() {
         let sr = SpacedRepetition {
             blocks: vec![SpacedBlock {
-                block_idx: 0, recall_count: 1,
-                last_recall_ms: 1000,  // régi
-                interval_days: 0.001,  // nagyon rövid intervallum → due
-                ease_factor: 2.5, importance: 5,
+                block_idx: 0,
+                recall_count: 1,
+                last_recall_ms: 1000, // régi
+                interval_days: 0.001, // nagyon rövid intervallum → due
+                ease_factor: 2.5,
+                importance: 5,
             }],
         };
         assert!(sr.due_count() > 0);

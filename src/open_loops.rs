@@ -106,10 +106,7 @@ pub fn resolve(dir: &Path, id: u64) -> Result<bool, String> {
             status: crate::timeline::STATUS_RESOLVED,
             text: format!("[loop#{} resolved] {}", id, entry.text),
         };
-        let _ = crate::timeline::append_entry(
-            &dir.join("timeline.bin"),
-            &timeline_entry,
-        );
+        let _ = crate::timeline::append_entry(&dir.join("timeline.bin"), &timeline_entry);
         Ok(true)
     } else {
         Ok(false)

@@ -9,9 +9,9 @@
 //!
 //! All numbers are wall-clock from a single release build run on this host.
 
+use microscope_memory::config::Config;
 use microscope_memory::consciousness_seqlock::SharedSnapshot;
 use microscope_memory::consciousness_stream::*;
-use microscope_memory::config::Config;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::thread;
@@ -96,8 +96,15 @@ fn perf_format_real_index() {
         "\n[FORMAT/REAL]   {} calls in {:.2?} → {:.2} µs/call (output {} bytes)\n  \
          state: hebbian.activations={}, resonance.field={}, mirror.echoes={},\n  \
          state: archetypes={}, thought_graph.crystallized={}",
-        n, elapsed, per_call_us, last_len,
-        n_activations, n_resonance, n_echoes, n_archetypes, n_patterns
+        n,
+        elapsed,
+        per_call_us,
+        last_len,
+        n_activations,
+        n_resonance,
+        n_echoes,
+        n_archetypes,
+        n_patterns
     );
 }
 
@@ -201,7 +208,11 @@ fn perf_format_cached_string_empty() {
         "\n[CACHED/EMPTY] {} calls in {:.2?} → {:.0} ns/call (output {} bytes)",
         n, elapsed, per_call_ns, last_len
     );
-    assert!(per_call_ns < 200.0, "cached format too slow: {} ns", per_call_ns);
+    assert!(
+        per_call_ns < 200.0,
+        "cached format too slow: {} ns",
+        per_call_ns
+    );
 }
 
 #[test]
@@ -233,7 +244,11 @@ fn perf_format_cached_string_real() {
         "\n[CACHED/REAL]   {} calls in {:.2?} → {:.0} ns/call (output {} bytes, 28k activations)",
         n, elapsed, per_call_ns, last_len
     );
-    assert!(per_call_ns < 200.0, "cached format too slow: {} ns", per_call_ns);
+    assert!(
+        per_call_ns < 200.0,
+        "cached format too slow: {} ns",
+        per_call_ns
+    );
 }
 
 #[test]
@@ -260,7 +275,11 @@ fn perf_hot_fields() {
         "\n[HOT_FIELDS]    {} calls in {:.2?} → {:.0} ns/call (cycle={})",
         n, elapsed, per_call_ns, last_cycle
     );
-    assert!(per_call_ns < 50.0, "hot fields too slow: {} ns", per_call_ns);
+    assert!(
+        per_call_ns < 50.0,
+        "hot fields too slow: {} ns",
+        per_call_ns
+    );
 }
 
 #[test]

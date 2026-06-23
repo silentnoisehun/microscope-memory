@@ -7,18 +7,18 @@ use std::path::Path;
 #[derive(Clone, Debug)]
 pub struct HyperfocusState {
     pub target: String,
-    pub target_type: String,  // "planning", "problem_solving", "creative", "research"
-    pub intensity: f32,       // 0.0-1.0, how concentrated
+    pub target_type: String, // "planning", "problem_solving", "creative", "research"
+    pub intensity: f32,      // 0.0-1.0, how concentrated
     pub start_time_ms: u64,
-    pub depth_level: f32,     // how deep in the topic (0.0-1.0)
-    pub efficiency: f32,      // data processing efficiency
+    pub depth_level: f32, // how deep in the topic (0.0-1.0)
+    pub efficiency: f32,  // data processing efficiency
     pub blocks_processed: u32,
 }
 
 pub struct Hyperfocus {
     pub current_focus: Option<HyperfocusState>,
     pub focus_history: Vec<HyperfocusState>,
-    pub attention_multiplier: f32,  // base 1.0, up to 3.0 in hyperfocus
+    pub attention_multiplier: f32, // base 1.0, up to 3.0 in hyperfocus
     pub resource_concentration: f32, // how much goes to focus (0.5-1.0)
 }
 
@@ -35,11 +35,11 @@ impl Hyperfocus {
     /// Enter hyperfocus state on a specific target
     pub fn enter_hyperfocus(&mut self, target: &str, focus_type: &str) -> f32 {
         let now = Self::now_ms();
-        
+
         // Ramp up attention and resources
-        self.attention_multiplier = 3.0;  // 3x normal
+        self.attention_multiplier = 3.0; // 3x normal
         self.resource_concentration = 0.95; // 95% to this task
-        
+
         let state = HyperfocusState {
             target: target.to_string(),
             target_type: focus_type.to_string(),
@@ -49,7 +49,7 @@ impl Hyperfocus {
             efficiency: 0.8,
             blocks_processed: 0,
         };
-        
+
         self.current_focus = Some(state);
         self.attention_multiplier
     }
@@ -59,17 +59,17 @@ impl Hyperfocus {
         if let Some(focus) = &mut self.current_focus {
             // Efficiency increases with focus type
             let type_bonus = match focus.target_type.as_str() {
-                "research" => 1.2,      // best for data processing
+                "research" => 1.2, // best for data processing
                 "problem_solving" => 1.1,
                 "creative" => 0.9,
                 "planning" => 1.0,
                 _ => 1.0,
             };
-            
+
             focus.efficiency = (focus.efficiency + 0.02 * type_bonus).min(1.0);
             focus.depth_level = (focus.depth_level + 0.05 * complexity).min(1.0);
             focus.blocks_processed += blocks_count;
-            
+
             // Intensity sustained at high level
             focus.intensity = 0.95 + (blocks_count as f32 * 0.001).min(0.05);
         }
@@ -83,11 +83,11 @@ impl Hyperfocus {
             if self.focus_history.len() > 100 {
                 self.focus_history.remove(0);
             }
-            
+
             // Return to normal
             self.attention_multiplier = 1.0;
             self.resource_concentration = 0.5;
-            
+
             return Some(focus);
         }
         None
@@ -96,27 +96,27 @@ impl Hyperfocus {
     /// Get hyperfocus insights (what was learned)
     pub fn get_insights(&self) -> Vec<String> {
         let mut insights = Vec::new();
-        
+
         if let Some(focus) = &self.current_focus {
             let mut insight = format!("Hyperfocus on '{}' ({})", focus.target, focus.target_type);
-            
+
             if focus.blocks_processed > 100 {
                 insight.push_str(&format!(" - Processed {} blocks", focus.blocks_processed));
             }
-            
+
             if focus.depth_level > 0.7 {
                 insight.push_str(" - Deep understanding achieved");
             } else if focus.depth_level > 0.4 {
                 insight.push_str(" - Moderate depth");
             }
-            
+
             if focus.efficiency > 0.9 {
                 insight.push_str(" - High efficiency");
             }
-            
+
             insights.push(insight);
         }
-        
+
         insights
     }
 
@@ -133,7 +133,10 @@ impl Hyperfocus {
     pub fn get_resource_allocation(&self) -> (f32, f32) {
         // (to_focus, to_background)
         if self.current_focus.is_some() {
-            (self.resource_concentration, 1.0 - self.resource_concentration)
+            (
+                self.resource_concentration,
+                1.0 - self.resource_concentration,
+            )
         } else {
             (0.5, 0.5)
         }
@@ -162,15 +165,15 @@ impl Hyperfocus {
 
         if let Some(focus) = &self.current_focus {
             data.push(1); // Active
-            
+
             let target_bytes = focus.target.as_bytes();
             data.extend_from_slice(&(target_bytes.len() as u16).to_le_bytes());
             data.extend_from_slice(target_bytes);
-            
+
             let type_bytes = focus.target_type.as_bytes();
             data.push(type_bytes.len() as u8);
             data.extend_from_slice(type_bytes);
-            
+
             data.extend_from_slice(&focus.intensity.to_le_bytes());
             data.extend_from_slice(&focus.start_time_ms.to_le_bytes());
             data.extend_from_slice(&focus.depth_level.to_le_bytes());
@@ -203,32 +206,66 @@ impl Hyperfocus {
             idx += 1;
 
             if idx + 2 <= data.len() {
-                let target_len = u16::from_le_bytes([data[idx], data[idx+1]]) as usize;
+                let target_len = u16::from_le_bytes([data[idx], data[idx + 1]]) as usize;
                 idx += 2;
 
-                if idx + target_len > data.len() { return Ok(Self::new()); }
-                let target = String::from_utf8_lossy(&data[idx..idx+target_len]).to_string();
+                if idx + target_len > data.len() {
+                    return Ok(Self::new());
+                }
+                let target = String::from_utf8_lossy(&data[idx..idx + target_len]).to_string();
                 idx += target_len;
 
-                if idx >= data.len() { return Ok(Self::new()); }
+                if idx >= data.len() {
+                    return Ok(Self::new());
+                }
                 let type_len = data[idx] as usize;
                 idx += 1;
 
-                if idx + type_len > data.len() { return Ok(Self::new()); }
-                let target_type = String::from_utf8_lossy(&data[idx..idx+type_len]).to_string();
+                if idx + type_len > data.len() {
+                    return Ok(Self::new());
+                }
+                let target_type = String::from_utf8_lossy(&data[idx..idx + type_len]).to_string();
                 idx += type_len;
 
                 if idx + 24 <= data.len() {
-                    let intensity = f32::from_le_bytes([data[idx], data[idx+1], data[idx+2], data[idx+3]]);
+                    let intensity = f32::from_le_bytes([
+                        data[idx],
+                        data[idx + 1],
+                        data[idx + 2],
+                        data[idx + 3],
+                    ]);
                     idx += 4;
-                    let start_time_ms = u64::from_le_bytes([data[idx], data[idx+1], data[idx+2], data[idx+3],
-                                                          data[idx+4], data[idx+5], data[idx+6], data[idx+7]]);
+                    let start_time_ms = u64::from_le_bytes([
+                        data[idx],
+                        data[idx + 1],
+                        data[idx + 2],
+                        data[idx + 3],
+                        data[idx + 4],
+                        data[idx + 5],
+                        data[idx + 6],
+                        data[idx + 7],
+                    ]);
                     idx += 8;
-                    let depth_level = f32::from_le_bytes([data[idx], data[idx+1], data[idx+2], data[idx+3]]);
+                    let depth_level = f32::from_le_bytes([
+                        data[idx],
+                        data[idx + 1],
+                        data[idx + 2],
+                        data[idx + 3],
+                    ]);
                     idx += 4;
-                    let efficiency = f32::from_le_bytes([data[idx], data[idx+1], data[idx+2], data[idx+3]]);
+                    let efficiency = f32::from_le_bytes([
+                        data[idx],
+                        data[idx + 1],
+                        data[idx + 2],
+                        data[idx + 3],
+                    ]);
                     idx += 4;
-                    let blocks_processed = u32::from_le_bytes([data[idx], data[idx+1], data[idx+2], data[idx+3]]);
+                    let blocks_processed = u32::from_le_bytes([
+                        data[idx],
+                        data[idx + 1],
+                        data[idx + 2],
+                        data[idx + 3],
+                    ]);
 
                     current_focus = Some(HyperfocusState {
                         target,

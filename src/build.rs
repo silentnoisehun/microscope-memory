@@ -616,8 +616,7 @@ pub fn build(config: &Config, force: bool) -> Result<(), String> {
     let merkle_tmp = merkle_path.with_extension("bin.tmp");
     fs::write(&merkle_tmp, merkle_tree.to_bytes())
         .map_err(|e| format!("write merkle.bin: {}", e))?;
-    fs::rename(&merkle_tmp, &merkle_path)
-        .map_err(|e| format!("rename merkle.bin: {}", e))?;
+    fs::rename(&merkle_tmp, &merkle_path).map_err(|e| format!("rename merkle.bin: {}", e))?;
     println!(
         "  {}: {} leaves, root={}",
         "merkle".green(),

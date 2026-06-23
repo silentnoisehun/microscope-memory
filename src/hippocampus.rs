@@ -9,9 +9,9 @@ use std::path::Path;
 #[derive(Clone, Debug)]
 pub struct ContextBinding {
     pub query_hash: u64,
-    pub context: String,           // spatial/temporal context
-    pub block_indices: Vec<u32>,   // blocks retrieved in this context
-    pub binding_strength: f32,     // 0.0-1.0
+    pub context: String,         // spatial/temporal context
+    pub block_indices: Vec<u32>, // blocks retrieved in this context
+    pub binding_strength: f32,   // 0.0-1.0
     pub timestamp_ms: u64,
     pub retrieval_count: u32,
 }
@@ -28,7 +28,7 @@ pub struct EpisodicIndex {
 pub struct Hippocampus {
     pub context_bindings: HashMap<u64, ContextBinding>,
     pub episodes: Vec<EpisodicIndex>,
-    pub consolidation_queue: Vec<u64>,  // episode IDs to consolidate
+    pub consolidation_queue: Vec<u64>, // episode IDs to consolidate
     pub binding_threshold: f32,
 }
 
@@ -45,7 +45,7 @@ impl Hippocampus {
     /// Create context-event binding: link blocks to their retrieval context
     pub fn create_binding(&mut self, query_hash: u64, context: &str, blocks: Vec<u32>) -> u64 {
         let binding_strength = (blocks.len() as f32 / 100.0).min(1.0);
-        
+
         let binding = ContextBinding {
             query_hash,
             context: context.to_string(),
@@ -87,28 +87,44 @@ impl Hippocampus {
 
     /// Get consolidation candidates (fresh episodes with strong bindings)
     pub fn get_consolidation_candidates(&self, k: usize) -> Vec<EpisodicIndex> {
-        let mut candidates: Vec<_> = self.episodes.iter()
-            .filter(|e| e.consolidation_state == 0 && e.context_binding.binding_strength > self.binding_threshold)
+        let mut candidates: Vec<_> = self
+            .episodes
+            .iter()
+            .filter(|e| {
+                e.consolidation_state == 0
+                    && e.context_binding.binding_strength > self.binding_threshold
+            })
             .cloned()
             .collect();
-        
+
         candidates.sort_by(|a, b| {
-            b.context_binding.binding_strength.partial_cmp(&a.context_binding.binding_strength).unwrap()
+            b.context_binding
+                .binding_strength
+                .partial_cmp(&a.context_binding.binding_strength)
+                .unwrap()
         });
-        
+
         candidates.into_iter().take(k).collect()
     }
 
     /// Mark episode as consolidating
     pub fn mark_consolidating(&mut self, episode_id: u64) {
-        if let Some(ep) = self.episodes.iter_mut().find(|e| e.episode_id == episode_id) {
+        if let Some(ep) = self
+            .episodes
+            .iter_mut()
+            .find(|e| e.episode_id == episode_id)
+        {
             ep.consolidation_state = 1;
         }
     }
 
     /// Mark episode as consolidated
     pub fn mark_consolidated(&mut self, episode_id: u64) {
-        if let Some(ep) = self.episodes.iter_mut().find(|e| e.episode_id == episode_id) {
+        if let Some(ep) = self
+            .episodes
+            .iter_mut()
+            .find(|e| e.episode_id == episode_id)
+        {
             ep.consolidation_state = 2;
             ep.replay_count += 1;
         }
@@ -116,23 +132,29 @@ impl Hippocampus {
 
     /// Replay episode for consolidation (simulates sleep consolidation)
     pub fn replay_episode(&mut self, episode_id: u64) -> Option<Vec<u32>> {
-        self.episodes.iter_mut()
+        self.episodes
+            .iter_mut()
             .find(|e| e.episode_id == episode_id)
             .map(|e| {
                 e.replay_count += 1;
-                e.context_binding.binding_strength = (e.context_binding.binding_strength + 0.05).min(1.0);
+                e.context_binding.binding_strength =
+                    (e.context_binding.binding_strength + 0.05).min(1.0);
                 e.blocks.clone()
             })
     }
 
     /// Get related episodes (same context)
     pub fn get_related_episodes(&self, episode_id: u64) -> Vec<EpisodicIndex> {
-        let context = self.episodes.iter()
+        let context = self
+            .episodes
+            .iter()
             .find(|e| e.episode_id == episode_id)
             .map(|e| e.context_binding.context.clone());
 
         if let Some(ctx) = context {
-            return self.episodes.iter()
+            return self
+                .episodes
+                .iter()
                 .filter(|e| e.context_binding.context == ctx && e.episode_id != episode_id)
                 .cloned()
                 .collect();
@@ -144,15 +166,27 @@ impl Hippocampus {
     pub fn stats(&self) -> (usize, usize, usize, f32) {
         let total_bindings = self.context_bindings.len();
         let total_episodes = self.episodes.len();
-        let consolidated = self.episodes.iter().filter(|e| e.consolidation_state == 2).count();
+        let consolidated = self
+            .episodes
+            .iter()
+            .filter(|e| e.consolidation_state == 2)
+            .count();
         let avg_binding_strength = if !self.context_bindings.is_empty() {
-            self.context_bindings.values().map(|b| b.binding_strength).sum::<f32>() 
+            self.context_bindings
+                .values()
+                .map(|b| b.binding_strength)
+                .sum::<f32>()
                 / self.context_bindings.len() as f32
         } else {
             0.0
         };
 
-        (total_bindings, total_episodes, consolidated, avg_binding_strength)
+        (
+            total_bindings,
+            total_episodes,
+            consolidated,
+            avg_binding_strength,
+        )
     }
 
     /// Decay old episodes (biological forgetting)
@@ -190,7 +224,7 @@ impl Hippocampus {
             data.extend_from_slice(&binding.binding_strength.to_le_bytes());
             data.extend_from_slice(&binding.timestamp_ms.to_le_bytes());
             data.extend_from_slice(&binding.retrieval_count.to_le_bytes());
-            
+
             let ctx_bytes = binding.context.as_bytes();
             data.extend_from_slice(&(ctx_bytes.len() as u16).to_le_bytes());
             data.extend_from_slice(ctx_bytes);
@@ -209,7 +243,7 @@ impl Hippocampus {
             data.extend_from_slice(&episode.episode_id.to_le_bytes());
             data.push(episode.consolidation_state);
             data.extend_from_slice(&episode.replay_count.to_le_bytes());
-            
+
             let block_count = episode.blocks.len() as u16;
             data.extend_from_slice(&block_count.to_le_bytes());
             for &idx in &episode.blocks {
@@ -238,82 +272,140 @@ impl Hippocampus {
 
         // Read bindings
         if idx + 4 <= data.len() {
-            let binding_count = u32::from_le_bytes([data[idx], data[idx+1], data[idx+2], data[idx+3]]) as usize;
+            let binding_count =
+                u32::from_le_bytes([data[idx], data[idx + 1], data[idx + 2], data[idx + 3]])
+                    as usize;
             idx += 4;
 
             for _ in 0..binding_count {
-                if idx + 32 > data.len() { break; }
-                
-                let hash = u64::from_le_bytes([data[idx], data[idx+1], data[idx+2], data[idx+3],
-                                             data[idx+4], data[idx+5], data[idx+6], data[idx+7]]);
+                if idx + 32 > data.len() {
+                    break;
+                }
+
+                let hash = u64::from_le_bytes([
+                    data[idx],
+                    data[idx + 1],
+                    data[idx + 2],
+                    data[idx + 3],
+                    data[idx + 4],
+                    data[idx + 5],
+                    data[idx + 6],
+                    data[idx + 7],
+                ]);
                 idx += 8;
 
-                let binding_strength = f32::from_le_bytes([data[idx], data[idx+1], data[idx+2], data[idx+3]]);
+                let binding_strength =
+                    f32::from_le_bytes([data[idx], data[idx + 1], data[idx + 2], data[idx + 3]]);
                 idx += 4;
 
-                let timestamp_ms = u64::from_le_bytes([data[idx], data[idx+1], data[idx+2], data[idx+3],
-                                                     data[idx+4], data[idx+5], data[idx+6], data[idx+7]]);
+                let timestamp_ms = u64::from_le_bytes([
+                    data[idx],
+                    data[idx + 1],
+                    data[idx + 2],
+                    data[idx + 3],
+                    data[idx + 4],
+                    data[idx + 5],
+                    data[idx + 6],
+                    data[idx + 7],
+                ]);
                 idx += 8;
 
-                let retrieval_count = u32::from_le_bytes([data[idx], data[idx+1], data[idx+2], data[idx+3]]);
+                let retrieval_count =
+                    u32::from_le_bytes([data[idx], data[idx + 1], data[idx + 2], data[idx + 3]]);
                 idx += 4;
 
-                if idx + 2 > data.len() { break; }
-                let ctx_len = u16::from_le_bytes([data[idx], data[idx+1]]) as usize;
+                if idx + 2 > data.len() {
+                    break;
+                }
+                let ctx_len = u16::from_le_bytes([data[idx], data[idx + 1]]) as usize;
                 idx += 2;
 
-                if idx + ctx_len > data.len() { break; }
-                let context = String::from_utf8_lossy(&data[idx..idx+ctx_len]).to_string();
+                if idx + ctx_len > data.len() {
+                    break;
+                }
+                let context = String::from_utf8_lossy(&data[idx..idx + ctx_len]).to_string();
                 idx += ctx_len;
 
-                if idx + 2 > data.len() { break; }
-                let block_count = u16::from_le_bytes([data[idx], data[idx+1]]) as usize;
+                if idx + 2 > data.len() {
+                    break;
+                }
+                let block_count = u16::from_le_bytes([data[idx], data[idx + 1]]) as usize;
                 idx += 2;
 
                 let mut block_indices = Vec::new();
                 for _ in 0..block_count {
-                    if idx + 4 > data.len() { break; }
-                    let block_idx = u32::from_le_bytes([data[idx], data[idx+1], data[idx+2], data[idx+3]]);
+                    if idx + 4 > data.len() {
+                        break;
+                    }
+                    let block_idx = u32::from_le_bytes([
+                        data[idx],
+                        data[idx + 1],
+                        data[idx + 2],
+                        data[idx + 3],
+                    ]);
                     block_indices.push(block_idx);
                     idx += 4;
                 }
 
-                context_bindings.insert(hash, ContextBinding {
-                    query_hash: hash,
-                    context,
-                    block_indices,
-                    binding_strength,
-                    timestamp_ms,
-                    retrieval_count,
-                });
+                context_bindings.insert(
+                    hash,
+                    ContextBinding {
+                        query_hash: hash,
+                        context,
+                        block_indices,
+                        binding_strength,
+                        timestamp_ms,
+                        retrieval_count,
+                    },
+                );
             }
         }
 
         // Read episodes
         if idx + 4 <= data.len() {
-            let episode_count = u32::from_le_bytes([data[idx], data[idx+1], data[idx+2], data[idx+3]]) as usize;
+            let episode_count =
+                u32::from_le_bytes([data[idx], data[idx + 1], data[idx + 2], data[idx + 3]])
+                    as usize;
             idx += 4;
 
             for _ in 0..episode_count {
-                if idx + 15 > data.len() { break; }
-                
-                let episode_id = u64::from_le_bytes([data[idx], data[idx+1], data[idx+2], data[idx+3],
-                                                   data[idx+4], data[idx+5], data[idx+6], data[idx+7]]);
+                if idx + 15 > data.len() {
+                    break;
+                }
+
+                let episode_id = u64::from_le_bytes([
+                    data[idx],
+                    data[idx + 1],
+                    data[idx + 2],
+                    data[idx + 3],
+                    data[idx + 4],
+                    data[idx + 5],
+                    data[idx + 6],
+                    data[idx + 7],
+                ]);
                 idx += 8;
 
                 let consolidation_state = data[idx];
                 idx += 1;
 
-                let replay_count = u32::from_le_bytes([data[idx], data[idx+1], data[idx+2], data[idx+3]]);
+                let replay_count =
+                    u32::from_le_bytes([data[idx], data[idx + 1], data[idx + 2], data[idx + 3]]);
                 idx += 4;
 
-                let block_count = u16::from_le_bytes([data[idx], data[idx+1]]) as usize;
+                let block_count = u16::from_le_bytes([data[idx], data[idx + 1]]) as usize;
                 idx += 2;
 
                 let mut blocks = Vec::new();
                 for _ in 0..block_count {
-                    if idx + 4 > data.len() { break; }
-                    let block_idx = u32::from_le_bytes([data[idx], data[idx+1], data[idx+2], data[idx+3]]);
+                    if idx + 4 > data.len() {
+                        break;
+                    }
+                    let block_idx = u32::from_le_bytes([
+                        data[idx],
+                        data[idx + 1],
+                        data[idx + 2],
+                        data[idx + 3],
+                    ]);
                     blocks.push(block_idx);
                     idx += 4;
                 }

@@ -116,13 +116,15 @@ impl KnowledgeBase {
 
         // Indexelés tagek szerint
         for tag in &entry.tags {
-            tag_index.entry(tag.clone())
+            tag_index
+                .entry(tag.clone())
                 .or_insert_with(Vec::new)
                 .push(id.clone());
         }
 
         // Indexelés típus szerint
-        type_index.entry(entry.entry_type.clone())
+        type_index
+            .entry(entry.entry_type.clone())
             .or_insert_with(Vec::new)
             .push(id.clone());
 
@@ -141,7 +143,8 @@ impl KnowledgeBase {
         let query_lower = query.to_lowercase();
         let query_words: Vec<&str> = query_lower.split_whitespace().collect();
 
-        let mut scored: Vec<(f64, &KnowledgeEntry, Vec<String>)> = entries.values()
+        let mut scored: Vec<(f64, &KnowledgeEntry, Vec<String>)> = entries
+            .values()
             .map(|entry| {
                 let mut score = 0.0;
 
@@ -156,7 +159,9 @@ impl KnowledgeBase {
                 }
 
                 // Tag egyezés
-                let matched_tags: Vec<String> = entry.tags.iter()
+                let matched_tags: Vec<String> = entry
+                    .tags
+                    .iter()
                     .filter(|tag| query_words.iter().any(|w| tag.to_lowercase().contains(w)))
                     .cloned()
                     .collect();
@@ -181,7 +186,8 @@ impl KnowledgeBase {
         // Rendezés pontszám szerint
         scored.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
 
-        scored.into_iter()
+        scored
+            .into_iter()
             .take(max_results)
             .map(|(score, entry, matched_tags)| SearchResult {
                 entry: entry.clone(),
@@ -220,15 +226,15 @@ impl KnowledgeBase {
         let entries = self.entries.read().unwrap();
 
         if let Some(related) = associations.get(id) {
-            let mut scored: Vec<(f64, &KnowledgeEntry)> = related.iter()
-                .filter_map(|(rel_id, weight)| {
-                    entries.get(rel_id).map(|entry| (*weight, entry))
-                })
+            let mut scored: Vec<(f64, &KnowledgeEntry)> = related
+                .iter()
+                .filter_map(|(rel_id, weight)| entries.get(rel_id).map(|entry| (*weight, entry)))
                 .collect();
 
             scored.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
 
-            scored.into_iter()
+            scored
+                .into_iter()
                 .take(max_results)
                 .map(|(_, entry)| entry.clone())
                 .collect()
@@ -289,7 +295,11 @@ impl KnowledgeBase {
     }
 
     /// Döntési minta hozzáadása
-    pub fn add_from_decision(&self, decision: &DecisionLogEntry, pattern: &HeuristicPattern) -> String {
+    pub fn add_from_decision(
+        &self,
+        decision: &DecisionLogEntry,
+        pattern: &HeuristicPattern,
+    ) -> String {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
@@ -298,11 +308,17 @@ impl KnowledgeBase {
         let entry = KnowledgeEntry {
             id: format!("decision_{}", rand::random::<u32>()),
             entry_type: KnowledgeEntryType::DecisionPattern,
-            title: format!("Decision pattern: {} (success={:.1}%)",
-                pattern.name, pattern.success_rate * 100.0),
+            title: format!(
+                "Decision pattern: {} (success={:.1}%)",
+                pattern.name,
+                pattern.success_rate * 100.0
+            ),
             description: format!(
                 "Decision type: {:?}, selected: {}, outcome_score: {:.2}, reflection: {}",
-                decision.decision_type, decision.selected_option, decision.outcome_score, decision.reflection
+                decision.decision_type,
+                decision.selected_option,
+                decision.outcome_score,
+                decision.reflection
             ),
             tags: vec![
                 "decision".to_string(),
@@ -322,7 +338,13 @@ impl KnowledgeBase {
     }
 
     /// Eureka/Insight hozzáadása
-    pub fn add_insight(&self, title: &str, description: &str, tags: Vec<String>, source: &str) -> String {
+    pub fn add_insight(
+        &self,
+        title: &str,
+        description: &str,
+        tags: Vec<String>,
+        source: &str,
+    ) -> String {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
@@ -351,7 +373,13 @@ impl KnowledgeBase {
     }
 
     /// Legjobb gyakorlat hozzáadása
-    pub fn add_best_practice(&self, title: &str, description: &str, context: &str, tags: Vec<String>) -> String {
+    pub fn add_best_practice(
+        &self,
+        title: &str,
+        description: &str,
+        context: &str,
+        tags: Vec<String>,
+    ) -> String {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
@@ -380,7 +408,13 @@ impl KnowledgeBase {
     }
 
     /// Ismert hiba/buktátó hozzáadása
-    pub fn add_pitfall(&self, title: &str, description: &str, context: &str, tags: Vec<String>) -> String {
+    pub fn add_pitfall(
+        &self,
+        title: &str,
+        description: &str,
+        context: &str,
+        tags: Vec<String>,
+    ) -> String {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
@@ -392,7 +426,11 @@ impl KnowledgeBase {
             title: title.to_string(),
             description: description.to_string(),
             tags: {
-                let mut t = vec!["pitfall".to_string(), "warning".to_string(), "anti_pattern".to_string()];
+                let mut t = vec![
+                    "pitfall".to_string(),
+                    "warning".to_string(),
+                    "anti_pattern".to_string(),
+                ];
                 t.extend(tags);
                 t
             },
@@ -409,7 +447,14 @@ impl KnowledgeBase {
     }
 
     /// Heurisztikus szabály hozzáadása
-    pub fn add_heuristic_rule(&self, title: &str, description: &str, context: &str, confidence: f64, tags: Vec<String>) -> String {
+    pub fn add_heuristic_rule(
+        &self,
+        title: &str,
+        description: &str,
+        context: &str,
+        confidence: f64,
+        tags: Vec<String>,
+    ) -> String {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
@@ -442,7 +487,8 @@ impl KnowledgeBase {
         let type_index = self.type_index.read().unwrap();
         let entries = self.entries.read().unwrap();
 
-        type_index.get(entry_type)
+        type_index
+            .get(entry_type)
             .map(|ids| {
                 ids.iter()
                     .filter_map(|id| entries.get(id))
@@ -457,7 +503,8 @@ impl KnowledgeBase {
         let tag_index = self.tag_index.read().unwrap();
         let entries = self.entries.read().unwrap();
 
-        tag_index.get(tag)
+        tag_index
+            .get(tag)
             .map(|ids| {
                 ids.iter()
                     .filter_map(|id| entries.get(id))
@@ -473,13 +520,34 @@ impl KnowledgeBase {
         let type_index = self.type_index.read().unwrap();
 
         let total = entries.len() as u64;
-        let arch_count = type_index.get(&KnowledgeEntryType::ArchitecturePattern).map(|v| v.len() as u64).unwrap_or(0);
-        let sim_count = type_index.get(&KnowledgeEntryType::SimulationResult).map(|v| v.len() as u64).unwrap_or(0);
-        let dec_count = type_index.get(&KnowledgeEntryType::DecisionPattern).map(|v| v.len() as u64).unwrap_or(0);
-        let ins_count = type_index.get(&KnowledgeEntryType::Insight).map(|v| v.len() as u64).unwrap_or(0);
-        let rule_count = type_index.get(&KnowledgeEntryType::HeuristicRule).map(|v| v.len() as u64).unwrap_or(0);
-        let prac_count = type_index.get(&KnowledgeEntryType::BestPractice).map(|v| v.len() as u64).unwrap_or(0);
-        let pit_count = type_index.get(&KnowledgeEntryType::KnownPitfall).map(|v| v.len() as u64).unwrap_or(0);
+        let arch_count = type_index
+            .get(&KnowledgeEntryType::ArchitecturePattern)
+            .map(|v| v.len() as u64)
+            .unwrap_or(0);
+        let sim_count = type_index
+            .get(&KnowledgeEntryType::SimulationResult)
+            .map(|v| v.len() as u64)
+            .unwrap_or(0);
+        let dec_count = type_index
+            .get(&KnowledgeEntryType::DecisionPattern)
+            .map(|v| v.len() as u64)
+            .unwrap_or(0);
+        let ins_count = type_index
+            .get(&KnowledgeEntryType::Insight)
+            .map(|v| v.len() as u64)
+            .unwrap_or(0);
+        let rule_count = type_index
+            .get(&KnowledgeEntryType::HeuristicRule)
+            .map(|v| v.len() as u64)
+            .unwrap_or(0);
+        let prac_count = type_index
+            .get(&KnowledgeEntryType::BestPractice)
+            .map(|v| v.len() as u64)
+            .unwrap_or(0);
+        let pit_count = type_index
+            .get(&KnowledgeEntryType::KnownPitfall)
+            .map(|v| v.len() as u64)
+            .unwrap_or(0);
 
         let avg_conf = if total > 0 {
             entries.values().map(|e| e.confidence).sum::<f64>() / total as f64
@@ -550,8 +618,11 @@ pub fn auto_build_from_simulations(
                 if metrics.stability_score > 0.9 {
                     kb.add_best_practice(
                         &format!("High stability architecture: {}", arch.name),
-                        &format!("Architecture '{}' achieved {:.1}% stability under test conditions.",
-                            arch.name, metrics.stability_score * 100.0),
+                        &format!(
+                            "Architecture '{}' achieved {:.1}% stability under test conditions.",
+                            arch.name,
+                            metrics.stability_score * 100.0
+                        ),
                         &format!("architecture={}, stability>0.9", arch.name),
                         vec![
                             "stability".to_string(),
@@ -573,7 +644,8 @@ pub fn auto_build_from_decisions(
 ) {
     for pattern in patterns {
         // Csak a releváns döntéseket keressük
-        let relevant_decisions: Vec<&DecisionLogEntry> = decision_log.iter()
+        let relevant_decisions: Vec<&DecisionLogEntry> = decision_log
+            .iter()
             .filter(|d| format!("{:?}", d.decision_type) == pattern.pattern_type)
             .collect();
 
@@ -585,8 +657,12 @@ pub fn auto_build_from_decisions(
         if pattern.success_rate > 0.8 && pattern.usage_count > 3 {
             kb.add_best_practice(
                 &format!("Proven decision pattern: {}", pattern.name),
-                &format!("Pattern '{}' has {:.1}% success rate after {} uses.",
-                    pattern.name, pattern.success_rate * 100.0, pattern.usage_count),
+                &format!(
+                    "Pattern '{}' has {:.1}% success rate after {} uses.",
+                    pattern.name,
+                    pattern.success_rate * 100.0,
+                    pattern.usage_count
+                ),
                 &format!("decision_type={}", pattern.pattern_type),
                 vec![
                     "decision".to_string(),
@@ -600,8 +676,11 @@ pub fn auto_build_from_decisions(
         if pattern.success_rate < 0.3 && pattern.usage_count > 2 {
             kb.add_pitfall(
                 &format!("Unreliable decision pattern: {}", pattern.name),
-                &format!("Pattern '{}' has only {:.1}% success rate. Consider alternative approaches.",
-                    pattern.name, pattern.success_rate * 100.0),
+                &format!(
+                    "Pattern '{}' has only {:.1}% success rate. Consider alternative approaches.",
+                    pattern.name,
+                    pattern.success_rate * 100.0
+                ),
                 &format!("decision_type={}", pattern.pattern_type),
                 vec![
                     "decision".to_string(),
@@ -623,12 +702,11 @@ pub fn auto_learn_associations(kb: &KnowledgeBase) {
             let b = &entries[j];
 
             // Közös tagek alapján asszociáció
-            let common_tags: Vec<&String> = a.tags.iter()
-                .filter(|t| b.tags.contains(t))
-                .collect();
+            let common_tags: Vec<&String> = a.tags.iter().filter(|t| b.tags.contains(t)).collect();
 
             if !common_tags.is_empty() {
-                let weight = common_tags.len() as f64 / a.tags.len().max(1).min(b.tags.len().max(1)) as f64;
+                let weight =
+                    common_tags.len() as f64 / a.tags.len().max(1).min(b.tags.len().max(1)) as f64;
                 if weight > 0.3 {
                     kb.learn_association(&a.id, &b.id, weight);
                     kb.learn_association(&b.id, &a.id, weight);
@@ -636,8 +714,9 @@ pub fn auto_learn_associations(kb: &KnowledgeBase) {
             }
 
             // Típus alapján asszociáció (pl. simulation -> pitfall)
-            if a.entry_type == KnowledgeEntryType::SimulationResult &&
-               b.entry_type == KnowledgeEntryType::KnownPitfall {
+            if a.entry_type == KnowledgeEntryType::SimulationResult
+                && b.entry_type == KnowledgeEntryType::KnownPitfall
+            {
                 if a.description.contains(&b.title[..b.title.len().min(20)]) {
                     kb.learn_association(&a.id, &b.id, 0.8);
                 }

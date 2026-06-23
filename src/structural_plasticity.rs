@@ -8,11 +8,11 @@ use std::path::Path;
 #[derive(Clone, Debug)]
 pub struct Dendrite {
     pub block_id: u32,
-    pub branches: Vec<u32>,        // connected blocks
+    pub branches: Vec<u32>, // connected blocks
     pub branch_count: u32,
-    pub total_length: f32,         // accumulated connection strength
-    pub growth_rate: f32,          // 0.0-1.0
-    pub pruning_state: u8,         // 0=active, 1=marked_for_pruning, 2=pruned
+    pub total_length: f32, // accumulated connection strength
+    pub growth_rate: f32,  // 0.0-1.0
+    pub pruning_state: u8, // 0=active, 1=marked_for_pruning, 2=pruned
 }
 
 #[derive(Clone, Debug)]
@@ -21,7 +21,7 @@ pub struct NeuronLike {
     pub blocks: Vec<u32>,
     pub dendrite: Dendrite,
     pub axon_terminals: Vec<u32>,
-    pub activation_history: Vec<f32>,  // recent activations
+    pub activation_history: Vec<f32>, // recent activations
     pub specialization: String,
 }
 
@@ -59,7 +59,12 @@ impl StructuralPlasticity {
     /// Mark synapse for pruning (use it or lose it)
     pub fn mark_for_pruning(&mut self, neuron_id: u64, block_to_remove: u32) {
         if let Some(neuron) = self.neurons.get_mut(&neuron_id) {
-            if let Some(pos) = neuron.dendrite.branches.iter().position(|&b| b == block_to_remove) {
+            if let Some(pos) = neuron
+                .dendrite
+                .branches
+                .iter()
+                .position(|&b| b == block_to_remove)
+            {
                 neuron.dendrite.branches.remove(pos);
                 neuron.dendrite.branch_count = neuron.dendrite.branch_count.saturating_sub(1);
                 neuron.dendrite.total_length -= 0.05;
@@ -70,15 +75,19 @@ impl StructuralPlasticity {
     /// Prune inactive branches
     pub fn prune_inactive_branches(&mut self, neuron_id: u64) -> u32 {
         let mut pruned = 0;
-        
+
         if let Some(neuron) = self.neurons.get_mut(&neuron_id) {
             let avg_activation = if neuron.activation_history.is_empty() {
                 0.0
             } else {
-                neuron.activation_history.iter().sum::<f32>() / neuron.activation_history.len() as f32
+                neuron.activation_history.iter().sum::<f32>()
+                    / neuron.activation_history.len() as f32
             };
 
-            neuron.dendrite.branches.retain(|_| avg_activation > self.pruning_threshold);
+            neuron
+                .dendrite
+                .branches
+                .retain(|_| avg_activation > self.pruning_threshold);
             let new_count = neuron.dendrite.branches.len() as u32;
             pruned = neuron.dendrite.branch_count.saturating_sub(new_count);
             neuron.dendrite.branch_count = new_count;
@@ -90,7 +99,7 @@ impl StructuralPlasticity {
     /// Neurogenesis: create new neuron-like structure
     pub fn neurogenesis(&mut self, seed_blocks: Vec<u32>, specialization: &str) -> u64 {
         let neuron_id = Self::neuron_hash(&seed_blocks);
-        
+
         let dendrite = Dendrite {
             block_id: seed_blocks[0],
             branches: seed_blocks.clone(),
@@ -140,15 +149,26 @@ impl StructuralPlasticity {
         let avg_dendrite_length = if self.neurons.is_empty() {
             0.0
         } else {
-            self.neurons.values().map(|n| n.dendrite.total_length).sum::<f32>() / self.neurons.len() as f32
+            self.neurons
+                .values()
+                .map(|n| n.dendrite.total_length)
+                .sum::<f32>()
+                / self.neurons.len() as f32
         };
 
-        (total_neurons, total_branches, avg_dendrite_length, self.neurogenesis_events)
+        (
+            total_neurons,
+            total_branches,
+            avg_dendrite_length,
+            self.neurogenesis_events,
+        )
     }
 
     /// Get most specialized neurons
     pub fn specialized_neurons(&self) -> Vec<(u64, &str, u32)> {
-        let mut specialized: Vec<_> = self.neurons.iter()
+        let mut specialized: Vec<_> = self
+            .neurons
+            .iter()
             .map(|(id, n)| (*id, n.specialization.as_str(), n.dendrite.branch_count))
             .collect();
         specialized.sort_by(|a, b| b.2.cmp(&a.2));
@@ -167,7 +187,7 @@ impl StructuralPlasticity {
         data.extend_from_slice(&neuron_count.to_le_bytes());
         for (_, neuron) in &self.neurons {
             data.extend_from_slice(&neuron.id.to_le_bytes());
-            
+
             let blocks_count = neuron.blocks.len() as u16;
             data.extend_from_slice(&blocks_count.to_le_bytes());
             for &block in &neuron.blocks {
@@ -178,7 +198,7 @@ impl StructuralPlasticity {
             data.extend_from_slice(&neuron.dendrite.block_id.to_le_bytes());
             data.extend_from_slice(&neuron.dendrite.growth_rate.to_le_bytes());
             data.push(neuron.dendrite.pruning_state);
-            
+
             let branch_count = neuron.dendrite.branches.len() as u16;
             data.extend_from_slice(&branch_count.to_le_bytes());
             for &branch in &neuron.dendrite.branches {
@@ -214,54 +234,89 @@ impl StructuralPlasticity {
 
         // Read neurons
         if idx + 4 <= data.len() {
-            let neuron_count = u32::from_le_bytes([data[idx], data[idx+1], data[idx+2], data[idx+3]]) as usize;
+            let neuron_count =
+                u32::from_le_bytes([data[idx], data[idx + 1], data[idx + 2], data[idx + 3]])
+                    as usize;
             idx += 4;
 
             for _ in 0..neuron_count {
-                if idx + 10 > data.len() { break; }
+                if idx + 10 > data.len() {
+                    break;
+                }
 
-                let neuron_id = u64::from_le_bytes([data[idx], data[idx+1], data[idx+2], data[idx+3],
-                                                  data[idx+4], data[idx+5], data[idx+6], data[idx+7]]);
+                let neuron_id = u64::from_le_bytes([
+                    data[idx],
+                    data[idx + 1],
+                    data[idx + 2],
+                    data[idx + 3],
+                    data[idx + 4],
+                    data[idx + 5],
+                    data[idx + 6],
+                    data[idx + 7],
+                ]);
                 idx += 8;
 
-                let blocks_count = u16::from_le_bytes([data[idx], data[idx+1]]) as usize;
+                let blocks_count = u16::from_le_bytes([data[idx], data[idx + 1]]) as usize;
                 idx += 2;
 
                 let mut blocks = Vec::new();
                 for _ in 0..blocks_count {
-                    if idx + 4 > data.len() { break; }
-                    let block = u32::from_le_bytes([data[idx], data[idx+1], data[idx+2], data[idx+3]]);
+                    if idx + 4 > data.len() {
+                        break;
+                    }
+                    let block = u32::from_le_bytes([
+                        data[idx],
+                        data[idx + 1],
+                        data[idx + 2],
+                        data[idx + 3],
+                    ]);
                     blocks.push(block);
                     idx += 4;
                 }
 
-                if idx + 13 > data.len() { break; }
-                let dendrite_block_id = u32::from_le_bytes([data[idx], data[idx+1], data[idx+2], data[idx+3]]);
+                if idx + 13 > data.len() {
+                    break;
+                }
+                let dendrite_block_id =
+                    u32::from_le_bytes([data[idx], data[idx + 1], data[idx + 2], data[idx + 3]]);
                 idx += 4;
 
-                let growth_rate = f32::from_le_bytes([data[idx], data[idx+1], data[idx+2], data[idx+3]]);
+                let growth_rate =
+                    f32::from_le_bytes([data[idx], data[idx + 1], data[idx + 2], data[idx + 3]]);
                 idx += 4;
 
                 let pruning_state = data[idx];
                 idx += 1;
 
-                let branch_count = u16::from_le_bytes([data[idx], data[idx+1]]) as usize;
+                let branch_count = u16::from_le_bytes([data[idx], data[idx + 1]]) as usize;
                 idx += 2;
 
                 let mut branches = Vec::new();
                 for _ in 0..branch_count {
-                    if idx + 4 > data.len() { break; }
-                    let branch = u32::from_le_bytes([data[idx], data[idx+1], data[idx+2], data[idx+3]]);
+                    if idx + 4 > data.len() {
+                        break;
+                    }
+                    let branch = u32::from_le_bytes([
+                        data[idx],
+                        data[idx + 1],
+                        data[idx + 2],
+                        data[idx + 3],
+                    ]);
                     branches.push(branch);
                     idx += 4;
                 }
 
-                if idx >= data.len() { break; }
+                if idx >= data.len() {
+                    break;
+                }
                 let spec_len = data[idx] as usize;
                 idx += 1;
 
-                if idx + spec_len > data.len() { break; }
-                let specialization = String::from_utf8_lossy(&data[idx..idx+spec_len]).to_string();
+                if idx + spec_len > data.len() {
+                    break;
+                }
+                let specialization =
+                    String::from_utf8_lossy(&data[idx..idx + spec_len]).to_string();
                 idx += spec_len;
 
                 let dendrite = Dendrite {
@@ -273,20 +328,24 @@ impl StructuralPlasticity {
                     pruning_state,
                 };
 
-                neurons.insert(neuron_id, NeuronLike {
-                    id: neuron_id,
-                    blocks,
-                    dendrite,
-                    axon_terminals: Vec::new(),
-                    activation_history: Vec::new(),
-                    specialization,
-                });
+                neurons.insert(
+                    neuron_id,
+                    NeuronLike {
+                        id: neuron_id,
+                        blocks,
+                        dendrite,
+                        axon_terminals: Vec::new(),
+                        activation_history: Vec::new(),
+                        specialization,
+                    },
+                );
             }
         }
 
         let mut neurogenesis_events = 0;
         if idx + 4 <= data.len() {
-            neurogenesis_events = u32::from_le_bytes([data[idx], data[idx+1], data[idx+2], data[idx+3]]);
+            neurogenesis_events =
+                u32::from_le_bytes([data[idx], data[idx + 1], data[idx + 2], data[idx + 3]]);
         }
 
         Ok(Self {

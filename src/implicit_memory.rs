@@ -7,9 +7,9 @@ use std::path::Path;
 
 #[derive(Clone, Debug)]
 pub struct ImplicitPattern {
-    pub pattern: Vec<u32>,      // Sequence of block hashes
-    pub strength: f32,          // 0.0-1.0, reinforcement level
-    pub frequency: u32,         // How many times seen
+    pub pattern: Vec<u32>, // Sequence of block hashes
+    pub strength: f32,     // 0.0-1.0, reinforcement level
+    pub frequency: u32,    // How many times seen
     pub last_activation_ms: u64,
     pub performance_metric: f32, // Success rate for procedural skills
 }
@@ -17,8 +17,8 @@ pub struct ImplicitPattern {
 #[derive(Clone, Debug)]
 pub struct SkillNode {
     pub name: String,
-    pub mastery_level: f32,     // 0.0-1.0
-    pub error_rate: f32,        // Recent error frequency
+    pub mastery_level: f32, // 0.0-1.0
+    pub error_rate: f32,    // Recent error frequency
     pub last_practiced_ms: u64,
     pub practice_count: u32,
 }
@@ -26,8 +26,8 @@ pub struct SkillNode {
 pub struct ImplicitMemory {
     pub patterns: HashMap<u64, ImplicitPattern>, // Pattern hash -> pattern
     pub skills: HashMap<String, SkillNode>,
-    pub habits: Vec<(String, f32)>,              // (trigger, strength) pairs
-    pub conditioning: HashMap<String, f32>,      // stimulus -> response strength
+    pub habits: Vec<(String, f32)>, // (trigger, strength) pairs
+    pub conditioning: HashMap<String, f32>, // stimulus -> response strength
 }
 
 impl ImplicitMemory {
@@ -45,11 +45,13 @@ impl ImplicitMemory {
         let hash = Self::hash_pattern(&pattern);
         let strength_delta = if success { 0.1 } else { -0.05 };
 
-        self.patterns.entry(hash)
+        self.patterns
+            .entry(hash)
             .and_modify(|p| {
                 p.strength = (p.strength + strength_delta).clamp(0.0, 1.0);
                 p.frequency += 1;
-                p.performance_metric = p.performance_metric * 0.8 + if success { 1.0 } else { 0.0 } * 0.2;
+                p.performance_metric =
+                    p.performance_metric * 0.8 + if success { 1.0 } else { 0.0 } * 0.2;
                 p.last_activation_ms = Self::now_ms();
             })
             .or_insert_with(|| ImplicitPattern {
@@ -63,7 +65,8 @@ impl ImplicitMemory {
 
     /// Develop or improve a skill
     pub fn practice_skill(&mut self, skill: &str, error_occurred: bool) {
-        self.skills.entry(skill.to_string())
+        self.skills
+            .entry(skill.to_string())
             .and_modify(|s| {
                 s.practice_count += 1;
                 let improvement = 0.02;
@@ -91,29 +94,31 @@ impl ImplicitMemory {
             let new_strength = (self.habits[idx].1 + strength_delta).clamp(0.0, 1.0);
             self.habits[idx].1 = new_strength;
         } else {
-            self.habits.push((trigger.to_string(), strength_delta.clamp(0.0, 1.0)));
+            self.habits
+                .push((trigger.to_string(), strength_delta.clamp(0.0, 1.0)));
         }
     }
 
     /// Classical conditioning: stimulus -> response
     pub fn condition_response(&mut self, stimulus: &str, response_strength: f32) {
-        self.conditioning.entry(stimulus.to_string())
+        self.conditioning
+            .entry(stimulus.to_string())
             .and_modify(|s| *s = (*s * 0.7 + response_strength * 0.3).clamp(0.0, 1.0))
             .or_insert(response_strength.clamp(0.0, 1.0));
     }
 
     /// Get strongest patterns
     pub fn strongest_patterns(&self, k: usize) -> Vec<(u64, ImplicitPattern)> {
-        let mut sorted: Vec<_> = self.patterns.iter()
-            .map(|(h, p)| (*h, p.clone()))
-            .collect();
+        let mut sorted: Vec<_> = self.patterns.iter().map(|(h, p)| (*h, p.clone())).collect();
         sorted.sort_by(|a, b| b.1.strength.partial_cmp(&a.1.strength).unwrap());
         sorted.into_iter().take(k).collect()
     }
 
     /// Get most practiced skills
     pub fn skill_ranking(&self) -> Vec<(String, SkillNode)> {
-        let mut sorted: Vec<_> = self.skills.iter()
+        let mut sorted: Vec<_> = self
+            .skills
+            .iter()
             .map(|(n, s)| (n.clone(), s.clone()))
             .collect();
         sorted.sort_by(|a, b| b.1.mastery_level.partial_cmp(&a.1.mastery_level).unwrap());
@@ -179,7 +184,7 @@ impl ImplicitMemory {
             data.extend_from_slice(&pattern.frequency.to_le_bytes());
             data.extend_from_slice(&pattern.last_activation_ms.to_le_bytes());
             data.extend_from_slice(&pattern.performance_metric.to_le_bytes());
-            
+
             let seq_len = pattern.pattern.len() as u16;
             data.extend_from_slice(&seq_len.to_le_bytes());
             for &val in &pattern.pattern {
@@ -222,87 +227,142 @@ impl ImplicitMemory {
 
         // Read patterns
         if idx + 4 <= data.len() {
-            let pattern_count = u32::from_le_bytes([data[idx], data[idx+1], data[idx+2], data[idx+3]]) as usize;
+            let pattern_count =
+                u32::from_le_bytes([data[idx], data[idx + 1], data[idx + 2], data[idx + 3]])
+                    as usize;
             idx += 4;
 
             for _ in 0..pattern_count {
-                if idx + 32 > data.len() { break; }
-                
-                let hash = u64::from_le_bytes([data[idx], data[idx+1], data[idx+2], data[idx+3],
-                                             data[idx+4], data[idx+5], data[idx+6], data[idx+7]]);
+                if idx + 32 > data.len() {
+                    break;
+                }
+
+                let hash = u64::from_le_bytes([
+                    data[idx],
+                    data[idx + 1],
+                    data[idx + 2],
+                    data[idx + 3],
+                    data[idx + 4],
+                    data[idx + 5],
+                    data[idx + 6],
+                    data[idx + 7],
+                ]);
                 idx += 8;
 
-                let strength = f32::from_le_bytes([data[idx], data[idx+1], data[idx+2], data[idx+3]]);
+                let strength =
+                    f32::from_le_bytes([data[idx], data[idx + 1], data[idx + 2], data[idx + 3]]);
                 idx += 4;
 
-                let frequency = u32::from_le_bytes([data[idx], data[idx+1], data[idx+2], data[idx+3]]);
+                let frequency =
+                    u32::from_le_bytes([data[idx], data[idx + 1], data[idx + 2], data[idx + 3]]);
                 idx += 4;
 
-                let last_activation_ms = u64::from_le_bytes([data[idx], data[idx+1], data[idx+2], data[idx+3],
-                                                           data[idx+4], data[idx+5], data[idx+6], data[idx+7]]);
+                let last_activation_ms = u64::from_le_bytes([
+                    data[idx],
+                    data[idx + 1],
+                    data[idx + 2],
+                    data[idx + 3],
+                    data[idx + 4],
+                    data[idx + 5],
+                    data[idx + 6],
+                    data[idx + 7],
+                ]);
                 idx += 8;
 
-                let performance_metric = f32::from_le_bytes([data[idx], data[idx+1], data[idx+2], data[idx+3]]);
+                let performance_metric =
+                    f32::from_le_bytes([data[idx], data[idx + 1], data[idx + 2], data[idx + 3]]);
                 idx += 4;
 
                 if idx + 2 <= data.len() {
-                    let seq_len = u16::from_le_bytes([data[idx], data[idx+1]]) as usize;
+                    let seq_len = u16::from_le_bytes([data[idx], data[idx + 1]]) as usize;
                     idx += 2;
 
                     let mut pattern = Vec::new();
                     for _ in 0..seq_len {
-                        if idx + 4 > data.len() { break; }
-                        let val = u32::from_le_bytes([data[idx], data[idx+1], data[idx+2], data[idx+3]]);
+                        if idx + 4 > data.len() {
+                            break;
+                        }
+                        let val = u32::from_le_bytes([
+                            data[idx],
+                            data[idx + 1],
+                            data[idx + 2],
+                            data[idx + 3],
+                        ]);
                         pattern.push(val);
                         idx += 4;
                     }
 
-                    patterns.insert(hash, ImplicitPattern {
-                        pattern,
-                        strength,
-                        frequency,
-                        last_activation_ms,
-                        performance_metric,
-                    });
+                    patterns.insert(
+                        hash,
+                        ImplicitPattern {
+                            pattern,
+                            strength,
+                            frequency,
+                            last_activation_ms,
+                            performance_metric,
+                        },
+                    );
                 }
             }
         }
 
         // Read skills
         if idx + 4 <= data.len() {
-            let skill_count = u32::from_le_bytes([data[idx], data[idx+1], data[idx+2], data[idx+3]]) as usize;
+            let skill_count =
+                u32::from_le_bytes([data[idx], data[idx + 1], data[idx + 2], data[idx + 3]])
+                    as usize;
             idx += 4;
 
             for _ in 0..skill_count {
-                if idx >= data.len() { break; }
+                if idx >= data.len() {
+                    break;
+                }
                 let name_len = data[idx] as usize;
                 idx += 1;
 
-                if idx + name_len > data.len() { break; }
-                let name = String::from_utf8_lossy(&data[idx..idx+name_len]).to_string();
+                if idx + name_len > data.len() {
+                    break;
+                }
+                let name = String::from_utf8_lossy(&data[idx..idx + name_len]).to_string();
                 idx += name_len;
 
-                if idx + 20 > data.len() { break; }
-                let mastery_level = f32::from_le_bytes([data[idx], data[idx+1], data[idx+2], data[idx+3]]);
+                if idx + 20 > data.len() {
+                    break;
+                }
+                let mastery_level =
+                    f32::from_le_bytes([data[idx], data[idx + 1], data[idx + 2], data[idx + 3]]);
                 idx += 4;
 
-                let error_rate = f32::from_le_bytes([data[idx], data[idx+1], data[idx+2], data[idx+3]]);
+                let error_rate =
+                    f32::from_le_bytes([data[idx], data[idx + 1], data[idx + 2], data[idx + 3]]);
                 idx += 4;
 
-                let last_practiced_ms = u64::from_le_bytes([data[idx], data[idx+1], data[idx+2], data[idx+3],
-                                                          data[idx+4], data[idx+5], data[idx+6], data[idx+7]]);
+                let last_practiced_ms = u64::from_le_bytes([
+                    data[idx],
+                    data[idx + 1],
+                    data[idx + 2],
+                    data[idx + 3],
+                    data[idx + 4],
+                    data[idx + 5],
+                    data[idx + 6],
+                    data[idx + 7],
+                ]);
                 idx += 8;
 
-                let practice_count = u32::from_le_bytes([data[idx], data[idx+1], data[idx+2], data[idx+3]]);
+                let practice_count =
+                    u32::from_le_bytes([data[idx], data[idx + 1], data[idx + 2], data[idx + 3]]);
                 idx += 4;
 
-                skills.insert(name.clone(), SkillNode {
-                    name,
-                    mastery_level,
-                    error_rate,
-                    last_practiced_ms,
-                    practice_count,
-                });
+                skills.insert(
+                    name.clone(),
+                    SkillNode {
+                        name,
+                        mastery_level,
+                        error_rate,
+                        last_practiced_ms,
+                        practice_count,
+                    },
+                );
             }
         }
 

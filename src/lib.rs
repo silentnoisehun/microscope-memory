@@ -50,11 +50,11 @@ pub mod emotional_contagion;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod eureka;
 #[cfg(not(target_arch = "wasm32"))]
-pub mod salience;
-#[cfg(not(target_arch = "wasm32"))]
 pub mod narrative;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod reconsolidation;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod salience;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod spaced_repetition;
 #[cfg(not(target_arch = "wasm32"))]
@@ -62,59 +62,59 @@ pub mod working_memory;
 
 // New cognitive enhancement modules
 #[cfg(not(target_arch = "wasm32"))]
-pub mod mental_sandbox;
-#[cfg(not(target_arch = "wasm32"))]
-pub mod impulse_control;
-#[cfg(not(target_arch = "wasm32"))]
-pub mod meta_supervision;
-#[cfg(not(target_arch = "wasm32"))]
-pub mod executive;
-#[cfg(not(target_arch = "wasm32"))]
-pub mod implicit_memory;
-#[cfg(not(target_arch = "wasm32"))]
-pub mod explicit_memory;
-#[cfg(not(target_arch = "wasm32"))]
-pub mod hippocampus;
-#[cfg(not(target_arch = "wasm32"))]
-pub mod neuroplasticity;
-#[cfg(not(target_arch = "wasm32"))]
-pub mod structural_plasticity;
-#[cfg(not(target_arch = "wasm32"))]
-pub mod functional_plasticity;
-#[cfg(not(target_arch = "wasm32"))]
-pub mod synaptic_plasticity;
-#[cfg(not(target_arch = "wasm32"))]
-pub mod mental_stimulation;
-#[cfg(not(target_arch = "wasm32"))]
-pub mod hyperfocus;
-#[cfg(not(target_arch = "wasm32"))]
 pub mod advanced_cognition;
-#[cfg(not(target_arch = "wasm32"))]
-pub mod architecture_simulator;
-#[cfg(not(target_arch = "wasm32"))]
-pub mod heuristic_decision;
-#[cfg(not(target_arch = "wasm32"))]
-pub mod knowledge_base;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod architecture_generator;
 #[cfg(not(target_arch = "wasm32"))]
-pub mod morphogenesis;
-#[cfg(not(target_arch = "wasm32"))]
-pub mod pattern_recognition;
-#[cfg(not(target_arch = "wasm32"))]
-pub mod planning;
-#[cfg(not(target_arch = "wasm32"))]
-pub mod vagus;
+pub mod architecture_simulator;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod autopoiesis;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod chatgpt;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod code_memory;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod executive;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod explicit_memory;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod functional_plasticity;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod heuristic_decision;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod hippocampus;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod hyperfocus;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod implicit_memory;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod impulse_control;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod knowledge_base;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod mental_sandbox;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod mental_stimulation;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod meta_supervision;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod morphogenesis;
 pub mod multimodal;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod neuroplasticity;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod pattern_recognition;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod planning;
 pub mod predictive_cache;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod structural_plasticity;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod synaptic_plasticity;
 pub mod temporal_archetype;
 pub mod thought_graph;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod vagus;
 pub mod viz;
 
 #[cfg(target_arch = "wasm32")]
@@ -127,19 +127,19 @@ pub mod python;
 #[cfg(feature = "gpu")]
 pub mod gpu;
 
-pub mod timeline;
-pub mod open_loops;
 pub mod cli;
+pub mod open_loops;
+pub mod timeline;
 
 // Re-export commonly used items
-pub use reader::{
-    append_emotion_log, build_emotions_from_log, emotional_similarity, format_emotion,
-    load_emotion_lookup, read_append_log, store_memory, store_memory_with_emotion, store_memory_temporary,
-    AppendEntry, BlockHeader, DataStore,
-    MicroscopeReader, RadialResult, ResultSet, EMOTION_DIMS, EMOTION_VECTOR_SIZE,
-};
 #[cfg(not(target_arch = "wasm32"))]
 pub use emotional_state::{emotional_prime_weight, EmotionalStateRing};
+pub use reader::{
+    append_emotion_log, build_emotions_from_log, emotional_similarity, format_emotion,
+    load_emotion_lookup, read_append_log, store_memory, store_memory_temporary,
+    store_memory_with_emotion, AppendEntry, BlockHeader, DataStore, MicroscopeReader, RadialResult,
+    ResultSet, EMOTION_DIMS, EMOTION_VECTOR_SIZE,
+};
 
 // Re-export CLI
 pub use cli::{Cli, Cmd};
@@ -342,16 +342,13 @@ mod tests {
     }
 }
 
-
-
-
 // Additional modules for main binary
-pub mod self_reflect;
-pub mod self_model;
-pub mod curiosity;
-pub mod inner_monologue;
-pub mod narrative_memory;
 pub mod auto_context;
-pub mod emotional_21d;
-pub mod mermaid;
 pub mod autonomous;
+pub mod curiosity;
+pub mod emotional_21d;
+pub mod inner_monologue;
+pub mod mermaid;
+pub mod narrative_memory;
+pub mod self_model;
+pub mod self_reflect;

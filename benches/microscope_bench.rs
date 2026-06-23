@@ -230,7 +230,7 @@ fn bench_morphogenesis_growth(c: &mut Criterion) {
     use microscope_memory::morphogenesis::*;
 
     let mut group = c.benchmark_group("morphogenesis");
-    
+
     group.bench_function("mycelium_growth", |b| {
         b.iter(|| {
             let seed = Seed::new("bench", 0.0, 0.0, 0.0, "service");
@@ -284,7 +284,8 @@ fn bench_morphogenesis_evaluate_fitness(c: &mut Criterion) {
 
     c.bench_function("evaluate_fitness", |b| {
         b.iter(|| {
-            let result = evaluate_fitness(black_box(&organism), black_box(&FitnessObjective::Balanced));
+            let result =
+                evaluate_fitness(black_box(&organism), black_box(&FitnessObjective::Balanced));
             black_box(result.score);
         });
     });
@@ -332,9 +333,15 @@ fn bench_pattern_recognition(c: &mut Criterion) {
     });
 
     // Structural motifs
-    let edges: Vec<(String, String, f64)> = (0..50).map(|i| {
-        (format!("node_{}", i), format!("node_{}", (i + 1) % 50), rand::random::<f64>())
-    }).collect();
+    let edges: Vec<(String, String, f64)> = (0..50)
+        .map(|i| {
+            (
+                format!("node_{}", i),
+                format!("node_{}", (i + 1) % 50),
+                rand::random::<f64>(),
+            )
+        })
+        .collect();
 
     c.bench_function("find_motifs", |b| {
         b.iter(|| {
@@ -373,8 +380,13 @@ fn bench_autopoiesis(c: &mut Criterion) {
     use microscope_memory::autopoiesis::AutopoiesisEngine;
 
     let engine = AutopoiesisEngine::new();
-    engine.register_template("test_tmpl", "test_module", "fn hello() { println!(\"{{name}}\"); }",
-        vec!["name".to_string()], "Test template");
+    engine.register_template(
+        "test_tmpl",
+        "test_module",
+        "fn hello() { println!(\"{{name}}\"); }",
+        vec!["name".to_string()],
+        "Test template",
+    );
 
     c.bench_function("autopoiesis_generate_template", |b| {
         b.iter(|| {

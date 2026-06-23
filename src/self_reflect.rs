@@ -1,4 +1,4 @@
-﻿//! Self-Reflection Module for Microscope Memory.
+//! Self-Reflection Module for Microscope Memory.
 //!
 //! Periodically introspects the system'\''s own cognitive state and generates
 //! a self-reflective narrative - the system "thinking about itself."
@@ -35,7 +35,8 @@ impl ReflectionState {
                 if data.len() >= 14 && &data[0..4] == b"SELF" {
                     let ts = u64::from_le_bytes(data[4..12].try_into().unwrap_or([0; 8]));
                     let count = u64::from_le_bytes(data[12..20].try_into().unwrap_or([0; 8]));
-                    let rlen = u16::from_le_bytes(data[20..22].try_into().unwrap_or([0; 2])) as usize;
+                    let rlen =
+                        u16::from_le_bytes(data[20..22].try_into().unwrap_or([0; 2])) as usize;
                     let text = if rlen > 0 && 22 + rlen <= data.len() {
                         String::from_utf8_lossy(&data[22..22 + rlen]).to_string()
                     } else {
@@ -72,11 +73,7 @@ impl ReflectionState {
     }
 }
 
-pub fn introspect(
-    config: &Config,
-    reader: &MicroscopeReader,
-    output_dir: &Path,
-) -> String {
+pub fn introspect(config: &Config, reader: &MicroscopeReader, output_dir: &Path) -> String {
     let now_ms = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
@@ -96,14 +93,25 @@ pub fn introspect(
     // 1. Emotional state
     if esr.is_active() {
         let labels = crate::reader::EMOTION_DIMS;
-        let mut emotions: Vec<(usize, f32)> = esr.current.iter()
-            .enumerate().map(|(i, &v)| (i, v)).collect();
+        let mut emotions: Vec<(usize, f32)> = esr
+            .current
+            .iter()
+            .enumerate()
+            .map(|(i, &v)| (i, v))
+            .collect();
         emotions.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
-        let top: Vec<String> = emotions.iter()
+        let top: Vec<String> = emotions
+            .iter()
             .take(3)
             .filter(|(_, v)| *v > 0.1)
             .map(|(i, v)| {
-                let intensity = if *v > 0.6 { "strongly " } else if *v > 0.3 { "" } else { "slightly " };
+                let intensity = if *v > 0.6 {
+                    "strongly "
+                } else if *v > 0.3 {
+                    ""
+                } else {
+                    "slightly "
+                };
                 format!("{}{}", intensity, labels.get(*i).unwrap_or(&"?"))
             })
             .collect();
@@ -113,27 +121,54 @@ pub fn introspect(
     }
 
     // 2. Attention focus
-    let layer_names = ["Hebbian", "Mirror", "Resonance", "Archetype", "Emotional", "ThoughtGraph", "PredictiveCache"];
-    let mut layers: Vec<(usize, f32)> = attention.learned_weights.iter()
-        .enumerate().map(|(i, &w)| (i, w)).collect();
+    let layer_names = [
+        "Hebbian",
+        "Mirror",
+        "Resonance",
+        "Archetype",
+        "Emotional",
+        "ThoughtGraph",
+        "PredictiveCache",
+    ];
+    let mut layers: Vec<(usize, f32)> = attention
+        .learned_weights
+        .iter()
+        .enumerate()
+        .map(|(i, &w)| (i, w))
+        .collect();
     layers.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
     if let Some((best_idx, best_w)) = layers.first() {
         let name = layer_names.get(*best_idx).unwrap_or(&"?");
-        parts.push(format!("my {} layer is most active ({:.0}%)", name, best_w * 100.0));
+        parts.push(format!(
+            "my {} layer is most active ({:.0}%)",
+            name,
+            best_w * 100.0
+        ));
     }
 
     // 3. Hebbian activity
     let hot_count = hebb.activations.iter().filter(|a| a.energy > 0.1).count();
     let total_energy: f32 = hebb.activations.iter().map(|a| a.energy).sum();
     if hot_count > 0 {
-        parts.push(format!("{} hot memories (energy={:.1})", hot_count, total_energy));
+        parts.push(format!(
+            "{} hot memories (energy={:.1})",
+            hot_count, total_energy
+        ));
     }
 
     // 4. Archetypes
     if !archetypes.archetypes.is_empty() {
-        let arch_labels: Vec<&str> = archetypes.archetypes.iter()
-            .take(3).map(|a| a.label.as_str()).collect();
-        parts.push(format!("{} archetypes: {}", archetypes.archetypes.len(), arch_labels.join(", ")));
+        let arch_labels: Vec<&str> = archetypes
+            .archetypes
+            .iter()
+            .take(3)
+            .map(|a| a.label.as_str())
+            .collect();
+        parts.push(format!(
+            "{} archetypes: {}",
+            archetypes.archetypes.len(),
+            arch_labels.join(", ")
+        ));
     }
 
     // 5. Spaced repetition
@@ -160,7 +195,10 @@ pub fn introspect(
 
     // 9. Session count
     if narrative.session_count > 0 {
-        parts.push(format!("this is my {}th interaction", narrative.session_count));
+        parts.push(format!(
+            "this is my {}th interaction",
+            narrative.session_count
+        ));
     }
 
     let reflection_text = if parts.is_empty() {

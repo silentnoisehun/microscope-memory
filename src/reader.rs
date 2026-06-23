@@ -976,9 +976,27 @@ pub const EMOTION_VECTOR_SIZE: usize = 21;
 
 /// Emotion dimension labels for the 21D emotion vector.
 pub const EMOTION_DIMS: &[&str] = &[
-    "joy", "sadness", "anger", "fear", "surprise", "disgust", "trust", "anticipation",
-    "love", "gratitude", "curiosity", "confusion", "pride", "shame", "anxiety", "calm",
-    "excitement", "boredom", "hope", "regret", "empathy",
+    "joy",
+    "sadness",
+    "anger",
+    "fear",
+    "surprise",
+    "disgust",
+    "trust",
+    "anticipation",
+    "love",
+    "gratitude",
+    "curiosity",
+    "confusion",
+    "pride",
+    "shame",
+    "anxiety",
+    "calm",
+    "excitement",
+    "boredom",
+    "hope",
+    "regret",
+    "empathy",
 ];
 
 /// Cosine similarity between two 21D emotion vectors.
@@ -986,7 +1004,9 @@ pub fn emotional_similarity(a: &[f32; 21], b: &[f32; 21]) -> f32 {
     let dot: f32 = a.iter().zip(b.iter()).map(|(x, y)| x * y).sum();
     let na: f32 = a.iter().map(|x| x * x).sum::<f32>().sqrt();
     let nb: f32 = b.iter().map(|x| x * x).sum::<f32>().sqrt();
-    if na < 1e-10 || nb < 1e-10 { return 0.0; }
+    if na < 1e-10 || nb < 1e-10 {
+        return 0.0;
+    }
     (dot / (na * nb)).clamp(0.0, 1.0)
 }
 
@@ -994,17 +1014,23 @@ pub fn emotional_similarity(a: &[f32; 21], b: &[f32; 21]) -> f32 {
 /// emotions.bin format: flat array of [f32; 21] per block index.
 pub fn load_emotion_lookup(output_dir: &Path) -> Option<Box<dyn Fn(usize) -> Option<[f32; 21]>>> {
     let path = output_dir.join("emotions.bin");
-    if !path.exists() { return None; }
+    if !path.exists() {
+        return None;
+    }
     let data = fs::read(&path).ok()?;
     let entry_size = 21 * 4; // 21 f32 values, 4 bytes each
     let count = data.len() / entry_size;
     Some(Box::new(move |idx: usize| {
-        if idx >= count { return None; }
+        if idx >= count {
+            return None;
+        }
         let off = idx * entry_size;
-        if off + entry_size > data.len() { return None; }
+        if off + entry_size > data.len() {
+            return None;
+        }
         let mut emo = [0.0f32; 21];
         for i in 0..21 {
-            let bytes: [u8; 4] = data[off + i*4..off + i*4 + 4].try_into().ok()?;
+            let bytes: [u8; 4] = data[off + i * 4..off + i * 4 + 4].try_into().ok()?;
             emo[i] = f32::from_le_bytes(bytes);
         }
         Some(emo)
@@ -1026,7 +1052,7 @@ pub fn write_emotion(path: &Path, block_idx: usize, emotion: &[f32; 21]) -> Resu
     }
     let off = block_idx * entry_size;
     for i in 0..21 {
-        data[off + i*4..off + i*4 + 4].copy_from_slice(&emotion[i].to_le_bytes());
+        data[off + i * 4..off + i * 4 + 4].copy_from_slice(&emotion[i].to_le_bytes());
     }
     // Atomic write: temp file + rename to prevent corruption on crash
     let tmp_path = path.with_extension("bin.tmp");
@@ -1071,22 +1097,24 @@ pub fn append_emotion_log(
 /// Reads emotion_log.bin and maps each entry to the closest main-index block.
 pub fn build_emotions_from_log(output_dir: &Path, reader: &MicroscopeReader) -> Result<(), String> {
     let log_path = output_dir.join("emotion_log.bin");
-    if !log_path.exists() { return Ok(()); }
+    if !log_path.exists() {
+        return Ok(());
+    }
     let data = fs::read(&log_path).map_err(|e| format!("read emotion_log.bin: {}", e))?;
     let entry_size = 8 + 21 * 4 + 4; // ts + emotion + text_len
     let mut emotions = vec![[0.0f32; 21]; reader.block_count];
     let mut i = 0;
     while i + entry_size <= data.len() {
-        let ts_bytes: [u8; 8] = data[i..i+8].try_into().unwrap();
+        let ts_bytes: [u8; 8] = data[i..i + 8].try_into().unwrap();
         let _ts = u64::from_le_bytes(ts_bytes);
         i += 8;
         let mut emo = [0.0f32; 21];
         for j in 0..21 {
-            let bytes: [u8; 4] = data[i..i+4].try_into().unwrap();
+            let bytes: [u8; 4] = data[i..i + 4].try_into().unwrap();
             emo[j] = f32::from_le_bytes(bytes);
             i += 4;
         }
-        let text_len = u32::from_le_bytes(data[i..i+4].try_into().unwrap()) as usize;
+        let text_len = u32::from_le_bytes(data[i..i + 4].try_into().unwrap()) as usize;
         i += 4;
         let text_end = (i + text_len).min(data.len());
         let _text = String::from_utf8_lossy(&data[i..text_end]).to_string();

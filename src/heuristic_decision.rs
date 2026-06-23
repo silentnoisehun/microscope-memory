@@ -8,11 +8,11 @@ use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use crate::meta_supervision::MetaSupervisor;
 use crate::architecture_simulator::{ArchitectureSimulator, SimulationConfig, SimulationMetrics};
-use crate::salience::SalienceState;
 use crate::eureka::EurekaLog;
 use crate::knowledge_base::KnowledgeBase;
+use crate::meta_supervision::MetaSupervisor;
+use crate::salience::SalienceState;
 
 // ─── Alap típusok ───────────────────────────────────────────────────────────
 
@@ -156,7 +156,8 @@ impl HeuristicDecisionMaker {
 
     /// Döntési lehetőségek értékelése és rangsorolása
     pub fn evaluate_options(&self, options: Vec<DecisionOption>) -> Vec<DecisionOption> {
-        let mut scored_options: Vec<(f64, DecisionOption)> = options.into_iter()
+        let mut scored_options: Vec<(f64, DecisionOption)> = options
+            .into_iter()
             .map(|opt| {
                 let score = self.calculate_option_score(&opt);
                 (score, opt)
@@ -236,7 +237,8 @@ impl HeuristicDecisionMaker {
         // 10. Tudásbázisból származó megerősítés
         let kb_boost = {
             let results = self.knowledge_base.search(&option.description, 3);
-            let boost: f64 = results.iter()
+            let boost: f64 = results
+                .iter()
                 .map(|r| r.entry.confidence * r.relevance_score.min(1.0) / 10.0)
                 .sum();
             boost.min(0.2)
@@ -253,8 +255,12 @@ impl HeuristicDecisionMaker {
 
         for pattern in patterns.values() {
             // Csak releváns mintákat alkalmazunk
-            if option.description.contains(&pattern.context) || 
-               option.decision_type.to_string().contains(&pattern.pattern_type) {
+            if option.description.contains(&pattern.context)
+                || option
+                    .decision_type
+                    .to_string()
+                    .contains(&pattern.pattern_type)
+            {
                 let recency_factor = if pattern.last_used > 0 {
                     let now = SystemTime::now()
                         .duration_since(UNIX_EPOCH)
@@ -362,9 +368,14 @@ impl HeuristicDecisionMaker {
     }
 
     /// Döntés utólagos értékelése (tanulás)
-    pub fn evaluate_decision_outcome(&self, decision_id: &str, outcome_score: f64, reflection: &str) {
+    pub fn evaluate_decision_outcome(
+        &self,
+        decision_id: &str,
+        outcome_score: f64,
+        reflection: &str,
+    ) {
         let mut log = self.decision_log.write().unwrap();
-        
+
         if let Some(entry) = log.iter_mut().find(|e| e.decision_id == decision_id) {
             entry.outcome_score = outcome_score;
             entry.reflection = reflection.to_string();
@@ -408,76 +419,85 @@ impl HeuristicDecisionMaker {
     /// Architektúra ajánlás a szimulátor segítségével
     pub fn recommend_architecture(&self, requirements: &str) -> Option<Decision> {
         let architectures = self.simulator.list_architectures();
-        
+
         if architectures.is_empty() {
             return None;
         }
 
-        let options: Vec<DecisionOption> = architectures.iter().map(|arch| {
-            // Szimuláció futtatása
-            let config = SimulationConfig {
-                duration_secs: 30.0,
-                time_step_ms: 100.0,
-                max_concurrent_requests: 500,
-                load_pattern: "sine".to_string(),
-                peak_load: 0.7,
-                enable_fault_injection: true,
-                fault_rate: 0.01,
-                ..SimulationConfig::default()
-            };
+        let options: Vec<DecisionOption> = architectures
+            .iter()
+            .map(|arch| {
+                // Szimuláció futtatása
+                let config = SimulationConfig {
+                    duration_secs: 30.0,
+                    time_step_ms: 100.0,
+                    max_concurrent_requests: 500,
+                    load_pattern: "sine".to_string(),
+                    peak_load: 0.7,
+                    enable_fault_injection: true,
+                    fault_rate: 0.01,
+                    ..SimulationConfig::default()
+                };
 
-            let sim_result = self.simulator.run_simulation(&arch.id, &config);
+                let sim_result = self.simulator.run_simulation(&arch.id, &config);
 
-            // Salience pontszám (valós salience számítás)
-            let salience_score = {
-                let salience = self.salience.read().unwrap();
-                let hash = SalienceState::topic_hash(&format!("{} {}", arch.name, requirements));
-                salience.compute_salience(0.5f32, 0.5f32, 0.5f32, hash) as f64
-            };
+                // Salience pontszám (valós salience számítás)
+                let salience_score = {
+                    let salience = self.salience.read().unwrap();
+                    let hash =
+                        SalienceState::topic_hash(&format!("{} {}", arch.name, requirements));
+                    salience.compute_salience(0.5f32, 0.5f32, 0.5f32, hash) as f64
+                };
 
-            // Eureka pontszám (insight score alapján)
-            let eureka_score = {
-                let eureka = self.eureka.read().unwrap();
-                let events = &eureka.events;
-                if events.is_empty() {
-                    0.0
-                } else {
-                    let total: f32 = events.iter().map(|e| e.insight_score()).sum();
-                    (total / events.len() as f32) as f64
+                // Eureka pontszám (insight score alapján)
+                let eureka_score = {
+                    let eureka = self.eureka.read().unwrap();
+                    let events = &eureka.events;
+                    if events.is_empty() {
+                        0.0
+                    } else {
+                        let total: f32 = events.iter().map(|e| e.insight_score()).sum();
+                        (total / events.len() as f32) as f64
+                    }
+                };
+
+                // Meta-felügyeleti pontszám
+                let meta_score = {
+                    let meta = self.meta_supervisor.read().unwrap();
+                    let (current, _trend, _volatility) = meta.get_summary();
+                    current as f64
+                };
+
+                DecisionOption {
+                    id: arch.id.clone(),
+                    description: format!("{}: {}", arch.name, arch.description),
+                    decision_type: DecisionType::ArchitectureSelection,
+                    expected_utility: arch.cohesion_score,
+                    risk_level: 1.0 - arch.cohesion_score,
+                    execution_cost: 0.3,
+                    confidence: 0.7,
+                    salience_score,
+                    eureka_score,
+                    meta_score,
+                    simulation_prediction: sim_result,
                 }
-            };
-
-            // Meta-felügyeleti pontszám
-            let meta_score = {
-                let meta = self.meta_supervisor.read().unwrap();
-                let (current, _trend, _volatility) = meta.get_summary();
-                current as f64
-            };
-
-            DecisionOption {
-                id: arch.id.clone(),
-                description: format!("{}: {}", arch.name, arch.description),
-                decision_type: DecisionType::ArchitectureSelection,
-                expected_utility: arch.cohesion_score,
-                risk_level: 1.0 - arch.cohesion_score,
-                execution_cost: 0.3,
-                confidence: 0.7,
-                salience_score,
-                eureka_score,
-                meta_score,
-                simulation_prediction: sim_result,
-            }
-        }).collect();
+            })
+            .collect();
 
         self.make_decision(options)
     }
 
     /// Gyors heurisztikus döntés (időkorlátos)
-    pub fn quick_decision(&self, options: Vec<DecisionOption>, time_budget_ms: u64) -> Option<Decision> {
+    pub fn quick_decision(
+        &self,
+        options: Vec<DecisionOption>,
+        time_budget_ms: u64,
+    ) -> Option<Decision> {
         let start = std::time::Instant::now();
-        
+
         // Csak a legfontosabb tényezőket értékeljük
-        let scored: Vec<(f64, DecisionOption)> = options.into_iter()
+        let scored: Vec<(f64, DecisionOption)> = options
+            .into_iter()
             .map(|opt| {
                 let elapsed = start.elapsed().as_millis() as u64;
                 if elapsed > time_budget_ms {
@@ -486,14 +506,15 @@ impl HeuristicDecisionMaker {
                 }
 
                 // Gyorsított pontszámítás (kevesebb tényező)
-                let score = opt.expected_utility * 0.4 +
-                           (1.0 - opt.risk_level) * 0.3 +
-                           opt.confidence * 0.3;
+                let score = opt.expected_utility * 0.4
+                    + (1.0 - opt.risk_level) * 0.3
+                    + opt.confidence * 0.3;
                 (score, opt)
             })
             .collect();
 
-        let best = scored.into_iter()
+        let best = scored
+            .into_iter()
             .max_by(|a, b| a.0.partial_cmp(&b.0).unwrap())?;
 
         Some(Decision {
@@ -517,12 +538,14 @@ impl HeuristicDecisionMaker {
 
         for entry in log.iter() {
             let key = format!("{:?}", entry.decision_type);
-            pattern_map.entry(key)
+            pattern_map
+                .entry(key)
                 .or_insert_with(Vec::new)
                 .push(entry.outcome_score);
         }
 
-        pattern_map.into_iter()
+        pattern_map
+            .into_iter()
             .map(|(key, scores)| {
                 let avg_score = scores.iter().sum::<f64>() / scores.len() as f64;
                 HeuristicPattern {
@@ -555,7 +578,11 @@ impl HeuristicDecisionMaker {
             total_decisions,
             successful_decisions: successful,
             failed_decisions: failed,
-            success_rate: if total_decisions > 0 { successful as f64 / total_decisions as f64 } else { 0.0 },
+            success_rate: if total_decisions > 0 {
+                successful as f64 / total_decisions as f64
+            } else {
+                0.0
+            },
             learned_patterns: patterns.len() as u64,
             current_preference: self.preference.clone(),
             learning_rate: self.learning_rate,
@@ -628,11 +655,11 @@ impl std::fmt::Display for DecisionType {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::meta_supervision::MetaSupervisor;
     use crate::architecture_simulator::ArchitectureSimulator;
-    use crate::salience::SalienceState;
     use crate::eureka::EurekaLog;
     use crate::knowledge_base::KnowledgeBase;
+    use crate::meta_supervision::MetaSupervisor;
+    use crate::salience::SalienceState;
     use std::path::Path;
 
     fn create_test_decision_maker() -> HeuristicDecisionMaker {
@@ -651,9 +678,24 @@ mod tests {
         let dm = create_test_decision_maker();
 
         let options = vec![
-            create_option("Use microservices architecture", DecisionType::ArchitectureSelection, 0.8, 0.3),
-            create_option("Use monolithic architecture", DecisionType::ArchitectureSelection, 0.5, 0.1),
-            create_option("Use serverless architecture", DecisionType::ArchitectureSelection, 0.6, 0.5),
+            create_option(
+                "Use microservices architecture",
+                DecisionType::ArchitectureSelection,
+                0.8,
+                0.3,
+            ),
+            create_option(
+                "Use monolithic architecture",
+                DecisionType::ArchitectureSelection,
+                0.5,
+                0.1,
+            ),
+            create_option(
+                "Use serverless architecture",
+                DecisionType::ArchitectureSelection,
+                0.6,
+                0.5,
+            ),
         ];
 
         let decision = dm.make_decision(options);
@@ -680,9 +722,12 @@ mod tests {
     fn test_learn_from_outcome() {
         let dm = create_test_decision_maker();
 
-        let options = vec![
-            create_option("Test option", DecisionType::LearningStrategy, 0.7, 0.3),
-        ];
+        let options = vec![create_option(
+            "Test option",
+            DecisionType::LearningStrategy,
+            0.7,
+            0.3,
+        )];
 
         let decision = dm.make_decision(options).unwrap();
         dm.evaluate_decision_outcome(&decision.id, 0.9, "Good decision");
@@ -698,11 +743,18 @@ mod tests {
 
         // Több döntés szimulálása
         for i in 0..5 {
-            let options = vec![
-                create_option(&format!("Pattern option {}", i), DecisionType::ArchitectureSelection, 0.7, 0.3),
-            ];
+            let options = vec![create_option(
+                &format!("Pattern option {}", i),
+                DecisionType::ArchitectureSelection,
+                0.7,
+                0.3,
+            )];
             if let Some(decision) = dm.make_decision(options) {
-                dm.evaluate_decision_outcome(&decision.id, 0.8 + (i as f64 * 0.02), "Consistent pattern");
+                dm.evaluate_decision_outcome(
+                    &decision.id,
+                    0.8 + (i as f64 * 0.02),
+                    "Consistent pattern",
+                );
             }
         }
 

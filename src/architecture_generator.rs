@@ -9,8 +9,8 @@ use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
 use crate::architecture_simulator::{
-    Architecture, Component, ComponentType, Connection, ArchitectureSimulator,
-    SimulationConfig, SimulationMetrics,
+    Architecture, ArchitectureSimulator, Component, ComponentType, Connection, SimulationConfig,
+    SimulationMetrics,
 };
 use crate::knowledge_base::{KnowledgeBase, KnowledgeEntryType};
 
@@ -92,10 +92,7 @@ pub struct ArchitectureGenerator {
 
 impl ArchitectureGenerator {
     /// Létrehoz egy új generátort
-    pub fn new(
-        knowledge_base: Arc<KnowledgeBase>,
-        simulator: Arc<ArchitectureSimulator>,
-    ) -> Self {
+    pub fn new(knowledge_base: Arc<KnowledgeBase>, simulator: Arc<ArchitectureSimulator>) -> Self {
         Self {
             knowledge_base,
             simulator,
@@ -122,7 +119,11 @@ impl ArchitectureGenerator {
     }
 
     /// Hibrid generálás: kombinálja a legjobb mintákat a tudásbázisból
-    fn generate_hybrid(&self, requirements: &str, params: &GenerationParams) -> Vec<ArchitectureProposal> {
+    fn generate_hybrid(
+        &self,
+        requirements: &str,
+        params: &GenerationParams,
+    ) -> Vec<ArchitectureProposal> {
         let mut proposals = Vec::new();
 
         // 1. Keressünk releváns mintákat a tudásbázisban
@@ -138,23 +139,33 @@ impl ArchitectureGenerator {
                 KnowledgeEntryType::BestPractice => {
                     // Best practice -> magas súly
                     if entry.tags.contains(&"microservices".to_string()) {
-                        *component_type_weights.entry(ComponentType::Software).or_insert(0.0) += 0.3;
+                        *component_type_weights
+                            .entry(ComponentType::Software)
+                            .or_insert(0.0) += 0.3;
                     }
                     if entry.tags.contains(&"scalability".to_string()) {
-                        *component_type_weights.entry(ComponentType::Network).or_insert(0.0) += 0.2;
+                        *component_type_weights
+                            .entry(ComponentType::Network)
+                            .or_insert(0.0) += 0.2;
                     }
                 }
                 KnowledgeEntryType::SimulationResult => {
                     // Magas stabilitású architektúrák komponensei
                     if entry.confidence > 0.8 {
-                        *component_type_weights.entry(ComponentType::Software).or_insert(0.0) += 0.2;
-                        *component_type_weights.entry(ComponentType::Storage).or_insert(0.0) += 0.1;
+                        *component_type_weights
+                            .entry(ComponentType::Software)
+                            .or_insert(0.0) += 0.2;
+                        *component_type_weights
+                            .entry(ComponentType::Storage)
+                            .or_insert(0.0) += 0.1;
                     }
                 }
                 KnowledgeEntryType::KnownPitfall => {
                     // Buktatók -> csökkentjük a súlyt
                     if entry.tags.contains(&"bottleneck".to_string()) {
-                        *component_type_weights.entry(ComponentType::Storage).or_insert(0.0) -= 0.1;
+                        *component_type_weights
+                            .entry(ComponentType::Storage)
+                            .or_insert(0.0) -= 0.1;
                     }
                 }
                 _ => {}
@@ -176,20 +187,26 @@ impl ArchitectureGenerator {
                 let latency = 5.0 + (i as f64 * 2.0) + rand::random::<f64>() * 5.0;
                 let error_rate = 0.005 + rand::random::<f64>() * 0.02;
 
-                components.insert(comp_id.clone(), Component {
-                    id: comp_id,
-                    name: format!("{}_{}", Self::type_name(&comp_type), i),
-                    component_type: comp_type,
-                    capacity: HashMap::new(),
-                    load: 0.0,
-                    error_rate,
-                    latency_ms: latency,
-                });
+                components.insert(
+                    comp_id.clone(),
+                    Component {
+                        id: comp_id,
+                        name: format!("{}_{}", Self::type_name(&comp_type), i),
+                        component_type: comp_type,
+                        capacity: HashMap::new(),
+                        load: 0.0,
+                        error_rate,
+                        latency_ms: latency,
+                    },
+                );
             }
 
             // Kapcsolatok generálása
             let comp_ids: Vec<String> = components.keys().cloned().collect();
-            for i in 0..conn_count.min(params.max_connections).min(comp_ids.len().saturating_sub(1)) {
+            for i in 0..conn_count
+                .min(params.max_connections)
+                .min(comp_ids.len().saturating_sub(1))
+            {
                 let from = &comp_ids[i % comp_ids.len()];
                 let to = &comp_ids[(i + 1) % comp_ids.len()];
                 let bandwidth = 1000.0 + rand::random::<f64>() * 9000.0;
@@ -236,7 +253,8 @@ impl ArchitectureGenerator {
             let score = self.calculate_proposal_score(&arch, &sim_result, params);
 
             // Inspirációs források
-            let sources: Vec<String> = relevant_entries.iter()
+            let sources: Vec<String> = relevant_entries
+                .iter()
                 .take(3)
                 .map(|r| r.entry.title.clone())
                 .collect();
@@ -257,13 +275,20 @@ impl ArchitectureGenerator {
         proposals.sort_by(|a, b| b.generation_score.partial_cmp(&a.generation_score).unwrap());
 
         // Tárolás a történetben
-        self.generation_history.write().unwrap().extend(proposals.clone());
+        self.generation_history
+            .write()
+            .unwrap()
+            .extend(proposals.clone());
 
         proposals
     }
 
     /// Optimalizált generálás: meglévő architektúra javítása
-    fn generate_optimized(&self, requirements: &str, params: &GenerationParams) -> Vec<ArchitectureProposal> {
+    fn generate_optimized(
+        &self,
+        requirements: &str,
+        params: &GenerationParams,
+    ) -> Vec<ArchitectureProposal> {
         let mut proposals = Vec::new();
 
         // Keressünk egy meglévő architektúrát a szimulátorban
@@ -288,25 +313,34 @@ impl ArchitectureGenerator {
             }
             for comp_id in &to_remove {
                 optimized.components.remove(comp_id);
-                optimized.connections.retain(|c| c.from != *comp_id && c.to != *comp_id);
+                optimized
+                    .connections
+                    .retain(|c| c.from != *comp_id && c.to != *comp_id);
             }
 
             // 2. Adjunk hozzá cache réteget a teljesítmény javításához
-            if !optimized.components.values().any(|c| c.component_type == ComponentType::Storage) {
+            if !optimized
+                .components
+                .values()
+                .any(|c| c.component_type == ComponentType::Storage)
+            {
                 let cache_id = "cache_0".to_string();
-                optimized.components.insert(cache_id.clone(), Component {
-                    id: cache_id.clone(),
-                    name: "Cache Layer".to_string(),
-                    component_type: ComponentType::Storage,
-                    capacity: {
-                        let mut cap = HashMap::new();
-                        cap.insert("memory_mb".to_string(), 8192.0);
-                        cap
+                optimized.components.insert(
+                    cache_id.clone(),
+                    Component {
+                        id: cache_id.clone(),
+                        name: "Cache Layer".to_string(),
+                        component_type: ComponentType::Storage,
+                        capacity: {
+                            let mut cap = HashMap::new();
+                            cap.insert("memory_mb".to_string(), 8192.0);
+                            cap
+                        },
+                        load: 0.0,
+                        error_rate: 0.001,
+                        latency_ms: 1.0,
                     },
-                    load: 0.0,
-                    error_rate: 0.001,
-                    latency_ms: 1.0,
-                });
+                );
 
                 // Kapcsoljuk a cache-t az első komponenshez
                 if let Some(first_comp) = optimized.components.keys().next() {
@@ -349,12 +383,19 @@ impl ArchitectureGenerator {
         }
 
         proposals.sort_by(|a, b| b.generation_score.partial_cmp(&a.generation_score).unwrap());
-        self.generation_history.write().unwrap().extend(proposals.clone());
+        self.generation_history
+            .write()
+            .unwrap()
+            .extend(proposals.clone());
         proposals
     }
 
     /// Új architektúra generálása a semmiből
-    fn generate_novel(&self, requirements: &str, params: &GenerationParams) -> Vec<ArchitectureProposal> {
+    fn generate_novel(
+        &self,
+        requirements: &str,
+        params: &GenerationParams,
+    ) -> Vec<ArchitectureProposal> {
         let mut proposals = Vec::new();
 
         for variant in 0..3 {
@@ -375,15 +416,18 @@ impl ArchitectureGenerator {
                 let latency = 1.0 + rand::random::<f64>() * 20.0;
                 let error_rate = rand::random::<f64>() * 0.01;
 
-                components.insert(comp_id.clone(), Component {
-                    id: comp_id,
-                    name: format!("Novel_{}_{}", Self::type_name(&comp_type), i),
-                    component_type: comp_type,
-                    capacity: HashMap::new(),
-                    load: 0.0,
-                    error_rate,
-                    latency_ms: latency,
-                });
+                components.insert(
+                    comp_id.clone(),
+                    Component {
+                        id: comp_id,
+                        name: format!("Novel_{}_{}", Self::type_name(&comp_type), i),
+                        component_type: comp_type,
+                        capacity: HashMap::new(),
+                        load: 0.0,
+                        error_rate,
+                        latency_ms: latency,
+                    },
+                );
             }
 
             // Mesh hálózat (mindenki mindenkivel)
@@ -391,12 +435,17 @@ impl ArchitectureGenerator {
             let mut connections = Vec::new();
             for i in 0..comp_ids.len() {
                 for j in (i + 1)..comp_ids.len() {
-                    if rand::random::<f64>() < 0.3 { // 30% kapcsolódási valószínűség
+                    if rand::random::<f64>() < 0.3 {
+                        // 30% kapcsolódási valószínűség
                         connections.push(Connection {
                             from: comp_ids[i].clone(),
                             to: comp_ids[j].clone(),
                             bandwidth: 1000.0 + rand::random::<f64>() * 9000.0,
-                            protocol: if rand::random() { "HTTP/2".to_string() } else { "gRPC".to_string() },
+                            protocol: if rand::random() {
+                                "HTTP/2".to_string()
+                            } else {
+                                "gRPC".to_string()
+                            },
                             latency_ms: rand::random::<f64>() * 5.0,
                             packet_loss: rand::random::<f64>() * 0.01,
                         });
@@ -438,17 +487,25 @@ impl ArchitectureGenerator {
         }
 
         proposals.sort_by(|a, b| b.generation_score.partial_cmp(&a.generation_score).unwrap());
-        self.generation_history.write().unwrap().extend(proposals.clone());
+        self.generation_history
+            .write()
+            .unwrap()
+            .extend(proposals.clone());
         proposals
     }
 
     /// Evolúciós generálás: mutáció és szelekció
-    fn generate_evolutionary(&self, requirements: &str, params: &GenerationParams) -> Vec<ArchitectureProposal> {
+    fn generate_evolutionary(
+        &self,
+        requirements: &str,
+        params: &GenerationParams,
+    ) -> Vec<ArchitectureProposal> {
         let mut population = Vec::new();
 
         // Kezdeti populáció létrehozása
         for _ in 0..10 {
-            let comp_count = params.min_components + (rand::random::<usize>() % (params.max_components - params.min_components + 1));
+            let comp_count = params.min_components
+                + (rand::random::<usize>() % (params.max_components - params.min_components + 1));
             let mut components = HashMap::new();
 
             for i in 0..comp_count {
@@ -459,15 +516,18 @@ impl ArchitectureGenerator {
                     _ => ComponentType::Hardware,
                 };
                 let comp_id = format!("evo_comp_{}", i);
-                components.insert(comp_id.clone(), Component {
-                    id: comp_id,
-                    name: format!("Evo_{}_{}", Self::type_name(&comp_type), i),
-                    component_type: comp_type,
-                    capacity: HashMap::new(),
-                    load: 0.0,
-                    error_rate: rand::random::<f64>() * 0.02,
-                    latency_ms: rand::random::<f64>() * 30.0 + 1.0,
-                });
+                components.insert(
+                    comp_id.clone(),
+                    Component {
+                        id: comp_id,
+                        name: format!("Evo_{}_{}", Self::type_name(&comp_type), i),
+                        component_type: comp_type,
+                        capacity: HashMap::new(),
+                        load: 0.0,
+                        error_rate: rand::random::<f64>() * 0.02,
+                        latency_ms: rand::random::<f64>() * 30.0 + 1.0,
+                    },
+                );
             }
 
             let comp_ids: Vec<String> = components.keys().cloned().collect();
@@ -478,7 +538,11 @@ impl ArchitectureGenerator {
                         from: comp_ids[i].clone(),
                         to: comp_ids[i + 1].clone(),
                         bandwidth: 1000.0 + rand::random::<f64>() * 9000.0,
-                        protocol: if rand::random() { "HTTP/2".to_string() } else { "gRPC".to_string() },
+                        protocol: if rand::random() {
+                            "HTTP/2".to_string()
+                        } else {
+                            "gRPC".to_string()
+                        },
                         latency_ms: rand::random::<f64>() * 3.0,
                         packet_loss: rand::random::<f64>() * 0.01,
                     });
@@ -573,14 +637,20 @@ impl ArchitectureGenerator {
             proposals.push(ArchitectureProposal {
                 architecture: arch.clone(),
                 generation_score: score,
-                inspiration_sources: vec![format!("Evolutionary generation ({} generations)", params.generations)],
+                inspiration_sources: vec![format!(
+                    "Evolutionary generation ({} generations)",
+                    params.generations
+                )],
                 improvements: vec!["Evolved through natural selection".to_string()],
                 predicted_metrics: sim_result,
             });
         }
 
         proposals.sort_by(|a, b| b.generation_score.partial_cmp(&a.generation_score).unwrap());
-        self.generation_history.write().unwrap().extend(proposals.clone());
+        self.generation_history
+            .write()
+            .unwrap()
+            .extend(proposals.clone());
         proposals
     }
 
@@ -606,7 +676,8 @@ impl ArchitectureGenerator {
             score += latency_score * 0.2;
 
             // Áteresztőképesség pontszám
-            let throughput_score = (metrics.throughput_req_per_sec / params.target_throughput).min(1.0);
+            let throughput_score =
+                (metrics.throughput_req_per_sec / params.target_throughput).min(1.0);
             score += throughput_score * 0.15;
 
             // Stabilitás pontszám
@@ -641,7 +712,11 @@ impl ArchitectureGenerator {
     }
 
     /// Javasolt fejlesztések generálása
-    fn suggest_improvements(&self, arch: &Architecture, sim_result: &Option<SimulationMetrics>) -> Vec<String> {
+    fn suggest_improvements(
+        &self,
+        arch: &Architecture,
+        sim_result: &Option<SimulationMetrics>,
+    ) -> Vec<String> {
         let mut improvements = Vec::new();
 
         if let Some(ref metrics) = sim_result {
@@ -649,7 +724,9 @@ impl ArchitectureGenerator {
                 improvements.push("Consider adding a cache layer to reduce latency".to_string());
             }
             if metrics.error_rate > 0.05 {
-                improvements.push("Implement retry logic and circuit breakers for error resilience".to_string());
+                improvements.push(
+                    "Implement retry logic and circuit breakers for error resilience".to_string(),
+                );
             }
             if !metrics.bottleneck_components.is_empty() {
                 improvements.push(format!(
@@ -658,22 +735,29 @@ impl ArchitectureGenerator {
                 ));
             }
             if metrics.stability_score < 0.7 {
-                improvements.push("Add load balancing and auto-scaling for better stability".to_string());
+                improvements
+                    .push("Add load balancing and auto-scaling for better stability".to_string());
             }
             if metrics.resilience_score < 0.7 {
-                improvements.push("Implement bulkhead isolation to prevent cascade failures".to_string());
+                improvements
+                    .push("Implement bulkhead isolation to prevent cascade failures".to_string());
             }
         }
 
         if arch.connections.len() < arch.components.len() {
-            improvements.push("Consider adding redundant connections for fault tolerance".to_string());
+            improvements
+                .push("Consider adding redundant connections for fault tolerance".to_string());
         }
 
         improvements
     }
 
     /// Súlyozott komponens típus választás
-    fn select_weighted_type(&self, weights: &HashMap<ComponentType, f64>, index: usize) -> ComponentType {
+    fn select_weighted_type(
+        &self,
+        weights: &HashMap<ComponentType, f64>,
+        index: usize,
+    ) -> ComponentType {
         if weights.is_empty() {
             return match index % 4 {
                 0 => ComponentType::Software,

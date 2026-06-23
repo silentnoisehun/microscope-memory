@@ -12,7 +12,7 @@
 
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
-use std::time::{SystemTime, UNIX_EPOCH, Duration, Instant};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use crate::architecture_simulator::ArchitectureSimulator;
 use crate::heuristic_decision::HeuristicDecisionMaker;
@@ -25,8 +25,8 @@ use crate::knowledge_base::KnowledgeBase;
 pub struct VagusTone {
     pub current: f64,
     pub baseline: f64,
-    pub trend: f64,           // csökkenő = stressz, növekvő = relaxáció
-    pub volatility: f64,      // mennyire stabil a tónus
+    pub trend: f64,      // csökkenő = stressz, növekvő = relaxáció
+    pub volatility: f64, // mennyire stabil a tónus
     pub last_update: u64,
 }
 
@@ -35,10 +35,10 @@ pub struct VagusTone {
 pub struct SystemPulse {
     pub timestamp: u64,
     pub cpu_pressure: f64,     // 0.0-1.0
-    pub memory_pressure: f64,   // 0.0-1.0
+    pub memory_pressure: f64,  // 0.0-1.0
     pub io_pressure: f64,      // 0.0-1.0
-    pub network_pressure: f64,  // 0.0-1.0
-    pub request_rate: f64,      // kérések/másodperc
+    pub network_pressure: f64, // 0.0-1.0
+    pub request_rate: f64,     // kérések/másodperc
     pub error_rate: f64,       // hibák/másodperc
     pub hrv: f64,
 }
@@ -47,11 +47,11 @@ pub struct SystemPulse {
 #[derive(Debug, Clone)]
 pub struct GutFeeling {
     pub id: String,
-    pub source: String,        // honnan jött (pl. "bridge_api", "spine_client", "mcp_device")
-    pub raw_signal: f64,       // nyers jel erőssége
-    pub anomaly_score: f64,    // mennyire "furcsa" ez a jel
+    pub source: String, // honnan jött (pl. "bridge_api", "spine_client", "mcp_device")
+    pub raw_signal: f64, // nyers jel erőssége
+    pub anomaly_score: f64, // mennyire "furcsa" ez a jel
     pub timestamp: u64,
-    pub processed: bool,       // feldolgozta-e már a rendszer
+    pub processed: bool, // feldolgozta-e már a rendszer
 }
 
 /// Kognitív "gyulladás" típusai
@@ -68,7 +68,10 @@ pub enum CognitiveInflammation {
     /// Resource exhaustion - erőforrás kimerülés
     ResourceExhaustion { resource: String, usage: f64 },
     /// Cascade failure - kaszkád hiba
-    CascadeFailure { origin: String, affected: Vec<String> },
+    CascadeFailure {
+        origin: String,
+        affected: Vec<String>,
+    },
     ///custom
     Custom(String),
 }
@@ -77,11 +80,11 @@ pub enum CognitiveInflammation {
 #[derive(Debug, Clone)]
 pub struct AntiInflammatoryResponse {
     pub inflammation_type: CognitiveInflammation,
-    pub action: String,                    // milyen beavatkozás történt
-    pub target: String,                    // melyik modul/csomópont
-    pub success: bool,                      // sikeres volt-e
-    pub recovery_time_ms: u64,             // mennyi idő alatt állt helyre
-    pub side_effects: Vec<String>,          // mellékhatások
+    pub action: String,            // milyen beavatkozás történt
+    pub target: String,            // melyik modul/csomópont
+    pub success: bool,             // sikeres volt-e
+    pub recovery_time_ms: u64,     // mennyi idő alatt állt helyre
+    pub side_effects: Vec<String>, // mellékhatások
     pub timestamp: u64,
 }
 
@@ -93,8 +96,8 @@ pub struct VagusState {
     pub gut_feelings: Vec<GutFeeling>,
     pub active_inflammations: Vec<CognitiveInflammation>,
     pub response_history: Vec<AntiInflammatoryResponse>,
-    pub parasympathetic_mode: bool,  // aktívan lassít-e a rendszer
-    pub freeze_initiated: bool,      // kényszerített lassítás aktív
+    pub parasympathetic_mode: bool, // aktívan lassít-e a rendszer
+    pub freeze_initiated: bool,     // kényszerített lassítás aktív
 }
 
 /// Figyelmeztetési szint
@@ -128,10 +131,7 @@ pub struct VagusNerve {
 }
 
 impl VagusNerve {
-    pub fn new(
-        simulator: Arc<ArchitectureSimulator>,
-        knowledge_base: Arc<KnowledgeBase>,
-    ) -> Self {
+    pub fn new(simulator: Arc<ArchitectureSimulator>, knowledge_base: Arc<KnowledgeBase>) -> Self {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
@@ -140,7 +140,7 @@ impl VagusNerve {
         Self {
             state: Arc::new(RwLock::new(VagusState {
                 tone: VagusTone {
-                    current: 0.8,  // Kezdetben nyugodt
+                    current: 0.8, // Kezdetben nyugodt
                     baseline: 0.8,
                     trend: 0.0,
                     volatility: 0.1,
@@ -154,7 +154,7 @@ impl VagusNerve {
                     network_pressure: 0.0,
                     request_rate: 0.0,
                     error_rate: 0.0,
-                    hrv: 0.8,  // healthy variability
+                    hrv: 0.8, // healthy variability
                 },
                 gut_feelings: Vec::new(),
                 active_inflammations: Vec::new(),
@@ -216,16 +216,19 @@ impl VagusNerve {
         let pulse = &state.pulse;
 
         // Átlagos terhelés
-        let avg_pressure = (pulse.cpu_pressure + pulse.memory_pressure + 
-                           pulse.io_pressure + pulse.network_pressure) / 4.0;
+        let avg_pressure = (pulse.cpu_pressure
+            + pulse.memory_pressure
+            + pulse.io_pressure
+            + pulse.network_pressure)
+            / 4.0;
 
         // Új tónus számítása
         let target_tone = 1.0 - avg_pressure;
-        
+
         //mozgóátlag (exponenciális smoothing)
         let alpha = 0.1;
         let new_tone = state.tone.current * (1.0 - alpha) + target_tone * alpha;
-        
+
         // Trend számítása
         let trend = new_tone - state.tone.current;
 
@@ -255,7 +258,7 @@ impl VagusNerve {
             .as_secs();
 
         // Anomália detektálás (egyszerű: ha túl nagy a jel, az anomália)
-        let baseline = 0.5;  // assumed baseline
+        let baseline = 0.5; // assumed baseline
         let anomaly_score = ((raw_signal - baseline).abs() / baseline).min(1.0);
 
         let feeling = GutFeeling {
@@ -268,11 +271,11 @@ impl VagusNerve {
         };
 
         let id = feeling.id.clone();
-        
+
         {
             let mut state = self.state.write().unwrap();
             state.gut_feelings.push(feeling);
-            
+
             // Max 1000 gut feelinget tárolunk
             if state.gut_feelings.len() > 1000 {
                 state.gut_feelings.drain(0..500);
@@ -310,31 +313,40 @@ impl VagusNerve {
         // 3. Resource exhaustion
         if pulse.cpu_pressure > 0.95 || pulse.memory_pressure > 0.95 {
             inflammations.push(CognitiveInflammation::ResourceExhaustion {
-                resource: if pulse.cpu_pressure > 0.95 { "cpu".to_string() } else { "memory".to_string() },
+                resource: if pulse.cpu_pressure > 0.95 {
+                    "cpu".to_string()
+                } else {
+                    "memory".to_string()
+                },
                 usage: pulse.cpu_pressure.max(pulse.memory_pressure),
             });
         }
 
         // 4. Low HRV = rendszer "fél" (nem tud válaszolni)
         if pulse.hrv < 0.3 {
-            inflammations.push(CognitiveInflammation::Custom("system_paralysis".to_string()));
+            inflammations.push(CognitiveInflammation::Custom(
+                "system_paralysis".to_string(),
+            ));
         }
 
         // Frissítjük az állapotot
         drop(state);
         let mut state = self.state.write().unwrap();
         state.active_inflammations = inflammations.clone();
-        
+
         inflammations
     }
 
     /// Gyulladáscsökkentő válasz végrehajtása
-    pub fn trigger_anti_inflammatory_response(&self, inflammation: &CognitiveInflammation) -> AntiInflammatoryResponse {
+    pub fn trigger_anti_inflammatory_response(
+        &self,
+        inflammation: &CognitiveInflammation,
+    ) -> AntiInflammatoryResponse {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_secs();
-        
+
         let start = Instant::now();
 
         let (action, target, success, side_effects) = match inflammation {
@@ -344,7 +356,10 @@ impl VagusNerve {
                     "force_memory_flush".to_string(),
                     module.clone(),
                     true,
-                    vec!["cache_cleared".to_string(), "recent_activations_preserved".to_string()],
+                    vec![
+                        "cache_cleared".to_string(),
+                        "recent_activations_preserved".to_string(),
+                    ],
                 )
             }
             CognitiveInflammation::DoSAttack { source, .. } => {
@@ -353,7 +368,10 @@ impl VagusNerve {
                     "activate_rate_limiting".to_string(),
                     source.clone(),
                     true,
-                    vec!["throttle_applied".to_string(), "legitimate_requests_delayed".to_string()],
+                    vec![
+                        "throttle_applied".to_string(),
+                        "legitimate_requests_delayed".to_string(),
+                    ],
                 )
             }
             CognitiveInflammation::ResourceExhaustion { resource, .. } => {
@@ -383,14 +401,12 @@ impl VagusNerve {
                     vec!["partial_computation_lost".to_string()],
                 )
             }
-            _ => {
-                (
-                    "general_pause".to_string(),
-                    "system".to_string(),
-                    true,
-                    vec!["all_operations_slowed".to_string()],
-                )
-            }
+            _ => (
+                "general_pause".to_string(),
+                "system".to_string(),
+                true,
+                vec!["all_operations_slowed".to_string()],
+            ),
         };
 
         let recovery_time = start.elapsed().as_millis() as u64;
@@ -409,7 +425,7 @@ impl VagusNerve {
         {
             let mut state = self.state.write().unwrap();
             state.response_history.push(response.clone());
-            
+
             // Max 100 választ tárolunk
             if state.response_history.len() > 100 {
                 state.response_history.drain(0..50);
@@ -419,9 +435,15 @@ impl VagusNerve {
         // Tanulás a válaszból a tudásbázisba
         self.knowledge_base.add_pitfall(
             &format!("Inflammation detected: {:?}", inflammation),
-            &format!("Action taken: {}, Recovery time: {}ms", action, recovery_time),
+            &format!(
+                "Action taken: {}, Recovery time: {}ms",
+                action, recovery_time
+            ),
             "system_defense",
-            vec!["vagus_response".to_string(), "anti_inflammatory".to_string()],
+            vec![
+                "vagus_response".to_string(),
+                "anti_inflammatory".to_string(),
+            ],
         );
 
         response
@@ -430,26 +452,31 @@ impl VagusNerve {
     /// Paraszimpatikus mód aktiválása — kényszerített lassítás
     pub fn activate_parasympathetic(&self) -> bool {
         let mut state = self.state.write().unwrap();
-        
+
         let tone = state.tone.current;
         let pulse = &state.pulse;
-        let avg_pressure = (pulse.cpu_pressure + pulse.memory_pressure + 
-                           pulse.io_pressure + pulse.network_pressure) / 4.0;
+        let avg_pressure = (pulse.cpu_pressure
+            + pulse.memory_pressure
+            + pulse.io_pressure
+            + pulse.network_pressure)
+            / 4.0;
 
         // Ha túl magas a nyomás és alacsony a tónus -> aktiválás
         if avg_pressure > self.parasympathetic_threshold && tone < 0.3 {
             state.parasympathetic_mode = true;
             state.freeze_initiated = true;
-            
+
             // Logoljuk
             self.knowledge_base.add_insight(
                 "Parasympathetic Mode Activated",
-                &format!("System entering rest mode. Avg pressure: {:.2}, Tone: {:.2}", 
-                    avg_pressure, tone),
+                &format!(
+                    "System entering rest mode. Avg pressure: {:.2}, Tone: {:.2}",
+                    avg_pressure, tone
+                ),
                 vec!["vagus".to_string(), "homeostasis".to_string()],
                 "vagus_system",
             );
-            
+
             true
         } else {
             false
@@ -459,11 +486,14 @@ impl VagusNerve {
     /// Paraszimpatikus mód deaktiválása — visszatérés normál működéshez
     pub fn deactivate_parasympathetic(&self) -> bool {
         let state = self.state.read().unwrap();
-        
+
         let tone = state.tone.current;
         let pulse = &state.pulse;
-        let avg_pressure = (pulse.cpu_pressure + pulse.memory_pressure + 
-                           pulse.io_pressure + pulse.network_pressure) / 4.0;
+        let avg_pressure = (pulse.cpu_pressure
+            + pulse.memory_pressure
+            + pulse.io_pressure
+            + pulse.network_pressure)
+            / 4.0;
 
         drop(state);
 
@@ -473,30 +503,35 @@ impl VagusNerve {
             if state.parasympathetic_mode {
                 state.parasympathetic_mode = false;
                 state.freeze_initiated = false;
-                
+
                 self.knowledge_base.add_insight(
                     "Parasympathetic Mode Deactivated",
-                    &format!("System returning to active mode. Avg pressure: {:.2}, Tone: {:.2}", 
-                        avg_pressure, tone),
+                    &format!(
+                        "System returning to active mode. Avg pressure: {:.2}, Tone: {:.2}",
+                        avg_pressure, tone
+                    ),
                     vec!["vagus".to_string(), "recovery".to_string()],
                     "vagus_system",
                 );
-                
+
                 return true;
             }
         }
-        
+
         false
     }
 
     /// Alert szint meghatározása
     pub fn get_alert_level(&self) -> AlertLevel {
         let state = self.state.read().unwrap();
-        
+
         let pulse = &state.pulse;
         let tone = state.tone.current;
-        let avg_pressure = (pulse.cpu_pressure + pulse.memory_pressure + 
-                           pulse.io_pressure + pulse.network_pressure) / 4.0;
+        let avg_pressure = (pulse.cpu_pressure
+            + pulse.memory_pressure
+            + pulse.io_pressure
+            + pulse.network_pressure)
+            / 4.0;
 
         // Emergency: kritikus terhelés + alacsony HRV
         if avg_pressure > 0.95 && pulse.hrv < 0.2 {
@@ -535,7 +570,9 @@ impl VagusNerve {
     /// Feldolgozatlan "zsigeri" jelek lekérése
     pub fn get_unprocessed_gut_feelings(&self) -> Vec<GutFeeling> {
         let state = self.state.read().unwrap();
-        state.gut_feelings.iter()
+        state
+            .gut_feelings
+            .iter()
             .filter(|f| !f.processed)
             .cloned()
             .collect()
@@ -561,7 +598,9 @@ impl VagusNerve {
         };
 
         // 1. Pulzus mérése (ha kell)
-        if self.last_pulse.read().unwrap().elapsed() > Duration::from_millis(self.heartbeat_interval_ms) {
+        if self.last_pulse.read().unwrap().elapsed()
+            > Duration::from_millis(self.heartbeat_interval_ms)
+        {
             // Itt a hívónak kell megadnia a metrikákat
             status.pulse_measured = true;
         }
@@ -597,14 +636,17 @@ impl VagusNerve {
     /// Statisztikák lekérése
     pub fn get_statistics(&self) -> VagusStatistics {
         let state = self.state.read().unwrap();
-        
+
         VagusStatistics {
             current_tone: state.tone.current,
             tone_trend: state.tone.trend,
             tone_volatility: state.tone.volatility,
             hrv: state.pulse.hrv,
-            avg_pressure: (state.pulse.cpu_pressure + state.pulse.memory_pressure + 
-                         state.pulse.io_pressure + state.pulse.network_pressure) / 4.0,
+            avg_pressure: (state.pulse.cpu_pressure
+                + state.pulse.memory_pressure
+                + state.pulse.io_pressure
+                + state.pulse.network_pressure)
+                / 4.0,
             gut_feelings_count: state.gut_feelings.len(),
             unprocessed_gut_feelings: state.gut_feelings.iter().filter(|f| !f.processed).count(),
             active_inflammations: state.active_inflammations.len(),
@@ -686,17 +728,35 @@ impl std::fmt::Display for VagusStatistics {
         writeln!(f, "{}", "═".repeat(40))?;
         writeln!(f, "  VAGUS NERVE STATUS")?;
         writeln!(f, "{}", "═".repeat(40))?;
-        writeln!(f, "  Tone: {:.2} (trend: {:.3}, vol: {:.3})", 
-            self.current_tone, self.tone_trend, self.tone_volatility)?;
+        writeln!(
+            f,
+            "  Tone: {:.2} (trend: {:.3}, vol: {:.3})",
+            self.current_tone, self.tone_trend, self.tone_volatility
+        )?;
         writeln!(f, "  HRV: {:.2}", self.hrv)?;
         writeln!(f, "  Avg Pressure: {:.1}%", self.avg_pressure * 100.0)?;
-        writeln!(f, "  Gut Feelings: {} / {} pending", 
-            self.gut_feelings_count - self.unprocessed_gut_feelings, self.unprocessed_gut_feelings)?;
+        writeln!(
+            f,
+            "  Gut Feelings: {} / {} pending",
+            self.gut_feelings_count - self.unprocessed_gut_feelings,
+            self.unprocessed_gut_feelings
+        )?;
         writeln!(f, "  Active Inflammations: {}", self.active_inflammations)?;
         writeln!(f, "  Response History: {}", self.response_count)?;
-        writeln!(f, "  Parasympathetic: {} | Freeze: {}", 
-            if self.parasympathetic_mode { "ACTIVE" } else { "OFF" },
-            if self.freeze_initiated { "ACTIVE" } else { "OFF" })?;
+        writeln!(
+            f,
+            "  Parasympathetic: {} | Freeze: {}",
+            if self.parasympathetic_mode {
+                "ACTIVE"
+            } else {
+                "OFF"
+            },
+            if self.freeze_initiated {
+                "ACTIVE"
+            } else {
+                "OFF"
+            }
+        )?;
         writeln!(f, "  Alert Level: {}", self.alert_level)?;
         writeln!(f, "{}", "═".repeat(40))
     }
@@ -715,13 +775,13 @@ mod tests {
     #[test]
     fn test_gut_feeling() {
         let vagus = create_test_vagus();
-        
+
         let id = vagus.receive_gut_feeling("test_source", 0.9);
         assert!(!id.is_empty());
-        
+
         let feelings = vagus.get_unprocessed_gut_feelings();
         assert!(!feelings.is_empty());
-        
+
         vagus.mark_gut_feeling_processed(&id);
         let feelings = vagus.get_unprocessed_gut_feelings();
         assert!(feelings.is_empty());
@@ -730,7 +790,7 @@ mod tests {
     #[test]
     fn test_tone_update() {
         let vagus = create_test_vagus();
-        
+
         // Pulse first
         let metrics = SystemMetrics {
             cpu_usage: 0.5,
@@ -741,21 +801,21 @@ mod tests {
             error_rate: 0.01,
         };
         vagus.measure_pulse(&metrics);
-        
+
         vagus.update_tone();
         let tone = vagus.get_tone();
-        
+
         assert!(tone.current >= 0.0 && tone.current <= 1.0);
     }
 
     #[test]
     fn test_alert_level() {
         let vagus = create_test_vagus();
-        
+
         // Relaxed state
         let level = vagus.get_alert_level();
         assert_eq!(level, AlertLevel::Relaxed);
-        
+
         // High pressure
         let metrics = SystemMetrics {
             cpu_usage: 0.9,
@@ -767,7 +827,7 @@ mod tests {
         };
         vagus.measure_pulse(&metrics);
         vagus.update_tone();
-        
+
         let level = vagus.get_alert_level();
         assert!(level >= AlertLevel::Stressed);
     }
@@ -775,7 +835,7 @@ mod tests {
     #[test]
     fn test_inflammation_detection() {
         let vagus = create_test_vagus();
-        
+
         // DOS-like conditions
         let metrics = SystemMetrics {
             cpu_usage: 0.5,
@@ -783,11 +843,11 @@ mod tests {
             io_usage: 0.5,
             network_usage: 0.5,
             request_rate: 500.0,
-            error_rate: 0.2,  // High error rate
+            error_rate: 0.2, // High error rate
         };
         vagus.measure_pulse(&metrics);
         vagus.update_tone();
-        
+
         let inflammations = vagus.detect_inflammation();
         assert!(!inflammations.is_empty());
     }

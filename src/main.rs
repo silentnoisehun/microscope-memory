@@ -402,19 +402,23 @@ fn recall(config: &Config, query: &str, k: usize) {
         let _ = attention.save(output_dir);
 
         // --- Eureka: detect unexpected connections ---
-        let eureka_events = microscope_memory::eureka::detect_eureka(
-            config, &reader, query, None, &all_results,
-        );
+        let eureka_events =
+            microscope_memory::eureka::detect_eureka(config, &reader, query, None, &all_results);
         if !eureka_events.is_empty() {
             let mut eureka_log = microscope_memory::eureka::EurekaLog::load_or_init(output_dir);
             for ev in &eureka_events {
                 let _ = eureka_log.record(output_dir, ev.clone());
-                println!("  {} {}", "EUREKA:".red().bold(), microscope_memory::eureka::format_eureka(ev));
+                println!(
+                    "  {} {}",
+                    "EUREKA:".red().bold(),
+                    microscope_memory::eureka::format_eureka(ev)
+                );
             }
         }
 
         // --- Spaced repetition: record recall for each activated block ---
-        let mut spaced = microscope_memory::spaced_repetition::SpacedRepetition::load_or_init(output_dir);
+        let mut spaced =
+            microscope_memory::spaced_repetition::SpacedRepetition::load_or_init(output_dir);
         for &(idx, _) in &activated {
             spaced.record_recall(idx, 5, 3);
         }
@@ -425,7 +429,9 @@ fn recall(config: &Config, query: &str, k: usize) {
         let esr = microscope_memory::emotional_state::EmotionalStateRing::load_or_init(output_dir);
         let due_count = Some(spaced.due_count());
         let thought_count = Some(thought_graph.crystallized_count());
-        let wm_items: Vec<String> = activated.iter().take(3)
+        let wm_items: Vec<String> = activated
+            .iter()
+            .take(3)
             .map(|&(idx, _)| reader.text(idx as usize).chars().take(60).collect())
             .collect();
         if let Err(e) = narrative.update(
@@ -448,9 +454,17 @@ fn recall(config: &Config, query: &str, k: usize) {
         }
 
         // --- Auto-reflect: every N recalls, the system thinks about itself ---
-        if narrative.session_count > 0 && (narrative.session_count as usize) % microscope_memory::self_reflect::AUTO_REFLECT_INTERVAL == 0 {
-            let reflection = microscope_memory::self_reflect::introspect(config, &reader, output_dir);
-            println!("{}", microscope_memory::self_reflect::format_reflection(&reflection));
+        if narrative.session_count > 0
+            && (narrative.session_count as usize)
+                % microscope_memory::self_reflect::AUTO_REFLECT_INTERVAL
+                == 0
+        {
+            let reflection =
+                microscope_memory::self_reflect::introspect(config, &reader, output_dir);
+            println!(
+                "{}",
+                microscope_memory::self_reflect::format_reflection(&reflection)
+            );
         }
 
         // --- Auto self-model snapshot: every 10th recall ---
@@ -458,33 +472,48 @@ fn recall(config: &Config, query: &str, k: usize) {
             let mut self_model = microscope_memory::self_model::SelfModel::load_or_init(output_dir);
             let snap = self_model.take_snapshot(config, &reader, output_dir);
             let change = self_model.describe_change();
-            println!("{}", microscope_memory::self_model::format_self_model(&snap, &change));
+            println!(
+                "{}",
+                microscope_memory::self_model::format_self_model(&snap, &change)
+            );
         }
 
         // --- Auto curiosity: every 7th recall ---
         if narrative.session_count > 0 && (narrative.session_count as usize) % 7 == 0 {
-            let mut curiosity = microscope_memory::curiosity::CuriosityState::load_or_init(output_dir);
+            let mut curiosity =
+                microscope_memory::curiosity::CuriosityState::load_or_init(output_dir);
             let queries = curiosity.generate_queries(config, &reader, output_dir);
             if !queries.is_empty() {
-                println!("{}", microscope_memory::curiosity::format_curiosity(&queries));
+                println!(
+                    "{}",
+                    microscope_memory::curiosity::format_curiosity(&queries)
+                );
             }
         }
 
         // --- Narrative Memory: build story episode from every recall ---
         {
-            let mut nm = microscope_memory::narrative_memory::NarrativeMemory::load_or_init(output_dir);
+            let mut nm =
+                microscope_memory::narrative_memory::NarrativeMemory::load_or_init(output_dir);
             if let Some(ep) = nm.build_episode(config, &reader, output_dir, query, &all_results) {
                 if nm.episodes.len() <= 3 || nm.episodes.len() % 5 == 0 {
-                    println!("{}", microscope_memory::narrative_memory::format_episode(&ep));
+                    println!(
+                        "{}",
+                        microscope_memory::narrative_memory::format_episode(&ep)
+                    );
                 }
             }
         }
 
         // --- Auto inner monologue: every 15th recall ---
         if narrative.session_count > 0 && (narrative.session_count as usize) % 15 == 0 {
-            let mut monologue = microscope_memory::inner_monologue::MonologueState::load_or_init(output_dir);
+            let mut monologue =
+                microscope_memory::inner_monologue::MonologueState::load_or_init(output_dir);
             let entry = monologue.generate_monologue(config, &reader, output_dir);
-            println!("{}", microscope_memory::inner_monologue::format_monologue(&entry));
+            println!(
+                "{}",
+                microscope_memory::inner_monologue::format_monologue(&entry)
+            );
         }
     }
 
@@ -1152,34 +1181,34 @@ async fn main() {
                 Err(e) => eprintln!("Error: {}", e),
             }
         }
-                Cmd::AutoContext { compact, output } => {
-                    let reader = match microscope_memory::reader::MicroscopeReader::open(&config) {
-                        Ok(r) => r,
-                        Err(e) => {
-                            eprintln!("Error opening reader: {}", e);
-                            return;
-                        }
-                    };
-                    let output_dir = std::path::Path::new(&config.paths.output_dir);
-                    let ctx = crate::auto_context::build(output_dir, &reader);
-                    let text = if compact {
-                        crate::auto_context::render_compact(&ctx)
-                    } else {
-                        crate::auto_context::render(&ctx)
-                    };
-                    if let Some(path) = output {
-                        let p = std::path::Path::new(&path);
-                        let tmp_path = p.with_extension("tmp");
-                        if std::fs::write(&tmp_path, &text).is_ok() {
-                            let _ = std::fs::rename(&tmp_path, p);
-                            println!("Auto-context written to {}", path);
-                        } else {
-                            eprintln!("Error writing to {}", path);
-                        }
-                    } else {
-                        print!("{}", text);
-                    }
+        Cmd::AutoContext { compact, output } => {
+            let reader = match microscope_memory::reader::MicroscopeReader::open(&config) {
+                Ok(r) => r,
+                Err(e) => {
+                    eprintln!("Error opening reader: {}", e);
+                    return;
                 }
+            };
+            let output_dir = std::path::Path::new(&config.paths.output_dir);
+            let ctx = crate::auto_context::build(output_dir, &reader);
+            let text = if compact {
+                crate::auto_context::render_compact(&ctx)
+            } else {
+                crate::auto_context::render(&ctx)
+            };
+            if let Some(path) = output {
+                let p = std::path::Path::new(&path);
+                let tmp_path = p.with_extension("tmp");
+                if std::fs::write(&tmp_path, &text).is_ok() {
+                    let _ = std::fs::rename(&tmp_path, p);
+                    println!("Auto-context written to {}", path);
+                } else {
+                    eprintln!("Error writing to {}", path);
+                }
+            } else {
+                print!("{}", text);
+            }
+        }
         Cmd::Recall { query, k } => {
             recall(&config, &query, k);
         }
@@ -2410,8 +2439,12 @@ async fn main() {
         Cmd::Introspect => {
             let reader = open_reader(&config);
             let output_dir = Path::new(&config.paths.output_dir);
-            let reflection = microscope_memory::self_reflect::introspect(&config, &reader, output_dir);
-            println!("{}", microscope_memory::self_reflect::format_reflection(&reflection));
+            let reflection =
+                microscope_memory::self_reflect::introspect(&config, &reader, output_dir);
+            println!(
+                "{}",
+                microscope_memory::self_reflect::format_reflection(&reflection)
+            );
         }
         Cmd::SelfModel => {
             let reader = open_reader(&config);
@@ -2419,21 +2452,32 @@ async fn main() {
             let mut self_model = microscope_memory::self_model::SelfModel::load_or_init(output_dir);
             let snap = self_model.take_snapshot(&config, &reader, output_dir);
             let change = self_model.describe_change();
-            println!("{}", microscope_memory::self_model::format_self_model(&snap, &change));
+            println!(
+                "{}",
+                microscope_memory::self_model::format_self_model(&snap, &change)
+            );
         }
         Cmd::Curiosity => {
             let reader = open_reader(&config);
             let output_dir = Path::new(&config.paths.output_dir);
-            let mut curiosity = microscope_memory::curiosity::CuriosityState::load_or_init(output_dir);
+            let mut curiosity =
+                microscope_memory::curiosity::CuriosityState::load_or_init(output_dir);
             let queries = curiosity.generate_queries(&config, &reader, output_dir);
-            println!("{}", microscope_memory::curiosity::format_curiosity(&queries));
+            println!(
+                "{}",
+                microscope_memory::curiosity::format_curiosity(&queries)
+            );
         }
         Cmd::Monologue => {
             let reader = open_reader(&config);
             let output_dir = Path::new(&config.paths.output_dir);
-            let mut monologue = microscope_memory::inner_monologue::MonologueState::load_or_init(output_dir);
+            let mut monologue =
+                microscope_memory::inner_monologue::MonologueState::load_or_init(output_dir);
             let entry = monologue.generate_monologue(&config, &reader, output_dir);
-            println!("{}", microscope_memory::inner_monologue::format_monologue(&entry));
+            println!(
+                "{}",
+                microscope_memory::inner_monologue::format_monologue(&entry)
+            );
         }
         Cmd::Stories { k } => {
             let reader = open_reader(&config);
@@ -2441,11 +2485,21 @@ async fn main() {
             let nm = microscope_memory::narrative_memory::NarrativeMemory::load_or_init(output_dir);
             let episodes = nm.recent_episodes(k);
             if episodes.is_empty() {
-                println!("  {} No narrative episodes yet - recall to build stories", "STORIES:".cyan());
+                println!(
+                    "  {} No narrative episodes yet - recall to build stories",
+                    "STORIES:".cyan()
+                );
             } else {
-                println!("  {} {} recent episodes:", "STORIES:".cyan().bold(), episodes.len());
+                println!(
+                    "  {} {} recent episodes:",
+                    "STORIES:".cyan().bold(),
+                    episodes.len()
+                );
                 for ep in episodes {
-                    println!("{}", microscope_memory::narrative_memory::format_episode(ep));
+                    println!(
+                        "{}",
+                        microscope_memory::narrative_memory::format_episode(ep)
+                    );
                 }
             }
         }
@@ -2453,7 +2507,8 @@ async fn main() {
             let reader = open_reader(&config);
             let output_dir = Path::new(&config.paths.output_dir);
             let seed_text = if seed.is_empty() {
-                let narrative = microscope_memory::narrative::NarrativeState::load_or_init(output_dir);
+                let narrative =
+                    microscope_memory::narrative::NarrativeState::load_or_init(output_dir);
                 if narrative.narrative.is_empty() || narrative.narrative == "I am silent." {
                     "Microscope Memory".to_string()
                 } else {
@@ -2463,7 +2518,10 @@ async fn main() {
                 seed
             };
             match microscope_memory::daydream::daydream(&config, &seed_text, steps) {
-                Ok(result) => println!("{}", microscope_memory::daydream::format_daydream(&result, true)),
+                Ok(result) => println!(
+                    "{}",
+                    microscope_memory::daydream::format_daydream(&result, true)
+                ),
                 Err(e) => eprintln!("  {} Daydream error: {}", "ERROR:".red(), e),
             }
         }
@@ -2471,19 +2529,38 @@ async fn main() {
             let output_dir = Path::new(&config.paths.output_dir);
             let mut hf = microscope_memory::hyperfocus::Hyperfocus::new();
             let intensity = hf.enter_hyperfocus(&target, &focus_type);
-            println!("  {} Entering hyperfocus on '{}' ({})", "FOCUS:".green().bold(), target, focus_type);
-            println!("  {} Attention multiplier: {}x, Resource concentration: {:.0}%", "FOCUS:".green(), intensity, hf.resource_concentration * 100.0);
+            println!(
+                "  {} Entering hyperfocus on '{}' ({})",
+                "FOCUS:".green().bold(),
+                target,
+                focus_type
+            );
+            println!(
+                "  {} Attention multiplier: {}x, Resource concentration: {:.0}%",
+                "FOCUS:".green(),
+                intensity,
+                hf.resource_concentration * 100.0
+            );
             // Run a focused recall
             let reader = open_reader(&config);
             let results = reader.find_text(&target, 10);
             if !results.is_empty() {
-                println!("  {} Found {} relevant blocks", "FOCUS:".green(), results.len());
+                println!(
+                    "  {} Found {} relevant blocks",
+                    "FOCUS:".green(),
+                    results.len()
+                );
                 for (depth, idx) in results.iter().take(5) {
                     reader.print_result(*idx, *depth as f32);
                 }
             }
         }
-        Cmd::Autonomous { tts, daemon, interval, max_cycles } => {
+        Cmd::Autonomous {
+            tts,
+            daemon,
+            interval,
+            max_cycles,
+        } => {
             let auto_config = microscope_memory::autonomous::AutonomousConfig {
                 cycle_interval_secs: interval,
                 tts_enabled: tts,
@@ -2510,12 +2587,32 @@ fn print_client_setup(client: &str, config: &microscope_memory::config::Config) 
     let cfg_path = std::path::Path::new(&config.paths.output_dir);
 
     println!();
-    println!("{}", "════════════════════════════════════════════════════════════".cyan().bold());
-    println!("{}", format!("  Microscope Memory — Setup for: {}", client).cyan().bold());
-    println!("{}", "════════════════════════════════════════════════════════════".cyan().bold());
+    println!(
+        "{}",
+        "════════════════════════════════════════════════════════════"
+            .cyan()
+            .bold()
+    );
+    println!(
+        "{}",
+        format!("  Microscope Memory — Setup for: {}", client)
+            .cyan()
+            .bold()
+    );
+    println!(
+        "{}",
+        "════════════════════════════════════════════════════════════"
+            .cyan()
+            .bold()
+    );
     println!();
     println!("Binary:    {}", bin_path.green());
-    println!("Config:    {} (layers={}, output={})", "config.toml".green(), config.paths.layers_dir, config.paths.output_dir);
+    println!(
+        "Config:    {} (layers={}, output={})",
+        "config.toml".green(),
+        config.paths.layers_dir,
+        config.paths.output_dir
+    );
     println!();
     println!("{}", "─ MCP server (stdin/stdout JSON-RPC) ─".yellow());
     println!("Run in background:  {} mcp", bin_path.green());
@@ -2546,7 +2643,12 @@ fn print_client_setup(client: &str, config: &microscope_memory::config::Config) 
             println!("  Windows: %APPDATA%\\Claude\\claude_desktop_config.json");
             println!("  macOS:   ~/Library/Application Support/Claude/claude_desktop_config.json");
             println!();
-            println!("{}", "── Auto-context hook (Claude Code SessionStart) ──".yellow().bold());
+            println!(
+                "{}",
+                "── Auto-context hook (Claude Code SessionStart) ──"
+                    .yellow()
+                    .bold()
+            );
             println!("Optional: drop-in hook for universal auto-injection.");
             println!("Install: copy scripts/auto-inject.ps1 to your hooks dir, register in settings.json.");
         }
@@ -2587,14 +2689,17 @@ fn print_client_setup(client: &str, config: &microscope_memory::config::Config) 
             println!();
             println!("{}", mcp_config_json);
             println!();
-            println!("{}", "── Shell wrapper for non-MCP clients ──".yellow().bold());
+            println!(
+                "{}",
+                "── Shell wrapper for non-MCP clients ──".yellow().bold()
+            );
             println!("Bash / git-bash:");
             println!("    ./scripts/auto-inject.sh --output /tmp/ctx.txt");
             println!("    cat /tmp/ctx.txt   # paste into system prompt");
             println!();
             println!("PowerShell:");
-                        println!("    .\\scripts\\auto-inject.ps1 -OutputPath C:\\ctx.txt");
-                        println!("    Get-Content C:\\ctx.txt   # paste into system prompt");
+            println!("    .\\scripts\\auto-inject.ps1 -OutputPath C:\\ctx.txt");
+            println!("    Get-Content C:\\ctx.txt   # paste into system prompt");
         }
     }
     println!();
@@ -2606,5 +2711,10 @@ fn print_client_setup(client: &str, config: &microscope_memory::config::Config) 
     println!("  memory_open_loops     list unresolved tasks");
     println!("  memory_resolve_loop   mark loop resolved");
     println!();
-    println!("{}", "════════════════════════════════════════════════════════════".cyan().bold());
+    println!(
+        "{}",
+        "════════════════════════════════════════════════════════════"
+            .cyan()
+            .bold()
+    );
 }

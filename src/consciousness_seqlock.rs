@@ -233,9 +233,12 @@ impl SharedSnapshot {
     /// Update hot atomic fields. Called by the background cycle.
     pub fn set_hot_fields(&self, cycle: u64, surprise: f32, curiosity: f32, predicted_hash: u64) {
         self.hot_cycle.store(cycle, Ordering::Relaxed);
-        self.hot_surprise_bits.store(surprise.to_bits(), Ordering::Relaxed);
-        self.hot_curiosity_bits.store(curiosity.to_bits(), Ordering::Relaxed);
-        self.hot_predicted_hash.store(predicted_hash, Ordering::Relaxed);
+        self.hot_surprise_bits
+            .store(surprise.to_bits(), Ordering::Relaxed);
+        self.hot_curiosity_bits
+            .store(curiosity.to_bits(), Ordering::Relaxed);
+        self.hot_predicted_hash
+            .store(predicted_hash, Ordering::Relaxed);
     }
 
     /// Read the snapshot. Returns `None` after `SNAPSHOT_MAX_RETRIES` torn reads.

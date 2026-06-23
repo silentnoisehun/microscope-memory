@@ -188,7 +188,11 @@ impl ArchitectureSimulator {
     }
 
     /// Futtat egy szimulációt egy architektúrán
-    pub fn run_simulation(&self, arch_id: &str, config: &SimulationConfig) -> Option<SimulationMetrics> {
+    pub fn run_simulation(
+        &self,
+        arch_id: &str,
+        config: &SimulationConfig,
+    ) -> Option<SimulationMetrics> {
         let arch = {
             let architectures = self.architectures.read().unwrap();
             architectures.get(arch_id).cloned()?
@@ -231,19 +235,21 @@ impl ArchitectureSimulator {
             current_load = match config.load_pattern.as_str() {
                 "linear" => (current_time / (config.duration_secs * 1000.0)) * config.peak_load,
                 "spike" => {
-                    if current_time > config.duration_secs * 500.0 && current_time < config.duration_secs * 600.0 {
+                    if current_time > config.duration_secs * 500.0
+                        && current_time < config.duration_secs * 600.0
+                    {
                         config.peak_load
                     } else {
                         config.peak_load * 0.3
                     }
                 }
                 "sine" => {
-                    let phase = (current_time / (config.duration_secs * 1000.0)) * std::f64::consts::PI * 4.0;
+                    let phase = (current_time / (config.duration_secs * 1000.0))
+                        * std::f64::consts::PI
+                        * 4.0;
                     (phase.sin() * 0.5 + 0.5) * config.peak_load
                 }
-                "random" => {
-                    rand::random::<f64>() * config.peak_load
-                }
+                "random" => rand::random::<f64>() * config.peak_load,
                 _ => config.peak_load * 0.5,
             };
 
@@ -256,7 +262,7 @@ impl ArchitectureSimulator {
                 let base_latency = comp.latency_ms;
                 let load_factor = current_load * (1.0 + comp.error_rate);
                 let effective_latency = base_latency * (1.0 + load_factor * 2.0);
-                
+
                 latencies.push(effective_latency);
                 component_loads.get_mut(comp_id).unwrap().push(load_factor);
 
@@ -267,7 +273,10 @@ impl ArchitectureSimulator {
                         time_ms: current_time,
                         event_type: "fault".to_string(),
                         component_id: comp_id.clone(),
-                        description: format!("Fault injected in {} at load {:.2}", comp.name, current_load),
+                        description: format!(
+                            "Fault injected in {} at load {:.2}",
+                            comp.name, current_load
+                        ),
                         severity: 2,
                     });
                 }
@@ -307,10 +316,11 @@ impl ArchitectureSimulator {
         metrics.error_rate = metrics.failed_requests as f64 / metrics.total_requests.max(1) as f64;
 
         // CPU, memória, hálózat kihasználtság
-        let avg_loads: Vec<f64> = component_loads.values()
+        let avg_loads: Vec<f64> = component_loads
+            .values()
             .map(|loads| loads.iter().sum::<f64>() / loads.len() as f64)
             .collect();
-        
+
         if avg_loads.len() >= 3 {
             metrics.cpu_utilization = avg_loads[0];
             metrics.memory_utilization = avg_loads[1 % avg_loads.len()];
@@ -327,7 +337,8 @@ impl ArchitectureSimulator {
 
         // Eredmények tárolása
         let mut results = self.simulation_results.write().unwrap();
-        results.entry(arch_id.to_string())
+        results
+            .entry(arch_id.to_string())
             .or_insert_with(Vec::new)
             .push(metrics.clone());
 
@@ -372,7 +383,7 @@ impl ArchitectureSimulator {
                 // Töréspont detektálása
                 if metrics.error_rate > 0.5 && result.breaking_point_load == 0.0 {
                     result.breaking_point_load = load;
-                    
+
                     // Kaszkád hibák detektálása
                     if metrics.error_rate > previous_error_rate * 2.0 {
                         cascade_started = true;
@@ -397,7 +408,9 @@ impl ArchitectureSimulator {
         // Ha nem találtunk töréspontot, a maximális terhelésnél sincs probléma
         if result.breaking_point_load == 0.0 {
             result.breaking_point_load = 1.0;
-            result.recommendations.push("Architecture is stable up to maximum load".to_string());
+            result
+                .recommendations
+                .push("Architecture is stable up to maximum load".to_string());
         } else {
             result.recommendations.push(format!(
                 "Breaking point at {:.0}% load — consider scaling or optimization",
@@ -406,20 +419,21 @@ impl ArchitectureSimulator {
         }
 
         if !result.graceful_degradation {
-            result.recommendations.push(
-                "Implement circuit breaker pattern for graceful degradation".to_string()
-            );
+            result
+                .recommendations
+                .push("Implement circuit breaker pattern for graceful degradation".to_string());
         }
 
         if cascade_started {
-            result.recommendations.push(
-                "Add bulkhead isolation to prevent cascade failures".to_string()
-            );
+            result
+                .recommendations
+                .push("Add bulkhead isolation to prevent cascade failures".to_string());
         }
 
         // Eredmények tárolása
         let mut stress_results = self.stress_test_results.write().unwrap();
-        stress_results.entry(arch_id.to_string())
+        stress_results
+            .entry(arch_id.to_string())
             .or_insert_with(Vec::new)
             .push(result.clone());
 
@@ -427,7 +441,11 @@ impl ArchitectureSimulator {
     }
 
     /// Összehasonlít két architektúrát
-    pub fn compare_architectures(&self, arch_id_a: &str, arch_id_b: &str) -> Option<ComparisonResult> {
+    pub fn compare_architectures(
+        &self,
+        arch_id_a: &str,
+        arch_id_b: &str,
+    ) -> Option<ComparisonResult> {
         let results = self.simulation_results.read().unwrap();
         let results_a = results.get(arch_id_a)?;
         let results_b = results.get(arch_id_b)?;
@@ -438,10 +456,27 @@ impl ArchitectureSimulator {
         Some(ComparisonResult {
             architecture_a: arch_id_a.to_string(),
             architecture_b: arch_id_b.to_string(),
-            latency_winner: if latest_a.avg_latency_ms < latest_b.avg_latency_ms { arch_id_a.to_string() } else { arch_id_b.to_string() },
-            throughput_winner: if latest_a.throughput_req_per_sec > latest_b.throughput_req_per_sec { arch_id_a.to_string() } else { arch_id_b.to_string() },
-            stability_winner: if latest_a.stability_score > latest_b.stability_score { arch_id_a.to_string() } else { arch_id_b.to_string() },
-            resilience_winner: if latest_a.resilience_score > latest_b.resilience_score { arch_id_a.to_string() } else { arch_id_b.to_string() },
+            latency_winner: if latest_a.avg_latency_ms < latest_b.avg_latency_ms {
+                arch_id_a.to_string()
+            } else {
+                arch_id_b.to_string()
+            },
+            throughput_winner: if latest_a.throughput_req_per_sec > latest_b.throughput_req_per_sec
+            {
+                arch_id_a.to_string()
+            } else {
+                arch_id_b.to_string()
+            },
+            stability_winner: if latest_a.stability_score > latest_b.stability_score {
+                arch_id_a.to_string()
+            } else {
+                arch_id_b.to_string()
+            },
+            resilience_winner: if latest_a.resilience_score > latest_b.resilience_score {
+                arch_id_a.to_string()
+            } else {
+                arch_id_b.to_string()
+            },
             recommendations: self.generate_recommendations(latest_a, latest_b),
         })
     }
@@ -449,7 +484,7 @@ impl ArchitectureSimulator {
     /// Tanulás a szimulációs eredményekből
     fn learn_from_simulation(&self, metrics: &SimulationMetrics) {
         let mut patterns = self.learned_patterns.write().unwrap();
-        
+
         // Magas hibaarány -> negatív minta
         if metrics.error_rate > 0.1 {
             let key = format!("high_error_rate_{:.2}", metrics.error_rate);
@@ -470,7 +505,11 @@ impl ArchitectureSimulator {
     }
 
     /// Generál ajánlásokat két architektúra összehasonlításából
-    fn generate_recommendations(&self, a: &SimulationMetrics, b: &SimulationMetrics) -> Vec<String> {
+    fn generate_recommendations(
+        &self,
+        a: &SimulationMetrics,
+        b: &SimulationMetrics,
+    ) -> Vec<String> {
         let mut recs = Vec::new();
 
         if a.avg_latency_ms < b.avg_latency_ms * 0.8 {
@@ -533,34 +572,39 @@ pub fn create_architecture(
     name: &str,
     description: &str,
     components: Vec<(&str, ComponentType, f64, f64)>, // (name, type, latency_ms, error_rate)
-    connections: Vec<(&str, &str, f64, &str)>, // (from, to, bandwidth, protocol)
+    connections: Vec<(&str, &str, f64, &str)>,        // (from, to, bandwidth, protocol)
 ) -> Architecture {
     let id = format!("arch_{}", rand::random::<u32>());
     let mut comp_map = HashMap::new();
 
     for (i, (name, comp_type, latency, error_rate)) in components.iter().enumerate() {
         let comp_id = format!("comp_{}", i);
-        comp_map.insert(comp_id.clone(), Component {
-            id: comp_id,
-            name: name.to_string(),
-            component_type: comp_type.clone(),
-            capacity: HashMap::new(),
-            load: 0.0,
-            error_rate: *error_rate,
-            latency_ms: *latency,
-        });
+        comp_map.insert(
+            comp_id.clone(),
+            Component {
+                id: comp_id,
+                name: name.to_string(),
+                component_type: comp_type.clone(),
+                capacity: HashMap::new(),
+                load: 0.0,
+                error_rate: *error_rate,
+                latency_ms: *latency,
+            },
+        );
     }
 
-    let conns: Vec<Connection> = connections.iter().enumerate().map(|(i, (_from, _to, bw, proto))| {
-        Connection {
+    let conns: Vec<Connection> = connections
+        .iter()
+        .enumerate()
+        .map(|(i, (_from, _to, bw, proto))| Connection {
             from: format!("comp_{}", i),
             to: format!("comp_{}", i + 1),
             bandwidth: *bw,
             protocol: proto.to_string(),
             latency_ms: 1.0,
             packet_loss: 0.001,
-        }
-    }).collect();
+        })
+        .collect();
 
     Architecture {
         id,
@@ -579,7 +623,8 @@ pub fn run_parallel_simulations(
     arch_ids: &[&str],
     config: &SimulationConfig,
 ) -> Vec<(String, Option<SimulationMetrics>)> {
-    arch_ids.iter()
+    arch_ids
+        .iter()
         .map(|id| {
             let result = simulator.run_simulation(id, config);
             (id.to_string(), result)
@@ -594,7 +639,7 @@ mod tests {
     #[test]
     fn test_create_and_simulate() {
         let simulator = ArchitectureSimulator::new();
-        
+
         let arch = create_architecture(
             "Test Microservice",
             "A simple test architecture",
@@ -611,10 +656,10 @@ mod tests {
 
         let arch_id = arch.id.clone();
         simulator.register_architecture(arch);
-        
+
         let config = SimulationConfig::default();
         let result = simulator.run_simulation(&arch_id, &config);
-        
+
         assert!(result.is_some());
         let metrics = result.unwrap();
         assert!(metrics.total_requests > 0);
@@ -624,7 +669,7 @@ mod tests {
     #[test]
     fn test_stress_test() {
         let simulator = ArchitectureSimulator::new();
-        
+
         let arch = create_architecture(
             "Stress Test Target",
             "Architecture for stress testing",
@@ -642,7 +687,7 @@ mod tests {
         let arch_id = arch.id.clone();
         simulator.register_architecture(arch);
         let result = simulator.run_stress_test(&arch_id);
-        
+
         assert!(result.is_some());
         let stress = result.unwrap();
         assert!(stress.breaking_point_load > 0.0);

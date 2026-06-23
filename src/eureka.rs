@@ -74,43 +74,69 @@ impl EurekaLog {
                 let mut off = 8;
                 let mut max_id = 0u64;
                 for _ in 0..count {
-                    if off + 16 > data.len() { break; }
-                    let id = u64::from_le_bytes(data[off..off+8].try_into().unwrap());
-                    let ts = u64::from_le_bytes(data[off+8..off+16].try_into().unwrap());
+                    if off + 16 > data.len() {
+                        break;
+                    }
+                    let id = u64::from_le_bytes(data[off..off + 8].try_into().unwrap());
+                    let ts = u64::from_le_bytes(data[off + 8..off + 16].try_into().unwrap());
                     off += 16;
-                    if off + 2 > data.len() { break; }
-                    let qlen = u16::from_le_bytes(data[off..off+2].try_into().unwrap()) as usize;
+                    if off + 2 > data.len() {
+                        break;
+                    }
+                    let qlen = u16::from_le_bytes(data[off..off + 2].try_into().unwrap()) as usize;
                     off += 2;
-                    if off + qlen > data.len() { break; }
-                    let query = String::from_utf8_lossy(&data[off..off+qlen]).to_string();
+                    if off + qlen > data.len() {
+                        break;
+                    }
+                    let query = String::from_utf8_lossy(&data[off..off + qlen]).to_string();
                     off += qlen;
-                    if off + 2 > data.len() { break; }
-                    let tlen = u16::from_le_bytes(data[off..off+2].try_into().unwrap()) as usize;
+                    if off + 2 > data.len() {
+                        break;
+                    }
+                    let tlen = u16::from_le_bytes(data[off..off + 2].try_into().unwrap()) as usize;
                     off += 2;
                     let text = if off + tlen <= data.len() {
-                        String::from_utf8_lossy(&data[off..off+tlen]).to_string()
-                    } else { String::new() };
+                        String::from_utf8_lossy(&data[off..off + tlen]).to_string()
+                    } else {
+                        String::new()
+                    };
                     off += tlen;
-                    if off + 20 > data.len() { break; }
-                    let surprise = f32::from_le_bytes(data[off..off+4].try_into().unwrap());
-                    let curiosity = f32::from_le_bytes(data[off+4..off+8].try_into().unwrap());
-                    let sd = f32::from_le_bytes(data[off+8..off+12].try_into().unwrap());
-                    let es = f32::from_le_bytes(data[off+12..off+16].try_into().unwrap());
-                    let lid = data[off+16];
-                    let bi = u32::from_le_bytes(data[off+17..off+21].try_into().unwrap());
+                    if off + 20 > data.len() {
+                        break;
+                    }
+                    let surprise = f32::from_le_bytes(data[off..off + 4].try_into().unwrap());
+                    let curiosity = f32::from_le_bytes(data[off + 4..off + 8].try_into().unwrap());
+                    let sd = f32::from_le_bytes(data[off + 8..off + 12].try_into().unwrap());
+                    let es = f32::from_le_bytes(data[off + 12..off + 16].try_into().unwrap());
+                    let lid = data[off + 16];
+                    let bi = u32::from_le_bytes(data[off + 17..off + 21].try_into().unwrap());
                     off += 21;
-                    if id > max_id { max_id = id; }
+                    if id > max_id {
+                        max_id = id;
+                    }
                     events.push(EurekaEvent {
-                        id, timestamp_ms: ts, query, text,
-                        surprise_score: surprise, curiosity_score: curiosity,
-                        spatial_dist: sd, emotional_sim: es,
-                        layer_id: lid, block_index: bi,
+                        id,
+                        timestamp_ms: ts,
+                        query,
+                        text,
+                        surprise_score: surprise,
+                        curiosity_score: curiosity,
+                        spatial_dist: sd,
+                        emotional_sim: es,
+                        layer_id: lid,
+                        block_index: bi,
                     });
                 }
-                return EurekaLog { events, next_id: max_id + 1 };
+                return EurekaLog {
+                    events,
+                    next_id: max_id + 1,
+                };
             }
         }
-        EurekaLog { events: Vec::new(), next_id: 1 }
+        EurekaLog {
+            events: Vec::new(),
+            next_id: 1,
+        }
     }
 
     /// Save to EUR1 file.
@@ -164,18 +190,29 @@ pub fn detect_eureka(
 ) -> Vec<EurekaEvent> {
     let output_dir = Path::new(&config.paths.output_dir);
     let emotion_lookup = load_emotion_lookup(output_dir);
-    let (qx, qy, qz) = crate::content_coords_blended(query, "long_term", config.search.semantic_weight);
+    let (qx, qy, qz) =
+        crate::content_coords_blended(query, "long_term", config.search.semantic_weight);
     let mut eureka_events = Vec::new();
 
     // Extract surprise and curiosity from the query emotion
-    let surprise_idx = EMOTION_DIMS.iter().position(|&d| d == "surprise").unwrap_or(4);
-    let curiosity_idx = EMOTION_DIMS.iter().position(|&d| d == "curiosity").unwrap_or(10);
+    let surprise_idx = EMOTION_DIMS
+        .iter()
+        .position(|&d| d == "surprise")
+        .unwrap_or(4);
+    let curiosity_idx = EMOTION_DIMS
+        .iter()
+        .position(|&d| d == "curiosity")
+        .unwrap_or(10);
     let query_surprise = emotion.map(|e| e[surprise_idx]).unwrap_or(0.0);
     let query_curiosity = emotion.map(|e| e[curiosity_idx]).unwrap_or(0.0);
 
     for &(_score, idx, is_main) in results {
-        if !is_main { continue; }
-        if idx >= reader.block_count { continue; }
+        if !is_main {
+            continue;
+        }
+        if idx >= reader.block_count {
+            continue;
+        }
 
         let hdr = reader.header(idx);
         let dx = hdr.x - qx;
@@ -183,17 +220,21 @@ pub fn detect_eureka(
         let dz = hdr.z - qz;
         let spatial_dist = dx * dx + dy * dy + dz * dz;
 
-        if spatial_dist < EUREKA_MIN_SPATIAL_DIST { continue; }
+        if spatial_dist < EUREKA_MIN_SPATIAL_DIST {
+            continue;
+        }
 
         // Emotional similarity between query emotion and block emotion
         let emotional_sim = match (emotion, emotion_lookup.as_ref()) {
-            (Some(qe), Some(lookup)) => {
-                lookup(idx).map(|be| emotional_similarity(qe, &be)).unwrap_or(0.0)
-            }
+            (Some(qe), Some(lookup)) => lookup(idx)
+                .map(|be| emotional_similarity(qe, &be))
+                .unwrap_or(0.0),
             _ => 0.0,
         };
 
-        if emotional_sim < EUREKA_MIN_EMO_SIM { continue; }
+        if emotional_sim < EUREKA_MIN_EMO_SIM {
+            continue;
+        }
 
         // Use query surprise/curiosity, or default to emotional_sim * 0.5
         let surprise = query_surprise.max(emotional_sim * 0.3);
@@ -201,7 +242,10 @@ pub fn detect_eureka(
 
         let event = EurekaEvent {
             id: 0, // assigned by EurekaLog::record
-            timestamp_ms: SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_millis() as u64,
+            timestamp_ms: SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_millis() as u64,
             query: safe_truncate(query, 80),
             text: safe_truncate(reader.text(idx), 120),
             surprise_score: surprise,
@@ -278,11 +322,16 @@ mod tests {
     #[test]
     fn test_insight_score_formula() {
         let ev = EurekaEvent {
-            id: 1, timestamp_ms: 0,
-            query: "q".into(), text: "r".into(),
-            surprise_score: 0.8, curiosity_score: 0.7,
-            spatial_dist: 0.2, emotional_sim: 0.6,
-            layer_id: 0, block_index: 0,
+            id: 1,
+            timestamp_ms: 0,
+            query: "q".into(),
+            text: "r".into(),
+            surprise_score: 0.8,
+            curiosity_score: 0.7,
+            spatial_dist: 0.2,
+            emotional_sim: 0.6,
+            layer_id: 0,
+            block_index: 0,
         };
         let score = ev.insight_score();
         // 0.8 * 0.7 * 0.6 / 0.2 = 1.68

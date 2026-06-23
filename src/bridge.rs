@@ -949,11 +949,7 @@ async fn build_index(
     let _ = std::fs::remove_file(append_path);
     let reader = MicroscopeReader::open(&state.config)
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-    let depths = reader
-        .depth_ranges
-        .iter()
-        .filter(|&&(_, c)| c > 0)
-        .count();
+    let depths = reader.depth_ranges.iter().filter(|&&(_, c)| c > 0).count();
     Ok(Json(serde_json::json!({
         "status": "ok",
         "blocks": reader.block_count,
@@ -970,8 +966,7 @@ async fn session_log(
     if !file_path.exists() {
         return Ok(Json(Vec::new()));
     }
-    let content =
-        std::fs::read_to_string(&file_path).unwrap_or_default();
+    let content = std::fs::read_to_string(&file_path).unwrap_or_default();
     let entries: Vec<&str> = content
         .split("\n\n")
         .filter(|s| !s.trim().is_empty())
@@ -994,14 +989,20 @@ async fn consolidate_sessions(
     } else {
         return Ok(Json(serde_json::json!({"consolidated": 0, "groups": []})));
     };
-    let entries: Vec<&str> = content.split("\n\n").filter(|s| !s.trim().is_empty()).collect();
+    let entries: Vec<&str> = content
+        .split("\n\n")
+        .filter(|s| !s.trim().is_empty())
+        .collect();
     if entries.len() < 3 {
         return Ok(Json(serde_json::json!({"consolidated": 0, "groups": []})));
     }
-    let mut groups: std::collections::HashMap<String, Vec<String>> = std::collections::HashMap::new();
+    let mut groups: std::collections::HashMap<String, Vec<String>> =
+        std::collections::HashMap::new();
     for entry in &entries {
         let sid = if entry.contains("[sid-") {
-            entry.split("[sid-").nth(1)
+            entry
+                .split("[sid-")
+                .nth(1)
                 .and_then(|s| s.split(']').next())
                 .map(|s| format!("sid-{}", s))
                 .unwrap_or_else(|| "nosid".to_string())
@@ -1015,21 +1016,22 @@ async fn consolidate_sessions(
         if group.len() < 2 {
             continue;
         }
-        let topics: Vec<String> = group.iter()
+        let topics: Vec<String> = group
+            .iter()
             .take(5)
             .map(|e| {
                 let parts: Vec<&str> = e.split("] ").collect();
                 crate::safe_truncate(parts.last().unwrap_or(&""), 50)
             })
             .collect();
-        let summary = format!("[{}] CONSOLIDATED: {} interactions. Topics: {}", sid, group.len(), topics.join(" | "));
-        crate::store_memory(
-            &state.config,
-            &summary,
-            "long_term",
-            8,
-        )
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        let summary = format!(
+            "[{}] CONSOLIDATED: {} interactions. Topics: {}",
+            sid,
+            group.len(),
+            topics.join(" | ")
+        );
+        crate::store_memory(&state.config, &summary, "long_term", 8)
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
         summaries.push(summary);
     }
     Ok(Json(serde_json::json!({

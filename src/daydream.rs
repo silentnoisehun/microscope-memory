@@ -6,9 +6,9 @@
 //!
 //! Bináris formátum: no separate file, uses narrative.bin and append log.
 
-use std::path::Path;
 use crate::config::Config;
 use crate::reader::MicroscopeReader;
+use std::path::Path;
 
 // ─── Constants ──────────────────────────────────────
 
@@ -43,14 +43,9 @@ pub struct DaydreamStep {
 /// 4. ESR frissítés a blokk emotion-jával
 /// 5. Új narratíva generálás
 /// 6. Ismétlés steps-szer
-pub fn daydream(
-    config: &Config,
-    seed: &str,
-    steps: usize,
-) -> Result<DaydreamResult, String> {
+pub fn daydream(config: &Config, seed: &str, steps: usize) -> Result<DaydreamResult, String> {
     let output_dir = Path::new(&config.paths.output_dir);
-    let reader = MicroscopeReader::open(config)
-        .map_err(|e| format!("open reader: {}", e))?;
+    let reader = MicroscopeReader::open(config).map_err(|e| format!("open reader: {}", e))?;
     let sw = config.search.semantic_weight;
 
     let mut current_seed = seed.to_string();
@@ -75,7 +70,9 @@ pub fn daydream(
 
         for zoom in zoom_lo..=zoom_hi {
             let (start, count) = reader.depth_ranges[zoom as usize];
-            if count == 0 { continue; }
+            if count == 0 {
+                continue;
+            }
 
             // Linear scan (acceptable for daydreaming — not latency-critical)
             for bi in 0..count {
@@ -85,8 +82,12 @@ pub fn daydream(
                 let dy = hdr.y - qy;
                 let dz = hdr.z - qz;
                 let dist = dx * dx + dy * dy + dz * dz;
-                if dist < MIN_ASSOC_DIST { continue; } // skip same
-                if visited.contains(&i) { continue; } // skip already visited
+                if dist < MIN_ASSOC_DIST {
+                    continue;
+                } // skip same
+                if visited.contains(&i) {
+                    continue;
+                } // skip already visited
                 if dist < best_dist {
                     best_dist = dist;
                     best_idx = i;
@@ -102,7 +103,8 @@ pub fn daydream(
 
         // 2. Load emotions.bin for this block
         let emotion_lookup = crate::reader::load_emotion_lookup(output_dir);
-        let block_emotion = emotion_lookup.as_ref()
+        let block_emotion = emotion_lookup
+            .as_ref()
             .and_then(|lookup| lookup(best_idx as usize))
             .unwrap_or([0.0f32; 21]);
 
@@ -157,9 +159,19 @@ fn safe_truncate(s: &str, max: usize) -> String {
 
 /// DaydreamResult formázása CLI kimenethez.
 pub fn format_daydream(result: &DaydreamResult, verbose: bool) -> String {
-    let mut out = format!("{} ({} steps)\n", "DAYDREAM".cyan().bold(), result.steps.len());
-    out.push_str(&format!("  Total emotion shift: {:.3}\n", result.total_emotion_shift));
-    out.push_str(&format!("  Final narrative: \"{}\"\n", result.final_narrative));
+    let mut out = format!(
+        "{} ({} steps)\n",
+        "DAYDREAM".cyan().bold(),
+        result.steps.len()
+    );
+    out.push_str(&format!(
+        "  Total emotion shift: {:.3}\n",
+        result.total_emotion_shift
+    ));
+    out.push_str(&format!(
+        "  Final narrative: \"{}\"\n",
+        result.final_narrative
+    ));
 
     if verbose {
         for step in &result.steps {

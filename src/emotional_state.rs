@@ -18,7 +18,6 @@ use std::fs;
 use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-
 // ─── Constants ──────────────────────────────────────
 
 const RING_MAGIC: &[u8; 4] = b"ESR1";
@@ -70,7 +69,8 @@ impl EmotionalStateRing {
     pub fn save(&self, output_dir: &Path) -> Result<(), String> {
         let path = output_dir.join("emotional_state.bin");
         let tmp_path = output_dir.join("emotional_state.bin.tmp");
-        fs::write(&tmp_path, &self.to_bytes()).map_err(|e| format!("save emotional_state.bin: {}", e))?;
+        fs::write(&tmp_path, &self.to_bytes())
+            .map_err(|e| format!("save emotional_state.bin: {}", e))?;
         fs::rename(&tmp_path, &path).map_err(|e| format!("rename emotional_state.bin: {}", e))
     }
 
@@ -140,7 +140,11 @@ impl EmotionalStateRing {
         }
         let mut avg = [0.0f32; 21];
         for i in 0..self.count {
-            let idx = if i < self.count { (self.head + RING_SIZE - 1 - i) % RING_SIZE } else { 0 };
+            let idx = if i < self.count {
+                (self.head + RING_SIZE - 1 - i) % RING_SIZE
+            } else {
+                0
+            };
             for j in 0..21 {
                 avg[j] += self.ring[idx][j];
             }
@@ -250,7 +254,10 @@ mod tests {
     #[test]
     fn test_update_changes_state() {
         let mut ring = EmotionalStateRing::default();
-        let happy = [0.8f32, 0.0, 0.0, 0.0, 0.0, 0.0, 0.6, 0.0, 0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.3, 0.0, 0.0, 0.0, 0.0, 0.4];
+        let happy = [
+            0.8f32, 0.0, 0.0, 0.0, 0.0, 0.0, 0.6, 0.0, 0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.3, 0.0,
+            0.0, 0.0, 0.0, 0.4,
+        ];
         ring.update(&happy, 8);
         assert!(ring.intensity() > 0.0);
         assert!(ring.is_active());

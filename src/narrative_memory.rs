@@ -1,4 +1,4 @@
-﻿//! Narrative Memory Module for Microscope Memory.
+//! Narrative Memory Module for Microscope Memory.
 //!
 //! Automatically links sequences of recalls into coherent narratives -
 //! story arcs that emerge from thought patterns and can be replayed
@@ -54,30 +54,58 @@ impl NarrativeEpisode {
         for &idx in self.block_indices.iter().take(50) {
             buf.extend_from_slice(&idx.to_le_bytes());
         }
-        for v in self.emotional_arc { buf.extend_from_slice(&v.to_le_bytes()); }
+        for v in self.emotional_arc {
+            buf.extend_from_slice(&v.to_le_bytes());
+        }
         buf
     }
 
     pub fn from_bytes(data: &[u8]) -> Option<Self> {
-        if data.len() < 120 || &data[0..4] != b"NVM1" { return None; }
+        if data.len() < 120 || &data[0..4] != b"NVM1" {
+            return None;
+        }
         let mut pos = 4;
-        let ts = u64::from_le_bytes(data[pos..pos+8].try_into().ok()?); pos += 8;
-        let eid = u32::from_le_bytes(data[pos..pos+4].try_into().ok()?); pos += 4;
-        let tlen = u16::from_le_bytes(data[pos..pos+2].try_into().unwrap_or([0;2])) as usize; pos += 2;
-        let title = if tlen > 0 { String::from_utf8_lossy(&data[pos..pos+tlen]).to_string() } else { String::new() }; pos += tlen;
-        let slen = u16::from_le_bytes(data[pos..pos+2].try_into().unwrap_or([0;2])) as usize; pos += 2;
-        let summary = if slen > 0 { String::from_utf8_lossy(&data[pos..pos+slen]).to_string() } else { String::new() }; pos += slen;
-        let bcount = u16::from_le_bytes(data[pos..pos+2].try_into().unwrap_or([0;2])) as usize; pos += 2;
+        let ts = u64::from_le_bytes(data[pos..pos + 8].try_into().ok()?);
+        pos += 8;
+        let eid = u32::from_le_bytes(data[pos..pos + 4].try_into().ok()?);
+        pos += 4;
+        let tlen = u16::from_le_bytes(data[pos..pos + 2].try_into().unwrap_or([0; 2])) as usize;
+        pos += 2;
+        let title = if tlen > 0 {
+            String::from_utf8_lossy(&data[pos..pos + tlen]).to_string()
+        } else {
+            String::new()
+        };
+        pos += tlen;
+        let slen = u16::from_le_bytes(data[pos..pos + 2].try_into().unwrap_or([0; 2])) as usize;
+        pos += 2;
+        let summary = if slen > 0 {
+            String::from_utf8_lossy(&data[pos..pos + slen]).to_string()
+        } else {
+            String::new()
+        };
+        pos += slen;
+        let bcount = u16::from_le_bytes(data[pos..pos + 2].try_into().unwrap_or([0; 2])) as usize;
+        pos += 2;
         let mut indices = Vec::new();
         for _ in 0..bcount {
-            let idx = u32::from_le_bytes(data[pos..pos+4].try_into().ok()?); pos += 4;
+            let idx = u32::from_le_bytes(data[pos..pos + 4].try_into().ok()?);
+            pos += 4;
             indices.push(idx);
         }
         let mut emo = [0.0f32; 21];
         for i in 0..21 {
-            emo[i] = f32::from_le_bytes(data[pos..pos+4].try_into().ok()?); pos += 4;
+            emo[i] = f32::from_le_bytes(data[pos..pos + 4].try_into().ok()?);
+            pos += 4;
         }
-        Some(Self { timestamp_ms: ts, episode_id: eid, title, summary, block_indices: indices, emotional_arc: emo })
+        Some(Self {
+            timestamp_ms: ts,
+            episode_id: eid,
+            title,
+            summary,
+            block_indices: indices,
+            emotional_arc: emo,
+        })
     }
 }
 
@@ -95,11 +123,24 @@ impl NarrativeMemory {
             let mut pos = 0;
             while pos + 120 <= data.len() {
                 if let Some(ep) = NarrativeEpisode::from_bytes(&data[pos..]) {
-                    let size = 4 + 8 + 4 + 2 + ep.title.len().min(MAX_STR_LEN) + 2 + ep.summary.len().min(MAX_STR_LEN) + 2 + ep.block_indices.len().min(50) * 4 + 84;
+                    let size = 4
+                        + 8
+                        + 4
+                        + 2
+                        + ep.title.len().min(MAX_STR_LEN)
+                        + 2
+                        + ep.summary.len().min(MAX_STR_LEN)
+                        + 2
+                        + ep.block_indices.len().min(50) * 4
+                        + 84;
                     pos += size;
-                    if ep.episode_id >= next_id { next_id = ep.episode_id + 1; }
+                    if ep.episode_id >= next_id {
+                        next_id = ep.episode_id + 1;
+                    }
                     episodes.push(ep);
-                } else { pos += 1; }
+                } else {
+                    pos += 1;
+                }
             }
         }
         Self { episodes, next_id }
@@ -116,26 +157,45 @@ impl NarrativeMemory {
         fs::rename(&tmp_path, &path).map_err(|e| format!("rename narrative_memory.bin: {}", e))
     }
 
-    pub fn build_episode(&mut self, config: &Config, reader: &MicroscopeReader, output_dir: &Path, query: &str, results: &[(f32, usize, bool)]) -> Option<NarrativeEpisode> {
-        if results.is_empty() { return None; }
-        let now_ms = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_millis() as u64;
+    pub fn build_episode(
+        &mut self,
+        config: &Config,
+        reader: &MicroscopeReader,
+        output_dir: &Path,
+        query: &str,
+        results: &[(f32, usize, bool)],
+    ) -> Option<NarrativeEpisode> {
+        if results.is_empty() {
+            return None;
+        }
+        let now_ms = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis() as u64;
 
         // Collect main index results
-        let indices: Vec<u32> = results.iter()
+        let indices: Vec<u32> = results
+            .iter()
             .filter(|(_, _, is_main)| *is_main)
             .take(10)
             .map(|(_, idx, _)| *idx as u32)
             .collect();
-        if indices.is_empty() { return None; }
+        if indices.is_empty() {
+            return None;
+        }
 
         // Build title from query
         let title = format!("Episode: {}", crate::safe_truncate(query, 60));
 
         // Build summary from result texts
-        let texts: Vec<String> = indices.iter().take(5).map(|&idx| {
-            let text = reader.text(idx as usize);
-            crate::safe_truncate(text, 80)
-        }).collect();
+        let texts: Vec<String> = indices
+            .iter()
+            .take(5)
+            .map(|&idx| {
+                let text = reader.text(idx as usize);
+                crate::safe_truncate(text, 80)
+            })
+            .collect();
         let summary = if texts.len() == 1 {
             format!("Recalled: {}", texts[0])
         } else {
@@ -144,7 +204,11 @@ impl NarrativeMemory {
 
         // Get emotional arc from emotional state
         let esr = crate::emotional_state::EmotionalStateRing::load_or_init(output_dir);
-        let emotional_arc = if esr.is_active() { esr.current } else { [0.0f32; 21] };
+        let emotional_arc = if esr.is_active() {
+            esr.current
+        } else {
+            [0.0f32; 21]
+        };
 
         let episode = NarrativeEpisode {
             timestamp_ms: now_ms,
@@ -167,9 +231,19 @@ impl NarrativeMemory {
 
 pub fn format_episode(ep: &NarrativeEpisode) -> String {
     let labels = crate::reader::EMOTION_DIMS;
-    let mut emos: Vec<(usize, f32)> = ep.emotional_arc.iter().enumerate().map(|(i, &v)| (i, v)).collect();
+    let mut emos: Vec<(usize, f32)> = ep
+        .emotional_arc
+        .iter()
+        .enumerate()
+        .map(|(i, &v)| (i, v))
+        .collect();
     emos.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
-    let top_emo: Vec<String> = emos.iter().take(2).filter(|(_, v)| *v > 0.1).map(|(i, v)| format!("{}={:.2}", labels[*i], v)).collect();
+    let top_emo: Vec<String> = emos
+        .iter()
+        .take(2)
+        .filter(|(_, v)| *v > 0.1)
+        .map(|(i, v)| format!("{}={:.2}", labels[*i], v))
+        .collect();
 
     format!(
         "  {} [#{}] {}\n\
@@ -181,7 +255,11 @@ pub fn format_episode(ep: &NarrativeEpisode) -> String {
         ep.title,
         ep.summary,
         ep.block_indices.len(),
-        if top_emo.is_empty() { "neutral".to_string() } else { top_emo.join(", ") },
+        if top_emo.is_empty() {
+            "neutral".to_string()
+        } else {
+            top_emo.join(", ")
+        },
         chrono_str(ep.timestamp_ms),
     )
 }

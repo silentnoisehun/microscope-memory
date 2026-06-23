@@ -428,7 +428,6 @@ fn test_embedding_index_search() {
     }
 }
 
-
 // ─── Morphogenesis Integration ───────────────────────────
 
 #[test]
@@ -457,9 +456,13 @@ fn test_pattern_recognition_sequences() {
     use microscope_memory::pattern_recognition::*;
     let recognizer = PatternRecognizer::new();
     // Register a known pattern, then verify it's there
-    recognizer.register_pattern("test_seq", PatternType::Sequence, 
-        PatternTemplate::Sequence(vec!["a".to_string(), "b".to_string()]), 
-        "test", vec![]);
+    recognizer.register_pattern(
+        "test_seq",
+        PatternType::Sequence,
+        PatternTemplate::Sequence(vec!["a".to_string(), "b".to_string()]),
+        "test",
+        vec![],
+    );
     let found = recognizer.find_pattern("test_seq");
     assert!(found.is_some(), "Should find registered pattern");
     assert_eq!(found.unwrap().pattern_type, PatternType::Sequence);
@@ -469,9 +472,13 @@ fn test_pattern_recognition_sequences() {
 fn test_pattern_recognition_motifs() {
     use microscope_memory::pattern_recognition::*;
     let recognizer = PatternRecognizer::new();
-    recognizer.register_pattern("motif_test", PatternType::Structural,
+    recognizer.register_pattern(
+        "motif_test",
+        PatternType::Structural,
         PatternTemplate::Structural(vec![("a".to_string(), "b".to_string(), 1.0)]),
-        "test_graph", vec![]);
+        "test_graph",
+        vec![],
+    );
     let patterns = recognizer.list_patterns(Some(PatternType::Structural), Some("test_graph"));
     assert!(patterns.len() >= 1, "Should have structural patterns");
 }
@@ -529,7 +536,13 @@ fn test_planning_create_and_execute() {
 fn test_autopoiesis_template_and_mutation() {
     use microscope_memory::autopoiesis::*;
     let engine = AutopoiesisEngine::new();
-    engine.register_template("tmpl", "mod", "fn {{name}}() {}", vec!["name".to_string()], "Test");
+    engine.register_template(
+        "tmpl",
+        "mod",
+        "fn {{name}}() {}",
+        vec!["name".to_string()],
+        "Test",
+    );
     let mut vars = std::collections::HashMap::new();
     vars.insert("name".to_string(), "hello".to_string());
     let code = engine.generate_from_template("tmpl", &vars);
@@ -540,7 +553,14 @@ fn test_autopoiesis_template_and_mutation() {
 fn test_autopoiesis_mutation_lifecycle() {
     use microscope_memory::autopoiesis::*;
     let engine = AutopoiesisEngine::new();
-    let id = engine.propose_mutation("fix", MutationType::Modification, "test_mod", "code", "reason", "system");
+    let id = engine.propose_mutation(
+        "fix",
+        MutationType::Modification,
+        "test_mod",
+        "code",
+        "reason",
+        "system",
+    );
     assert!(engine.apply_mutation(id));
     assert!(!engine.list_mutations(None).is_empty());
 }
@@ -551,8 +571,24 @@ fn test_autopoiesis_mutation_lifecycle() {
 fn test_code_memory_store_and_recall() {
     use microscope_memory::code_memory::*;
     let cm = CodeMemory::new();
-    cm.store(CodeEntryType::Function, "parse", "fn parse() {}", "lib.rs", "rust", "proj", vec![], vec![]);
-    let q = CodeQuery { query: "parse".to_string(), language: None, entry_type: None, project: None, file: None, k: 10 };
+    cm.store(
+        CodeEntryType::Function,
+        "parse",
+        "fn parse() {}",
+        "lib.rs",
+        "rust",
+        "proj",
+        vec![],
+        vec![],
+    );
+    let q = CodeQuery {
+        query: "parse".to_string(),
+        language: None,
+        entry_type: None,
+        project: None,
+        file: None,
+        k: 10,
+    };
     assert!(!cm.recall(&q).is_empty());
 }
 
@@ -569,7 +605,25 @@ fn test_code_memory_error_solution() {
 fn test_code_memory_stats() {
     use microscope_memory::code_memory::*;
     let cm = CodeMemory::new();
-    cm.store(CodeEntryType::Function, "a", "fn a() {}", "a.rs", "rust", "p1", vec![], vec![]);
-    cm.store(CodeEntryType::Type, "B", "struct B {}", "b.rs", "rust", "p2", vec![], vec![]);
+    cm.store(
+        CodeEntryType::Function,
+        "a",
+        "fn a() {}",
+        "a.rs",
+        "rust",
+        "p1",
+        vec![],
+        vec![],
+    );
+    cm.store(
+        CodeEntryType::Type,
+        "B",
+        "struct B {}",
+        "b.rs",
+        "rust",
+        "p2",
+        vec![],
+        vec![],
+    );
     assert_eq!(cm.stats().0, 2);
 }

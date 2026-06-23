@@ -106,9 +106,7 @@ impl ConsciousnessStream {
         let hebbian = HebbianState::load_or_init(output_dir, block_count);
         // Initial total: sum whatever was loaded from disk. Subsequent
         // decay updates keep this in sync via the background cycle.
-        let hebbian_total_energy: f32 = hebbian.activations.iter()
-            .map(|a| a.energy)
-            .sum();
+        let hebbian_total_energy: f32 = hebbian.activations.iter().map(|a| a.energy).sum();
 
         let snapshot = Arc::new(SharedSnapshot::new_zeroed());
 
@@ -163,8 +161,8 @@ impl ConsciousnessStream {
                     // Az egyetlen O(n) lépés kikerül a read path-ból.
                     const DECAY_FACTOR: f32 = 0.995_f32;
                     // 0.995^DECAY_INTERVAL — egyszer kiszámítjuk, O(1) update
-                    let decay_pow: f32 = (0..DECAY_INTERVAL as i32)
-                        .fold(1.0_f32, |acc, _| acc * DECAY_FACTOR);
+                    let decay_pow: f32 =
+                        (0..DECAY_INTERVAL as i32).fold(1.0_f32, |acc, _| acc * DECAY_FACTOR);
                     s.hebbian_total_energy *= decay_pow;
                     for rec in &mut s.hebbian.activations {
                         rec.energy *= DECAY_FACTOR;
@@ -293,7 +291,10 @@ impl ConsciousnessStream {
             None => return "🧠 Consciousness Stream — (snapshot busy, retry)".to_string(),
         };
         let dominant = if v.emo_dominant_idx >= 0 {
-            format!(" (idx={} val={:.2})", v.emo_dominant_idx, v.emo_dominant_val)
+            format!(
+                " (idx={} val={:.2})",
+                v.emo_dominant_idx, v.emo_dominant_val
+            )
         } else {
             String::new()
         };

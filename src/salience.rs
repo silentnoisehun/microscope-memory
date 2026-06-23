@@ -56,17 +56,25 @@ impl SalienceState {
                 let mut inhibitions = Vec::with_capacity(count);
                 let mut off = 8;
                 for _ in 0..count {
-                    if off + 20 > data.len() { break; }
-                    let topic_hash = u64::from_le_bytes(data[off..off+8].try_into().unwrap());
-                    let remaining = f32::from_le_bytes(data[off+8..off+12].try_into().unwrap());
-                    let created = u64::from_le_bytes(data[off+12..off+20].try_into().unwrap());
-                    inhibitions.push(InhibitionEntry { topic_hash, remaining_strength: remaining, created_ms: created });
+                    if off + 20 > data.len() {
+                        break;
+                    }
+                    let topic_hash = u64::from_le_bytes(data[off..off + 8].try_into().unwrap());
+                    let remaining = f32::from_le_bytes(data[off + 8..off + 12].try_into().unwrap());
+                    let created = u64::from_le_bytes(data[off + 12..off + 20].try_into().unwrap());
+                    inhibitions.push(InhibitionEntry {
+                        topic_hash,
+                        remaining_strength: remaining,
+                        created_ms: created,
+                    });
                     off += 20;
                 }
                 return SalienceState { inhibitions };
             }
         }
-        SalienceState { inhibitions: Vec::new() }
+        SalienceState {
+            inhibitions: Vec::new(),
+        }
     }
 
     /// Mentés SAL1 formátumba.
@@ -100,8 +108,13 @@ impl SalienceState {
     /// Inhibíció hozzáadása egy témához (topic_hash).
     pub fn inhibit(&mut self, topic_hash: u64) {
         // Ha már van, erősítsd
-        if let Some(existing) = self.inhibitions.iter_mut().find(|e| e.topic_hash == topic_hash) {
-            existing.remaining_strength = (existing.remaining_strength + INHIBITION_STRENGTH).min(1.0);
+        if let Some(existing) = self
+            .inhibitions
+            .iter_mut()
+            .find(|e| e.topic_hash == topic_hash)
+        {
+            existing.remaining_strength =
+                (existing.remaining_strength + INHIBITION_STRENGTH).min(1.0);
             existing.created_ms = now_ms();
             return;
         }
@@ -128,12 +141,18 @@ impl SalienceState {
     ) -> f32 {
         let base = emotional_delta * insight_score * recency_factor;
         // Inhibíció: ha a téma nemrég volt a narratívában, csökkent
-        let inhibition = self.inhibitions.iter()
+        let inhibition = self
+            .inhibitions
+            .iter()
             .find(|e| e.topic_hash == topic_hash)
             .map(|e| e.remaining_strength)
             .unwrap_or(0.0);
         let salience = base * (1.0 - inhibition);
-        if salience < SALIENCE_THRESHOLD { 0.0 } else { salience }
+        if salience < SALIENCE_THRESHOLD {
+            0.0
+        } else {
+            salience
+        }
     }
 
     /// Kompakt hash egy szövegből (használható topic_hash-ként).
@@ -157,20 +176,26 @@ impl SalienceState {
         scores: &[(u32, f32, f32, f32)], // (block_idx, emotional_delta, insight_score, recency)
     ) -> Vec<(u32, f32)> {
         self.decay();
-        scores.iter().filter_map(|&(idx, ed, isc, rec)| {
-            let topic_h = SalienceState::topic_hash(&format!("block_{}", idx));
-            let s = self.compute_salience(ed, isc, rec, topic_h);
-            if s > SALIENCE_THRESHOLD {
-                Some((idx, s))
-            } else {
-                None
-            }
-        }).collect()
+        scores
+            .iter()
+            .filter_map(|&(idx, ed, isc, rec)| {
+                let topic_h = SalienceState::topic_hash(&format!("block_{}", idx));
+                let s = self.compute_salience(ed, isc, rec, topic_h);
+                if s > SALIENCE_THRESHOLD {
+                    Some((idx, s))
+                } else {
+                    None
+                }
+            })
+            .collect()
     }
 }
 
 fn now_ms() -> u64 {
-    SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_millis() as u64
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as u64
 }
 
 #[cfg(test)]

@@ -55,9 +55,8 @@ impl NarrativeState {
                 let mut emotion = [0.0f32; 21];
                 for i in 0..21 {
                     let off = 20 + i * 4;
-                    emotion[i] = f32::from_le_bytes(
-                        data[off..off + 4].try_into().unwrap_or([0u8; 4]),
-                    );
+                    emotion[i] =
+                        f32::from_le_bytes(data[off..off + 4].try_into().unwrap_or([0u8; 4]));
                 }
                 let nlen = u16::from_le_bytes(data[104..106].try_into().unwrap_or([0; 2])) as usize;
                 let narrative = if 106 + nlen <= data.len() {
@@ -123,13 +122,7 @@ impl NarrativeState {
         }
 
         // 2. Generate the narrative sentence
-        self.narrative = build_narrative(
-            &self.emotion,
-            wm_items,
-            due_count,
-            thought_count,
-            query,
-        );
+        self.narrative = build_narrative(&self.emotion, wm_items, due_count, thought_count, query);
 
         self.save(output_dir)
     }
@@ -148,11 +141,16 @@ pub fn metacognitive_store(output_dir: &Path, narrative: &str, emotion: &[f32; 2
     // A store_memory-hoz config kell, de itt nincs. Használjuk az emotion_log-ot
     // és a persist_to_layer_file-t, hogy a rebuild túlélje.
     let layer = "meta_cognitive";
-    let layer_path = output_dir.parent().and_then(|p| p.parent()).map(|root| {
-        root.join("layers").join(format!("{}.txt", layer))
-    }).unwrap_or_else(|| {
-        output_dir.join("..").join("layers").join(format!("{}.txt", layer))
-    });
+    let layer_path = output_dir
+        .parent()
+        .and_then(|p| p.parent())
+        .map(|root| root.join("layers").join(format!("{}.txt", layer)))
+        .unwrap_or_else(|| {
+            output_dir
+                .join("..")
+                .join("layers")
+                .join(format!("{}.txt", layer))
+        });
 
     // Write directly to layer file (best-effort)
     if let Ok(mut file) = fs::OpenOptions::new()
@@ -167,7 +165,11 @@ pub fn metacognitive_store(output_dir: &Path, narrative: &str, emotion: &[f32; 2
     }
 
     // Also write emotion to emotion_log for rebuild survival
-    let _ = crate::reader::append_emotion_log(output_dir, &format!("[MetaCognitive] {}", narrative), emotion);
+    let _ = crate::reader::append_emotion_log(
+        output_dir,
+        &format!("[MetaCognitive] {}", narrative),
+        emotion,
+    );
 }
 
 // ─── Narrative generation ──────────────────────────
@@ -191,14 +193,18 @@ fn build_narrative(
     // Fókusz rész (working memory)
     if let Some(items) = wm_items {
         if !items.is_empty() {
-            let foci: Vec<&str> = items.iter().take(2).map(|s| {
-                let s = s.trim();
-                if s.len() > MAX_FOCUS_LEN {
-                    &s[..s.floor_char_boundary(MAX_FOCUS_LEN)]
-                } else {
-                    s
-                }
-            }).collect();
+            let foci: Vec<&str> = items
+                .iter()
+                .take(2)
+                .map(|s| {
+                    let s = s.trim();
+                    if s.len() > MAX_FOCUS_LEN {
+                        &s[..s.floor_char_boundary(MAX_FOCUS_LEN)]
+                    } else {
+                        s
+                    }
+                })
+                .collect();
             parts.push(format!("focused on {}", foci.join(" and ")));
         }
     }
@@ -238,12 +244,19 @@ fn felt_emotions(emotion: &[f32; 21], max: usize) -> String {
     let mut pairs: Vec<(usize, f32)> = emotion.iter().enumerate().map(|(i, &v)| (i, v)).collect();
     pairs.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
 
-    let felt: Vec<String> = pairs.into_iter()
+    let felt: Vec<String> = pairs
+        .into_iter()
         .take(max)
         .filter(|(_, v)| *v > FEELING_THRESHOLD)
         .map(|(i, v)| {
             let name = EMOTION_DIMS.get(i).unwrap_or(&"?");
-            let intensity = if v > 0.6 { "strongly " } else if v > 0.3 { "" } else { "slightly " };
+            let intensity = if v > 0.6 {
+                "strongly "
+            } else if v > 0.3 {
+                ""
+            } else {
+                "slightly "
+            };
             format!("{}{}", intensity, name)
         })
         .collect();
@@ -310,7 +323,13 @@ mod tests {
         let mut emotion = [0.0f32; 21];
         emotion[0] = 0.9; // joy
         emotion[7] = 0.6; // anticipation
-        let s = build_narrative(&emotion, Some(&["hello".to_string()].as_slice()), Some(3), Some(5), Some("test query"));
+        let s = build_narrative(
+            &emotion,
+            Some(&["hello".to_string()].as_slice()),
+            Some(3),
+            Some(5),
+            Some("test query"),
+        );
         assert!(s.contains("joy"));
         assert!(s.contains("hello"));
         assert!(s.contains("test"));

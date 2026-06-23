@@ -102,9 +102,7 @@ pub fn render(ctx: &AutoContext) -> String {
     if !ctx.timeline_entries.is_empty() {
         out.push_str("║\n║ LAST SESSION TIMELINE (newest first):\n");
         for e in &ctx.timeline_entries {
-            let layer = LAYER_NAMES
-                .get(e.layer_id as usize)
-                .unwrap_or(&"?");
+            let layer = LAYER_NAMES.get(e.layer_id as usize).unwrap_or(&"?");
             let status_label = match e.status {
                 timeline::STATUS_OPEN => "OPEN",
                 timeline::STATUS_RESOLVED => "RESOLVED",
@@ -164,9 +162,7 @@ pub fn render_compact(ctx: &AutoContext) -> String {
             ctx.timeline_entries.len()
         ));
         for e in ctx.timeline_entries.iter().take(3) {
-            let layer = LAYER_NAMES
-                .get(e.layer_id as usize)
-                .unwrap_or(&"?");
+            let layer = LAYER_NAMES.get(e.layer_id as usize).unwrap_or(&"?");
             let status_label = match e.status {
                 timeline::STATUS_OPEN => "[OPEN]",
                 timeline::STATUS_RESOLVED => "[RESOLVED]",

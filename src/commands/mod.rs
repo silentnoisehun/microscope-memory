@@ -9,6 +9,5 @@ pub mod federated;
 pub mod init;
 pub mod recall;
 pub mod search;
-pub mod serve;
 pub mod verify;
 pub mod viz;

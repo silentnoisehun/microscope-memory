@@ -291,4 +291,49 @@ pub enum Cmd {
         #[arg(short, long, default_value = "8080")]
         port: u16,
     },
+    /// Autonomous mode - the system runs itself: daydream, curiosity, monologue, reflect, narrative, dream
+    Autonomous {
+        /// Enable TTS (text-to-speech) via Windows System.Speech
+        #[arg(long)]
+        tts: bool,
+        /// Run as daemon (continuous loop) instead of single cycle
+        #[arg(long)]
+        daemon: bool,
+        /// Cycle interval in seconds (default: 30)
+        #[arg(long, default_value = "30")]
+        interval: u64,
+        /// Maximum number of cycles (default: infinite in daemon mode, 1 in single mode)
+        #[arg(long)]
+        max_cycles: Option<usize>,
+    },
+    /// Introspect - self-reflection: the system thinks about itself
+    Introspect,
+    /// SelfModel - show the system's self-model snapshot
+    SelfModel,
+    /// Curiosity - show what the system is curious about
+    Curiosity,
+    /// Monologue - generate an inner monologue (the system thinking)
+    Monologue,
+    /// Stories - show narrative memory episodes (story arcs from recalls)
+    Stories {
+        #[arg(default_value = "5")]
+        k: usize,
+    },
+    /// Daydream - associative drift (mind wandering)
+    Daydream {
+        /// Seed text to start from (default: last narrative)
+        #[arg(default_value = "")]
+        seed: String,
+        /// Number of drift steps
+        #[arg(default_value = "3")]
+        steps: usize,
+    },
+    /// Hyperfocus - enter deep concentration mode on a topic
+    Hyperfocus {
+        /// Target topic
+        target: String,
+        /// Focus type: planning, problem_solving, creative, research
+        #[arg(default_value = "research")]
+        focus_type: String,
+    },
 }

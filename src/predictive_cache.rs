@@ -338,7 +338,9 @@ fn save_cache(path: &Path, cache: &PredictiveCache) -> Result<(), String> {
         }
     }
 
-    fs::write(path, &buf).map_err(|e| e.to_string())
+    let tmp_path = path.with_extension("bin.tmp");
+    fs::write(&tmp_path, &buf).map_err(|e| e.to_string())?;
+    fs::rename(&tmp_path, path).map_err(|e| e.to_string())
 }
 
 fn load_cache(path: &Path) -> PredictiveCache {

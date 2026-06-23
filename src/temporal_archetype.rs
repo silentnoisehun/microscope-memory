@@ -178,7 +178,10 @@ fn save_temporal(path: &Path, profiles: &[TemporalProfile]) -> Result<(), String
             .map_err(|e| e.to_string())?;
     }
 
-    fs::write(path, &buf).map_err(|e| e.to_string())
+    // Atomic write: temp file + rename
+    let tmp_path = path.with_extension("bin.tmp");
+    fs::write(&tmp_path, &buf).map_err(|e| e.to_string())?;
+    fs::rename(&tmp_path, path).map_err(|e| format!("rename temporal_archetypes.bin: {}", e))
 }
 
 fn load_temporal(path: &Path) -> TemporalArchetypeState {

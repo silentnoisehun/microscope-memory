@@ -15,6 +15,9 @@ pub struct Scenario {
     pub reward_potential: f32,
 }
 
+/// Maximum scenarios kept in memory before automatic purge of oldest.
+const MAX_SCENARIOS: usize = 100;
+
 /// Mental sandbox that simulates multiple scenarios
 pub struct MentalSandbox {
     scenarios: Arc<RwLock<HashMap<String, Scenario>>>,
@@ -56,10 +59,19 @@ impl MentalSandbox {
 
         let mut scenarios = self.scenarios.write().unwrap();
         scenarios.insert(id.clone(), scenario.clone());
-        
+
+        // Automatic purge: if over MAX_SCENARIOS, remove oldest entries
+        if scenarios.len() > MAX_SCENARIOS {
+            let excess = scenarios.len() - MAX_SCENARIOS;
+            let keys: Vec<String> = scenarios.keys().take(excess).cloned().collect();
+            for k in keys {
+                scenarios.remove(&k);
+            }
+        }
+
         let mut current = self.current_simulation.write().unwrap();
         *current = Some(id);
-        
+
         scenario
     }
 

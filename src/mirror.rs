@@ -292,6 +292,7 @@ fn load_mirror_state(output_dir: &Path) -> Option<MirrorState> {
 
 fn save_mirror_state(output_dir: &Path, state: &MirrorState) -> Result<(), String> {
     let path = output_dir.join("resonance.bin");
+    let tmp_path = output_dir.join("resonance.bin.tmp");
     let mut buf = Vec::new();
 
     // Header
@@ -318,7 +319,8 @@ fn save_mirror_state(output_dir: &Path, state: &MirrorState) -> Result<(), Strin
         buf.extend_from_slice(&res.strength.to_le_bytes());
     }
 
-    fs::write(&path, &buf).map_err(|e| format!("write resonance.bin: {}", e))
+    fs::write(&tmp_path, &buf).map_err(|e| format!("write resonance.bin: {}", e))?;
+    fs::rename(&tmp_path, &path).map_err(|e| format!("rename resonance.bin: {}", e))
 }
 
 // ─── Integration helper ─────────────────────────────

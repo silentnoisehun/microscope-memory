@@ -325,7 +325,9 @@ fn save_fingerprints(output_dir: &Path, fps: &[BlockFingerprint]) -> Result<(), 
         buf.extend_from_slice(&fp.histogram);
         buf.extend_from_slice(&fp.hash.to_le_bytes());
     }
-    fs::write(&path, &buf).map_err(|e| format!("write fingerprints.idx: {}", e))
+    let tmp_path = output_dir.join("fingerprints.idx.tmp");
+    fs::write(&tmp_path, &buf).map_err(|e| format!("write fingerprints.idx: {}", e))?;
+    fs::rename(&tmp_path, &path).map_err(|e| format!("rename fingerprints.idx: {}", e))
 }
 
 fn load_fingerprints(output_dir: &Path) -> Option<Vec<BlockFingerprint>> {
@@ -365,7 +367,9 @@ fn save_links(output_dir: &Path, links: &[StructuralLink]) -> Result<(), String>
         buf.extend_from_slice(&link.block_b.to_le_bytes());
         buf.extend_from_slice(&link.similarity.to_le_bytes());
     }
-    fs::write(&path, &buf).map_err(|e| format!("write links.bin: {}", e))
+    let tmp_path = output_dir.join("links.bin.tmp");
+    fs::write(&tmp_path, &buf).map_err(|e| format!("write links.bin: {}", e))?;
+    fs::rename(&tmp_path, &path).map_err(|e| format!("rename links.bin: {}", e))
 }
 
 fn load_links(output_dir: &Path) -> Option<Vec<StructuralLink>> {

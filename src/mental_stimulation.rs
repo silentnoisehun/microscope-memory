@@ -157,7 +157,9 @@ impl MentalStimulation {
             data.extend_from_slice(type_bytes);
         }
 
-        fs::write(&path, data).map_err(|e| e.to_string())
+        let tmp_path = dir.join("mental_stimulation.bin.tmp");
+        fs::write(&tmp_path, data).map_err(|e| e.to_string())?;
+        fs::rename(&tmp_path, &path).map_err(|e| e.to_string())
     }
 
     pub fn load(dir: &Path) -> Result<Self, String> {

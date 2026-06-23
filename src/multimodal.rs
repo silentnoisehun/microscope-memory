@@ -193,7 +193,9 @@ impl ModalityIndex {
             }
         }
 
-        fs::write(&path, &buf).map_err(|e| format!("write modalities.bin: {}", e))
+        let tmp_path = output_dir.join("modalities.bin.tmp");
+        fs::write(&tmp_path, &buf).map_err(|e| format!("write modalities.bin: {}", e))?;
+        fs::rename(&tmp_path, &path).map_err(|e| format!("rename modalities.bin: {}", e))
     }
 
     /// Register a block's modality.

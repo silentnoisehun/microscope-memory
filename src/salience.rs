@@ -80,7 +80,9 @@ impl SalienceState {
             buf.extend_from_slice(&e.remaining_strength.to_le_bytes());
             buf.extend_from_slice(&e.created_ms.to_le_bytes());
         }
-        fs::write(&path, &buf).map_err(|e| format!("write salience.bin: {}", e))
+        let tmp_path = output_dir.join("salience.bin.tmp");
+        fs::write(&tmp_path, &buf).map_err(|e| format!("write salience.bin: {}", e))?;
+        fs::rename(&tmp_path, &path).map_err(|e| format!("rename salience.bin: {}", e))
     }
 
     /// Decay inhibíciók: csökkenti a remaining_strength-et idő alapján.

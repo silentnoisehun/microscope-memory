@@ -21,6 +21,16 @@ pub enum EmbeddingError {
     NetworkError,
 }
 
+impl std::fmt::Display for EmbeddingError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            EmbeddingError::ApiError(msg) => write!(f, "API error: {}", msg),
+            EmbeddingError::InvalidDimension => write!(f, "Invalid embedding dimension"),
+            EmbeddingError::NetworkError => write!(f, "Network error"),
+        }
+    }
+}
+
 /// Cached embedding storage
 pub struct EmbeddingCache {
     embeddings: HashMap<String, Vec<f32>>,

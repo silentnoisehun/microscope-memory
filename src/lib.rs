@@ -1,3 +1,5 @@
+#![recursion_limit = "512"]
+
 //! Microscope Memory library interface.
 //! Re-exports core types and functions for integration tests and external use.
 
@@ -128,7 +130,7 @@ pub mod cli;
 // Re-export commonly used items
 pub use reader::{
     append_emotion_log, build_emotions_from_log, emotional_similarity, format_emotion,
-    load_emotion_lookup, read_append_log, store_memory, store_memory_with_emotion,
+    load_emotion_lookup, read_append_log, store_memory, store_memory_with_emotion, store_memory_temporary,
     AppendEntry, BlockHeader, DataStore,
     MicroscopeReader, RadialResult, ResultSet, EMOTION_DIMS, EMOTION_VECTOR_SIZE,
 };
@@ -340,6 +342,12 @@ mod tests {
 
 
 // Additional modules for main binary
+pub mod self_reflect;
+pub mod self_model;
+pub mod curiosity;
+pub mod inner_monologue;
+pub mod narrative_memory;
 pub mod auto_context;
 pub mod emotional_21d;
 pub mod mermaid;
+pub mod autonomous;

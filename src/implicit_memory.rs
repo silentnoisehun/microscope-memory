@@ -200,7 +200,9 @@ impl ImplicitMemory {
             data.extend_from_slice(&skill.practice_count.to_le_bytes());
         }
 
-        fs::write(&path, data).map_err(|e| e.to_string())
+        let tmp_path = dir.join("implicit_memory.bin.tmp");
+        fs::write(&tmp_path, data).map_err(|e| e.to_string())?;
+        fs::rename(&tmp_path, &path).map_err(|e| e.to_string())
     }
 
     pub fn load(dir: &Path) -> Result<Self, String> {

@@ -1,0 +1,40 @@
+{
+    "hooks":  {
+                  "PostToolUse":  {
+                                      "args":  [
+                                                   "-NoLogo",
+                                                   "-ExecutionPolicy",
+                                                   "Bypass",
+                                                   "-File",
+                                                   "C:\\Users\\mater\\.microscope\\microscope-recall-hook.ps1",
+                                                   "-Action",
+                                                   "PostToolUse"
+                                               ],
+                                      "command":  "powershell"
+                                  },
+                  "Stop":  {
+                               "args":  [
+                                            "-NoLogo",
+                                            "-ExecutionPolicy",
+                                            "Bypass",
+                                            "-File",
+                                            "C:\\Users\\mater\\.microscope\\microscope-recall-hook.ps1",
+                                            "-Action",
+                                            "Stop"
+                                        ],
+                               "command":  "powershell"
+                           },
+                  "UserPromptSubmit":  {
+                                           "args":  [
+                                                        "-NoLogo",
+                                                        "-ExecutionPolicy",
+                                                        "Bypass",
+                                                        "-File",
+                                                        "C:\\Users\\mater\\.microscope\\microscope-recall-hook.ps1",
+                                                        "-Action",
+                                                        "UserPromptSubmit"
+                                                    ],
+                                           "command":  "powershell"
+                                       }
+              }
+}

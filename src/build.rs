@@ -613,8 +613,11 @@ pub fn build(config: &Config, force: bool) -> Result<(), String> {
     }
 
     let merkle_tree = merkle::MerkleTree::build(&leaf_slices);
-    fs::write(&merkle_path, merkle_tree.to_bytes())
+    let merkle_tmp = merkle_path.with_extension("bin.tmp");
+    fs::write(&merkle_tmp, merkle_tree.to_bytes())
         .map_err(|e| format!("write merkle.bin: {}", e))?;
+    fs::rename(&merkle_tmp, &merkle_path)
+        .map_err(|e| format!("rename merkle.bin: {}", e))?;
     println!(
         "  {}: {} leaves, root={}",
         "merkle".green(),
@@ -634,7 +637,9 @@ pub fn build(config: &Config, force: bool) -> Result<(), String> {
     }
     meta_buf.extend_from_slice(&merkle_tree.root); // 32 bytes merkle root
     meta_buf.extend_from_slice(&layers_hash); // 32 bytes layers content hash
-    fs::write(meta_path, &meta_buf).map_err(|e| format!("write meta.bin: {}", e))?;
+    let meta_tmp = meta_path.with_extension("bin.tmp");
+    fs::write(&meta_tmp, &meta_buf).map_err(|e| format!("write meta.bin: {}", e))?;
+    fs::rename(&meta_tmp, meta_path).map_err(|e| format!("rename meta.bin: {}", e))?;
 
     // Report
     let hdr_size = n * HEADER_SIZE;
@@ -796,7 +801,9 @@ fn apply_hebbian_deltas(
         data[off + 8..off + 12].copy_from_slice(&new_z.to_le_bytes());
     }
 
-    fs::write(&hdr_path, &data).map_err(|e| format!("write microscope.bin: {}", e))?;
+    let hdr_tmp = hdr_path.with_extension("bin.tmp");
+    fs::write(&hdr_tmp, &data).map_err(|e| format!("write microscope.bin: {}", e))?;
+    fs::rename(&hdr_tmp, &hdr_path).map_err(|e| format!("rename microscope.bin: {}", e))?;
 
     // Clear drift values after integration (they're now baked in)
     let mut hebb_clone = crate::hebbian::HebbianState {

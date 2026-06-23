@@ -163,6 +163,7 @@ impl EmotionalContagionState {
 
     pub fn save(&self, output_dir: &Path) -> Result<(), String> {
         let path = output_dir.join("emotional_field.bin");
+        let tmp_path = output_dir.join("emotional_field.bin.tmp");
         let total = if self.local_snapshot.is_some() {
             1 + self.remote_snapshots.len()
         } else {
@@ -180,7 +181,8 @@ impl EmotionalContagionState {
             encode_snapshot_into(snap, &mut buf);
         }
 
-        fs::write(&path, &buf).map_err(|e| format!("write emotional_field.bin: {}", e))
+        fs::write(&tmp_path, &buf).map_err(|e| format!("write emotional_field.bin: {}", e))?;
+        fs::rename(&tmp_path, &path).map_err(|e| format!("rename emotional_field.bin: {}", e))
     }
 
     /// Capture the current local emotional field as a snapshot.

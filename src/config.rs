@@ -178,7 +178,9 @@ impl Config {
     /// Saves the current config to a binary mmap-ready format.
     pub fn save<P: AsRef<Path>>(&self, path: P) -> Result<(), Box<dyn std::error::Error>> {
         let bytes = bincode::serialize(self)?;
-        fs::write(path, bytes)?;
+        let tmp_path = path.as_ref().with_extension("bin.tmp");
+        fs::write(&tmp_path, &bytes)?;
+        fs::rename(&tmp_path, path.as_ref())?;
         Ok(())
     }
 }

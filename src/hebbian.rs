@@ -149,12 +149,19 @@ impl HebbianState {
     pub fn apply_drift(&mut self, headers: &[(f32, f32, f32)]) {
         let now_ms = now_epoch_ms();
 
-        // First: decay all energies
+        // First: decay all energies (exponential half-life decay)
+        // Correct formula: energy *= exp(-elapsed * ln(2) / half_life)
+        // The previous version multiplied energy by a negative factor then took exp(),
+        // which collapsed all energies toward 0 regardless of their initial value.
         for rec in &mut self.activations {
             if rec.energy > 0.0 && rec.last_activated_ms > 0 {
                 let elapsed_ms = (now_ms - rec.last_activated_ms) as f64;
-                rec.energy *= (-(elapsed_ms / ENERGY_HALF_LIFE_MS) * std::f64::consts::LN_2) as f32;
-                rec.energy = rec.energy.exp();
+                if elapsed_ms < 0.0 {
+                    // Clock skew or future timestamp — skip to avoid panics
+                    continue;
+                }
+                let decay = (-(elapsed_ms / ENERGY_HALF_LIFE_MS) * std::f64::consts::LN_2).exp() as f32;
+                rec.energy *= decay;
             }
         }
 
@@ -365,7 +372,9 @@ fn save_activations(output_dir: &Path, records: &[ActivationRecord]) -> Result<(
         buf.extend_from_slice(&rec.energy.to_le_bytes());
         buf.extend_from_slice(&rec._pad.to_le_bytes());
     }
-    fs::write(&path, &buf).map_err(|e| format!("write activations.bin: {}", e))
+    let tmp_path = output_dir.join("activations.bin.tmp");
+    fs::write(&tmp_path, &buf).map_err(|e| format!("write activations.bin: {}", e))?;
+    fs::rename(&tmp_path, &path).map_err(|e| format!("rename activations.bin: {}", e))
 }
 
 fn load_coactivations(output_dir: &Path) -> HashMap<(u32, u32), CoactivationPair> {
@@ -406,7 +415,9 @@ fn save_coactivations(
         buf.extend_from_slice(&pair.count.to_le_bytes());
         buf.extend_from_slice(&pair.last_ts_ms.to_le_bytes());
     }
-    fs::write(&path, &buf).map_err(|e| format!("write coactivations.bin: {}", e))
+    let tmp_path = output_dir.join("coactivations.bin.tmp");
+    fs::write(&tmp_path, &buf).map_err(|e| format!("write coactivations.bin: {}", e))?;
+    fs::rename(&tmp_path, &path).map_err(|e| format!("rename coactivations.bin: {}", e))
 }
 
 fn load_fingerprints(output_dir: &Path) -> Vec<ActivationFingerprint> {

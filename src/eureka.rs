@@ -135,7 +135,9 @@ impl EurekaLog {
             buf.push(ev.layer_id);
             buf.extend_from_slice(&ev.block_index.to_le_bytes());
         }
-        fs::write(&path, &buf).map_err(|e| format!("write eureka.bin: {}", e))
+        let tmp_path = output_dir.join("eureka.bin.tmp");
+        fs::write(&tmp_path, &buf).map_err(|e| format!("write eureka.bin: {}", e))?;
+        fs::rename(&tmp_path, &path).map_err(|e| format!("rename eureka.bin: {}", e))
     }
 
     /// Add a new event and save.

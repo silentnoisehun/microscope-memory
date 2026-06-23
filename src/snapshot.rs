@@ -37,7 +37,9 @@ pub fn export(output_dir: &Path, archive_path: &Path) -> Result<(), String> {
         return Err("no index files found to export".to_string());
     }
 
-    let f = fs::File::create(archive_path).map_err(|e| format!("create archive: {}", e))?;
+    // Atomic write: temp file + rename to prevent partial/corrupt archive on crash or disk-full
+    let tmp_path = archive_path.with_extension("mscope.tmp");
+    let f = fs::File::create(&tmp_path).map_err(|e| format!("create archive: {}", e))?;
     let mut w = BufWriter::new(f);
 
     // Header
@@ -61,6 +63,8 @@ pub fn export(output_dir: &Path, archive_path: &Path) -> Result<(), String> {
     }
 
     w.flush().map_err(|e| e.to_string())?;
+    drop(w);
+    fs::rename(&tmp_path, archive_path).map_err(|e| format!("rename archive: {}", e))?;
 
     println!(
         "  Exported {} files ({:.1} KB) → {}",
@@ -126,7 +130,9 @@ pub fn import(archive_path: &Path, output_dir: &Path) -> Result<(), String> {
         }
 
         let out_path = output_dir.join(&name);
-        fs::write(&out_path, &data).map_err(|e| format!("write {}: {}", name, e))?;
+        let out_tmp = output_dir.join(format!("{}.tmp", name));
+        fs::write(&out_tmp, &data).map_err(|e| format!("write {}: {}", name, e))?;
+        fs::rename(&out_tmp, &out_path).map_err(|e| format!("rename {}: {}", name, e))?;
         println!("    {}: {:.1} KB", name, data.len() as f64 / 1024.0);
     }
 

@@ -148,7 +148,7 @@ impl AttentionState {
 
         // Normalize so average weight = 1.0
         let sum: f32 = raw.iter().sum();
-        if sum > 0.0 {
+        if sum > 0.0 && sum.is_finite() {
             let scale = NUM_LAYERS as f32 / sum;
             for w in &mut raw {
                 *w *= scale;
@@ -278,7 +278,9 @@ fn save_attention(path: &Path, state: &AttentionState) -> Result<(), String> {
             .map_err(|e| e.to_string())?;
     }
 
-    fs::write(path, &buf).map_err(|e| e.to_string())
+    let tmp_path = path.with_extension("bin.tmp");
+    fs::write(&tmp_path, &buf).map_err(|e| e.to_string())?;
+    fs::rename(&tmp_path, path).map_err(|e| e.to_string())
 }
 
 fn load_attention(path: &Path) -> AttentionState {
@@ -318,6 +320,10 @@ fn load_attention(path: &Path) -> AttentionState {
             data[offset + 2],
             data[offset + 3],
         ]);
+        // Sanitize: replace NaN/inf with 1.0 to prevent propagation
+        if w.is_nan() || w.is_infinite() {
+            *w = 1.0;
+        }
         offset += 4;
     }
 
@@ -343,6 +349,9 @@ fn load_attention(path: &Path) -> AttentionState {
                 data[offset + 2],
                 data[offset + 3],
             ]);
+            if w.is_nan() || w.is_infinite() {
+                *w = 1.0;
+            }
             offset += 4;
         }
 
@@ -364,6 +373,7 @@ fn load_attention(path: &Path) -> AttentionState {
             data[offset + 2],
             data[offset + 3],
         ]);
+        let quality = if quality.is_nan() || quality.is_infinite() { 0.5 } else { quality };
         offset += 4;
 
         history.push(AttentionOutcome {

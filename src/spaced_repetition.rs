@@ -149,7 +149,9 @@ impl SpacedRepetition {
             buf.extend_from_slice(&b.ease_factor.to_le_bytes());
             buf.push(b.importance);
         }
-        fs::write(&path, &buf).map_err(|e| format!("write spaced.bin: {}", e))
+        let tmp_path = output_dir.join("spaced.bin.tmp");
+        fs::write(&tmp_path, &buf).map_err(|e| format!("write spaced.bin: {}", e))?;
+        fs::rename(&tmp_path, &path).map_err(|e| format!("rename spaced.bin: {}", e))
     }
 
     /// Keress egy blokkot block_idx alapján.

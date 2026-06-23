@@ -177,7 +177,9 @@ pub fn build_embedding_index(
     }
     eprintln!("\r  Embedded {}/{}", embedded, embed_count);
 
-    fs::write(output_path, &buf).map_err(|e| format!("write embeddings.bin: {}", e))?;
+    let tmp_path = output_path.with_extension("bin.tmp");
+    fs::write(&tmp_path, &buf).map_err(|e| format!("write embeddings.bin: {}", e))?;
+    fs::rename(&tmp_path, output_path).map_err(|e| format!("rename embeddings.bin: {}", e))?;
     let size_kb = buf.len() as f64 / 1024.0;
     println!(
         "  embeddings.bin: {:.1} KB ({} blocks, {} dim)",

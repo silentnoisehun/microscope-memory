@@ -96,7 +96,9 @@ impl NarrativeState {
         }
         buf.extend_from_slice(&nlen.to_le_bytes());
         buf.extend_from_slice(&nbytes[..nlen as usize]);
-        fs::write(&path, &buf).map_err(|e| format!("write narrative.bin: {}", e))
+        let tmp_path = output_dir.join("narrative.bin.tmp");
+        fs::write(&tmp_path, &buf).map_err(|e| format!("write narrative.bin: {}", e))?;
+        fs::rename(&tmp_path, &path).map_err(|e| format!("rename narrative.bin: {}", e))
     }
 
     /// Frissíti a narratívát a jelenlegi rendszerállapotból.

@@ -52,7 +52,9 @@ pub fn density(config: &Config, output: &str, grid: u16) {
         .collect();
 
     let data = microscope_memory::viz::export_density_map(&hebb, &headers, grid);
-    fs::write(output, &data).expect("write density map");
+    let tmp_path = output.with_extension("tmp");
+    fs::write(&tmp_path, &data).expect("write density map");
+    fs::rename(&tmp_path, output).expect("rename density map");
     println!(
         "{} {}×{} grid ({} bytes) -> {}",
         "DENSITY".cyan().bold(), grid, grid, data.len(), output

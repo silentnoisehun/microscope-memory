@@ -715,7 +715,9 @@ fn persist_to_layer_file(config: &Config, text: &str, layer: &str) -> Result<(),
         entries.drain(..start);
     }
     let result = entries.join("\n\n");
-    fs::write(&file_path, &result).map_err(|e| format!("write layer file: {}", e))?;
+    let tmp_path = file_path.with_extension("txt.tmp");
+    fs::write(&tmp_path, &result).map_err(|e| format!("write layer file: {}", e))?;
+    fs::rename(&tmp_path, &file_path).map_err(|e| format!("rename layer file: {}", e))?;
     Ok(())
 }
 
@@ -783,6 +785,69 @@ pub fn store_memory_with_emotion(
     emotion: Option<[f32; 21]>,
 ) -> Result<(), String> {
     store_memory_with_status(config, text, layer, importance, None, emotion)
+}
+
+/// Store memory to append log and timeline only (NOT to layer files).
+/// Used for temporary/internal thoughts that should not persist through rebuilds.
+pub fn store_memory_temporary(
+    config: &Config,
+    text: &str,
+    layer: &str,
+    importance: u8,
+) -> Result<(), String> {
+    let _lock = FileLock::acquire(config)?;
+    let (x, y, z) = content_coords_blended(text, layer, config.search.semantic_weight);
+    let lid = layer_to_id(layer);
+    let depth = auto_depth(text);
+
+    let append_path = Path::new(&config.paths.output_dir).join("append.bin");
+    let needs_magic = !append_path.exists()
+        || fs::metadata(&append_path)
+            .map(|m| m.len() == 0)
+            .unwrap_or(true);
+
+    let mut file = fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&append_path)
+        .map_err(|e| format!("open append log: {}", e))?;
+
+    let write = |f: &mut fs::File, data: &[u8]| -> Result<(), String> {
+        f.write_all(data)
+            .map_err(|e| format!("write append log: {}", e))
+    };
+
+    if needs_magic {
+        write(&mut file, b"APv2")?;
+    }
+
+    let text_bytes = text.as_bytes();
+    let len = text_bytes.len().min(BLOCK_DATA_SIZE);
+
+    write(&mut file, &(len as u32).to_le_bytes())?;
+    write(&mut file, &[lid])?;
+    write(&mut file, &[importance])?;
+    write(&mut file, &[depth])?;
+    write(&mut file, &x.to_le_bytes())?;
+    write(&mut file, &y.to_le_bytes())?;
+    write(&mut file, &z.to_le_bytes())?;
+    write(&mut file, &text_bytes[..len])?;
+
+    // Timeline log (always)
+    let output_dir = Path::new(&config.paths.output_dir);
+    let entry = crate::timeline::TimelineEntry {
+        ts_ms: crate::timeline::now_epoch_ms(),
+        layer_id: lid,
+        importance,
+        depth,
+        status: crate::timeline::STATUS_NORMAL,
+        text: text.to_string(),
+    };
+    if let Err(e) = crate::timeline::append_entry(&output_dir.join("timeline.bin"), &entry) {
+        eprintln!("  {} append timeline: {}", "WARN".yellow(), e);
+    }
+
+    Ok(())
 }
 
 /// Variant of `store_memory` that also writes to the timeline log and,
@@ -871,6 +936,16 @@ pub fn store_memory_with_status(
         }
     }
 
+    // ─── Emotion log (when provided) ─────────────────────────
+    // Previously the emotion vector was accepted but never written anywhere,
+    // silently dropping all 21D emotion data. Now we persist it to emotion_log.bin
+    // (rebuilt into emotions.bin during `build_emotions_from_log`).
+    if let Some(emo) = emotion {
+        if let Err(e) = append_emotion_log(output_dir, text, &emo) {
+            eprintln!("  {} append emotion log: {}", "WARN".yellow(), e);
+        }
+    }
+
     let elapsed = t0.elapsed();
     println!(
         "  {} D{} [{}/{}] ({:.3},{:.3},{:.3}) {}",
@@ -953,7 +1028,10 @@ pub fn write_emotion(path: &Path, block_idx: usize, emotion: &[f32; 21]) -> Resu
     for i in 0..21 {
         data[off + i*4..off + i*4 + 4].copy_from_slice(&emotion[i].to_le_bytes());
     }
-    fs::write(path, &data).map_err(|e| format!("write emotions.bin: {}", e))?;
+    // Atomic write: temp file + rename to prevent corruption on crash
+    let tmp_path = path.with_extension("bin.tmp");
+    fs::write(&tmp_path, &data).map_err(|e| format!("write emotions.bin: {}", e))?;
+    fs::rename(&tmp_path, path).map_err(|e| format!("rename emotions.bin: {}", e))?;
     Ok(())
 }
 
@@ -1041,7 +1119,9 @@ pub fn build_emotions_from_log(output_dir: &Path, reader: &MicroscopeReader) -> 
             out.extend_from_slice(&v.to_le_bytes());
         }
     }
-    fs::write(&emo_path, &out).map_err(|e| format!("write emotions.bin: {}", e))?;
+    let emo_tmp = output_dir.join("emotions.bin.tmp");
+    fs::write(&emo_tmp, &out).map_err(|e| format!("write emotions.bin: {}", e))?;
+    fs::rename(&emo_tmp, &emo_path).map_err(|e| format!("rename emotions.bin: {}", e))?;
     Ok(())
 }
 

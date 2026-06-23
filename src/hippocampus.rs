@@ -176,6 +176,7 @@ impl Hippocampus {
 
     pub fn save(&self, dir: &Path) -> Result<(), String> {
         let path = dir.join("hippocampus.bin");
+        let tmp_path = dir.join("hippocampus.bin.tmp");
         let mut data = Vec::new();
 
         data.extend_from_slice(b"HIPP");
@@ -216,7 +217,8 @@ impl Hippocampus {
             }
         }
 
-        fs::write(&path, data).map_err(|e| e.to_string())
+        fs::write(&tmp_path, &data).map_err(|e| e.to_string())?;
+        fs::rename(&tmp_path, &path).map_err(|e| format!("rename hippocampus.bin: {}", e))
     }
 
     pub fn load(dir: &Path) -> Result<Self, String> {

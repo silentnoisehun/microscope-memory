@@ -534,6 +534,7 @@ fn load_resonance_state(output_dir: &Path, _instance_id: u64) -> Option<Resonanc
 
 fn save_resonance_state(output_dir: &Path, state: &ResonanceState) -> Result<(), String> {
     let path = output_dir.join("pulses.bin");
+    let tmp_path = output_dir.join("pulses.bin.tmp");
     let mut buf = Vec::new();
 
     // Header
@@ -585,7 +586,8 @@ fn save_resonance_state(output_dir: &Path, state: &ResonanceState) -> Result<(),
         buf.extend_from_slice(&v.to_le_bytes());
     }
 
-    fs::write(&path, &buf).map_err(|e| format!("write pulses.bin: {}", e))
+    fs::write(&tmp_path, &buf).map_err(|e| format!("write pulses.bin: {}", e))?;
+    fs::rename(&tmp_path, &path).map_err(|e| format!("rename pulses.bin: {}", e))
 }
 
 #[cfg(test)]

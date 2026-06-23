@@ -1,4 +1,4 @@
-﻿//! Planning — céllebontás és hierarchikus tervezés
+//! Planning — céllebontás és hierarchikus tervezés
 
 //!
 
@@ -390,6 +390,34 @@ impl Planner {
 
     }
 
+    /// Rollback: visszalépés az utolsó végrehajtott lépésről, ha az sikertelen volt.
+
+    pub fn fail_step(&self, plan_id: u64, reason: &str) -> bool {
+
+        let mut plans = self.plans.write().unwrap();
+
+        let plan = match plans.get_mut(&plan_id) {
+
+            Some(p) => p,
+
+            None => return false,
+
+        };
+
+        if plan.executed_step == 0 {
+
+            return false;
+
+        }
+
+        plan.executed_step -= 1;
+
+        plan.status = PlanStatus::Failed(format!("step {} failed: {}", plan.executed_step, reason));
+
+        true
+
+    }
+
 
 
     /// Replanning: terv újragenerálás változott körülmények esetén
@@ -591,5 +619,3 @@ impl Planner {
     }
 
 }
-
-

@@ -130,7 +130,9 @@ impl WorkingMemory {
             buf.push(ll as u8);
             buf.extend_from_slice(&layer_bytes[..ll]);
         }
-        fs::write(&path, &buf).map_err(|e| format!("write working_memory.bin: {}", e))
+        let tmp_path = output_dir.join("working_memory.bin.tmp");
+        fs::write(&tmp_path, &buf).map_err(|e| format!("write working_memory.bin: {}", e))?;
+        fs::rename(&tmp_path, &path).map_err(|e| format!("rename working_memory.bin: {}", e))
     }
     /// Push one item. Evict lowest-score item if full.
     pub fn push(&mut self, text: &str, importance: f32, layer: &str, mem_type: MemoryType) {

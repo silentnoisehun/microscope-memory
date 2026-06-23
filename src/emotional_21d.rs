@@ -27,6 +27,12 @@ impl EmotionalState21D {
                             data[off..off + 4].try_into().unwrap_or([0u8; 4]),
                         );
                     }
+                    // Sanitize: replace any NaN with 0.0 to prevent NaN propagation
+                    for v in &mut vector {
+                        if v.is_nan() || v.is_infinite() {
+                            *v = 0.0;
+                        }
+                    }
                     return Self { vector };
                 }
             }
@@ -41,7 +47,9 @@ impl EmotionalState21D {
         for &v in &self.vector {
             buf.extend_from_slice(&v.to_le_bytes());
         }
-        fs::write(path, &buf).map_err(|e| format!("write emotion_21d.bin: {}", e))
+        let tmp_path = path.with_extension("bin.tmp");
+        fs::write(&tmp_path, &buf).map_err(|e| format!("write emotion_21d.bin: {}", e))?;
+        fs::rename(&tmp_path, path).map_err(|e| format!("rename emotion_21d.bin: {}", e))
     }
 }
 
@@ -50,6 +58,10 @@ impl EmotionalState21D {
 /// scaled by the overall emotional intensity.
 pub fn emotion_21d_bias(state: &EmotionalState21D) -> (f32, f32, f32) {
     let intensity: f32 = state.vector.iter().map(|x| x * x).sum::<f32>().sqrt().min(1.0);
+    // Defense-in-depth: if intensity is NaN, return zero bias
+    if intensity.is_nan() {
+        return (0.0, 0.0, 0.0);
+    }
     let dx = state.vector[0].clamp(-1.0, 1.0) * intensity;
     let dy = state.vector[1].clamp(-1.0, 1.0) * intensity;
     let dz = state.vector[2].clamp(-1.0, 1.0) * intensity;

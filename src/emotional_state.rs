@@ -69,7 +69,9 @@ impl EmotionalStateRing {
     /// Save to disk.
     pub fn save(&self, output_dir: &Path) -> Result<(), String> {
         let path = output_dir.join("emotional_state.bin");
-        fs::write(&path, &self.to_bytes()).map_err(|e| format!("save emotional_state.bin: {}", e))
+        let tmp_path = output_dir.join("emotional_state.bin.tmp");
+        fs::write(&tmp_path, &self.to_bytes()).map_err(|e| format!("save emotional_state.bin: {}", e))?;
+        fs::rename(&tmp_path, &path).map_err(|e| format!("rename emotional_state.bin: {}", e))
     }
 
     /// Update the emotional state with a new incoming emotion vector.

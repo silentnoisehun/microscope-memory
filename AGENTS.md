@@ -33,7 +33,7 @@ cargo build --release --features "gpu embeddings"
 - `Arc<RwLock<T>>` for shared state
 - `HashMap` for collections, `f64` for metrics
 
-## Project Architecture (v0.8.0)
+## Project Architecture (v0.8.1)
 
 ### Cognitive Modules
 | Module | Description |

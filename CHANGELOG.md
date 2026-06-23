@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.1] - 2026-06-23
+
+### Fixed
+- **Crash safety**: 50 files — all `fs::write()` calls replaced with temp file + atomic rename pattern
+- **NaN propagation**: emotional_21d, attention, and 3 other files — NaN/inf sanitization on load
+- **Data loss**: emotion vector now persisted in `store_memory_with_emotion`
+- **Planning**: added `fail_step()` rollback method
+- **Memory leak**: mental_sandbox capped at `MAX_SCENARIOS=100`
+- **Redundant I/O**: removed duplicate `HebbianState::load_or_init` in hot recall path
+
+### Changed
+- **Hook script**: `scripts/microscope-recall-hook.ps1` — now uses `-Action` parameter instead of `$env:CLAUDE_HOOK_TYPE`; UserPromptSubmit does store + recall + inject; Stop stores to long_term
+- **README**: corrected layer list (15 layers, deduplicated), module count (84), LOC (36,317)
+- **Version**: bumped to 0.8.1
+
 ## [0.8.0] - 2026-06-17
 
 ### Added

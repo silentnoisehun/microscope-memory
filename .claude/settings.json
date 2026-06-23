@@ -1,24 +1,12 @@
 {
     "hooks":  {
-                  "PostToolUse":  {
-                                      "args":  [
-                                                   "-NoLogo",
-                                                   "-ExecutionPolicy",
-                                                   "Bypass",
-                                                   "-File",
-                                                   "C:\\Users\\mater\\.microscope\\microscope-recall-hook.ps1",
-                                                   "-Action",
-                                                   "PostToolUse"
-                                               ],
-                                      "command":  "powershell"
-                                  },
                   "Stop":  {
                                "args":  [
                                             "-NoLogo",
                                             "-ExecutionPolicy",
                                             "Bypass",
                                             "-File",
-                                            "C:\\Users\\mater\\.microscope\\microscope-recall-hook.ps1",
+                                            "scripts\\microscope-recall-hook.ps1",
                                             "-Action",
                                             "Stop"
                                         ],
@@ -30,7 +18,7 @@
                                                         "-ExecutionPolicy",
                                                         "Bypass",
                                                         "-File",
-                                                        "C:\\Users\\mater\\.microscope\\microscope-recall-hook.ps1",
+                                                        "scripts\\microscope-recall-hook.ps1",
                                                         "-Action",
                                                         "UserPromptSubmit"
                                                     ],

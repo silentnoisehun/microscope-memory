@@ -397,7 +397,7 @@ The `UserPromptSubmit` Claude Code hook (`.claude/settings.json`) fires `microsc
 
 ```
 microscope-local/
-├── src/                       # Rust core (40,645 LOC, 84 modules)
+├── src/                       # Rust core (36,317 LOC, 91 modules)
 │   ├── main.rs                # CLI entry, command dispatch
 │   ├── lib.rs                 # library root
 │   ├── reader.rs              # mmap + binary block access

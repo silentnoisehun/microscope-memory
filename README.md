@@ -13,6 +13,18 @@
 
 Microscope is designed to be the persistent memory of AI agents and LLM workflows. It exposes its capabilities through three integration paths: a native Node.js addon for desktop apps, an MCP server for Claude Code/Cursor/Cline, and a binary CLI for scripts and shell pipelines.
 
+### ⚡ Speed at a glance
+
+| Operation | Latency | How |
+|-----------|---------|-----|
+| **D0 identity query** (1 block) | **37 ns** | Binary mmap + SIMD distance |
+| **Atomic hot field read** (consciousness stream) | **1 ns** | `AtomicU64`/`AtomicU32` load, no sync |
+| **Cached consciousness string** (`memory_consciousness` MCP tool) | **124 ns** | Pre-built string in `RwLock<String>` |
+| **Seqlock snapshot** (full 96-byte state) | **1.2 µs** | Sequence-locked protocol |
+| **4D soft-zoom query** (all 28k blocks) | 169 µs | Depth-banded binary search |
+
+**The 37 ns D0 query is single-digit CPU cycles.** The consciousness stream's hot-field reads are 1 ns — literally a single `MOV` instruction. Measured on this build, 28,492 blocks loaded. See [Performance](#-performance-measured) for the full benchmark and `tests/consciousness_perf.rs` for the consciousness-stream benchmarks.
+
 ---
 
 ## 🚀 Quick Start

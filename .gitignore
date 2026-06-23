@@ -58,8 +58,20 @@ electron/out/
 
 # Claude Code
 .claude/
-python e:\microscope-local\tools\edge_tts_server.py
-file:///E:/pwa-microscope/index.html# Ignore Windows reserved device names
+
+# Temporary Python fix/patch scripts
+fix_*.py
+patch_*.py
+test_*.py
+factory_*.py
+restore_*.py
+make_icon.py
+find_backtick.py
+
+# Temp audio
+*.mp3
+
+# Misc
 nul
 
 pwa/

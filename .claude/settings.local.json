@@ -112,7 +112,9 @@
       "Bash(Get-Date -Format 'HH:mm:ss')",
       "Bash(Add-Content -Path \"C:\\\\Users\\\\mater\\\\.microscope\\\\hook_debug.log\" -Value \"$\\(Get-Date -Format 'HH:mm:ss'\\) check\")",
       "PowerShell(Add-Content *)",
-      "Bash(git add *)"
+      "Bash(git add *)",
+      "Bash(git commit -m 'fix: 50 crash-safety & data-integrity fixes across codebase *)",
+      "Bash(git reset *)"
     ]
   },
   "enableAllProjectMcpServers": true,

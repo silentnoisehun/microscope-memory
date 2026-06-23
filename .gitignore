@@ -106,5 +106,3 @@ orchestrator/Cargo.lock
 mermaid_app/
 modules/
 styles/
-# Header image (user provides their own)
-microscope-memory-header.png

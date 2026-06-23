@@ -1639,7 +1639,13 @@ fn tool_consciousness(config: &Config, _args: &Value) -> Result<String, String> 
         None => ConsciousnessStream::start(config),
     };
 
-    Ok(ConsciousnessStream::format(&state))
+    // Prefer the lock-free seqlock path: read the snapshot that the
+    // background cycle publishes, no Mutex contention.
+    let snapshot = {
+        let s = state.lock().unwrap();
+        s.snapshot.clone()
+    };
+    Ok(ConsciousnessStream::format_snapshot(&snapshot))
 }
 
 // ─── Ping Tool (Auto-Context) ────────────────────────────

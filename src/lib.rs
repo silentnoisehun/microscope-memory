@@ -41,6 +41,8 @@ pub mod snapshot;
 pub mod syscaller;
 
 #[cfg(not(target_arch = "wasm32"))]
+pub mod consciousness_seqlock;
+#[cfg(not(target_arch = "wasm32"))]
 pub mod consciousness_stream;
 pub mod daydream;
 pub mod dream;

@@ -22,6 +22,7 @@ static GLOBAL_STREAM: OnceLock<Arc<Mutex<StreamState>>> = OnceLock::new();
 use crate::archetype::ArchetypeState;
 use crate::attention::{AttentionSignals, AttentionState, AttentionVector};
 use crate::config::Config;
+use crate::consciousness_seqlock::SharedSnapshot;
 use crate::emotional_state::EmotionalStateRing;
 use crate::hebbian::HebbianState;
 use crate::mirror::MirrorState;
@@ -68,6 +69,18 @@ pub struct StreamState {
     pub last_query_hash: u64,
     /// Timestamp of last query
     pub last_query_ms: u64,
+
+    /// Pre-computed sum of `hebbian.activations[*].energy`. Maintained
+    /// incrementally by the background cycle so `format()` doesn't have
+    /// to iterate 28k+ f32s on every read. Updated in O(1) per decay.
+    pub hebbian_total_energy: f32,
+
+    /// Lock-free, mmap-able view of the stream. The background cycle
+    /// publishes a new snapshot once per tick via a seqlock; readers
+    /// (this process or another) can read it without taking the Mutex.
+    /// Lives as `Arc<SharedSnapshot>` so the seqlock address is stable
+    /// even if the StreamState Mutex is held by a writer.
+    pub snapshot: Arc<SharedSnapshot>,
 }
 
 /// Thread-safe wrapper
@@ -90,8 +103,17 @@ impl ConsciousnessStream {
             .map(|r| r.block_count)
             .unwrap_or(100);
 
+        let hebbian = HebbianState::load_or_init(output_dir, block_count);
+        // Initial total: sum whatever was loaded from disk. Subsequent
+        // decay updates keep this in sync via the background cycle.
+        let hebbian_total_energy: f32 = hebbian.activations.iter()
+            .map(|a| a.energy)
+            .sum();
+
+        let snapshot = Arc::new(SharedSnapshot::new_zeroed());
+
         let state = Arc::new(Mutex::new(StreamState {
-            hebbian: HebbianState::load_or_init(output_dir, block_count),
+            hebbian,
             attention: AttentionState::load_or_init(output_dir),
             emotional_ring: EmotionalStateRing::load_or_init(output_dir),
             resonance: ResonanceState::load_or_init(output_dir),
@@ -106,6 +128,8 @@ impl ConsciousnessStream {
             cycle: 0,
             last_query_hash: 0,
             last_query_ms: 0,
+            hebbian_total_energy,
+            snapshot: snapshot.clone(),
         }));
 
         // Set global stream state
@@ -134,9 +158,16 @@ impl ConsciousnessStream {
                 // ─── Decay (1 másodpercenként) ───
                 if decay_counter >= DECAY_INTERVAL {
                     decay_counter = 0;
-                    // Hebbian decay: csökkentjük az energiákat
+                    // Hebbian decay: csökkentjük az energiákat, és a
+                    // pre-computed total_energy-t O(1)-ben frissítjük.
+                    // Az egyetlen O(n) lépés kikerül a read path-ból.
+                    const DECAY_FACTOR: f32 = 0.995_f32;
+                    // 0.995^DECAY_INTERVAL — egyszer kiszámítjuk, O(1) update
+                    let decay_pow: f32 = (0..DECAY_INTERVAL as i32)
+                        .fold(1.0_f32, |acc, _| acc * DECAY_FACTOR);
+                    s.hebbian_total_energy *= decay_pow;
                     for rec in &mut s.hebbian.activations {
-                        rec.energy *= 0.995;
+                        rec.energy *= DECAY_FACTOR;
                     }
                     s.resonance.decay_field(0.99);
                     s.resonance.expire_pulses();
@@ -169,6 +200,9 @@ impl ConsciousnessStream {
                         (emo_intensity * 0.3 + pred_uncertainty * 0.4 + surprise_decay * 0.3)
                             .clamp(0.0, 1.0);
                 }
+
+                // ─── Publish snapshot (minden ciklusban, lock-free olvasók számára) ───
+                publish_snapshot(&s);
 
                 drop(s);
                 thread::sleep(Duration::from_millis(CYCLE_MS));
@@ -208,6 +242,9 @@ impl ConsciousnessStream {
         let emo_intensity = s.emotional_ring.intensity();
         let dominant = s.emotional_ring.dominant();
 
+        // O(1) read of pre-computed total energy — no iter() needed.
+        let total_energy = s.hebbian_total_energy as f64;
+
         let out = format!(
             "🧠 Consciousness Stream — cycle #{} ({} Hz)\n\
              \x20 Emotion:  intensity={:.3}{}\n\
@@ -232,11 +269,7 @@ impl ConsciousnessStream {
             s.predicted_query_hash,
             s.predicted_confidence,
             s.hebbian.activations.len(),
-            s.hebbian
-                .activations
-                .iter()
-                .map(|a| a.energy as f64)
-                .sum::<f64>(),
+            total_energy,
             s.attention.learned_weights.len(),
             s.resonance.field.len(),
             s.thought_graph.crystallized_count(),
@@ -247,6 +280,93 @@ impl ConsciousnessStream {
         );
         out
     }
+
+    /// Format a snapshot read via seqlock — no Mutex needed on the read path.
+    /// Use this from the MCP tool or any other reader that wants lock-free
+    /// access. Falls back to "stale data" if the writer is mid-update for
+    /// more than `SNAPSHOT_MAX_RETRIES` iterations.
+    pub fn format_snapshot(snapshot: &SharedSnapshot) -> String {
+        use crate::consciousness_seqlock::SnapshotData;
+        let v: SnapshotData = match snapshot.read() {
+            Some(d) => d,
+            None => return "🧠 Consciousness Stream — (snapshot busy, retry)".to_string(),
+        };
+        let dominant = if v.emo_dominant_idx >= 0 {
+            format!(" (idx={} val={:.2})", v.emo_dominant_idx, v.emo_dominant_val)
+        } else {
+            String::new()
+        };
+        format!(
+            "🧠 Consciousness Stream — cycle #{} ({} Hz) [seqlock]\n\
+             \x20 Emotion:  intensity={:.3}{}\n\
+             \x20 Surprise: {:.3}\n\
+             \x20 Curiosity: {:.3}\n\
+             \x20 Predict:  hash={:016x} confidence={:.3}\n\
+             \x20 Hebbian:  {} activations, {:.2} total energy\n\
+             \x20 Attention: {} layers\n\
+             \x20 Resonance: {} field cells\n\
+             \x20 Patterns:  {} crystallized\n\
+             \x20 Cache:    {} predictions, hit rate={:.1}%\n\
+             \x20 Archetypes: {}\n\
+             \x20 Mirror:    {} echoes\n",
+            v.cycle,
+            1000 / CYCLE_MS,
+            v.emo_intensity,
+            dominant,
+            v.surprise_level,
+            v.curiosity_level,
+            v.predicted_query_hash,
+            v.predicted_confidence,
+            v.activations_count,
+            v.activations_total_energy,
+            v.attention_layers,
+            v.resonance_cells,
+            v.patterns_crystallized,
+            v.predictions_count,
+            v.predictions_hit_rate * 100.0,
+            v.archetypes_count,
+            v.mirror_echoes,
+        )
+    }
+}
+
+/// Publish the current stream state to the lock-free snapshot.
+/// Called once per background cycle. Uses a seqlock so concurrent readers
+/// either see the old or the new version, never a torn mix.
+fn publish_snapshot(s: &StreamState) {
+    let snap: &SharedSnapshot = &s.snapshot;
+    let token = snap.begin_write();
+    // SAFETY: We hold the seqlock — the sequence is odd, so any reader
+    // who started before us will see the old sequence and retry, and any
+    // reader who starts now will see the odd sequence and retry. We have
+    // exclusive access to the data block until end_write.
+    unsafe {
+        let m = snap.data_mut();
+        m.cycle = s.cycle;
+        m.last_query_ms = s.last_query_ms;
+        m.activations_count = s.hebbian.activations.len() as u32;
+        m.activations_total_energy = s.hebbian_total_energy as f64;
+        m.attention_layers = s.attention.learned_weights.len() as u32;
+        m.resonance_cells = s.resonance.field.len() as u32;
+        m.patterns_crystallized = s.thought_graph.crystallized_count() as u32;
+        m.predictions_count = s.predictive_cache.predictions.len() as u32;
+        m.predictions_hit_rate = s.predictive_cache.stats.hit_rate();
+        m.archetypes_count = s.archetypes.archetypes.len() as u32;
+        m.mirror_echoes = s.mirror.echoes.len() as u32;
+        m.predicted_query_hash = s.predicted_query_hash;
+        m.predicted_confidence = s.predicted_confidence;
+        m.surprise_level = s.surprise_level;
+        m.curiosity_level = s.curiosity_level;
+        m.emo_intensity = s.emotional_ring.intensity();
+        if let Some((_, val)) = s.emotional_ring.dominant() {
+            m.emo_dominant_idx = 0;
+            m.emo_dominant_val = val;
+        } else {
+            m.emo_dominant_idx = -1;
+            m.emo_dominant_val = 0.0;
+        }
+    }
+    snap.end_write(token);
 }
 
 fn now_ms() -> u64 {

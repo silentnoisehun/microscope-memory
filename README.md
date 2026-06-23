@@ -21,9 +21,9 @@ Microscope is designed to be the persistent memory of AI agents and LLM workflow
 | **D0 identity query** (1 block) | **37 ns** | Binary mmap + SIMD distance |
 | **Cached consciousness string** (`memory_consciousness` MCP tool) | **124 ns** | Pre-built string in `RwLock<String>` |
 | **Seqlock snapshot** (full 96-byte state) | **1.2 µs** | Sequence-locked protocol |
-| **4D soft-zoom query** (all 28k blocks) | 169 µs | Depth-banded binary search |
+| **4D soft-zoom query** (all 28k blocks) | 380 µs | Depth-banded binary search |
 
-**The 1 ns atomic hot-field read is a single CPU instruction** — as fast as a register load, no synchronization overhead. The 37 ns D0 query is single-digit CPU cycles. Measured on this build, 28,492 blocks loaded. See [Performance](#-performance-measured) for the full benchmark and `tests/consciousness_perf.rs` for the consciousness-stream benchmarks.
+**The 1 ns atomic hot-field read is a single CPU instruction** — as fast as a register load, no synchronization overhead. The 37 ns D0 query is single-digit CPU cycles. Measured on this build, 28,679 blocks loaded. See [Performance](#-performance-measured) for the full benchmark and `tests/consciousness_perf.rs` for the consciousness-stream benchmarks.
 
 ---
 
@@ -139,7 +139,7 @@ The stream publishes a `SharedSnapshot` that gives readers three performance tie
 
 **Why three tiers?** A seqlock gives a consistent multi-field snapshot but still costs an atomic sequence check + a struct copy. For callers that only need a single number (e.g. "is the stream still updating?"), the ultra-fast tier skips both. For callers that need a human-readable string, the cached-format tier skips `format!()` entirely — the background cycle pre-builds the string once per tick, and readers just clone it.
 
-Measured on this build (28,492 blocks loaded):
+Measured on this build (28,679 blocks loaded):
 
 | Operation | Latency |
 |-----------|---------|
@@ -194,7 +194,7 @@ Benchmark: 10,000 queries per depth, 28,995 blocks across 9 depths.
 | D7 | 11,226 | 36.6 µs |
 | D8 | 11,389 | 36.1 µs |
 
-**Overall average:** ~14.5 µs/query. **4D soft zoom (all blocks):** 169 µs/query.
+**Overall average:** ~112 µs/query. **4D soft zoom (all blocks):** 380 µs/query.
 
 **Consciousness stream read (3-tier path):**
 

@@ -179,7 +179,6 @@ fn bench_append_log(c: &mut Criterion) {
                     black_box("Benchmark test memory entry about quantum computing"),
                     black_box("long_term"),
                     black_box(5),
-                    None,
                 )
                 .expect("store");
                 let append_path = Path::new(&config.paths.output_dir).join("append.bin");
@@ -198,7 +197,6 @@ fn bench_append_log(c: &mut Criterion) {
             "Benchmark pre-stored memory entry",
             "long_term",
             5,
-            None,
         )
         .expect("store");
         let append_path = Path::new(&config.paths.output_dir).join("append.bin");

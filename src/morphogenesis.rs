@@ -2778,6 +2778,7 @@ pub fn simplify_organism(organism: &mut Organism) -> usize {
 // ─── NodeType → string konverzió ────────────────────────────────────────────
 
 impl NodeType {
+    #[allow(clippy::inherent_to_string_shadow_display)]
     pub fn to_string(&self) -> String {
         match self {
             NodeType::Root => "Root".to_string(),
@@ -3109,7 +3110,7 @@ mod tests {
 
         let removed = simplify_organism(&mut organism);
 
-        assert!(removed >= 0);
+        let _ = removed;
     }
 
     #[test]

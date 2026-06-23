@@ -193,6 +193,7 @@ impl SharedSnapshot {
     ///
     /// SAFETY: Caller must hold the seqlock by having called
     /// `begin_write` and not yet called `end_write`. Only one writer at a time.
+    #[allow(clippy::mut_from_ref)]
     pub unsafe fn data_mut(&self) -> &mut SnapshotData {
         &mut *self.data.get()
     }

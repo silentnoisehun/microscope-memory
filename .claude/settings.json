@@ -1,28 +1,34 @@
 {
     "hooks":  {
+                  "PostToolUse":  {
+                                      "args":  [
+                                                   "-NoProfile",
+                                                   "-ExecutionPolicy",
+                                                   "Bypass",
+                                                   "-File",
+                                                   "E:\\microscope-local\\scripts\\microscope-recall-hook.ps1"
+                                               ],
+                                      "command":  "powershell.exe"
+                                  },
                   "Stop":  {
                                "args":  [
-                                            "-NoLogo",
+                                            "-NoProfile",
                                             "-ExecutionPolicy",
                                             "Bypass",
                                             "-File",
-                                            "scripts\\microscope-recall-hook.ps1",
-                                            "-Action",
-                                            "Stop"
+                                            "E:\\microscope-local\\scripts\\microscope-recall-hook.ps1"
                                         ],
-                               "command":  "powershell"
+                               "command":  "powershell.exe"
                            },
                   "UserPromptSubmit":  {
                                            "args":  [
-                                                        "-NoLogo",
+                                                        "-NoProfile",
                                                         "-ExecutionPolicy",
                                                         "Bypass",
                                                         "-File",
-                                                        "scripts\\microscope-recall-hook.ps1",
-                                                        "-Action",
-                                                        "UserPromptSubmit"
+                                                        "E:\\microscope-local\\scripts\\microscope-recall-hook.ps1"
                                                     ],
-                                           "command":  "powershell"
+                                           "command":  "powershell.exe"
                                        }
               }
 }

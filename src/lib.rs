@@ -92,6 +92,7 @@ pub mod hyperfocus;
 pub mod implicit_memory;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod impulse_control;
+pub mod keystore;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod knowledge_base;
 #[cfg(not(target_arch = "wasm32"))]
@@ -120,6 +121,7 @@ pub mod thought_graph;
 pub mod vagus;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod viz;
+pub mod zen_keystore;
 
 #[cfg(target_arch = "wasm32")]
 pub mod wasm;
@@ -158,7 +160,7 @@ pub use cli::{Cli, Cmd};
 
 // Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬ Shared constants Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬
 pub const DEFAULT_CONFIG_PATH: &str = "config.toml";
-pub const BLOCK_DATA_SIZE: usize = 256;
+pub const BLOCK_DATA_SIZE: usize = 1024;
 pub const HEADER_SIZE: usize = 32;
 pub const META_HEADER_SIZE: usize = 16;
 pub const DEPTH_ENTRY_SIZE: usize = 8;

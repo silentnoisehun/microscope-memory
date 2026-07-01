@@ -123,10 +123,7 @@ impl KnowledgeBase {
 
         // Indexelés tagek szerint
         for tag in &entry.tags {
-            tag_index
-                .entry(tag.clone())
-                .or_default()
-                .push(id.clone());
+            tag_index.entry(tag.clone()).or_default().push(id.clone());
         }
 
         // Indexelés típus szerint
@@ -723,9 +720,10 @@ pub fn auto_learn_associations(kb: &KnowledgeBase) {
             // Típus alapján asszociáció (pl. simulation -> pitfall)
             if a.entry_type == KnowledgeEntryType::SimulationResult
                 && b.entry_type == KnowledgeEntryType::KnownPitfall
-                && a.description.contains(&b.title[..b.title.len().min(20)]) {
-                    kb.learn_association(&a.id, &b.id, 0.8);
-                }
+                && a.description.contains(&b.title[..b.title.len().min(20)])
+            {
+                kb.learn_association(&a.id, &b.id, 0.8);
+            }
         }
     }
 }

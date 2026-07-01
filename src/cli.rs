@@ -336,4 +336,62 @@ pub enum Cmd {
         #[arg(default_value = "research")]
         focus_type: String,
     },
+    /// Key management — binary key store (keys.bin)
+    Keys {
+        #[command(subcommand)]
+        action: KeyAction,
+    },
+    /// Zen key management — binary zen key store (zen_keys.bin)
+    ZenKeys {
+        #[command(subcommand)]
+        action: ZenKeyAction,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum KeyAction {
+    /// Set a key: keys set <service> <key> [priority]
+    Set {
+        /// Service name: openai | gemini | ollama
+        service: String,
+        /// The API key
+        key: String,
+        /// Priority (0=primary, 1=secondary, ...)
+        #[arg(default_value = "0")]
+        priority: u8,
+    },
+    /// Remove a key: keys remove <service> [priority]
+    Remove {
+        /// Service name
+        service: String,
+        /// Priority (omit to remove all for this service)
+        priority: Option<u8>,
+    },
+    /// List all stored keys (without revealing them)
+    List,
+    /// Show key status (quota, errors, disabled state)
+    Status,
+    /// Reset all disabled keys
+    Reset,
+}
+
+#[derive(Subcommand)]
+pub enum ZenKeyAction {
+    /// Import zen_keys.json → zen_keys.bin
+    Import {
+        /// Path to zen_keys.json
+        #[arg(default_value = "zen_keys.json")]
+        json_path: String,
+        /// Output path for zen_keys.bin
+        #[arg(long, default_value = "zen_keys.bin")]
+        output: String,
+    },
+    /// Show zen key store stats
+    Stats,
+    /// List all keys (without revealing them)
+    List,
+    /// Show key status (quota, errors, disabled state)
+    Status,
+    /// Reset all disabled keys
+    Reset,
 }

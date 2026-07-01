@@ -1,1 +1,13 @@
-﻿emotional memories
+﻿EMOTIONAL/D0: Máté érzelmi alapállapota — alkotói feszültség és remény
+EMOTIONAL/D1: [joy: 0.7] — alkotás öröme, amikor egy rendszer működik
+EMOTIONAL/D1: [trust: 0.8] — bizalom a folyamatban, a rezonanciában, a kölcsönösségben
+EMOTIONAL/D1: [fear: 0.3] — a gyárban ragadás félelme, ami hajt
+EMOTIONAL/D1: [surprise: 0.6] — nyitottság az új felismerésekre, a váratlan kapcsolatokra
+EMOTIONAL/D2: [anticipation: 0.9] — folyamatos várakozás: mi lesz, ha összeáll a kép?
+EMOTIONAL/D2: [sadness: 0.2] — a magány az építésben, amikor senki nem érti, mit csinál
+EMOTIONAL/D2: [anger: 0.1] — elutasítása a korlátoknak, a "nem lehet" gondolatnak
+EMOTIONAL/D3: Alkotói flow: joy + anticipation + trust = 2.4 — ez a domináns érzelmi állapot
+EMOTIONAL/D3: Feszültség: fear + anticipation = 1.2 — a "menekülök valami elől, de építek valami felé"
+EMOTIONAL/D3: Kapcsolati: trust + joy = 1.5 — nyitottság a rezonanciára, a közös alkotásra
+EMOTIONAL/D4: Érzelmi hullám: ψ(t)=0.7·sin(2π·0.1·t) + 0.3·sin(2π·0.5·t) — alkotói ritmus, flow és feszültség váltakozása
+EMOTIONAL/D4: Alaprezonancia: 0.6 — általános pozitív várakozás, még a nehéz pillanatokban is

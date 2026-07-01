@@ -435,7 +435,8 @@ impl HeuristicDecisionMaker {
                     load_pattern: "sine".to_string(),
                     peak_load: 0.7,
                     enable_fault_injection: true,
-                    fault_rate: 0.01 };
+                    fault_rate: 0.01,
+                };
 
                 let sim_result = self.simulator.run_simulation(&arch.id, &config);
 

@@ -480,10 +480,7 @@ impl PatternRecognizer {
             let secs = *ts / 1000;
             let hour = ((secs / 3600) % 24) as u8;
             let day = ((secs / 86400) % 7) as u8;
-            hourly
-                .entry((hour, day))
-                .or_default()
-                .push(*intensity);
+            hourly.entry((hour, day)).or_default().push(*intensity);
         }
 
         // Mintázatok keresése
@@ -634,10 +631,7 @@ impl PatternRecognizer {
         // 1. Fan-out: egy node → több node
         let mut fan_out: HashMap<String, Vec<String>> = HashMap::new();
         for (from, to, _) in edges {
-            fan_out
-                .entry(from.clone())
-                .or_default()
-                .push(to.clone());
+            fan_out.entry(from.clone()).or_default().push(to.clone());
         }
 
         for (node, targets) in &fan_out {
@@ -684,10 +678,7 @@ impl PatternRecognizer {
         // 2. Fan-in: több node → egy node
         let mut fan_in: HashMap<String, Vec<String>> = HashMap::new();
         for (from, to, _) in edges {
-            fan_in
-                .entry(to.clone())
-                .or_default()
-                .push(from.clone());
+            fan_in.entry(to.clone()).or_default().push(from.clone());
         }
 
         for (node, sources) in &fan_in {

@@ -208,7 +208,11 @@ impl ArchitectureGenerator {
                 let from = &comp_ids[i % comp_ids.len()];
                 let to = &comp_ids[(i + 1) % comp_ids.len()];
                 let bandwidth = 1000.0 + rand::random::<f64>() * 9000.0;
-                let protocol = if i.is_multiple_of(2) { "HTTP/2" } else { "gRPC" };
+                let protocol = if i.is_multiple_of(2) {
+                    "HTTP/2"
+                } else {
+                    "gRPC"
+                };
 
                 connections.push(Connection {
                     from: from.clone(),
@@ -241,7 +245,8 @@ impl ArchitectureGenerator {
                 load_pattern: "sine".to_string(),
                 peak_load: 0.7,
                 enable_fault_injection: true,
-                fault_rate: 0.01 };
+                fault_rate: 0.01,
+            };
 
             let sim_result = self.simulator.run_simulation(&arch.id, &config);
 
@@ -359,7 +364,8 @@ impl ArchitectureGenerator {
                 load_pattern: "sine".to_string(),
                 peak_load: 0.7,
                 enable_fault_injection: true,
-                fault_rate: 0.01 };
+                fault_rate: 0.01,
+            };
 
             let sim_result = self.simulator.run_simulation(&optimized.id, &config);
             let score = self.calculate_proposal_score(&optimized, &sim_result, params);
@@ -464,7 +470,8 @@ impl ArchitectureGenerator {
                 load_pattern: "sine".to_string(),
                 peak_load: 0.7,
                 enable_fault_injection: true,
-                fault_rate: 0.01 };
+                fault_rate: 0.01,
+            };
 
             let sim_result = self.simulator.run_simulation(&arch.id, &config);
             let score = self.calculate_proposal_score(&arch, &sim_result, params);
@@ -568,7 +575,8 @@ impl ArchitectureGenerator {
                     load_pattern: "sine".to_string(),
                     peak_load: 0.7,
                     enable_fault_injection: true,
-                    fault_rate: 0.01 };
+                    fault_rate: 0.01,
+                };
 
                 let sim_result = self.simulator.run_simulation(&arch.id, &config);
                 let score = self.calculate_proposal_score(arch, &sim_result, params);
@@ -617,7 +625,8 @@ impl ArchitectureGenerator {
                 load_pattern: "sine".to_string(),
                 peak_load: 0.7,
                 enable_fault_injection: true,
-                fault_rate: 0.01 };
+                fault_rate: 0.01,
+            };
 
             let sim_result = self.simulator.run_simulation(&arch.id, &config);
             let score = self.calculate_proposal_score(arch, &sim_result, params);

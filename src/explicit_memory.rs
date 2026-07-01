@@ -119,10 +119,7 @@ impl ExplicitMemory {
             .or_default()
             .push(key2.clone());
 
-        self.relationships
-            .entry(key2)
-            .or_default()
-            .push(key1);
+        self.relationships.entry(key2).or_default().push(key1);
     }
 
     /// Retrieve fact with confidence

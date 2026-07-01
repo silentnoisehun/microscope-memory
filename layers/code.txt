@@ -1,3 +1,15 @@
-﻿code memory entries for coding agents
-functions, symbols, error-solution pairs, project dependencies
-
+﻿CODE/D0: Máté kódolási mintái és projekt struktúrái
+CODE/D1: Nyelv: Rust (elsődleges). 2021 edition, idiomatic patterns. PascalCase structs/enums, snake_case functions/variables, SCREAMING_SNAKE_CASE constants.
+CODE/D1: Hibakezelés: Result<T, E> with thiserror. Nem használ unwrap()-ot production kódban — csak tesztekben.
+CODE/D1: Állapotkezelés: Arc<RwLock<T>> shared state-re. HashMap collections-re, f64 metrikákra.
+CODE/D2: Projekt struktúra: src/lib.rs (library crate) + src/main.rs (binary) + src/cli.rs (CLI parancsok). Modulok lib.rs-ben deklarálva, cfg-attribútumokkal platform-specifikus kód.
+CODE/D2: Tesztelés: cargo test --lib (unit), cargo test --test integration (integration). Tesztek modulon belül (#[cfg(test)] mod tests).
+CODE/D2: Build: cargo build --release. Features: "gpu", "embeddings", "compression". LTO=fat release build.
+CODE/D3: Microscope Memory architektúra: 13 layer (identity, long_term, short_term, associative, emotional, relational, reflections, crypto_chain, echo_cache, rust_state, code, session), 9 depth (D0-D8), binary mmap storage.
+CODE/D3: Kognitív modulok: morphogenesis (biológiai növekedés), pattern_recognition (mintázatok), executive (ütemező), planning (HTN), autopoiesis (kódgenerálás), code_memory (kód specifikus memória).
+CODE/D3: Teljesítmény: sub-microsecond recall, SIMD-optimized, zero-JSON hot path, seqlock lock-free consciousness read.
+CODE/D4: HOPE Key Spine: capability-based security, audit chain, budget guard, circuit breaker, health monitor. Rust + TypeScript.
+CODE/D4: STT: Web Speech API + Groq Whisper. VU meter, LED vizualizáció, CC19 mic, CC29 paste.
+CODE/D4: Rongyász: AST surgery (syn/quote), wave field, anchor rendszer, 7 tool (skill-execute, subagent-delegate, hebbian-fire, memory-recall, memory-store, bio-binary-load, skill-list).
+CODE/D5: Máté nem használ kész megoldásokat. Mindent a nulláról épít, hogy értse és kontrollálja. Ez lassabb, de mélyebb megértést ad.
+CODE/D5: Preferencia: bio-inspirált nevek és architektúrák. A kódban is: mycelium, capillary, slime, fractal, macrophage, crispr, synaptic.

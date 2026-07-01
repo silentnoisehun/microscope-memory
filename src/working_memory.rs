@@ -353,7 +353,8 @@ mod tests {
 
     #[test]
     fn test_save_load_roundtrip() {
-        let dir = std::env::temp_dir();
+        let dir = std::env::temp_dir().join("microscope_wm_test");
+        let _ = std::fs::create_dir_all(&dir);
         let mut wm = WorkingMemory::load_or_init(&dir);
         wm.push("hello", 7.0, "short_term", MemoryType::Episodic);
         wm.save(&dir).unwrap();
@@ -363,7 +364,7 @@ mod tests {
         assert_eq!(loaded.items[0].text, "hello");
         assert!((loaded.items[0].importance - 7.0).abs() < 0.01);
 
-        let _ = std::fs::remove_file(dir.join("working_memory.bin"));
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

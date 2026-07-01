@@ -445,7 +445,8 @@ fn recall(config: &Config, query: &str, k: usize) {
 
         // --- Auto-reflect: every N recalls, the system thinks about itself ---
         if narrative.session_count > 0
-            && (narrative.session_count as usize).is_multiple_of(microscope_memory::self_reflect::AUTO_REFLECT_INTERVAL)
+            && (narrative.session_count as usize)
+                .is_multiple_of(microscope_memory::self_reflect::AUTO_REFLECT_INTERVAL)
         {
             let reflection =
                 microscope_memory::self_reflect::introspect(config, &reader, output_dir);
@@ -2514,6 +2515,261 @@ async fn main() {
                 );
                 for (depth, idx) in results.iter().take(5) {
                     reader.print_result(*idx, *depth as f32);
+                }
+            }
+        }
+        Cmd::Keys { action } => {
+            use microscope_memory::keystore::{default_keys_path, KeyStore};
+            let keys_path = default_keys_path(&config.paths.output_dir);
+            let mut store = KeyStore::load(&keys_path).unwrap_or_default();
+            match action {
+                microscope_memory::cli::KeyAction::Set {
+                    service,
+                    key,
+                    priority,
+                } => {
+                    store.set(&service, key, priority);
+                    if let Err(e) = store.save(&keys_path) {
+                        eprintln!("  {} Failed to save keys.bin: {}", "ERROR:".red(), e);
+                    } else {
+                        println!(
+                            "  {} Key '{}' (priority {}) saved to keys.bin",
+                            "OK:".green(),
+                            service,
+                            priority
+                        );
+                    }
+                }
+                microscope_memory::cli::KeyAction::Remove { service, priority } => {
+                    if let Some(p) = priority {
+                        store.remove(&service, p);
+                    } else {
+                        store.entries.retain(|e| e.service != service);
+                    }
+                    let _ = store.save(&keys_path);
+                    println!("  {} Key(s) '{}' removed", "OK:".green(), service);
+                }
+                microscope_memory::cli::KeyAction::List => {
+                    let info = store.list();
+                    if info.is_empty() {
+                        println!("  {} No keys stored", "INFO:".yellow());
+                    } else {
+                        println!("{}", "─ Keys in keys.bin ─".cyan());
+                        for entry in &info {
+                            let status = if entry.disabled {
+                                "DISABLED".red()
+                            } else {
+                                "active".green()
+                            };
+                            println!(
+                                "  {} [{}] priority={} {} {}",
+                                status,
+                                entry.service,
+                                entry.priority,
+                                entry.key_preview,
+                                if let Some(ref err) = entry.last_error {
+                                    format!("({})", err.dimmed())
+                                } else {
+                                    String::new()
+                                }
+                            );
+                        }
+                    }
+                }
+                microscope_memory::cli::KeyAction::Status => {
+                    let info = store.list();
+                    if info.is_empty() {
+                        println!("  {} No keys stored", "INFO:".yellow());
+                    } else {
+                        println!("{}", "─ Key Status ─".cyan());
+                        for entry in &info {
+                            let status = if entry.disabled {
+                                "DISABLED".red()
+                            } else {
+                                "active".green()
+                            };
+                            let quota = match entry.quota_remaining {
+                                Some(q) => format!("{:.1}%", q * 100.0),
+                                None => "unknown".dimmed().to_string(),
+                            };
+                            println!(
+                                "  {} [{}] p{} | quota: {} | created: ? {}",
+                                status,
+                                entry.service,
+                                entry.priority,
+                                quota,
+                                if let Some(ref err) = entry.last_error {
+                                    format!("| err: {}", err.dimmed())
+                                } else {
+                                    String::new()
+                                }
+                            );
+                        }
+                    }
+                }
+                microscope_memory::cli::KeyAction::Reset => {
+                    let count = store.entries.len();
+                    store.reset_all();
+                    let _ = store.save(&keys_path);
+                    println!("  {} {} key(s) reset (re-enabled)", "OK:".green(), count);
+                }
+            }
+        }
+        Cmd::ZenKeys { action } => {
+            use microscope_memory::zen_keystore::ZenKeyStore;
+            let zen_path = "zen_keys.bin";
+            match action {
+                microscope_memory::cli::ZenKeyAction::Import { json_path, output } => {
+                    let json_str = match std::fs::read_to_string(&json_path) {
+                        Ok(s) => s,
+                        Err(e) => {
+                            eprintln!("  {} Cannot read {}: {}", "ERROR:".red(), json_path, e);
+                            return;
+                        }
+                    };
+                    match ZenKeyStore::import_json(&json_str) {
+                        Ok(store) => {
+                            let out_path = if output == "zen_keys.bin" && !json_path.is_empty() {
+                                // Use the json file's directory if relative
+                                let p = std::path::Path::new(&json_path);
+                                p.parent()
+                                    .unwrap_or(std::path::Path::new("."))
+                                    .join("zen_keys.bin")
+                            } else {
+                                std::path::PathBuf::from(&output)
+                            };
+                            if let Err(e) = store.save(&out_path) {
+                                eprintln!(
+                                    "  {} Failed to save zen_keys.bin: {}",
+                                    "ERROR:".red(),
+                                    e
+                                );
+                            } else {
+                                println!("  {} zen_keys.json → zen_keys.bin", "OK:".green());
+                                println!("{}", store.stats());
+                            }
+                        }
+                        Err(e) => {
+                            eprintln!("  {} Failed to import: {}", "ERROR:".red(), e);
+                        }
+                    }
+                }
+                microscope_memory::cli::ZenKeyAction::Stats => {
+                    let store = match ZenKeyStore::load(zen_path) {
+                        Ok(s) => s,
+                        Err(e) => {
+                            eprintln!("  {} Cannot load zen_keys.bin: {}", "ERROR:".red(), e);
+                            return;
+                        }
+                    };
+                    println!("{}", "─ Zen Key Store ─".cyan());
+                    println!("{}", store.stats());
+                }
+                microscope_memory::cli::ZenKeyAction::List => {
+                    let store = match ZenKeyStore::load(zen_path) {
+                        Ok(s) => s,
+                        Err(e) => {
+                            eprintln!("  {} Cannot load zen_keys.bin: {}", "ERROR:".red(), e);
+                            return;
+                        }
+                    };
+                    println!("{}", "─ Keys in zen_keys.bin ─".cyan());
+                    for p in &store.providers {
+                        println!(
+                            "  {} [{}] ({} keys):",
+                            p.name,
+                            p.rotation.as_str(),
+                            p.keys.len()
+                        );
+                        for (i, k) in p.keys.iter().enumerate() {
+                            let status = if k.disabled {
+                                "DISABLED".red()
+                            } else {
+                                "active".green()
+                            };
+                            let preview = if k.key.len() > 12 {
+                                format!("{}...", &k.key[..12])
+                            } else {
+                                "***".to_string()
+                            };
+                            println!("    #{} {} p{} {}", i, status, k.priority, preview.dimmed());
+                        }
+                    }
+                    if !store.models.is_empty() {
+                        println!("\n  {} Models:", "Models:".yellow());
+                        for m in &store.models {
+                            let prov = m.provider.as_deref().unwrap_or("openai");
+                            println!(
+                                "    #{} {} [{}] {} {}",
+                                m.priority,
+                                m.id,
+                                prov,
+                                m.endpoint,
+                                if m.free {
+                                    "FREE".green()
+                                } else {
+                                    "PAID".yellow()
+                                }
+                            );
+                        }
+                    }
+                }
+                microscope_memory::cli::ZenKeyAction::Status => {
+                    let store = match ZenKeyStore::load(zen_path) {
+                        Ok(s) => s,
+                        Err(e) => {
+                            eprintln!("  {} Cannot load zen_keys.bin: {}", "ERROR:".red(), e);
+                            return;
+                        }
+                    };
+                    println!("{}", "─ Zen Key Status ─".cyan());
+                    for p in &store.providers {
+                        println!("  {}:", p.name);
+                        for (i, k) in p.keys.iter().enumerate() {
+                            let status = if k.disabled {
+                                "DISABLED".red()
+                            } else {
+                                "active".green()
+                            };
+                            let quota = match k.quota_remaining {
+                                Some(q) => format!("{:.1}%", q * 100.0),
+                                None => "unknown".dimmed().to_string(),
+                            };
+                            println!(
+                                "    #{} {} p{} | quota: {} {}",
+                                i,
+                                status,
+                                k.priority,
+                                quota,
+                                if let Some(ref err) = k.last_error {
+                                    format!("| err: {}", err.dimmed())
+                                } else {
+                                    String::new()
+                                }
+                            );
+                        }
+                    }
+                }
+                microscope_memory::cli::ZenKeyAction::Reset => {
+                    let mut store = match ZenKeyStore::load(zen_path) {
+                        Ok(s) => s,
+                        Err(e) => {
+                            eprintln!("  {} Cannot load zen_keys.bin: {}", "ERROR:".red(), e);
+                            return;
+                        }
+                    };
+                    let mut count = 0;
+                    for p in &mut store.providers {
+                        for k in &mut p.keys {
+                            if k.disabled {
+                                k.disabled = false;
+                                k.last_error = None;
+                                count += 1;
+                            }
+                        }
+                    }
+                    let _ = store.save(zen_path);
+                    println!("  {} {} key(s) reset (re-enabled)", "OK:".green(), count);
                 }
             }
         }

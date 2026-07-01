@@ -1,0 +1,1 @@
+[sid-7128] Voice Loop PWA built: telefon mikofon → Tailscale → PC (Whisper STT → Claude API → edge-TTS) → telefon hangszóró. 2mp csend trigger + "vége"/"ennyi"/"kész" force trigger words. server.py + static PWA a voice-loop mappában, fut a 100.114.159.63:5000-en.

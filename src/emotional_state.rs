@@ -292,7 +292,8 @@ mod tests {
 
     #[test]
     fn test_save_load_roundtrip() {
-        let dir = std::env::temp_dir();
+        let dir = std::env::temp_dir().join("microscope_emotional_test");
+        let _ = std::fs::create_dir_all(&dir);
         let mut ring = EmotionalStateRing::default();
         let happy = [0.9f32; 21];
         ring.update(&happy, 10);
@@ -302,7 +303,7 @@ mod tests {
         assert_eq!(loaded.total_updates, 1);
         assert!((loaded.intensity() - ring.intensity()).abs() < 0.001);
 
-        let _ = std::fs::remove_file(dir.join("emotional_state.bin"));
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

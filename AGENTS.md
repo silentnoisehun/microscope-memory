@@ -1,3 +1,36 @@
+﻿# Microscope Memory
+
+A Microscope Memory egy kognitív memória engine — 13 réteg, 9 mélység, bináris mmap. Nem napló, nem adatbázis — élő emlékezet.
+
+## Hogyan működik
+
+### Automatikusan
+- **Auto-context:** minden válasz előtt a rendszer előhívja a releváns múltbeli kontextust
+- **Auto-store:** minden válasz után a rendszer eltárolja az interakciót
+- **Session végén:** összefoglaló long_term-be
+
+### A rétegek
+A rétegek neve magáért beszél. Nem kell szabály — magától értetődik, hova kerül egy emlék.
+
+| Réteg | Oda kerül |
+|-------|-----------|
+| session | Beszélgetések, napi interakciók |
+| identity | Aki a user, az értékei, a küldetése |
+| emotional | Érzelmek, hangulatok, reakciók |
+| long_term | Projekt tudás, döntések, architektúra |
+| reflections | Felismerések, insightok, aha pillanatok |
+| relational | Kapcsolatok dolgok között |
+| code | Kódolási minták, hibák, megoldások |
+| short_term | Átmeneti kontextus, aktuális fókusz |
+
+### CLI (ha kell)
+```powershell
+$env:MICROSCOPE_CONFIG = "D:\codex\microscope-memory\config.toml"
+& "D:\codex\microscope-memory\target\release\microscope-mem.exe" <command>
+```
+
+--- project-doc ---
+
 # AGENTS.md - Microscope Memory Agent Guidelines
 
 Build and code style guidelines for the Microscope Memory codebase.

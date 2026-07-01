@@ -219,7 +219,7 @@ impl Planner {
     }
 
     /// Cél lebontása részcélokra (HTN dekompozíció)
-pub fn decompose_goal(&self, goal_id: u64) -> Vec<u64> {
+    pub fn decompose_goal(&self, goal_id: u64) -> Vec<u64> {
         let goal = match self.goals.read().unwrap().get(&goal_id) {
             Some(g) => g.clone(),
             None => return vec![],
@@ -339,7 +339,7 @@ pub fn decompose_goal(&self, goal_id: u64) -> Vec<u64> {
     }
 
     /// Terv készítése egy célhoz
-pub fn create_plan(&self, goal_id: u64) -> Plan {
+    pub fn create_plan(&self, goal_id: u64) -> Plan {
         let goal = match self.goals.read().unwrap().get(&goal_id) {
             Some(g) => g.clone(),
             None => return self.empty_plan(),
@@ -394,7 +394,7 @@ pub fn create_plan(&self, goal_id: u64) -> Plan {
     }
 
     /// Terv végrehajtásának előre léptetése
-pub fn execute_step(&self, plan_id: u64) -> Option<Action> {
+    pub fn execute_step(&self, plan_id: u64) -> Option<Action> {
         let mut plans = self.plans.write().unwrap();
 
         let plan = plans.get_mut(&plan_id)?;
@@ -420,7 +420,7 @@ pub fn execute_step(&self, plan_id: u64) -> Option<Action> {
     }
 
     /// Rollback: visszalépés az utolsó végrehajtott lépésről, ha az sikertelen volt.
-pub fn fail_step(&self, plan_id: u64, reason: &str) -> bool {
+    pub fn fail_step(&self, plan_id: u64, reason: &str) -> bool {
         let mut plans = self.plans.write().unwrap();
 
         let plan = match plans.get_mut(&plan_id) {
@@ -441,7 +441,7 @@ pub fn fail_step(&self, plan_id: u64, reason: &str) -> bool {
     }
 
     /// Replanning: terv újragenerálás változott körülmények esetén
-pub fn replan(&self, plan_id: u64, reason: &str) -> Option<Plan> {
+    pub fn replan(&self, plan_id: u64, reason: &str) -> Option<Plan> {
         let plans = self.plans.write().unwrap();
 
         let old = plans.get(&plan_id)?.clone();

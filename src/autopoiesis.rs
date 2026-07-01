@@ -253,7 +253,8 @@ impl AutopoiesisEngine {
         };
         let rollbacks = self.rollback_points.read().unwrap();
         let _rp = match rollbacks
-            .iter().rfind(|r| r.module == mutation.target_module)
+            .iter()
+            .rfind(|r| r.module == mutation.target_module)
         {
             Some(r) => r,
             None => return false,

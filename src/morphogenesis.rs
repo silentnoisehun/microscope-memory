@@ -1317,9 +1317,9 @@ pub fn slime_mold_growth(seed: &Seed, field: &MorphogenField, config: &GrowthCon
             // Szenzorok: előre, balra, jobbra
 
             let sensors = [
-                (angle, 1.0), // előre
-                (angle - sensor_angle, 1.0), // balra
-                (angle + sensor_angle, 1.0), // jobbra
+                (angle, 1.0),                      // előre
+                (angle - sensor_angle, 1.0),       // balra
+                (angle + sensor_angle, 1.0),       // jobbra
                 (angle - sensor_angle * 2.0, 0.8), // balra távolabb
                 (angle + sensor_angle * 2.0, 0.8), // jobbra távolabb
             ];
@@ -2442,11 +2442,7 @@ pub fn map_to_neuroplasticity(organism: &Organism) -> Vec<(u32, u32, f32)> {
                 + c.bandwidth / 20000.0 * 0.3
                 + (1.0 - c.latency_ms / 20.0).max(0.0) * 0.2) as f32;
 
-            (
-                c.from_node as u32,
-                c.to_node as u32,
-                weight.clamp(0.0, 1.0),
-            )
+            (c.from_node as u32, c.to_node as u32, weight.clamp(0.0, 1.0))
         })
         .collect()
 }

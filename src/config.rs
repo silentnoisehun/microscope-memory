@@ -16,8 +16,6 @@ pub struct Config {
     pub server: Server,
     #[serde(default)]
     pub federation: Federation,
-    #[serde(default)]
-    pub hooks: HooksConfig,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -29,7 +27,6 @@ pub struct Paths {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Index {
-    pub block_size: usize,
     pub max_depth: u8,
     pub header_size: usize,
 }
@@ -162,37 +159,7 @@ fn default_weight() -> f32 {
     1.0
 }
 
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct HooksConfig {
-    #[serde(default = "default_hooks_enabled")]
-    pub enabled: bool,
-    #[serde(default = "default_hooks_read_only")]
-    pub read_only: bool,
-    #[serde(default = "default_hooks_write_enabled")]
-    pub write_enabled: bool,
-    #[serde(default = "default_hooks_min_importance")]
-    pub min_importance: u8,
-}
-
-fn default_hooks_enabled() -> bool { true }
-fn default_hooks_read_only() -> bool { true }
-fn default_hooks_write_enabled() -> bool { false }
-fn default_hooks_min_importance() -> u8 { 3 }
-
-impl Default for HooksConfig {
-    fn default() -> Self {
-        Self {
-            enabled: true,
-            read_only: true,
-            write_enabled: false,
-            min_importance: 3,
-        }
-    }
-}
-
 impl Config {
-
     /// Loads config from a TOML file.
     pub fn load<P: AsRef<Path>>(path: P) -> Result<Self, Box<dyn std::error::Error>> {
         if !path.as_ref().exists() {
@@ -219,11 +186,10 @@ impl Default for Config {
         Self {
             paths: Paths {
                 layers_dir: "./layers".to_string(),
-                output_dir: "./data".to_string(),
+                output_dir: "./output".to_string(),
                 temp_dir: "./tmp".to_string(),
             },
             index: Index {
-                block_size: 256,
                 max_depth: 8,
                 header_size: 32,
             },
@@ -259,8 +225,6 @@ impl Default for Config {
             embedding: Embedding::default(),
             server: Server::default(),
             federation: Federation::default(),
-            hooks: HooksConfig::default(),
         }
     }
 }
-

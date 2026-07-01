@@ -7,7 +7,6 @@ on:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-  CARGO_TERM_COLOR: always
 
 permissions:
   contents: read
@@ -19,50 +18,23 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build-wasm:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install wasm-pack
-        run: curl -fsSL https://rustwasm.github.io/wasm-pack/installer/init.sh | sh
-
-      - name: Debug wasm-pack
-        run: |
-          which wasm-pack
-          wasm-pack --version
-          rustup target list --installed | grep wasm
-
-      - name: Build WASM
-        run: |
-          wasm-pack build --target web --out-dir web-demo/pkg -- --features wasm 2>&1
-          EXIT_CODE=$?
-          echo "wasm-pack exit code: $EXIT_CODE"
-          echo "=== pkg/ ==="
-          ls -la web-demo/pkg/ 2>/dev/null || echo "pkg/ not found"
-          echo "=== current dir ==="
-          pwd
-          ls -la
-        continue-on-error: true
-
-      - name: Prepare static site
-        run: |
-          mkdir -p _site
-          cp -r web-demo/* _site/ 2>/dev/null || true
-          echo "=== _site/ ==="
-          find _site -type f | sort
-          echo "Microscope Memory WASM Demo Loaded" > _site/health.txt
-
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v4
-
   deploy:
-    needs: build-wasm
     runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: https://silentnoisehun.github.io/microscope-memory/
     steps:
+      - uses: actions/checkout@v4
+
+      - name: Prepare static site
+        run: |
+          mkdir -p _site
+          cp -r web-demo/* _site/ 2>/dev/null || true
+          echo "Microscope Memory WASM Demo Loaded" > _site/health.txt
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v4
+
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4

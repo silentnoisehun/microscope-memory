@@ -27,14 +27,22 @@ jobs:
       - name: Install wasm-pack
         run: curl -fsSL https://rustwasm.github.io/wasm-pack/installer/init.sh | sh
 
-      - name: Add wasm target
-        run: rustup target add wasm32-unknown-unknown
+      - name: Debug wasm-pack
+        run: |
+          which wasm-pack
+          wasm-pack --version
+          rustup target list --installed | grep wasm
 
       - name: Build WASM
         run: |
           wasm-pack build --target web --out-dir web-demo/pkg -- --features wasm 2>&1
+          EXIT_CODE=$?
+          echo "wasm-pack exit code: $EXIT_CODE"
           echo "=== pkg/ ==="
           ls -la web-demo/pkg/ 2>/dev/null || echo "pkg/ not found"
+          echo "=== current dir ==="
+          pwd
+          ls -la
         continue-on-error: true
 
       - name: Prepare static site

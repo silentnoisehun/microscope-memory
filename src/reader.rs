@@ -1,6 +1,8 @@
-//! MicroscopeReader â high-performance memory-mapped reader for the binary index.
+//! MicroscopeReader Ă˘Â€Â” high-performance memory-mapped reader for the binary index.
 
+#[cfg(not(target_arch = "wasm32"))]
 use colored::Colorize;
+#[cfg(not(target_arch = "wasm32"))]
 use rayon::prelude::*;
 use std::fs;
 use std::io::{self, Write};
@@ -12,6 +14,7 @@ use crate::{
     DEPTH_ENTRY_SIZE, HEADER_SIZE, LAYER_NAMES, META_HEADER_SIZE,
 };
 
+#[cfg(windows)]
 #[cfg(windows)]
 use windows_sys::Win32::System::Memory::{MEMORY_BASIC_INFORMATION, PAGE_GUARD, PAGE_NOACCESS, VirtualQuery};
 
@@ -43,6 +46,7 @@ pub struct MetaHeader {
     pub depth_count: u32,
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub fn layer_color(id: u8) -> &'static str {
     match id {
         0 => "white",
@@ -59,9 +63,10 @@ pub fn layer_color(id: u8) -> &'static str {
     }
 }
 
-#[cfg(target_arch = "x86_64")]
+#[cfg(all(target_arch = "x86_64", not(target_arch = "wasm32")))]
 use std::arch::x86_64::*;
 
+#[cfg(not(target_arch = "wasm32"))]
 #[inline(always)]
 fn l2_dist_sq_simd(h: &BlockHeader, x: f32, y: f32, z: f32, qz: f32, zw: f32) -> f32 {
     #[cfg(target_arch = "x86_64")]
@@ -88,7 +93,8 @@ fn l2_dist_sq_simd(h: &BlockHeader, x: f32, y: f32, z: f32, qz: f32, zw: f32) ->
     }
 }
 
-/// Backing store for block data â either memory-mapped or decompressed in-memory.
+/// Backing store for block data Ă˘Â€Â” either memory-mapped or decompressed in-memory.
+#[cfg(not(target_arch = "wasm32"))]
 pub enum DataStore {
     /// Normal mmap path (uncompressed data.bin)
     Mmap(memmap2::Mmap),
@@ -97,6 +103,13 @@ pub enum DataStore {
     InMemory(Vec<u8>),
 }
 
+#[cfg(target_arch = "wasm32")]
+pub enum DataStore {
+    /// In-memory data for WASM (no mmap)
+    InMemory(Vec<u8>),
+}
+
+#[cfg(not(target_arch = "wasm32"))]
 impl std::ops::Deref for DataStore {
     type Target = [u8];
     fn deref(&self) -> &[u8] {
@@ -108,7 +121,18 @@ impl std::ops::Deref for DataStore {
     }
 }
 
+#[cfg(target_arch = "wasm32")]
+impl std::ops::Deref for DataStore {
+    type Target = [u8];
+    fn deref(&self) -> &[u8] {
+        match self {
+            DataStore::InMemory(v) => v,
+        }
+    }
+}
+
 /// High-performance memory-mapped reader for the Microscope index.
+#[cfg(not(target_arch = "wasm32"))]
 pub struct MicroscopeReader {
     pub headers: memmap2::Mmap,
     pub data: DataStore,
@@ -116,6 +140,15 @@ pub struct MicroscopeReader {
     pub depth_ranges: [(u32, u32); 9],
 }
 
+#[cfg(target_arch = "wasm32")]
+pub struct MicroscopeReader {
+    pub headers: Vec<u8>,
+    pub data: DataStore,
+    pub block_count: usize,
+    pub depth_ranges: [(u32, u32); 9],
+}
+
+#[cfg(not(target_arch = "wasm32"))]
 impl MicroscopeReader {
     pub fn open(config: &Config) -> Result<Self, String> {
         Self::open_from_path(&config.paths.output_dir)
@@ -128,7 +161,7 @@ impl MicroscopeReader {
         let dat_path = output_dir.join("data.bin");
 
         let meta = fs::read(&meta_path)
-            .map_err(|e| format!("open meta.bin â run 'build' first: {}", e))?;
+            .map_err(|e| format!("open meta.bin Ă˘Â€Â” run 'build' first: {}", e))?;
         if meta.len() < 12 {
             return Err("meta.bin too small".to_string());
         }
@@ -484,7 +517,7 @@ impl MicroscopeReader {
     }
 }
 
-// âââ APPEND LOG ââââââââââââââââââââââââââââââââââââââ
+// Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€ APPEND LOG Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€
 
 #[allow(dead_code)]
 pub struct AppendEntry {
@@ -556,6 +589,7 @@ pub fn read_append_log(path: &Path) -> Vec<AppendEntry> {
 }
 
 /// Display a single append-log result entry.
+#[cfg(not(target_arch = "wasm32"))]
 pub fn print_append_result(appended: &[AppendEntry], idx: usize, dist: f32) {
     let ai = idx - 1_000_000;
     if ai < appended.len() {
@@ -571,7 +605,7 @@ pub fn print_append_result(appended: &[AppendEntry], idx: usize, dist: f32) {
     }
 }
 
-// âââ RADIAL SEARCH TYPES âââââââââââââââââââââââââââââ
+// Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€ RADIAL SEARCH TYPES Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€
 
 /// A single result from radial search.
 #[derive(Debug, Clone)]
@@ -725,6 +759,7 @@ fn is_leap(y: u64) -> bool {
     (y.is_multiple_of(4) && !y.is_multiple_of(100)) || y.is_multiple_of(400)
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub fn store_memory(
     config: &Config,
     text: &str,
@@ -735,6 +770,7 @@ pub fn store_memory(
 }
 
 /// Variant with emotion vector.
+#[cfg(not(target_arch = "wasm32"))]
 pub fn store_memory_with_emotion(
     config: &Config,
     text: &str,
@@ -747,6 +783,7 @@ pub fn store_memory_with_emotion(
 
 /// Store memory to append log and timeline only (NOT to layer files).
 /// Used for temporary/internal thoughts that should not persist through rebuilds.
+#[cfg(not(target_arch = "wasm32"))]
 pub fn store_memory_temporary(
     config: &Config,
     text: &str,
@@ -810,6 +847,7 @@ pub fn store_memory_temporary(
 
 /// Variant of `store_memory` that also writes to the timeline log and,
 /// optionally, marks the entry as an open loop (status="open").
+#[cfg(not(target_arch = "wasm32"))]
 pub fn store_memory_with_status(
     config: &Config,
     text: &str,
@@ -862,7 +900,7 @@ pub fn store_memory_with_status(
         eprintln!("  {} persist to layer file: {}", "WARN".yellow(), e);
     }
 
-    // âââ Timeline log (always) ââââââââââââââââââââââââââââ
+    // Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€ Timeline log (always) Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€
     let output_dir = Path::new(&config.paths.output_dir);
     let timeline_status = match status.unwrap_or("normal") {
         "open" => crate::timeline::STATUS_OPEN,
@@ -882,7 +920,7 @@ pub fn store_memory_with_status(
         eprintln!("  {} append timeline: {}", "WARN".yellow(), e);
     }
 
-    // âââ Open loops (only when status=open) ââââââââââââââââ
+    // Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€ Open loops (only when status=open) Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€
     if status == Some("open") {
         match crate::open_loops::append_open(output_dir, text, importance) {
             Ok(loop_id) => {
@@ -894,7 +932,7 @@ pub fn store_memory_with_status(
         }
     }
 
-    // ─── Emotion log (when provided) ─────────────────────────
+    // â”€â”€â”€ Emotion log (when provided) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // Previously the emotion vector was accepted but never written anywhere,
     // silently dropping all 21D emotion data. Now we persist it to emotion_log.bin
     // (rebuilt into emotions.bin during `build_emotions_from_log`).
@@ -929,7 +967,7 @@ pub fn store_memory_with_status(
     Ok(())
 }
 
-// ¦¦¦ Emotion constants ¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦
+// Â¦Â¦Â¦ Emotion constants Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦
 pub const EMOTION_VECTOR_SIZE: usize = 21;
 
 /// Emotion dimension labels for the 21D emotion vector.
@@ -958,6 +996,7 @@ pub const EMOTION_DIMS: &[&str] = &[
 ];
 
 /// Cosine similarity between two 21D emotion vectors.
+#[cfg(not(target_arch = "wasm32"))]
 pub fn emotional_similarity(a: &[f32; 21], b: &[f32; 21]) -> f32 {
     let dot: f32 = a.iter().zip(b.iter()).map(|(x, y)| x * y).sum();
     let na: f32 = a.iter().map(|x| x * x).sum::<f32>().sqrt();
@@ -972,6 +1011,7 @@ type EmotionLookup = Box<dyn Fn(usize) -> Option<[f32; 21]>>;
 
 /// Load emotions.bin and return a lookup closure.
 /// emotions.bin format: flat array of [f32; 21] per block index.
+#[cfg(not(target_arch = "wasm32"))]
 pub fn load_emotion_lookup(output_dir: &Path) -> Option<EmotionLookup> {
     let path = output_dir.join("emotions.bin");
     if !path.exists() {
@@ -999,6 +1039,7 @@ pub fn load_emotion_lookup(output_dir: &Path) -> Option<EmotionLookup> {
 
 /// Write a single block's emotion vector to emotions.bin.
 /// The file is grown to fit the block index if needed.
+#[cfg(not(target_arch = "wasm32"))]
 pub fn write_emotion(path: &Path, block_idx: usize, emotion: &[f32; 21]) -> Result<(), String> {
     let entry_size = 21 * 4;
     let needed = (block_idx + 1) * entry_size;
@@ -1023,6 +1064,7 @@ pub fn write_emotion(path: &Path, block_idx: usize, emotion: &[f32; 21]) -> Resu
 
 /// Append an emotion vector to the emotion log (emotion_log.bin).
 /// Format: [u64 timestamp_ms] [f32; 21 emotion] [u32 text_len] [bytes text]
+#[cfg(not(target_arch = "wasm32"))]
 pub fn append_emotion_log(
     output_dir: &Path,
     text: &str,
@@ -1055,6 +1097,7 @@ pub fn append_emotion_log(
 
 /// Build emotions.bin from the emotion log and main index.
 /// Reads emotion_log.bin and maps each entry to the closest main-index block.
+#[cfg(not(target_arch = "wasm32"))]
 pub fn build_emotions_from_log(output_dir: &Path, reader: &MicroscopeReader) -> Result<(), String> {
     let log_path = output_dir.join("emotion_log.bin");
     if !log_path.exists() {
@@ -1114,6 +1157,7 @@ pub fn build_emotions_from_log(output_dir: &Path, reader: &MicroscopeReader) -> 
 }
 
 /// Format an emotion vector as a human-readable string.
+#[cfg(not(target_arch = "wasm32"))]
 pub fn format_emotion(emotion: &[f32; 21]) -> String {
     let mut parts: Vec<String> = Vec::new();
     for (i, label) in EMOTION_DIMS.iter().enumerate() {

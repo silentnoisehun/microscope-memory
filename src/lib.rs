@@ -4,13 +4,17 @@
 
 pub mod archetype;
 pub mod attention;
+#[cfg(not(target_arch = "wasm32"))]
 pub mod build;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod cache;
 pub mod config;
+#[cfg(not(target_arch = "wasm32"))]
 pub mod doctor;
+#[cfg(not(target_arch = "wasm32"))]
 pub mod embedding_index;
 pub mod embeddings;
+#[cfg(not(target_arch = "wasm32"))]
 pub mod emotional;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod emotional_state;
@@ -27,9 +31,11 @@ pub mod bridge;
 pub mod mcp;
 pub mod merkle;
 pub mod mirror;
+#[cfg(not(target_arch = "wasm32"))]
 pub mod query;
 pub mod reader;
 pub mod resonance;
+#[cfg(not(target_arch = "wasm32"))]
 pub mod sequential_thinking;
 pub mod snapshot;
 
@@ -37,11 +43,15 @@ pub mod snapshot;
 pub mod consciousness_seqlock;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod consciousness_stream;
+#[cfg(not(target_arch = "wasm32"))]
 pub mod daydream;
+#[cfg(not(target_arch = "wasm32"))]
 pub mod dream;
+#[cfg(not(target_arch = "wasm32"))]
 pub mod emotional_contagion;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod eureka;
+#[cfg(not(target_arch = "wasm32"))]
 #[cfg(not(target_arch = "wasm32"))]
 pub mod narrative;
 #[cfg(not(target_arch = "wasm32"))]
@@ -108,6 +118,7 @@ pub mod temporal_archetype;
 pub mod thought_graph;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod vagus;
+#[cfg(not(target_arch = "wasm32"))]
 pub mod viz;
 
 #[cfg(target_arch = "wasm32")]
@@ -120,6 +131,7 @@ pub mod python;
 #[cfg(feature = "gpu")]
 pub mod gpu;
 
+#[cfg(not(target_arch = "wasm32"))]
 pub mod cli;
 pub mod open_loops;
 pub mod timeline;
@@ -127,6 +139,7 @@ pub mod timeline;
 // Re-export commonly used items
 #[cfg(not(target_arch = "wasm32"))]
 pub use emotional_state::{emotional_prime_weight, EmotionalStateRing};
+#[cfg(not(target_arch = "wasm32"))]
 pub use reader::{
     append_emotion_log, build_emotions_from_log, emotional_similarity, format_emotion,
     load_emotion_lookup, read_append_log, store_memory, store_memory_temporary,
@@ -134,10 +147,16 @@ pub use reader::{
     ResultSet, EMOTION_DIMS, EMOTION_VECTOR_SIZE,
 };
 
+#[cfg(target_arch = "wasm32")]
+pub use reader::{
+    AppendEntry, BlockHeader, DataStore, MicroscopeReader,
+};
+
 // Re-export CLI
+#[cfg(not(target_arch = "wasm32"))]
 pub use cli::{Cli, Cmd};
 
-// ─── Shared constants ────────────────────────────────
+// Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬ Shared constants Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬
 pub const DEFAULT_CONFIG_PATH: &str = "config.toml";
 pub const BLOCK_DATA_SIZE: usize = 256;
 pub const HEADER_SIZE: usize = 32;
@@ -158,7 +177,7 @@ pub const LAYER_NAMES: &[&str] = &[
     "session",
 ];
 
-// ─── Shared utility functions ────────────────────────
+// Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬ Shared utility functions Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬
 
 pub fn layer_to_id(name: &str) -> u8 {
     LAYER_NAMES.iter().position(|&n| n == name).unwrap_or(0) as u8
@@ -273,7 +292,7 @@ pub fn to_block(text: &str) -> Vec<u8> {
     }
 }
 
-// ─── AUTO ZOOM / AUTO DEPTH ──────────────────────────
+// Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬ AUTO ZOOM / AUTO DEPTH Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬
 
 pub fn auto_zoom(query: &str) -> (u8, u8) {
     let stopwords = ["a", "the", "is", "of", "and", "to", "in", "it", "on", "for"];
@@ -337,11 +356,18 @@ mod tests {
 
 // Additional modules for main binary
 pub mod auto_context;
+#[cfg(not(target_arch = "wasm32"))]
 pub mod autonomous;
+#[cfg(not(target_arch = "wasm32"))]
 pub mod curiosity;
 pub mod emotional_21d;
+#[cfg(not(target_arch = "wasm32"))]
 pub mod inner_monologue;
+#[cfg(not(target_arch = "wasm32"))]
 pub mod mermaid;
+#[cfg(not(target_arch = "wasm32"))]
 pub mod narrative_memory;
+#[cfg(not(target_arch = "wasm32"))]
 pub mod self_model;
+#[cfg(not(target_arch = "wasm32"))]
 pub mod self_reflect;

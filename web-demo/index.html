@@ -215,11 +215,10 @@ async function loadWasm() {
   badge.className = 'status loading';
 
   // Try to load WASM from the wasm-pack build output
-  // WASM build is a work in progress - see github.com/silentnoisehun/microscope-memory
   const wasmPaths = [
+    './pkg/microscope_memory.js',
     '/microscope-memory/pkg/microscope_memory.js',
     '/pkg/microscope_memory.js',
-    './pkg/microscope_memory.js',
   ];
 
   for (const path of wasmPaths) {
@@ -230,7 +229,7 @@ async function loadWasm() {
       document.getElementById('status-left').textContent = 'WASM engine loaded';
       return true;
     } catch (e) {
-      // WASM not available at this path - try next
+      console.warn('WASM not found at:', path);
     }
   }
 

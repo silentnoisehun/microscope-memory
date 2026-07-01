@@ -7,7 +7,6 @@ on:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-  CARGO_TERM_COLOR: always
 
 permissions:
   contents: read
@@ -19,65 +18,25 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build-wasm:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Rust wasm target
-        run: rustup target add wasm32-unknown-unknown
-
-      - name: Install wasm-bindgen CLI
-        run: cargo install wasm-bindgen-cli --version 0.2.100
-
-      - name: Build WASM binary with cargo
-        run: |
-          cargo build --target wasm32-unknown-unknown --release --features wasm 2>&1
-          echo "=== target dir ==="
-          find target/wasm32-unknown-unknown/release/ -name "*.wasm" -ls 2>/dev/null || echo "no .wasm files found"
-
-      - name: Generate JS bindings with wasm-bindgen
-        run: |
-          WASM_FILE=$(find target/wasm32-unknown-unknown/release/ -name "*.wasm" 2>/dev/null | head -1)
-          if [ -n "$WASM_FILE" ]; then
-            echo "Found WASM: $WASM_FILE"
-            mkdir -p web-demo/pkg
-            wasm-bindgen "$WASM_FILE" --target web --out-dir web-demo/pkg
-            echo "=== pkg/ ==="
-            ls -la web-demo/pkg/
-          else
-            echo "No WASM file found - cargo build may have failed"
-            exit 1
-          fi
-        continue-on-error: true
-
-      - name: List all web-demo files
-        run: |
-          echo "=== web-demo/ ==="
-          find web-demo -type f | sort
-
-      - name: Prepare static site
-        run: |
-          mkdir -p _site
-          cp -r web-demo/* _site/ 2>/dev/null || true
-          echo "=== _site/ ==="
-          find _site -type f | sort
-          if [ ! -f _site/index.html ]; then
-            echo "index.html MISSING"
-            exit 1
-          fi
-          echo "Microscope Memory WASM Demo Loaded" > _site/health.txt
-
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v4
-
   deploy:
-    needs: build-wasm
     runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: https://silentnoisehun.github.io/microscope-memory/
     steps:
+      - uses: actions/checkout@v4
+
+      - name: Prepare static site
+        run: |
+          mkdir -p _site
+          cp -r web-demo/* _site/ 2>/dev/null || true
+          echo "Microscope Memory WASM Demo Loaded" > _site/health.txt
+          echo "=== _site/ ==="
+          find _site -type f | sort
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v4
+
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4

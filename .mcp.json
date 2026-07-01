@@ -1,0 +1,11 @@
+﻿{
+  "mcpServers": {
+    "microscope": {
+      "command": "D:\\codex\\microscope-memory\\target\\release\\microscope-mem.exe",
+      "args": ["mcp"],
+      "env": {
+        "MICROSCOPE_CONFIG": "D:\\codex\\microscope-memory\\config.toml"
+      }
+    }
+  }
+}

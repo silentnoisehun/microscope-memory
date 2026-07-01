@@ -24,23 +24,30 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install wasm-pack
-        run: |
-          curl -fsSL https://rustwasm.github.io/wasm-pack/installer/init.sh | sh -s -- -y
-          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
-          echo "$HOME/.wasm-pack" >> $GITHUB_PATH
-
-      - name: Add wasm target
+      - name: Install Rust wasm target
         run: rustup target add wasm32-unknown-unknown
 
-      - name: Build WASM
+      - name: Install wasm-bindgen-cli
+        run: cargo install wasm-bindgen-cli --version 0.2.100
+
+      - name: Build WASM binary
         run: |
-          export PATH="$HOME/.cargo/bin:$HOME/.wasm-pack:$PATH"
-          which wasm-pack || echo "wasm-pack not in PATH"
-          wasm-pack --version || echo "wasm-pack version check failed"
-          wasm-pack build --target web --out-dir web-demo/pkg -- --features wasm 2>&1 || echo "wasm-pack build failed"
-          echo "=== pkg/ ==="
-          ls -la web-demo/pkg/ 2>/dev/null || echo "pkg/ not found"
+          cargo build --target wasm32-unknown-unknown --release --features wasm 2>&1
+          echo "=== find wasm ==="
+          find target/ -name "*.wasm" 2>/dev/null || echo "no .wasm files"
+        continue-on-error: true
+
+      - name: Generate JS bindings
+        run: |
+          WASM=$(find target/ -name "*.wasm" 2>/dev/null | head -1)
+          if [ -n "$WASM" ]; then
+            echo "Found WASM: $WASM"
+            mkdir -p web-demo/pkg
+            wasm-bindgen "$WASM" --target web --out-dir web-demo/pkg
+            ls -la web-demo/pkg/
+          else
+            echo "No WASM file found - cargo build may have failed"
+          fi
         continue-on-error: true
 
       - name: Prepare static site

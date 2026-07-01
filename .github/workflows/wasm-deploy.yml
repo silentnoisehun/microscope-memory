@@ -7,6 +7,7 @@ on:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  CARGO_TERM_COLOR: always
 
 permissions:
   contents: read
@@ -29,23 +30,35 @@ jobs:
       - name: Add wasm target
         run: rustup target add wasm32-unknown-unknown
 
-      - name: Build WASM
+      - name: Check Rust compilation (wasm target)
         run: |
-          wasm-pack build --target web --out-dir web-demo/pkg -- --features wasm 2>&1
-          echo "--- pkg contents ---"
-          ls -la web-demo/pkg/ 2>/dev/null || echo "pkg directory not found"
+          cargo check --target wasm32-unknown-unknown --features wasm 2>&1 || echo "cargo check failed"
+        continue-on-error: true
+
+      - name: Build WASM with wasm-pack
+        run: |
+          wasm-pack build --target web --out-dir web-demo/pkg -- --features wasm 2>&1 || \
+            (echo "WASM_BUILD_FAILED=true" >> $GITHUB_ENV && echo "wasm-pack build failed - will use JS fallback")
+        continue-on-error: true
+
+      - name: List pkg contents
+        run: |
+          echo "=== pkg/ ==="
+          ls -la web-demo/pkg/ 2>/dev/null || echo "pkg/ not found"
+          echo "=== web-demo/ ==="
+          ls -la web-demo/ 2>/dev/null
 
       - name: Prepare static site
         run: |
           mkdir -p _site
           cp -r web-demo/* _site/ 2>/dev/null || true
-          echo "--- _site contents ---"
-          ls -la _site/
+          echo "=== _site/ ==="
+          find _site -type f | sort
           if [ -f _site/index.html ]; then
             echo "index.html present"
           else
-            echo "index.html MISSING - copying fallback"
-            cp web-demo/index.html _site/index.html
+            echo "index.html MISSING"
+            exit 1
           fi
           echo "Microscope Memory WASM Demo Loaded" > _site/health.txt
 

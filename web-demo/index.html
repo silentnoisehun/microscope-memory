@@ -214,25 +214,34 @@ async function loadWasm() {
   badge.textContent = 'loading WASM...';
   badge.className = 'status loading';
 
-  try {
-    // Try to load from the wasm-pack build output
-    var wasmUrl = window.location.hostname === 'silentnoisehun.github.io'
-    ? '/microscope-memory/pkg/microscope_memory.js'
-    : '/pkg/microscope_memory.js';
-    wasm = await import(wasmUrl);
-    badge.textContent = 'WASM ready';
-    badge.className = 'status ready';
-    document.getElementById('status-left').textContent = 'WASM engine loaded';
-    return true;
-  } catch (e) {
-    console.warn('WASM not available, using JS fallback:', e.message);
-    badge.textContent = 'demo mode (JS)';
-    badge.className = 'status ready';
-    document.getElementById('status-left').textContent = 'JS fallback mode (no WASM)';
-    return false;
+  // Try multiple WASM paths (GitHub Pages subdirectory + local dev)
+  const wasmPaths = [
+    '/microscope-memory/pkg/microscope_memory.js',
+    '/pkg/microscope_memory.js',
+    './pkg/microscope_memory.js',
+  ];
+
+  for (const path of wasmPaths) {
+    try {
+      wasm = await import(path);
+      badge.textContent = 'WASM runtime active';
+      badge.className = 'status ready';
+      document.getElementById('status-left').textContent = 'WASM engine loaded';
+      return true;
+    } catch (e) {
+      console.warn('WASM not found at:', path, e.message);
+    }
   }
+
+  // WASM not available - use JS fallback
+  console.warn('WASM not available on any path, using JS fallback');
+  badge.textContent = 'JS fallback active';
+  badge.className = 'status ready';
+  document.getElementById('status-left').textContent = 'JS fallback mode (WASM build in progress)';
+  return false;
 }
 
+// ── Demo data
 // ── Demo data (embedded JS fallback) ──────────────────────────────────────
 const demoBlocks = [
   { text: 'Microscope Memory is a Rust-native, binary, hierarchical cognitive memory engine.', layer: 'identity', depth: 0, importance: 10 },

@@ -1,4 +1,4 @@
-use serde::{Deserialize, Serialize};
+﻿use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
 
@@ -16,6 +16,8 @@ pub struct Config {
     pub server: Server,
     #[serde(default)]
     pub federation: Federation,
+    #[serde(default)]
+    pub hooks: HooksConfig,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -160,26 +162,53 @@ fn default_weight() -> f32 {
     1.0
 }
 
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct HooksConfig {
+    #[serde(default = "default_hooks_enabled")]
+    pub enabled: bool,
+    #[serde(default = "default_hooks_read_only")]
+    pub read_only: bool,
+    #[serde(default = "default_hooks_write_enabled")]
+    pub write_enabled: bool,
+    #[serde(default = "default_hooks_min_importance")]
+    pub min_importance: u8,
+}
+
+fn default_hooks_enabled() -> bool { true }
+fn default_hooks_read_only() -> bool { true }
+fn default_hooks_write_enabled() -> bool { false }
+fn default_hooks_min_importance() -> u8 { 3 }
+
+impl Default for HooksConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            read_only: true,
+            write_enabled: false,
+            min_importance: 3,
+        }
+    }
+}
+
 impl Config {
-    /// Zero-JSON/Zero-TOML loader: reads config.bin via mmap or returns Default.
+
+    /// Loads config from a TOML file.
     pub fn load<P: AsRef<Path>>(path: P) -> Result<Self, Box<dyn std::error::Error>> {
         if !path.as_ref().exists() {
             return Ok(Self::default());
         }
 
-        let file = fs::File::open(path)?;
-        // Safety: config.bin is read-only and mapped for the duration of this call
-        let mmap = unsafe { memmap2::Mmap::map(&file)? };
-
-        let config: Config = bincode::deserialize(&mmap)?;
+        let content = fs::read_to_string(path)?;
+        let config: Config = toml::from_str(&content)?;
         Ok(config)
     }
 
-    /// Saves the current config to a binary mmap-ready format.
+    /// Saves the current config to a TOML file.
     pub fn save<P: AsRef<Path>>(&self, path: P) -> Result<(), Box<dyn std::error::Error>> {
-        let bytes = bincode::serialize(self)?;
-        let tmp_path = path.as_ref().with_extension("bin.tmp");
-        fs::write(&tmp_path, &bytes)?;
+        let content = toml::to_string_pretty(self)?;
+        let tmp_path = path.as_ref().with_extension("toml.tmp");
+        fs::write(&tmp_path, &content)?;
         fs::rename(&tmp_path, path.as_ref())?;
         Ok(())
     }
@@ -230,6 +259,8 @@ impl Default for Config {
             embedding: Embedding::default(),
             server: Server::default(),
             federation: Federation::default(),
+            hooks: HooksConfig::default(),
         }
     }
 }
+

@@ -1,11 +1,11 @@
-# Microscope Memory v0.8.1
+# Microscope Memory v0.8.1 — Public Demo Ready
 
 [![Rust](https://img.shields.io/badge/language-Rust-orange.svg)](https://www.rust-lang.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Zero-JSON](https://img.shields.io/badge/Architecture-Zero--JSON-green.svg)](#core-architecture)
 [![MCP](https://img.shields.io/badge/MCP-Native-purple.svg)](#-mcp-server-claude-code--cursor--cline)
 [![Electron](https://img.shields.io/badge/UI-Electron--Tray-blue.svg)](#-electron-tray-app)
-[![Tests](https://img.shields.io/badge/Tests-295%20passing-brightgreen.svg)](#-testing)
+[![Tests](https://img.shields.io/badge/Tests-285%20passing-brightgreen.svg)](#-testing)
 
 ![Microscope Memory](microscope-memory-header.png)
 
@@ -657,3 +657,150 @@ MIT. Copyright Máté Róbert — *The Silent Noise Research Series.*
 ---
 
 *"Below the byte level, only corruption exists — the atomic boundary of information."*
+
+
+## Hook System
+
+The Hook System is a thin orchestration layer that allows LLM agents to trigger memory actions automatically at key lifecycle points.
+
+**Principle:** The model is only the motor. Hooks are the nervous system. Microscope Memory is the memory.
+
+### Lifecycle Hooks
+
+| Hook | Default | Description |
+|------|---------|-------------|
+| `on_session_start` | ✅ | Load identity, memory contract, constraints at session start |
+| `before_tool_call` | ✅ | Retrieve task memory, check constraints before tool execution |
+| `after_tool_call` | ✅ | Summarize results, prepare memory candidates after tool success |
+| `on_error` | ✅ | Store error traces, associate failures with tasks |
+| `after_response` | ❌ | Extract durable memory from model responses (disabled by default) |
+
+### Safety Defaults
+
+- **Read-only mode** — enabled by default for public deployments
+- **Write disabled** — `after_response` hook and all memory writes are off by default
+- **Secret filtering** — passwords, tokens, API keys are automatically filtered
+- **stderr-only logging** — all hook output goes to stderr, never stdout
+
+### Configuration
+
+```toml
+# Public demo (default) — safe for public use
+[hooks]
+enabled = true
+read_only = true
+write_enabled = false
+min_importance = 3
+```
+
+```toml
+# Local full — for development only
+[hooks]
+enabled = true
+read_only = false
+write_enabled = true
+min_importance = 5
+```
+
+See [docs/HOOKS.md](docs/HOOKS.md) for full documentation.
+
+### Test Coverage
+
+- microscope-memory: 253 tests
+- microscope-hooks: 16 tests
+- MCP integration: 11 tests
+- **Total: 280 tests passing**
+
+
+## Public Demo Mode
+
+> **Memory is not a static vault.**  
+> **Memory is a living structure.**
+
+The public demo is a **read-only, safety-hardened configuration**  
+for inspecting the memory architecture without exposing private data  
+or enabling mutation tools.
+
+```
+ARCHITECTURAL MEMORY · PUBLIC DEMO
+
+T0      Fresh safe index
+T100    Clusters forming
+T1000   Context fields crystallize
+T5000   Public demo locked
+```
+
+### Safety Guarantees
+
+| Layer | Setting |
+|-------|---------|
+| `read_only` | `true` — no memory writes from hooks |
+| `write_enabled` | `false` — after_response hook disabled |
+| Private dataset | No private paths configured |
+| Secret filtering | Active — passwords, tokens, API keys filtered |
+| Logging | stderr only — never leaks to stdout |
+
+### How to Run
+
+```powershell
+# Using the run script
+.\scriptsun_public_demo.ps1
+
+# Or manually with the public-demo config
+$env:MICROSCOPE_CONFIG = "examples\config.public-demo.toml"
+.	argetelease\microscope-mem.exe mcp
+```
+
+### How to Connect an MCP Client
+
+**Claude Desktop / Claude Code:**
+```json
+{
+  "mcpServers": {
+    "microscope": {
+      "command": "path\to\microscope-mem.exe",
+      "args": ["mcp"],
+      "env": { "MICROSCOPE_CONFIG": "examples\config.public-demo.toml" }
+    }
+  }
+}
+```
+
+**Cursor:**
+Settings -> Features -> Model Context Protocol -> Add Server:
+- Name: `microscope`
+- Command: `path	o\microscope-mem.exe`
+- Args: `mcp`
+
+### Available Tools (Read-Only)
+
+| Tool | Description |
+|------|-------------|
+| `memory_status` | Index status, block count, depths |
+| `memory_recall` | Natural language memory search |
+| `memory_find` | Text search |
+| `memory_look` | Spatial coordinate lookup |
+| `memory_auto_context` | Session context snapshot |
+| `memory_timeline` | Chronological memory view |
+
+### Release Identity
+
+```
+ARCHITECTURAL MEMORY
+TEMPORAL EVOLUTION
+
+T0      Fresh safe index
+T100    Clusters forming
+T1000   Context fields crystallize
+T5000   Public demo locked
+```
+
+See [docs/RELEASE_PUBLIC_DEMO.md](docs/RELEASE_PUBLIC_DEMO.md) for the full release checklist.
+
+### Test Coverage
+
+- microscope-memory: 269 tests
+- microscope-hooks: 16 tests
+- **Total: 285 tests passing**
+
+

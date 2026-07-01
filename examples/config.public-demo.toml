@@ -1,0 +1,8 @@
+# Public Demo Configuration
+# Safe for public use - no writes, read-only mode
+
+[hooks]
+enabled = true
+read_only = true
+write_enabled = false
+min_importance = 3

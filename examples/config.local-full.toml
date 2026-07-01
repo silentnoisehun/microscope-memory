@@ -1,0 +1,8 @@
+# Local Full Configuration
+# For development use only - writes enabled, requires confirmation
+
+[hooks]
+enabled = true
+read_only = false
+write_enabled = true
+min_importance = 5

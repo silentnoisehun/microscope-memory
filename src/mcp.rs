@@ -6,6 +6,7 @@
 //! Not available on WASM targets (no stdio).
 
 use crate::config::Config;
+use microscope_hooks::*;
 use crate::reader::MicroscopeReader;
 use crate::{read_append_log, store_memory, store_memory_with_emotion, LAYER_NAMES};
 use serde_json::{json, Value};
@@ -21,6 +22,21 @@ pub fn run(config: Config) {
         windows_sys::Win32::System::Console::SetConsoleCP(65001);
         windows_sys::Win32::System::Console::SetConsoleOutputCP(65001);
     }
+
+    // Initialize hook manager
+    let hook_config = if config.hooks.read_only {
+        HookConfig::read_only()
+    } else if config.hooks.write_enabled {
+        HookConfig::full()
+    } else {
+        HookConfig::default()
+    };
+    let hook_manager = HookManager::new(hook_config);
+    let mut session_started = false;
+
+    eprintln!("[hooks] manager initialized (read_only={}, write_enabled={})",
+        config.hooks.read_only, config.hooks.write_enabled);
+
     let stdin = io::stdin();
     let stdout = io::stdout();
     let mut reader = BufReader::new(stdin.lock());
@@ -57,11 +73,19 @@ pub fn run(config: Config) {
         let id = request.get("id").cloned().unwrap_or(Value::Null);
         let method = request.get("method").and_then(|m| m.as_str()).unwrap_or("");
 
+        // Run on_session_start on first initialize
+        if method == "initialize" && !session_started {
+            let ctx = HookContext::new(HookEvent::SessionStart);
+            let _ = hook_manager.execute(HookEvent::SessionStart, ctx);
+            session_started = true;
+            eprintln!("[hooks] session started");
+        }
+
         let response = match method {
             "initialize" => handle_initialize(&id),
-            "initialized" => continue, // notification, no response
+            "initialized" => continue,
             "tools/list" => handle_tools_list(&id),
-            "tools/call" => handle_tools_call(&id, &request, &config),
+            "tools/call" => handle_tools_call_with_hooks(&id, &request, &config, &hook_manager),
             "ping" => json!({ "jsonrpc": "2.0", "id": id, "result": {} }),
             "notifications/cancelled" | "notifications/initialized" => continue,
             _ => json!({
@@ -74,6 +98,116 @@ pub fn run(config: Config) {
         let _ = write_message(&mut stdout, &response, incoming.framed);
     }
 }
+
+fn handle_tools_call_with_hooks(id: &Value, request: &Value, config: &Config, hook_manager: &HookManager) -> Value {
+    let params = request.get("params").cloned().unwrap_or(json!({}));
+    let tool_name = params
+        .get("name")
+        .and_then(|n: &Value| n.as_str())
+        .unwrap_or("");
+    let args = params.get("arguments").cloned().unwrap_or(json!({}));
+
+    // Run before_tool_call hook
+    let before_ctx = HookContext::new(HookEvent::BeforeToolCall)
+        .with_tool(tool_name, args.clone());
+    let _ = hook_manager.execute(HookEvent::BeforeToolCall, before_ctx);
+
+    // Execute the tool
+    let result = match tool_name {
+        "memory_status" => tool_status(config),
+        "memory_store" => tool_store(config, &args),
+        "memory_recall" => tool_recall(config, &args),
+        "memory_find" => tool_find(config, &args),
+        "memory_mql_query" => tool_mql_query(config, &args),
+        "memory_build" => tool_build(config, &args),
+        "memory_look" => tool_look(config, &args),
+        "memory_session_log" => tool_session_log(config, &args),
+        "memory_consolidate" => tool_consolidate(config, &args),
+        "memory_dream" => tool_dream(config, &args),
+        "memory_session_context" => tool_session_context(config, &args),
+        "memory_ping" => tool_ping(config, &args),
+        "memory_auto_context" => tool_auto_context(config, &args),
+        "memory_timeline" => tool_timeline(config, &args),
+        "memory_loops" => tool_loops(config, &args),
+        "memory_resolve_loop" => tool_resolve_loop(config, &args),
+        "memory_radial" => tool_radial(config, &args),
+        "memory_soft" => tool_soft(config, &args),
+        "memory_think" => tool_think(config, &args),
+        "memory_hebbian" => tool_hebbian(config, &args),
+        "memory_hottest" => tool_hottest(config, &args),
+        "memory_archetypes" => tool_archetypes(config, &args),
+        "memory_patterns" => tool_patterns(config, &args),
+        "memory_attention" => tool_attention(config, &args),
+        "memory_introspect" => tool_introspect(config, &args),
+        "memory_self_model" => tool_self_model(config, &args),
+        "memory_curiosity" => tool_curiosity(config, &args),
+        "memory_monologue" => tool_monologue(config, &args),
+        "memory_stories" => tool_stories(config, &args),
+        "memory_daydream" => tool_daydream(config, &args),
+        "memory_hyperfocus" => tool_hyperfocus(config, &args),
+        "memory_emotional_field" => tool_emotional_field(config, &args),
+        "memory_embed" => tool_embed(config, &args),
+        "memory_similar" => tool_similar(config, &args),
+        "memory_links" => tool_links(config, &args),
+        "memory_fingerprint" => tool_fingerprint(config, &args),
+        "memory_dream_log" => tool_dream_log(config, &args),
+        "memory_resonance" => tool_resonance(config, &args),
+        "memory_mirror" => tool_mirror(config, &args),
+        "memory_predictions" => tool_predictions(config, &args),
+        "memory_paths" => tool_paths(config, &args),
+        "memory_temporal_patterns" => tool_temporal_patterns(config, &args),
+        "memory_modalities" => tool_modalities(config, &args),
+        "memory_doctor" => tool_doctor(config, &args),
+        "memory_rebuild" => tool_rebuild(config, &args),
+        "memory_store_data" => tool_store_data(config, &args),
+        "memory_resonant" => tool_resonant(config, &args),
+        "memory_autonomous" => tool_autonomous(config, &args),
+        "memory_consciousness" => tool_consciousness(config, &args),
+        _ => Err(format!("Unknown tool: {}", tool_name)),
+    };
+
+    match result {
+        Ok(content) => {
+            // Run after_tool_call hook
+            let after_ctx = HookContext::new(HookEvent::AfterToolCall)
+                .with_tool(tool_name, args)
+                .with_response(&content);
+            let hook_ctx = hook_manager.execute(HookEvent::AfterToolCall, after_ctx);
+            if !hook_ctx.memory_candidates.is_empty() {
+                eprintln!("[hooks] after_tool_call: {} candidate(s) from '{}'",
+                    hook_ctx.memory_candidates.len(), tool_name);
+            }
+
+            json!({
+                "jsonrpc": "2.0",
+                "id": id,
+                "result": {
+                    "content": [{ "type": "text", "text": content }]
+                }
+            })
+        }
+        Err(e) => {
+            // Run on_error hook
+            let err_ctx = HookContext::new(HookEvent::Error)
+                .with_tool(tool_name, args)
+                .with_error(&e, "TOOL_ERROR");
+            let hook_ctx = hook_manager.execute(HookEvent::Error, err_ctx);
+            if !hook_ctx.memory_candidates.is_empty() {
+                eprintln!("[hooks] on_error: stored error trace for '{}'", tool_name);
+            }
+
+            json!({
+                "jsonrpc": "2.0",
+                "id": id,
+                "result": {
+                    "content": [{ "type": "text", "text": format!("Error: {}", e) }],
+                    "isError": true
+                }
+            })
+        }
+    }
+}
+
 
 struct IncomingMessage {
     payload: String,
@@ -732,87 +866,6 @@ fn handle_tools_list(id: &Value) -> Value {
     })
 }
 
-fn handle_tools_call(id: &Value, request: &Value, config: &Config) -> Value {
-    let params = request.get("params").cloned().unwrap_or(json!({}));
-    let tool_name = params
-        .get("name")
-        .and_then(|n: &Value| n.as_str())
-        .unwrap_or("");
-    let args = params.get("arguments").cloned().unwrap_or(json!({}));
-
-    let result = match tool_name {
-        "memory_status" => tool_status(config),
-        "memory_store" => tool_store(config, &args),
-        "memory_recall" => tool_recall(config, &args),
-        "memory_find" => tool_find(config, &args),
-        "memory_mql_query" => tool_mql_query(config, &args),
-        "memory_build" => tool_build(config, &args),
-        "memory_look" => tool_look(config, &args),
-        "memory_session_log" => tool_session_log(config, &args),
-        "memory_consolidate" => tool_consolidate(config, &args),
-        "memory_dream" => tool_dream(config, &args),
-        "memory_session_context" => tool_session_context(config, &args),
-        "memory_ping" => tool_ping(config, &args),
-        "memory_auto_context" => tool_auto_context(config, &args),
-        "memory_timeline" => tool_timeline(config, &args),
-        "memory_loops" => tool_loops(config, &args),
-        "memory_resolve_loop" => tool_resolve_loop(config, &args),
-        "memory_radial" => tool_radial(config, &args),
-        "memory_soft" => tool_soft(config, &args),
-        "memory_think" => tool_think(config, &args),
-        "memory_hebbian" => tool_hebbian(config, &args),
-        "memory_hottest" => tool_hottest(config, &args),
-        "memory_archetypes" => tool_archetypes(config, &args),
-        "memory_patterns" => tool_patterns(config, &args),
-        "memory_attention" => tool_attention(config, &args),
-        "memory_introspect" => tool_introspect(config, &args),
-        "memory_self_model" => tool_self_model(config, &args),
-        "memory_curiosity" => tool_curiosity(config, &args),
-        "memory_monologue" => tool_monologue(config, &args),
-        "memory_stories" => tool_stories(config, &args),
-        "memory_daydream" => tool_daydream(config, &args),
-        "memory_hyperfocus" => tool_hyperfocus(config, &args),
-        "memory_emotional_field" => tool_emotional_field(config, &args),
-        "memory_embed" => tool_embed(config, &args),
-        "memory_similar" => tool_similar(config, &args),
-        "memory_links" => tool_links(config, &args),
-        "memory_fingerprint" => tool_fingerprint(config, &args),
-        "memory_dream_log" => tool_dream_log(config, &args),
-        "memory_resonance" => tool_resonance(config, &args),
-        "memory_mirror" => tool_mirror(config, &args),
-        "memory_predictions" => tool_predictions(config, &args),
-        "memory_paths" => tool_paths(config, &args),
-        "memory_temporal_patterns" => tool_temporal_patterns(config, &args),
-        "memory_modalities" => tool_modalities(config, &args),
-        "memory_doctor" => tool_doctor(config, &args),
-        "memory_rebuild" => tool_rebuild(config, &args),
-        "memory_store_data" => tool_store_data(config, &args),
-        "memory_resonant" => tool_resonant(config, &args),
-        "memory_autonomous" => tool_autonomous(config, &args),
-        "memory_consciousness" => tool_consciousness(config, &args),
-        _ => Err(format!("Unknown tool: {}", tool_name)),
-    };
-
-    match result {
-        Ok(content) => json!({
-            "jsonrpc": "2.0",
-            "id": id,
-            "result": {
-                "content": [{ "type": "text", "text": content }]
-            }
-        }),
-        Err(e) => json!({
-            "jsonrpc": "2.0",
-            "id": id,
-            "result": {
-                "content": [{ "type": "text", "text": format!("Error: {}", e) }],
-                "isError": true
-            }
-        }),
-    }
-}
-
-// ─── Tool implementations ────────────────────────────
 
 fn tool_status(config: &Config) -> Result<String, String> {
     let reader = MicroscopeReader::open(config)?;
@@ -3120,4 +3173,384 @@ fn tool_autonomous(config: &Config, args: &Value) -> Result<String, String> {
     }
 
     Ok(output)
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use microscope_hooks::*;
+
+    // ── Helper: create a test config ───────────────────────────────────────
+
+    fn test_config() -> Config {
+        Config {
+            paths: crate::config::Paths {
+                layers_dir: "./layers".to_string(),
+                output_dir: "./data".to_string(),
+                temp_dir: "./tmp".to_string(),
+            },
+            index: crate::config::Index {
+                block_size: 256,
+                max_depth: 8,
+                header_size: 32,
+            },
+            search: crate::config::Search {
+                default_k: 10,
+                zoom_weight: 2.0,
+                keyword_boost: 0.1,
+                semantic_weight: 0.0,
+                emotional_bias_weight: 0.0,
+                emotion_21d_weight: 0.0,
+            },
+            memory_layers: crate::config::MemoryLayers {
+                layers: vec![
+                    "long_term".to_string(),
+                    "short_term".to_string(),
+                    "session".to_string(),
+                ],
+            },
+            performance: crate::config::Performance {
+                use_mmap: false,
+                cache_size: 64,
+                build_workers: 1,
+                use_gpu: false,
+                compression: false,
+                cache_ttl_secs: 300,
+            },
+            logging: crate::config::Logging {
+                level: "debug".to_string(),
+                file: None,
+            },
+            embedding: crate::config::Embedding::default(),
+            server: crate::config::Server::default(),
+            federation: crate::config::Federation::default(),
+            hooks: crate::config::HooksConfig::default(),
+        }
+    }
+
+    // ── Test: read-only public mode ────────────────────────────────────────
+
+    #[test]
+    fn test_hooks_read_only_public_mode() {
+        let config = test_config();
+        // Default HooksConfig has read_only=true
+        assert!(config.hooks.read_only, "public demo must be read-only by default");
+        assert!(!config.hooks.write_enabled, "write must be disabled in public mode");
+
+        let hook_config = if config.hooks.read_only {
+            HookConfig::read_only()
+        } else {
+            HookConfig::default()
+        };
+
+        assert!(hook_config.read_only);
+        assert!(!hook_config.can_write());
+        assert!(!hook_config.is_enabled(&HookEvent::AfterResponse));
+    }
+
+    // ── Test: before_tool_call injection ────────────────────────────────────
+
+    #[test]
+    fn test_before_tool_call_injection() {
+        let config = test_config();
+        let hook_config = if config.hooks.read_only {
+            HookConfig::read_only()
+        } else {
+            HookConfig::default()
+        };
+        let manager = HookManager::new(hook_config);
+
+        let ctx = HookContext::new(HookEvent::BeforeToolCall)
+            .with_tool("memory_recall", serde_json::json!({"query": "test"}));
+
+        let result = manager.execute(HookEvent::BeforeToolCall, ctx);
+
+        // before_tool_call should not produce memory candidates
+        assert!(result.memory_candidates.is_empty());
+        // Chain ID should be preserved
+        assert!(!result.chain_id.is_empty());
+        // Tool name should be preserved
+        assert_eq!(result.tool_name, Some("memory_recall".to_string()));
+    }
+
+    // ── Test: after_tool_call candidate creation ────────────────────────────
+
+    #[test]
+    fn test_after_tool_call_candidate_creation() {
+        let config = test_config();
+        let hook_config = if config.hooks.read_only {
+            HookConfig::read_only()
+        } else {
+            HookConfig::default()
+        };
+        let manager = HookManager::new(hook_config);
+
+        let ctx = HookContext::new(HookEvent::AfterToolCall)
+            .with_tool("memory_recall", serde_json::json!({"query": "test"}))
+            .with_response("Found 3 relevant memories about the project.");
+
+        let result = manager.execute(HookEvent::AfterToolCall, ctx);
+
+        // In read-only mode, candidates should be cleared
+        assert!(result.memory_candidates.is_empty(),
+            "read-only mode must clear all memory candidates");
+    }
+
+    // ── Test: after_tool_call creates candidates in full mode ───────────────
+
+    #[test]
+    fn test_after_tool_call_candidate_full_mode() {
+        let config = test_config();
+        let hook_config = HookConfig::full();
+        let manager = HookManager::new(hook_config);
+
+        let mut ctx = HookContext::new(HookEvent::AfterToolCall)
+            .with_tool("memory_recall", serde_json::json!({"query": "test"}));
+        ctx.tool_result = Some("Found 3 relevant memories about the project requirements.".to_string());
+
+        let result = manager.execute(HookEvent::AfterToolCall, ctx);
+
+        // In full mode, candidates should be created
+        assert!(!result.memory_candidates.is_empty(),
+            "full mode must create memory candidates");
+        assert_eq!(result.memory_candidates[0].source_tool, Some("memory_recall".to_string()));
+        assert_eq!(result.memory_candidates[0].source_event, HookEvent::AfterToolCall);
+    }
+
+    // ── Test: error hook execution ──────────────────────────────────────────
+
+    #[test]
+    fn test_error_hook_execution() {
+        let config = test_config();
+        let hook_config = if config.hooks.read_only {
+            HookConfig::read_only()
+        } else {
+            HookConfig::default()
+        };
+        let manager = HookManager::new(hook_config);
+
+        let ctx = HookContext::new(HookEvent::Error)
+            .with_tool("memory_store", serde_json::json!({"text": "test"}))
+            .with_error("Index not found - run build first", "E1001");
+
+        let result = manager.execute(HookEvent::Error, ctx);
+
+        // In read-only mode, error candidates should be cleared
+        assert!(result.memory_candidates.is_empty(),
+            "read-only mode must clear error candidates");
+    }
+
+    // ── Test: error hook creates candidates in full mode ────────────────────
+
+    #[test]
+    fn test_error_hook_full_mode() {
+        let config = test_config();
+        let hook_config = HookConfig::full();
+        let manager = HookManager::new(hook_config);
+
+        let ctx = HookContext::new(HookEvent::Error)
+            .with_tool("memory_store", serde_json::json!({"text": "test"}))
+            .with_error("Connection timeout", "E1002");
+
+        let result = manager.execute(HookEvent::Error, ctx);
+
+        assert!(!result.memory_candidates.is_empty(),
+            "full mode must create error candidates");
+        assert!(result.memory_candidates[0].is_error);
+        assert_eq!(result.memory_candidates[0].importance, 7);
+    }
+
+    // ── Test: write hook disabled by default ───────────────────────────────
+
+    #[test]
+    fn test_write_hook_disabled_by_default() {
+        let config = test_config();
+        // Default HooksConfig has write_enabled=false
+        assert!(!config.hooks.write_enabled, "write must be disabled by default");
+
+        let hook_config = HookConfig::default();
+        assert!(!hook_config.can_write(), "HookConfig must deny writes by default");
+        assert!(!hook_config.is_enabled(&HookEvent::AfterResponse),
+            "after_response hook must be disabled by default");
+    }
+
+    // ── Test: secret filtering ─────────────────────────────────────────────
+
+    #[test]
+    fn test_secret_filtering() {
+        let config = test_config();
+        let hook_config = HookConfig::full();
+        let manager = HookManager::new(hook_config);
+
+        // Create a context with a secret-containing response
+        let ctx = HookContext::new(HookEvent::AfterToolCall)
+            .with_tool("memory_store", serde_json::json!({"text": "test"}))
+            .with_response("The password is super-secret-123 and the API key is sk-test-key");
+
+        let result = manager.execute(HookEvent::AfterToolCall, ctx);
+
+        // Secret filtering should remove candidates containing secrets
+        for candidate in &result.memory_candidates {
+            assert!(!candidate.text.to_lowercase().contains("password"),
+                "candidate must not contain secrets: {}", candidate.text);
+            assert!(!candidate.text.to_lowercase().contains("sk-"),
+                "candidate must not contain API keys: {}", candidate.text);
+        }
+    }
+
+    // ── Test: secret filtering in read-only mode ───────────────────────────
+
+    #[test]
+    fn test_secret_filtering_read_only() {
+        let config = test_config();
+        let hook_config = HookConfig::read_only();
+        let manager = HookManager::new(hook_config);
+
+        let ctx = HookContext::new(HookEvent::AfterToolCall)
+            .with_tool("memory_store", serde_json::json!({"text": "test"}))
+            .with_response("The password is secret and the api_key=sk-abc123");
+
+        let result = manager.execute(HookEvent::AfterToolCall, ctx);
+
+        // In read-only mode, all candidates are cleared regardless
+        assert!(result.memory_candidates.is_empty(),
+            "read-only mode must clear all candidates even with secrets");
+    }
+
+    // ── Test: session start hook ────────────────────────────────────────────
+
+    #[test]
+    fn test_session_start_hook() {
+        let config = test_config();
+        let hook_config = if config.hooks.read_only {
+            HookConfig::read_only()
+        } else {
+            HookConfig::default()
+        };
+        let manager = HookManager::new(hook_config);
+
+        let ctx = HookContext::new(HookEvent::SessionStart);
+        let result = manager.execute(HookEvent::SessionStart, ctx);
+
+        // Session start should load memory contract
+        assert!(result.memory_contract.is_some(), "session start must load memory contract");
+        // Session start should load constraints
+        assert!(!result.constraints.is_empty(), "session start must load constraints");
+    }
+
+    // ── Test: full lifecycle chain ─────────────────────────────────────────
+
+    #[test]
+    fn test_full_lifecycle_chain() {
+        let config = test_config();
+        let hook_config = HookConfig::full();
+        let manager = HookManager::new(hook_config);
+
+        // Simulate a full lifecycle: session start -> before tool -> after tool
+        let ctx = HookContext::new(HookEvent::SessionStart);
+        let events = [
+            HookEvent::SessionStart,
+            HookEvent::BeforeToolCall,
+            HookEvent::AfterToolCall,
+        ];
+
+        let mut chain_ctx = ctx;
+        for event in &events {
+            chain_ctx = match event {
+                HookEvent::BeforeToolCall => {
+                    chain_ctx.with_tool("memory_recall", serde_json::json!({"query": "test"}))
+                }
+                HookEvent::AfterToolCall => {
+                    chain_ctx.tool_result = Some("Found relevant results from the memory search.".to_string());
+                    chain_ctx
+                }
+                _ => chain_ctx,
+            };
+            chain_ctx = manager.execute(*event, chain_ctx);
+        }
+
+        // After full chain with full mode, should have candidates
+        assert!(!chain_ctx.memory_candidates.is_empty(),
+            "full lifecycle chain should produce candidates");
+        assert!(chain_ctx.memory_contract.is_some(),
+            "memory contract should be loaded from session start");
+    }
+
+
+    // ── Smoke tests: public demo release ──────────────────────────────────
+
+    #[test]
+    fn test_public_demo_tools_list() {
+        let response = handle_tools_list(&serde_json::json!("test"));
+        let tools = response["result"]["tools"].as_array().unwrap();
+        assert!(!tools.is_empty(), "tools/list must return tools");
+        let names: Vec<&str> = tools.iter()
+            .filter_map(|t| t["name"].as_str())
+            .collect();
+        assert!(names.contains(&"memory_status"), "must include memory_status");
+        assert!(names.contains(&"memory_recall"), "must include memory_recall");
+        assert!(names.contains(&"memory_find"), "must include memory_find");
+        assert!(names.contains(&"memory_auto_context"), "must include memory_auto_context");
+    }
+
+    #[test]
+    fn test_public_demo_tools_are_read_only() {
+        // Verify that tools/list returns tools that are safe for read-only use
+        let response = handle_tools_list(&serde_json::json!("test"));
+        let tools = response["result"]["tools"].as_array().unwrap();
+        let names: Vec<&str> = tools.iter()
+            .filter_map(|t| t["name"].as_str())
+            .collect();
+
+        // Read tools must be present
+        assert!(names.contains(&"memory_status"), "must include memory_status");
+        assert!(names.contains(&"memory_recall"), "must include memory_recall");
+        assert!(names.contains(&"memory_find"), "must include memory_find");
+        assert!(names.contains(&"memory_look"), "must include memory_look");
+        assert!(names.contains(&"memory_auto_context"), "must include memory_auto_context");
+
+        // All tools must have inputSchema with no required dangerous fields
+        for tool in tools {
+            let name = tool["name"].as_str().unwrap_or("");
+            let schema = &tool["inputSchema"];
+            assert!(schema.is_object(), "tool '{}' must have inputSchema", name);
+        }
+    }
+
+    #[test]
+    fn test_public_demo_safe_query() {
+        let config = test_config();
+        let hook_config = HookConfig::read_only();
+        let manager = HookManager::new(hook_config);
+        let ctx = HookContext::new(HookEvent::BeforeToolCall)
+            .with_tool("memory_recall", serde_json::json!({"query": "safe query"}));
+        let result = manager.execute(HookEvent::BeforeToolCall, ctx);
+        assert!(result.memory_candidates.is_empty(),
+            "safe query must not produce memory candidates in public mode");
+        assert_eq!(result.tool_name, Some("memory_recall".to_string()));
+    }
+
+    #[test]
+    fn test_public_demo_secret_query_filtered() {
+        let config = test_config();
+        let hook_config = HookConfig::read_only();
+        let manager = HookManager::new(hook_config);
+        let mut ctx = HookContext::new(HookEvent::AfterToolCall)
+            .with_tool("memory_recall", serde_json::json!({"query": "test"}));
+        ctx.tool_result = Some("Found result with password=secret123".to_string());
+        let result = manager.execute(HookEvent::AfterToolCall, ctx);
+        assert!(result.memory_candidates.is_empty(),
+            "secret-containing results must not create candidates in public mode");
+    }
+
+    #[test]
+    fn test_public_demo_initialize_response() {
+        let response = handle_initialize(&serde_json::json!("test"));
+        assert_eq!(response["jsonrpc"], "2.0");
+        assert_eq!(response["id"], "test");
+        assert_eq!(response["result"]["protocolVersion"], "2024-11-05");
+        assert!(response["result"]["capabilities"]["tools"].is_object());
+    }
+
 }

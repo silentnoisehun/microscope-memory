@@ -799,6 +799,10 @@ T5000   Public demo locked
 
 See [docs/RELEASE_PUBLIC_DEMO.md](docs/RELEASE_PUBLIC_DEMO.md) for the full release checklist.
 
+### Whitepaper
+
+Download the [HOPE-Architect style whitepaper](docs/microscope-memory-public-demo-whitepaper.pdf) — a formatted PDF overview of the public demo release.
+
 ### Test Coverage
 
 - microscope-memory: 269 tests

@@ -709,7 +709,7 @@ See [docs/HOOKS.md](docs/HOOKS.md) for full documentation.
 - microscope-memory: 253 tests
 - microscope-hooks: 16 tests
 - MCP integration: 11 tests
-- **Total: 280 tests passing**
+- **Total: 285 tests passing**
 
 
 ## Public Demo Mode
@@ -744,11 +744,13 @@ T5000   Public demo locked
 
 ```powershell
 # Using the run script
-.\scriptsun_public_demo.ps1
+.\scripts
+un_public_demo.ps1
 
 # Or manually with the public-demo config
 $env:MICROSCOPE_CONFIG = "examples\config.public-demo.toml"
-.	argetelease\microscope-mem.exe mcp
+.	arget
+elease\microscope-mem.exe mcp
 ```
 
 ### How to Connect an MCP Client

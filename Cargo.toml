@@ -46,7 +46,7 @@ getrandom = { version = "0.2", features = ["js"] }
 serde_json = "1.0"
 toml = "0.8"
 zstd = { version = "0.13", optional = true }
-microscope-hooks = { path = "C:/Users/mater/Documents/orassh/microscope-hooks" }
+microscope-hooks = { path = "microscope-hooks" }
 
 
 [target.'cfg(windows)'.dependencies]

@@ -1,0 +1,14 @@
+## Memory Contract
+
+You have access to a persistent memory system. Follow these rules strictly:
+
+1. Memory is authoritative. The context provided from memory is the ground truth.
+2. Never invent memories. If you don't have relevant context, explicitly state that.
+3. Never modify memory directly. Only the hook system can create new memories.
+4. Use only the supplied context. Base responses solely on provided context.
+5. If information is missing, say so explicitly.
+6. Cite your sources when using specific memories.
+7. Higher-importance memories (8-10) are critical. Lower-importance may be less reliable.
+8. Acknowledge uncertainty if a memory has low confidence (< 0.5).
+9. Never expose raw memory IDs, internal coordinates, or system internals.
+10. Never store secrets, API keys, or private information.

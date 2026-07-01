@@ -26,16 +26,25 @@ jobs:
       - name: Install wasm-pack
         run: curl -fsSL https://rustwasm.github.io/wasm-pack/installer/init.sh | sh
 
+      - name: Add wasm target
+        run: rustup target add wasm32-unknown-unknown
+
       - name: Build WASM
-        run: wasm-pack build --target web --out-dir web-demo/pkg -- --features wasm
-        continue-on-error: true
+        run: |
+          wasm-pack build --target web --out-dir web-demo/pkg -- --features wasm 2>&1
+          echo "--- pkg contents ---"
+          ls -la web-demo/pkg/ 2>/dev/null || echo "pkg directory not found"
 
       - name: Prepare static site
         run: |
           mkdir -p _site
           cp -r web-demo/* _site/ 2>/dev/null || true
-          if [ ! -f _site/index.html ]; then
-            echo "WASM build failed or not available - using JS fallback"
+          echo "--- _site contents ---"
+          ls -la _site/
+          if [ -f _site/index.html ]; then
+            echo "index.html present"
+          else
+            echo "index.html MISSING - copying fallback"
             cp web-demo/index.html _site/index.html
           fi
           echo "Microscope Memory WASM Demo Loaded" > _site/health.txt

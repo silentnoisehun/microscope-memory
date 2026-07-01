@@ -1,11 +1,18 @@
-# Microscope Memory v0.8.1 — Public Demo Ready
+# Microscope Memory
+
+[![Open in Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/silentnoisehun/microscope-memory?quickstart=1)
+[![Web Demo](https://img.shields.io/badge/Try-Web%20Demo-blueviolet.svg)](https://silentnoisehun.github.io/microscope-memory/)
+[![Whitepaper](https://img.shields.io/badge/Read-Whitepaper-2C2C2C.svg)](docs/microscope-memory-public-demo-whitepaper.pdf)
+[![MCP](https://img.shields.io/badge/Run-MCP%20Server-purple.svg)](#public-demo-mode)
 
 [![Rust](https://img.shields.io/badge/language-Rust-orange.svg)](https://www.rust-lang.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Zero-JSON](https://img.shields.io/badge/Architecture-Zero--JSON-green.svg)](#core-architecture)
-[![MCP](https://img.shields.io/badge/MCP-Native-purple.svg)](#-mcp-server-claude-code--cursor--cline)
-[![Electron](https://img.shields.io/badge/UI-Electron--Tray-blue.svg)](#-electron-tray-app)
 [![Tests](https://img.shields.io/badge/Tests-285%20passing-brightgreen.svg)](#-testing)
+
+**Microscope Memory** is a Rust-native binary memory engine for AI agents.
+
+> The model is only the motor.  
+> Memory is the system.
 
 ![Microscope Memory](microscope-memory-header.png)
 

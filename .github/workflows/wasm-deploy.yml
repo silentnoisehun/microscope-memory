@@ -5,6 +5,9 @@ on:
     branches: [master]
   workflow_dispatch:
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 permissions:
   contents: read
   pages: write
@@ -31,16 +34,14 @@ jobs:
         run: |
           mkdir -p _site
           cp -r web-demo/* _site/ 2>/dev/null || true
-          # Ensure index.html exists at root
           if [ ! -f _site/index.html ]; then
             echo "WASM build failed or not available - using JS fallback"
             cp web-demo/index.html _site/index.html
           fi
-          # Add health marker
           echo "Microscope Memory WASM Demo Loaded" > _site/health.txt
 
       - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v4
 
   deploy:
     needs: build-wasm

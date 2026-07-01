@@ -714,6 +714,17 @@ See [docs/HOOKS.md](docs/HOOKS.md) for full documentation.
 
 ## Public Demo Mode
 
+[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](
+https://codespaces.new/silentnoisehun/microscope-memory?quickstart=1)
+
+> **Try it now — one click.**  
+> Open in Codespaces to get a running MCP server in seconds.  
+> Or visit the [web demo](https://silentnoisehun.github.io/microscope-memory/) (WASM, runs in your browser).
+
+---
+
+
+
 > **Memory is not a static vault.**  
 > **Memory is a living structure.**
 

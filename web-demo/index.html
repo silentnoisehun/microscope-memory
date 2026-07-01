@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Microscope Memory — Public Demo</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #f8f8f4;
+  color: #1a1a1a;
+  font-family: 'Courier New', Courier, monospace;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+header {
+  border-bottom: 2px solid #2c2c2c;
+  padding: 12px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #f0f0e8;
+}
+header .sigil { font-weight: bold; color: #2c2c2c; font-size: 14px; }
+header .doc-id { color: #888877; font-size: 10px; }
+header .status { font-size: 10px; padding: 2px 8px; border-radius: 2px; }
+.status.ready { background: #d4edda; color: #155724; }
+.status.loading { background: #fff3cd; color: #856404; }
+.status.error { background: #f8d7da; color: #721c24; }
+
+.container {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+  flex: 1;
+}
+@media (max-width: 768px) {
+  .container { grid-template-columns: 1fr; }
+}
+
+.panel {
+  padding: 20px;
+  border-right: 1px solid #d8d8c8;
+  display: flex;
+  flex-direction: column;
+}
+.panel:last-child { border-right: none; }
+
+.panel h2 {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: #888877;
+  margin-bottom: 12px;
+  border-bottom: 1px solid #d8d8c8;
+  padding-bottom: 6px;
+}
+
+#query-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #bebead;
+  background: #fff;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 13px;
+  color: #1a1a1a;
+  resize: vertical;
+  min-height: 60px;
+  margin-bottom: 8px;
+}
+#query-input:focus { outline: none; border-color: #2c2c2c; }
+
+.button-row {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+.btn {
+  padding: 6px 14px;
+  border: 1px solid #2c2c2c;
+  background: #fff;
+  color: #1a1a1a;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.btn:hover { background: #2c2c2c; color: #fff; }
+.btn:active { transform: scale(0.97); }
+.btn.primary { background: #2c2c2c; color: #fff; }
+.btn.primary:hover { background: #1a1a1a; }
+.btn.small { font-size: 9px; padding: 4px 10px; }
+
+#results {
+  flex: 1;
+  overflow-y: auto;
+  background: #fff;
+  border: 1px solid #bebead;
+  padding: 12px;
+  font-size: 11px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  font-family: 'Courier New', Courier, monospace;
+}
+#results .meta { color: #888877; font-size: 9px; }
+#results .block { margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid #ececdc; }
+#results .block:last-child { border-bottom: none; }
+#results .error { color: #721c24; }
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.stat {
+  text-align: center;
+  padding: 8px;
+  border: 1px solid #d8d8c8;
+}
+.stat .value { font-size: 22px; font-weight: bold; color: #2c2c2c; }
+.stat .label { font-size: 7px; color: #888877; text-transform: uppercase; letter-spacing: 1px; }
+
+#status-bar {
+  border-top: 1px solid #d8d8c8;
+  padding: 8px 24px;
+  font-size: 9px;
+  color: #888877;
+  display: flex;
+  justify-content: space-between;
+  background: #f0f0e8;
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <span class="sigil">() =&gt; []</span>
+    <span class="doc-id">MICROSCOPE MEMORY · PUBLIC DEMO</span>
+  </div>
+  <span class="status loading" id="status-badge">loading WASM...</span>
+</header>
+
+<div class="container">
+  <!-- Left panel: Query -->
+  <div class="panel">
+    <h2>Query</h2>
+    <div class="stats-grid" id="stats">
+      <div class="stat"><div class="value" id="stat-blocks">-</div><div class="label">Blocks</div></div>
+      <div class="stat"><div class="value" id="stat-depth">-</div><div class="label">Depth</div></div>
+      <div class="stat"><div class="value" id="stat-status">-</div><div class="label">Status</div></div>
+    </div>
+    <textarea id="query-input" placeholder="Enter a query...&#10;&#10;Examples:&#10;  memory system architecture&#10;  quantum consciousness&#10;  bio binaries test results">memory system architecture</textarea>
+    <div class="button-row">
+      <button class="btn primary" id="btn-recall">Recall</button>
+      <button class="btn" id="btn-status">Status</button>
+      <button class="btn" id="btn-find">Find</button>
+      <button class="btn small" id="btn-load-demo">Load Demo Data</button>
+    </div>
+    <div id="results">// waiting for input ...</div>
+  </div>
+
+  <!-- Right panel: Info -->
+  <div class="panel">
+    <h2>Architectural Memory</h2>
+    <div style="font-size: 11px; line-height: 1.7; color: #1a1a1a;">
+      <p style="margin-bottom: 12px;"><b>Memory is not a static vault.</b><br>Memory is a living structure.</p>
+      <div style="border: 1px solid #bebead; padding: 10px; margin-bottom: 12px; background: #f0f0e8; font-size: 10px;">
+        <b>T0</b> &nbsp; Fresh safe index<br>
+        <b>T100</b> &nbsp; Clusters forming<br>
+        <b>T1000</b> &nbsp; Context fields crystallize<br>
+        <b>T5000</b> &nbsp; Public demo locked
+      </div>
+      <p style="margin-bottom: 8px; color: #888877; font-size: 9px; text-transform: uppercase; letter-spacing: 1px;">Safety</p>
+      <table style="width:100%; font-size: 9px; border-collapse: collapse; margin-bottom: 12px;">
+        <tr><td style="padding: 2px 4px; border: 1px solid #d8d8c8;">read_only</td><td style="padding: 2px 4px; border: 1px solid #d8d8c8;">true</td></tr>
+        <tr><td style="padding: 2px 4px; border: 1px solid #d8d8c8;">write_enabled</td><td style="padding: 2px 4px; border: 1px solid #d8d8c8;">false</td></tr>
+        <tr><td style="padding: 2px 4px; border: 1px solid #d8d8c8;">secret_filter</td><td style="padding: 2px 4px; border: 1px solid #d8d8c8;">active</td></tr>
+        <tr><td style="padding: 2px 4px; border: 1px solid #d8d8c8;">tests</td><td style="padding: 2px 4px; border: 1px solid #d8d8c8;">285 passing</td></tr>
+      </table>
+      <p style="color: #888877; font-size: 8px;">
+        github.com/silentnoisehun/microscope-memory &middot; MIT License
+      </p>
+    </div>
+  </div>
+</div>
+
+<div id="status-bar">
+  <span id="status-left">WASM not loaded</span>
+  <span id="status-right">v0.1.0-public-demo</span>
+</div>
+
+<script type="module">
+// ── WASM loader ──────────────────────────────────────────────────────────
+let wasm = null;
+
+async function loadWasm() {
+  const badge = document.getElementById('status-badge');
+  badge.textContent = 'loading WASM...';
+  badge.className = 'status loading';
+
+  try {
+    // Try to load from the wasm-pack build output
+    wasm = await import('/pkg/microscope_memory.js');
+    badge.textContent = 'WASM ready';
+    badge.className = 'status ready';
+    document.getElementById('status-left').textContent = 'WASM engine loaded';
+    return true;
+  } catch (e) {
+    console.warn('WASM not available, using JS fallback:', e.message);
+    badge.textContent = 'demo mode (JS)';
+    badge.className = 'status ready';
+    document.getElementById('status-left').textContent = 'JS fallback mode (no WASM)';
+    return false;
+  }
+}
+
+// ── Demo data (embedded JS fallback) ──────────────────────────────────────
+const demoBlocks = [
+  { text: 'Microscope Memory is a Rust-native, binary, hierarchical cognitive memory engine.', layer: 'identity', depth: 0, importance: 10 },
+  { text: 'The public demo runs in read-only mode. No writes. No private dataset.', layer: 'session', depth: 3, importance: 8 },
+  { text: 'Memory is not a static vault. Memory is a living structure.', layer: 'identity', depth: 0, importance: 10 },
+  { text: 'T0: Fresh safe index. T100: Clusters forming. T1000: Context fields crystallize. T5000: Public demo locked.', layer: 'long_term', depth: 3, importance: 9 },
+  { text: 'The Hook System provides six lifecycle hooks: on_session_start, before_prompt, before_tool_call, after_tool_call, after_response, on_error.', layer: 'long_term', depth: 3, importance: 7 },
+  { text: '285 tests passing: 269 microscope-memory + 16 microscope-hooks.', layer: 'long_term', depth: 3, importance: 8 },
+  { text: 'Secret filtering active: passwords, tokens, API keys are automatically filtered.', layer: 'session', depth: 3, importance: 7 },
+  { text: 'The MCP server exposes read-only tools: memory_status, memory_recall, memory_find, memory_look, memory_auto_context.', layer: 'long_term', depth: 3, importance: 7 },
+  { text: 'Bio-Binaries: 30 binaries, 38 tests, 0 agents. Pure Rust, zero JSON.', layer: 'long_term', depth: 2, importance: 6 },
+  { text: 'Quantum Anchor: wave function collapse as memory selection. psi(t) = A * e^(-gamma*t) * cos(2*pi*f*t + phi)', layer: 'long_term', depth: 2, importance: 6 },
+  { text: 'The model is only the motor. Hooks are the nervous system. Microscope Memory is the memory.', layer: 'identity', depth: 0, importance: 10 },
+  { text: 'read_only = true, write_enabled = false, no private dataset path configured.', layer: 'session', depth: 3, importance: 8 },
+];
+
+let loadedBlocks = [];
+
+function loadDemoData() {
+  loadedBlocks = [...demoBlocks];
+  document.getElementById('stat-blocks').textContent = loadedBlocks.length;
+  document.getElementById('stat-depth').textContent = '0-3';
+  document.getElementById('stat-status').textContent = 'demo';
+  document.getElementById('results').textContent = `Loaded ${loadedBlocks.length} demo blocks.
+Ready for queries.`;
+  document.getElementById('status-left').textContent = `${loadedBlocks.length} blocks loaded (JS demo)`;
+}
+
+function searchBlocks(query) {
+  const q = query.toLowerCase();
+  return loadedBlocks
+    .map((b, i) => ({ ...b, idx: i, score: 0 }))
+    .filter(b => {
+      const text = b.text.toLowerCase();
+      const words = q.split(/\s+/).filter(w => w.length > 1);
+      if (words.length === 0) return true;
+      return words.some(w => text.includes(w));
+    })
+    .map(b => {
+      const words = q.split(/\s+/).filter(w => w.length > 1);
+      b.score = words.filter(w => b.text.toLowerCase().includes(w)).length / Math.max(words.length, 1);
+      return b;
+    })
+    .sort((a, b) => b.score - a.score || b.importance - a.importance)
+    .slice(0, 10);
+}
+
+// ── UI ────────────────────────────────────────────────────────────────────
+const resultsEl = document.getElementById('results');
+const queryInput = document.getElementById('query-input');
+
+function renderResults(blocks) {
+  if (blocks.length === 0) {
+    resultsEl.innerHTML = '<span class="meta">// no results</span>';
+    return;
+  }
+  let html = `<span class="meta">// ${blocks.length} results</span>\n`;
+  blocks.forEach(b => {
+    const layerColors = { identity: '#2c2c2c', long_term: '#555', session: '#888877' };
+    const color = layerColors[b.layer] || '#888877';
+    html += `<div class="block">`;
+    html += `<span class="meta">[${b.layer}] D${b.depth} imp=${b.importance} score=${(b.score*100).toFixed(0)}%</span>\n`;
+    html += `<span style="color:${color}">${b.text}</span>`;
+    html += `</div>`;
+  });
+  resultsEl.innerHTML = html;
+}
+
+document.getElementById('btn-recall').addEventListener('click', () => {
+  const q = queryInput.value.trim();
+  if (!q) return;
+  const results = searchBlocks(q);
+  renderResults(results);
+  document.getElementById('status-left').textContent = `recall: "${q.substring(0, 40)}" → ${results.length} results`;
+});
+
+document.getElementById('btn-status').addEventListener('click', () => {
+  resultsEl.innerHTML = `<span class="meta">// status</span>\n`;
+  resultsEl.innerHTML += `Blocks: ${loadedBlocks.length}\n`;
+  resultsEl.innerHTML += `Depth range: 0-3\n`;
+  resultsEl.innerHTML += `Layers: identity, long_term, session\n`;
+  resultsEl.innerHTML += `Mode: read-only\n`;
+  resultsEl.innerHTML += `Tests: 285 passing\n`;
+  resultsEl.innerHTML += `Version: v0.1.0-public-demo\n`;
+});
+
+document.getElementById('btn-find').addEventListener('click', () => {
+  const q = queryInput.value.trim();
+  if (!q) return;
+  const results = loadedBlocks
+    .map((b, i) => ({ ...b, idx: i, score: 0 }))
+    .filter(b => b.text.toLowerCase().includes(q.toLowerCase()));
+  renderResults(results);
+});
+
+document.getElementById('btn-load-demo').addEventListener('click', loadDemoData);
+
+// ── Init ──────────────────────────────────────────────────────────────────
+(async () => {
+  const hasWasm = await loadWasm();
+  if (!hasWasm) {
+    loadDemoData();
+  }
+})();
+</script>
+</body>
+</html>

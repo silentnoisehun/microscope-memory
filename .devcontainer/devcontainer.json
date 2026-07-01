@@ -1,0 +1,18 @@
+{
+    "name": "Microscope Memory — Public Demo",
+    "image": "mcr.microsoft.com/devcontainers/rust:1-1-bookworm",
+    "features": {
+        "ghcr.io/devcontainers/features/node:1": {}
+    },
+    "postCreateCommand": "cargo build --release && echo 'Build complete. Run: ./scripts/run_public_demo.ps1'",
+    "postStartCommand": "echo 'Microscope Memory public demo ready. Use MCP client to connect.'",
+    "forwardPorts": [],
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "rust-lang.rust-analyzer",
+                "vadimcn.vscode-lldb"
+            ]
+        }
+    }
+}

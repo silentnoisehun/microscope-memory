@@ -24,29 +24,37 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install wasm-pack
-        run: curl -fsSL https://rustwasm.github.io/wasm-pack/installer/init.sh | sh
-
-      - name: Add wasm target
+      - name: Install Rust wasm target
         run: rustup target add wasm32-unknown-unknown
 
-      - name: Check Rust compilation (wasm target)
+      - name: Install wasm-bindgen CLI
+        run: cargo install wasm-bindgen-cli --version 0.2.100
+
+      - name: Build WASM binary with cargo
         run: |
-          cargo check --target wasm32-unknown-unknown --features wasm 2>&1 || echo "cargo check failed"
+          cargo build --target wasm32-unknown-unknown --release --features wasm 2>&1
+          echo "=== target dir ==="
+          find target/wasm32-unknown-unknown/release/ -name "*.wasm" -ls 2>/dev/null || echo "no .wasm files found"
+
+      - name: Generate JS bindings with wasm-bindgen
+        run: |
+          WASM_FILE=$(find target/wasm32-unknown-unknown/release/ -name "*.wasm" 2>/dev/null | head -1)
+          if [ -n "$WASM_FILE" ]; then
+            echo "Found WASM: $WASM_FILE"
+            mkdir -p web-demo/pkg
+            wasm-bindgen "$WASM_FILE" --target web --out-dir web-demo/pkg
+            echo "=== pkg/ ==="
+            ls -la web-demo/pkg/
+          else
+            echo "No WASM file found - cargo build may have failed"
+            exit 1
+          fi
         continue-on-error: true
 
-      - name: Build WASM with wasm-pack
+      - name: List all web-demo files
         run: |
-          wasm-pack build --target web --out-dir web-demo/pkg -- --features wasm 2>&1 || \
-            (echo "WASM_BUILD_FAILED=true" >> $GITHUB_ENV && echo "wasm-pack build failed - will use JS fallback")
-        continue-on-error: true
-
-      - name: List pkg contents
-        run: |
-          echo "=== pkg/ ==="
-          ls -la web-demo/pkg/ 2>/dev/null || echo "pkg/ not found"
           echo "=== web-demo/ ==="
-          ls -la web-demo/ 2>/dev/null
+          find web-demo -type f | sort
 
       - name: Prepare static site
         run: |
@@ -54,9 +62,7 @@ jobs:
           cp -r web-demo/* _site/ 2>/dev/null || true
           echo "=== _site/ ==="
           find _site -type f | sort
-          if [ -f _site/index.html ]; then
-            echo "index.html present"
-          else
+          if [ ! -f _site/index.html ]; then
             echo "index.html MISSING"
             exit 1
           fi

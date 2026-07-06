@@ -195,8 +195,8 @@ impl Default for Config {
             },
             search: Search {
                 default_k: 10,
-                zoom_weight: 2.0,
-                keyword_boost: 0.1,
+                zoom_weight: 3.0,   // boost recent memories more
+                keyword_boost: 0.4,   // tuned for better recall precision
                 semantic_weight: 0.0,
                 emotional_bias_weight: 0.0,
                 emotion_21d_weight: 0.0,

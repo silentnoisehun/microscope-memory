@@ -149,12 +149,18 @@ pub fn soft_look(config: &Config, x: f32, y: f32, z: f32, zoom: u8, k: usize, us
 pub fn find_text(config: &Config, query: &str, k: usize) {
     let r = crate::open_reader(config);
     println!("{} '{}':", "FIND".cyan().bold(), query);
-    let res = r.find_text(query, k);
+    let append_path = Path::new(&config.paths.output_dir).join("append.bin");
+    let appended = read_append_log(&append_path);
+    let res = r.find_text_all(config, query, k);
     if res.is_empty() {
         println!("  (none)");
     }
-    for (_d, i) in res {
-        r.print_result(i, 0.0);
+    for (_d, i, is_main) in res {
+        if is_main {
+            r.print_result(i, 0.0);
+        } else {
+            print_append_result(&appended, i, 0.0);
+        }
     }
 }
 

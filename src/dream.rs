@@ -450,7 +450,7 @@ pub fn forget_old_thoughts(output_dir: &Path, _block_count: usize) -> Result<u32
     if meta.len() >= 8 {
         new_meta.extend_from_slice(&meta[..8]);
     } else {
-        new_meta.extend_from_slice(b"MSC3   ");
+        new_meta.extend_from_slice(b"MSC4   ");
     }
     // Write new block count (u32 at offset 8)
     new_meta.extend_from_slice(&(n as u32).to_le_bytes());

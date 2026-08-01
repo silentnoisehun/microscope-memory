@@ -19,6 +19,9 @@ const INDEX_FILES: &[&str] = &[
     "merkle.bin",
     "append.bin",
     "embeddings.bin",
+    "fingerprints.idx",
+    "links.bin",
+    "emotions.bin",
 ];
 
 /// Export all index files from output_dir into a single .mscope archive.

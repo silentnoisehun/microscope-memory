@@ -1,0 +1,86 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Microscope Memory WASM Demo</title>
+    <style>
+        body { font-family: system-ui, sans-serif; max-width: 800px; margin: 2rem auto; padding: 0 1rem; }
+        pre { background: #f5f5f5; padding: 1rem; border-radius: 6px; overflow-x: auto; }
+        button { padding: 0.5rem 1rem; cursor: pointer; }
+        input, select { padding: 0.4rem; }
+    </style>
+</head>
+<body>
+    <h1>🧠 Microscope Memory — WASM Demo</h1>
+
+    <h2>1. Store memories</h2>
+    <input id="textInput" type="text" size="40" placeholder="Type a memory..." value="Hello from WASM!">
+    <button id="storeBtn">Store</button>
+
+    <h2>2. Search</h2>
+    <input id="queryInput" type="text" size="40" placeholder="Search..." value="hello">
+    <button id="recallBtn">Recall</button>
+
+    <h2>3. Export / Load</h2>
+    <button id="exportBtn">Export APv2</button>
+    <input id="fileInput" type="file" accept=".bin">
+
+    <h2>Log</h2>
+    <pre id="log">Init...</pre>
+
+    <script type="module">
+        import init, { MicroscopeWasm } from './pkg/microscope_memory.js';
+
+        const log = document.getElementById('log');
+        const storeBtn = document.getElementById('storeBtn');
+        const recallBtn = document.getElementById('recallBtn');
+        const exportBtn = document.getElementById('exportBtn');
+        let memory;
+
+        async function main() {
+            await init();
+            memory = new MicroscopeWasm();
+            log.textContent += '\n✓ MicroscopeWasm instantiated';
+            log.textContent += '\nBlocks: ' + memory.block_count();
+        }
+
+        storeBtn.onclick = () => {
+            const text = document.getElementById('textInput').value;
+            memory.store(text, 'session', 5);
+            log.textContent += '\n📝 Stored: "' + text + '" (session, imp=5)';
+            log.textContent += '\n   Blocks: ' + memory.block_count();
+        };
+
+        recallBtn.onclick = () => {
+            const query = document.getElementById('queryInput').value;
+            const results = memory.recall(query, 5);
+            log.textContent += '\n🔍 Recall("' + query + '", k=5): ' + results.length + ' hits';
+            for (const r of results) {
+                log.textContent += '\n   - [' + r.layer + '] ' + r.text + ' (dist=' + r.distance.toFixed(4) + ')';
+            }
+        };
+
+        exportBtn.onclick = () => {
+            const blob = new Blob([memory.export_append()], { type: 'application/octet-stream' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = 'microscope_append.bin';
+            a.click();
+            URL.revokeObjectURL(url);
+            log.textContent += '\n💬 Exported (' + memory.export_append().length + ' bytes)';
+        };
+
+        document.getElementById('fileInput').onchange = async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const buf = await file.arrayBuffer();
+            memory.load_append(new Uint8Array(buf));
+            log.textContent += '\n📂 Loaded: ' + file.name + ' (' + buf.byteLength + ' bytes)';
+            log.textContent += '\n   Blocks: ' + memory.block_count();
+        };
+
+        main().catch(err => log.textContent += '\n❌ Error: ' + err);
+    </script>
+</body>
+</html>

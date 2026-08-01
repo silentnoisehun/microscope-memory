@@ -21,6 +21,15 @@ max_depth = 8
 # Header size in bytes
 header_size = 32
 
+# Automatically consolidate the hot append log into the main index.
+auto_rebuild = true
+
+# Trigger consolidation after this many pending entries.
+auto_rebuild_entries = 250
+
+# Maximum source entries per layer. Zero preserves the complete history.
+layer_retention_entries = 0
+
 [search]
 # Default number of results
 default_k = 10

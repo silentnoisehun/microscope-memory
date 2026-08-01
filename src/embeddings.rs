@@ -187,6 +187,240 @@ impl EmbeddingProvider for MockEmbeddingProvider {
     }
 }
 
+// ─── Python subprocess embedding provider ────────────
+/// Real embedding provider backed by the bundled `embed.py` subprocess
+/// (sentence-transformers / MiniLM). Wire protocol (see embed.py):
+/// the script writes a u32 LE dimension header on stdout, then for every
+/// line it reads on stdin it writes `dim * f32 LE` bytes on stdout.
+///
+/// The child is spawned once and kept alive; reads are bounded by a timeout
+/// so a hung model can never block the host process forever.
+#[cfg(not(target_arch = "wasm32"))]
+pub struct PythonEmbeddingProvider {
+    child: std::sync::Mutex<std::process::Child>,
+    stdin: std::sync::Mutex<std::process::ChildStdin>,
+    rx: std::sync::Mutex<std::sync::mpsc::Receiver<Result<Vec<u8>, String>>>,
+    dim: usize,
+    timeout: std::time::Duration,
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+impl PythonEmbeddingProvider {
+    /// Spawn `embed.py` with the given HuggingFace model id and read the
+    /// dimension header. Python binary, script path and timeout can be
+    /// overridden via MICROSCOPE_PYTHON, MICROSCOPE_EMBED_SCRIPT and
+    /// MICROSCOPE_EMBED_TIMEOUT_MS respectively.
+    pub fn new(model: &str) -> Result<Self, EmbeddingError> {
+        let python = std::env::var("MICROSCOPE_PYTHON").unwrap_or_else(|_| "python".to_string());
+        let script = std::env::var("MICROSCOPE_EMBED_SCRIPT").unwrap_or_else(|_| {
+            let manifest = format!("{}/embed.py", env!("CARGO_MANIFEST_DIR"));
+            if std::path::Path::new(&manifest).exists() {
+                manifest
+            } else {
+                std::env::var("MICROSCOPE_HOME")
+                    .map(|h| format!("{}/embed.py", h))
+                    .unwrap_or_else(|_| "embed.py".to_string())
+            }
+        });
+        let timeout_ms = std::env::var("MICROSCOPE_EMBED_TIMEOUT_MS")
+            .ok()
+            .and_then(|v| v.parse::<u64>().ok())
+            .unwrap_or(120_000);
+
+        let mut child = std::process::Command::new(&python)
+            .arg(&script)
+            .arg(model)
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::null())
+            .spawn()
+            .map_err(|e| {
+                EmbeddingError::ApiError(format!("spawn {} {}: {}", python, script, e))
+            })?;
+        let stdin = child
+            .stdin
+            .take()
+            .ok_or_else(|| EmbeddingError::ApiError("embedding stdin unavailable".into()))?;
+        let mut stdout = child
+            .stdout
+            .take()
+            .ok_or_else(|| EmbeddingError::ApiError("embedding stdout unavailable".into()))?;
+
+        // Persistent reader thread: header first, then one vector per line.
+        let (tx, rx) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            use std::io::Read;
+            let mut header = [0u8; 4];
+            let dim = match stdout.read_exact(&mut header) {
+                Ok(()) => u32::from_le_bytes(header) as usize,
+                Err(e) => {
+                    let _ = tx.send(Err(format!("read dim header: {}", e)));
+                    return;
+                }
+            };
+            let _ = tx.send(Ok(header.to_vec()));
+            let mut buf = vec![0u8; dim * 4];
+            loop {
+                match stdout.read_exact(&mut buf) {
+                    Ok(()) => {
+                        if tx.send(Ok(buf.clone())).is_err() {
+                            break;
+                        }
+                    }
+                    Err(e) => {
+                        let _ = tx.send(Err(format!("read embedding: {}", e)));
+                        break;
+                    }
+                }
+            }
+        });
+
+        let timeout = std::time::Duration::from_millis(timeout_ms);
+        let header_msg = rx
+            .recv_timeout(timeout)
+            .map_err(|_| {
+                let _ = child.kill();
+                EmbeddingError::ApiError(format!(
+                    "embedding model '{}' did not initialize within {} ms",
+                    model, timeout_ms
+                ))
+            })?
+            .map_err(EmbeddingError::ApiError)?;
+        let dim = u32::from_le_bytes(header_msg[0..4].try_into().unwrap()) as usize;
+
+        Ok(Self {
+            child: std::sync::Mutex::new(child),
+            stdin: std::sync::Mutex::new(stdin),
+            rx: std::sync::Mutex::new(rx),
+            dim,
+            timeout,
+        })
+    }
+
+    fn read_vector(&self) -> Result<Vec<f32>, EmbeddingError> {
+        let rx = self
+            .rx
+            .lock()
+            .map_err(|_| EmbeddingError::ApiError("embedding receiver lock poisoned".into()))?;
+        match rx.recv_timeout(self.timeout) {
+            Ok(Ok(bytes)) => {
+                let mut v = Vec::with_capacity(bytes.len() / 4);
+                for chunk in bytes.chunks_exact(4) {
+                    v.push(f32::from_le_bytes(chunk.try_into().unwrap()));
+                }
+                Ok(v)
+            }
+            Ok(Err(e)) => Err(EmbeddingError::ApiError(e)),
+            Err(_) => {
+                let mut child = self
+                    .child
+                    .lock()
+                    .map_err(|_| EmbeddingError::ApiError("embedding child lock poisoned".into()))?;
+                let _ = child.kill();
+                Err(EmbeddingError::ApiError(format!(
+                    "embedding provider timed out after {} ms",
+                    self.timeout.as_millis()
+                )))
+            }
+        }
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+impl Drop for PythonEmbeddingProvider {
+    fn drop(&mut self) {
+        if let Ok(mut child) = self.child.lock() {
+            let _ = child.kill();
+            let _ = child.wait();
+        }
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+impl EmbeddingProvider for PythonEmbeddingProvider {
+    fn embed(&self, text: &str) -> Result<Vec<f32>, EmbeddingError> {
+        use std::io::Write;
+        let mut stdin = self
+            .stdin
+            .lock()
+            .map_err(|_| EmbeddingError::ApiError("embedding stdin lock poisoned".into()))?;
+        writeln!(stdin, "{}", text)
+            .map_err(|e| EmbeddingError::ApiError(format!("write stdin: {}", e)))?;
+        stdin
+            .flush()
+            .map_err(|e| EmbeddingError::ApiError(format!("flush stdin: {}", e)))?;
+        drop(stdin);
+        self.read_vector()
+    }
+
+    fn embed_batch(&self, texts: &[String]) -> Result<Vec<Vec<f32>>, EmbeddingError> {
+        use std::io::Write;
+        let mut stdin = self
+            .stdin
+            .lock()
+            .map_err(|_| EmbeddingError::ApiError("embedding stdin lock poisoned".into()))?;
+        for t in texts {
+            writeln!(stdin, "{}", t)
+                .map_err(|e| EmbeddingError::ApiError(format!("write stdin: {}", e)))?;
+        }
+        stdin
+            .flush()
+            .map_err(|e| EmbeddingError::ApiError(format!("flush stdin: {}", e)))?;
+        drop(stdin);
+        let mut out = Vec::with_capacity(texts.len());
+        for _ in texts {
+            out.push(self.read_vector()?);
+        }
+        Ok(out)
+    }
+
+    fn dimension(&self) -> usize {
+        self.dim
+    }
+}
+
+/// Build the embedding provider requested by config with an honest fallback:
+/// a configured provider that cannot be initialized is reported on stderr
+/// instead of silently degrading to the mock. The mock is returned for
+/// "mock"/"none" (and as a last resort), with `idx_dim` as its dimension.
+pub fn provider_from_config(
+    cfg: &crate::config::Embedding,
+    idx_dim: usize,
+) -> Box<dyn EmbeddingProvider> {
+    match cfg.provider.as_str() {
+        #[cfg(not(target_arch = "wasm32"))]
+        "python" => match PythonEmbeddingProvider::new(&cfg.model) {
+            Ok(p) => Box::new(p),
+            Err(e) => {
+                eprintln!("  WARN: python embedding provider unavailable: {} — using mock", e);
+                Box::new(MockEmbeddingProvider::new(idx_dim))
+            }
+        },
+        "candle" => {
+            #[cfg(feature = "embeddings")]
+            {
+                match CandleEmbeddingProvider::new(&cfg.model) {
+                    Ok(p) => Box::new(p),
+                    Err(e) => {
+                        eprintln!("  WARN: candle init failed: {:?} — using mock", e);
+                        Box::new(MockEmbeddingProvider::new(idx_dim))
+                    }
+                }
+            }
+            #[cfg(not(feature = "embeddings"))]
+            {
+                eprintln!("  WARN: candle provider requires the 'embeddings' feature — using mock");
+                Box::new(MockEmbeddingProvider::new(idx_dim))
+            }
+        }
+        "none" | "mock" => Box::new(MockEmbeddingProvider::new(idx_dim)),
+        other => {
+            eprintln!("  WARN: unknown embedding provider '{}' — using mock", other);
+            Box::new(MockEmbeddingProvider::new(idx_dim))
+        }
+    }
+}
+
 /// Embedding-enhanced block header
 #[repr(C, packed)]
 pub struct EmbeddedBlockHeader {

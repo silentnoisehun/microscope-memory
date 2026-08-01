@@ -1,5 +1,6 @@
 use crate::config::Config;
 
+use crate::types::{BlockHeader, MemoryQueryOptions, ProjectId};
 use crate::{MicroscopeReader, LAYER_NAMES};
 use axum::{
     extract::{Json, Query, State},
@@ -13,13 +14,30 @@ use serde_json::Value;
 use std::fs;
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::str::FromStr;
+use std::sync::{Arc, Mutex};
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::TraceLayer;
 
 #[derive(Clone)]
 pub struct AppState {
     pub config: Config,
+    pub active_project: Arc<Mutex<Option<ProjectId>>>,
+}
+
+fn active_project_or_default(state: &AppState) -> ProjectId {
+    state
+        .active_project
+        .lock()
+        .ok()
+        .and_then(|g| *g)
+        .unwrap_or(state.config.project_id)
+}
+
+fn project_aware_config(state: &AppState) -> Config {
+    let mut cfg = state.config.clone();
+    cfg.project_id = active_project_or_default(state);
+    cfg
 }
 
 #[derive(Deserialize)]
@@ -225,6 +243,164 @@ fn strip_user_scope(text: &str, user_id: &str) -> Option<String> {
     text.strip_prefix(&prefix).map(str::to_string)
 }
 
+#[derive(Deserialize)]
+pub struct SwitchProjectRequest {
+    pub project_path: String,
+    pub project_id: Option<String>,
+}
+
+#[derive(Serialize)]
+pub struct SwitchProjectResponse {
+    pub status: String,
+    pub active_project: String,
+    pub hot_blocks_count: usize,
+    pub delta_synced_entries: usize,
+}
+
+#[derive(Deserialize)]
+pub struct RecallRequest {
+    pub query: String,
+    pub project_id: Option<String>,
+    pub top_k: Option<usize>,
+}
+
+async fn switch_project(
+    State(state): State<Arc<AppState>>,
+    Json(payload): Json<SwitchProjectRequest>,
+) -> Result<Json<SwitchProjectResponse>, (StatusCode, String)> {
+    let pid = match payload.project_id {
+        Some(s) => ProjectId::from_str(&s).map_err(|e| (StatusCode::BAD_REQUEST, e))?,
+        None => ProjectId::from_path(&payload.project_path),
+    };
+
+    let (hot_blocks_count, delta_synced_entries) = {
+        let output_dir = Path::new(&state.config.paths.output_dir);
+        let meta_path = output_dir.join("meta.bin");
+        if meta_path.exists() {
+            let reader = MicroscopeReader::open(&state.config)
+                .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+            let hot = (0..reader.block_count)
+                .filter(|&i| {
+                    let h = reader.header(i);
+                    h.project_id == pid || h.project_id.is_global()
+                })
+                .count();
+            let append_path = output_dir.join("append.bin");
+            let appended = crate::read_append_log(&append_path);
+            let delta = appended
+                .iter()
+                .filter(|e| e.project_id == pid || e.project_id.is_global())
+                .count();
+            (hot, delta)
+        } else {
+            (0, 0)
+        }
+    };
+
+    *state.active_project.lock().map_err(|_| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "active project lock poisoned".to_string(),
+        )
+    })? = Some(pid);
+
+    Ok(Json(SwitchProjectResponse {
+        status: "OK".to_string(),
+        active_project: pid.to_string(),
+        hot_blocks_count,
+        delta_synced_entries,
+    }))
+}
+
+async fn recall_request_handler(
+    State(state): State<Arc<AppState>>,
+    Json(payload): Json<RecallRequest>,
+) -> Result<Json<Vec<MemoryResponse>>, (StatusCode, String)> {
+    let k = payload.top_k.unwrap_or(10);
+    let active = match payload.project_id {
+        Some(s) => ProjectId::from_str(&s).map_err(|e| (StatusCode::BAD_REQUEST, e))?,
+        None => active_project_or_default(&state),
+    };
+    let opts = MemoryQueryOptions {
+        active_project: active,
+        include_global: true,
+        min_importance: 0,
+        max_results: k,
+    };
+
+    let reader = MicroscopeReader::open(&state.config)
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    let (qx, qy, qz) = crate::content_coords_blended(
+        &payload.query,
+        "long_term",
+        state.config.search.semantic_weight,
+    );
+    let depth = crate::auto_depth(&payload.query);
+    let results =
+        reader.radial_search_with_options(&state.config, qx, qy, qz, depth, 0.5, k, Some(&opts));
+
+    let append_path = Path::new(&state.config.paths.output_dir).join("append.bin");
+    let appended = crate::read_append_log(&append_path);
+
+    let mut response = Vec::new();
+    for res in results.all() {
+        if !res.is_main {
+            continue;
+        }
+        let raw_text = if res.block_idx >= 1_000_000 {
+            appended
+                .get(res.block_idx - 1_000_000)
+                .map(|e| e.text.clone())
+                .unwrap_or_default()
+        } else {
+            reader.text(res.block_idx).to_string()
+        };
+        if raw_text.is_empty() {
+            continue;
+        }
+        let h = if res.block_idx >= 1_000_000 {
+            appended
+                .get(res.block_idx - 1_000_000)
+                .map(|e| BlockHeader {
+                    x: e.x,
+                    y: e.y,
+                    z: e.z,
+                    zoom: e.depth as f32 / 8.0,
+                    depth: e.depth,
+                    layer_id: e.layer_id,
+                    data_offset: 0,
+                    data_len: 0,
+                    parent_idx: u32::MAX,
+                    child_count: 0,
+                    crc16: [0; 2],
+                    project_id: e.project_id,
+                    importance: e.importance,
+                    flags: 0,
+                })
+                .unwrap_or_else(|| reader.header(0))
+        } else {
+            reader.header(res.block_idx)
+        };
+        let layer = LAYER_NAMES
+            .get(h.layer_id as usize)
+            .copied()
+            .unwrap_or("long_term")
+            .to_string();
+        response.push(MemoryResponse {
+            text: raw_text,
+            depth: h.depth,
+            layer,
+            distance: res.dist_sq.sqrt(),
+            memory_scope: "active".to_string(),
+        });
+        if response.len() >= k {
+            break;
+        }
+    }
+
+    Ok(Json(response))
+}
+
 fn recall_internal(
     state: &AppState,
     query: &str,
@@ -419,7 +595,8 @@ async fn mobile_remember(
     let importance = payload.importance.unwrap_or(7);
     let scoped_text = scope_user_text(&payload.user_id, &payload.text);
 
-    crate::store_memory(&state.config, &scoped_text, &layer, importance)
+    let cfg = project_aware_config(&state);
+    crate::store_memory(&cfg, &scoped_text, &layer, importance)
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     Ok(Json(serde_json::json!({
@@ -849,19 +1026,36 @@ async fn find_memory(
     let reader = MicroscopeReader::open(&state.config)
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     let k = params.k.unwrap_or(10);
-    let results = reader.find_text(&params.q, k);
+    let append_path = std::path::Path::new(&state.config.paths.output_dir).join("append.bin");
+    let appended = crate::read_append_log(&append_path);
+    let results = reader.find_text_all(&state.config, &params.q, k);
     let mut response = Vec::new();
-    for (_depth, idx) in &results {
-        let h = reader.header(*idx);
-        let text = reader.text(*idx).to_string();
-        let layer = LAYER_NAMES
-            .get(h.layer_id as usize)
-            .copied()
-            .unwrap_or("unknown")
-            .to_string();
+    for (depth, idx, is_main) in &results {
+        let (text, layer) = if *is_main {
+            let h = reader.header(*idx);
+            (
+                reader.text(*idx).to_string(),
+                LAYER_NAMES
+                    .get(h.layer_id as usize)
+                    .copied()
+                    .unwrap_or("unknown")
+                    .to_string(),
+            )
+        } else if let Some(entry) = appended.get(idx.saturating_sub(1_000_000)) {
+            (
+                entry.text.clone(),
+                LAYER_NAMES
+                    .get(entry.layer_id as usize)
+                    .copied()
+                    .unwrap_or("unknown")
+                    .to_string(),
+            )
+        } else {
+            continue;
+        };
         response.push(FindResponse {
             text: crate::safe_truncate(&text, 200),
-            depth: h.depth,
+            depth: *depth,
             layer,
         });
     }
@@ -944,10 +1138,13 @@ async fn build_index(
     Json(payload): Json<BuildRequest>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
     let force = payload.force.unwrap_or(false);
-    crate::build::build(&state.config, force)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-    let append_path = std::path::Path::new(&state.config.paths.output_dir).join("append.bin");
-    let _ = std::fs::remove_file(append_path);
+    if force {
+        crate::build::rebuild_pending(&state.config, true)
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    } else {
+        crate::build::build(&state.config, false)
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    }
     let reader = MicroscopeReader::open(&state.config)
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     let depths = reader.depth_ranges.iter().filter(|&&(_, c)| c > 0).count();
@@ -1070,7 +1267,10 @@ pub async fn run(
     host: String,
     port: u16,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let state = Arc::new(AppState { config });
+    let state = Arc::new(AppState {
+        config,
+        active_project: Arc::new(Mutex::new(None)),
+    });
 
     let cors = CorsLayer::new()
         .allow_origin(Any)
@@ -1091,7 +1291,9 @@ pub async fn run(
         .route("/dream", post(dream_consolidation))
         .route("/mobile/recall", post(mobile_recall))
         .route("/mobile/remember", post(mobile_remember))
-        .route("/mobile/chat", post(mobile_chat));
+        .route("/mobile/chat", post(mobile_chat))
+        .route("/project/switch", post(switch_project))
+        .route("/project/recall", post(recall_request_handler));
 
     let app = Router::new()
         .route("/", get(get_root))
@@ -1109,6 +1311,8 @@ pub async fn run(
         .route("/session_log", get(session_log))
         .route("/consolidate", post(consolidate_sessions))
         .route("/dream", post(dream_consolidation))
+        .route("/project/switch", post(switch_project))
+        .route("/project/recall", post(recall_request_handler))
         .route("/openapi.json", get(get_openapi))
         .layer(TraceLayer::new_for_http())
         .layer(cors)

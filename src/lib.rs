@@ -22,6 +22,7 @@ pub mod emotional_state;
 pub mod federation;
 pub mod fingerprint;
 pub mod hebbian;
+pub mod types;
 
 #[cfg(not(target_arch = "wasm32"))]
 pub mod ai_adapter;
@@ -33,6 +34,7 @@ pub mod merkle;
 pub mod mirror;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod query;
+#[cfg(not(target_arch = "wasm32"))]
 pub mod reader;
 pub mod resonance;
 #[cfg(not(target_arch = "wasm32"))]
@@ -145,14 +147,14 @@ pub use emotional_state::{emotional_prime_weight, EmotionalStateRing};
 pub use reader::{
     append_emotion_log, build_emotions_from_log, emotional_similarity, format_emotion,
     load_emotion_lookup, read_append_log, store_memory, store_memory_temporary,
-    store_memory_with_emotion, AppendEntry, BlockHeader, DataStore, MicroscopeReader, RadialResult,
-    ResultSet, EMOTION_DIMS, EMOTION_VECTOR_SIZE,
+    store_memory_with_emotion, DataStore, MicroscopeReader, RadialResult, ResultSet, EMOTION_DIMS,
+    EMOTION_VECTOR_SIZE,
 };
+#[cfg(not(target_arch = "wasm32"))]
+pub use types::{AppendEntry, BlockHeader, MemoryBlockHeader, MemoryQueryOptions, ProjectId};
 
 #[cfg(target_arch = "wasm32")]
-pub use reader::{
-    AppendEntry, BlockHeader, DataStore, MicroscopeReader,
-};
+pub use types::{AppendEntry, BlockHeader, MemoryBlockHeader, MemoryQueryOptions, ProjectId};
 
 // Re-export CLI
 #[cfg(not(target_arch = "wasm32"))]
@@ -161,7 +163,9 @@ pub use cli::{Cli, Cmd};
 // Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬ Shared constants Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬
 pub const DEFAULT_CONFIG_PATH: &str = "config.toml";
 pub const BLOCK_DATA_SIZE: usize = 1024;
-pub const HEADER_SIZE: usize = 32;
+pub const HEADER_SIZE: usize = 50;
+pub const LEGACY_HEADER_SIZE: usize = 32;
+pub const APV3_MAGIC: &[u8] = b"APv3";
 pub const META_HEADER_SIZE: usize = 16;
 pub const DEPTH_ENTRY_SIZE: usize = 8;
 pub const LAYER_NAMES: &[&str] = &[
@@ -357,6 +361,7 @@ mod tests {
 }
 
 // Additional modules for main binary
+#[cfg(not(target_arch = "wasm32"))]
 pub mod auto_context;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod autonomous;

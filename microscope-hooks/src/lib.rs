@@ -32,8 +32,7 @@ pub enum HookError {
 
 pub type HookResult<T> = std::result::Result<T, HookError>;
 
-
-// ── HookEvent ────────────────────────────────────────────────────────────────
+// Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬ HookEvent Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum HookEvent {
@@ -69,7 +68,7 @@ impl HookEvent {
     }
 }
 
-// ── HookContext ──────────────────────────────────────────────────────────────
+// Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬ HookContext Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HookContext {
@@ -140,7 +139,7 @@ impl HookContext {
     }
 }
 
-// ── MemoryBlockRef ──────────────────────────────────────────────────────────
+// Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬ MemoryBlockRef Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MemoryBlockRef {
@@ -152,7 +151,7 @@ pub struct MemoryBlockRef {
     pub distance: f32,
 }
 
-// ── MemoryCandidate ──────────────────────────────────────────────────────────
+// Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬ MemoryCandidate Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MemoryCandidate {
@@ -167,7 +166,7 @@ pub struct MemoryCandidate {
     pub association_id: Option<String>,
 }
 
-// ── HookConfig ────────────────────────────────────────────────────────────────
+// Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬ HookConfig Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HookConfig {
@@ -235,19 +234,21 @@ impl HookConfig {
     }
 }
 
-// ── HookHandler trait ────────────────────────────────────────────────────────
+// Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬ HookHandler trait Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬
 
 pub trait HookHandler: Send + Sync {
     fn event(&self) -> HookEvent;
     fn execute(&self, ctx: HookContext) -> HookContext;
 }
 
-// ── Default Handlers ─────────────────────────────────────────────────────────
+// Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬ Default Handlers Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬
 
 pub fn default_on_session_start(mut ctx: HookContext) -> HookContext {
     ctx.memory_contract = Some(include_str!("contract.txt").to_string());
-    ctx.constraints.push("Never store secrets or API keys".to_string());
-    ctx.constraints.push("Memory is authoritative - never invent memories".to_string());
+    ctx.constraints
+        .push("Never store secrets or API keys".to_string());
+    ctx.constraints
+        .push("Memory is authoritative - never invent memories".to_string());
     ctx
 }
 
@@ -259,8 +260,9 @@ pub fn default_before_prompt(mut ctx: HookContext) -> HookContext {
 }
 
 pub fn default_before_tool_call(mut ctx: HookContext) -> HookContext {
-    if let Some(project) = &ctx.project_context {
-        ctx.metadata.insert("project_context_active".to_string(), "true".to_string());
+    if let Some(_project) = &ctx.project_context {
+        ctx.metadata
+            .insert("project_context_active".to_string(), "true".to_string());
     }
     ctx
 }
@@ -270,7 +272,11 @@ pub fn default_after_tool_call(mut ctx: HookContext) -> HookContext {
         if !result.is_empty() && result.len() > 20 {
             let tool = ctx.tool_name.clone().unwrap_or_default();
             ctx.memory_candidates.push(MemoryCandidate {
-                text: format!("[Tool: {}] {}", tool, &result.chars().take(500).collect::<String>()),
+                text: format!(
+                    "[Tool: {}] {}",
+                    tool,
+                    &result.chars().take(500).collect::<String>()
+                ),
                 layer: "session".to_string(),
                 importance: 4,
                 source_event: HookEvent::AfterToolCall,
@@ -289,7 +295,11 @@ pub fn default_after_response(mut ctx: HookContext) -> HookContext {
     if let (Some(query), Some(response)) = (&ctx.query, &ctx.response) {
         if response.len() > 30 {
             ctx.memory_candidates.push(MemoryCandidate {
-                text: format!("Q: {} | A: {}", query, &response.chars().take(300).collect::<String>()),
+                text: format!(
+                    "Q: {} | A: {}",
+                    query,
+                    &response.chars().take(300).collect::<String>()
+                ),
                 layer: "session".to_string(),
                 importance: 3,
                 source_event: HookEvent::AfterResponse,
@@ -321,7 +331,7 @@ pub fn default_on_error(mut ctx: HookContext) -> HookContext {
     ctx
 }
 
-// ── HookManager ───────────────────────────────────────────────────────────────
+// Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬ HookManager Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬
 
 pub struct HookManager {
     config: HookConfig,
@@ -369,7 +379,11 @@ impl HookManager {
             return ctx;
         }
 
-        tracing::debug!("Executing hook '{}' (chain: {})", event.label(), ctx.chain_id);
+        tracing::debug!(
+            "Executing hook '{}' (chain: {})",
+            event.label(),
+            ctx.chain_id
+        );
         let mut current_ctx = ctx;
 
         if self.use_defaults {
@@ -393,13 +407,21 @@ impl HookManager {
             current_ctx.memory_candidates.clear();
         } else {
             if self.config.write.filter_secrets {
-                current_ctx.memory_candidates.retain(|c| !contains_secrets(&c.text));
+                current_ctx
+                    .memory_candidates
+                    .retain(|c| !contains_secrets(&c.text));
             }
             if self.config.write.filter_api_keys {
-                current_ctx.memory_candidates.retain(|c| !contains_api_key(&c.text));
+                current_ctx
+                    .memory_candidates
+                    .retain(|c| !contains_api_key(&c.text));
             }
-            current_ctx.memory_candidates.retain(|c| c.importance >= self.config.min_importance);
-            current_ctx.memory_candidates.truncate(self.config.max_candidates);
+            current_ctx
+                .memory_candidates
+                .retain(|c| c.importance >= self.config.min_importance);
+            current_ctx
+                .memory_candidates
+                .truncate(self.config.max_candidates);
         }
 
         current_ctx
@@ -426,26 +448,32 @@ impl HookManager {
     }
 }
 
-// ── Security Filters ─────────────────────────────────────────────────────────
+// Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬ Security Filters Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬
 
 fn contains_secrets(text: &str) -> bool {
     let lower = text.to_lowercase();
     let patterns = [
-        "password", "passwd", "pwd", "secret", "token", "credential",
-        "auth_token", "bearer", "private_key", "-----begin",
+        "password",
+        "passwd",
+        "pwd",
+        "secret",
+        "token",
+        "credential",
+        "auth_token",
+        "bearer",
+        "private_key",
+        "-----begin",
     ];
     patterns.iter().any(|p| lower.contains(p))
 }
 
 fn contains_api_key(text: &str) -> bool {
     let lower = text.to_lowercase();
-    let patterns = [
-        "api_key", "apikey", "api-key", "sk-", "pk-", "openai_key",
-    ];
+    let patterns = ["api_key", "apikey", "api-key", "sk-", "pk-", "openai_key"];
     patterns.iter().any(|p| lower.contains(p))
 }
 
-// ── Helper: Build context package ────────────────────────────────────────────
+// Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬ Helper: Build context package Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬
 
 pub fn build_context_package(ctx: &HookContext) -> String {
     let mut package = String::new();
@@ -455,8 +483,8 @@ pub fn build_context_package(ctx: &HookContext) -> String {
         package.push_str("\n\n");
     }
 
-    if let Some(project) = &ctx.project_context {
-        package.push_str(&format!("## Project Context\n{}\n\n", project));
+    if let Some(_project) = &ctx.project_context {
+        package.push_str(&format!("## Project Context\n{}\n\n", _project));
     }
 
     if !ctx.constraints.is_empty() {
@@ -468,7 +496,10 @@ pub fn build_context_package(ctx: &HookContext) -> String {
     }
 
     if !ctx.retrieved_memories.is_empty() {
-        package.push_str(&format!("## Retrieved Memories ({} blocks)\n", ctx.retrieved_memories.len()));
+        package.push_str(&format!(
+            "## Retrieved Memories ({} blocks)\n",
+            ctx.retrieved_memories.len()
+        ));
         for m in &ctx.retrieved_memories {
             package.push_str(&format!(
                 "- [{}] D{} imp={} dist={:.3}: {}\n",
@@ -480,7 +511,6 @@ pub fn build_context_package(ctx: &HookContext) -> String {
 
     package
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -549,16 +579,19 @@ mod tests {
         let ctx = HookContext::new(HookEvent::AfterToolCall)
             .with_tool("test_tool", serde_json::json!({}));
         let mut ctx_with_result = ctx.clone();
-        ctx_with_result.tool_result = Some("This is a significant tool result with useful information.".to_string());
+        ctx_with_result.tool_result =
+            Some("This is a significant tool result with useful information.".to_string());
         let result = default_after_tool_call(ctx_with_result);
         assert!(!result.memory_candidates.is_empty());
-        assert_eq!(result.memory_candidates[0].source_tool, Some("test_tool".to_string()));
+        assert_eq!(
+            result.memory_candidates[0].source_tool,
+            Some("test_tool".to_string())
+        );
     }
 
     #[test]
     fn test_default_on_error() {
-        let ctx = HookContext::new(HookEvent::Error)
-            .with_error("Connection timeout", "E1001");
+        let ctx = HookContext::new(HookEvent::Error).with_error("Connection timeout", "E1001");
         let result = default_on_error(ctx);
         assert!(!result.memory_candidates.is_empty());
         assert!(result.memory_candidates[0].is_error);
@@ -639,7 +672,9 @@ mod tests {
     fn test_custom_handler() {
         struct TestHandler;
         impl HookHandler for TestHandler {
-            fn event(&self) -> HookEvent { HookEvent::BeforePrompt }
+            fn event(&self) -> HookEvent {
+                HookEvent::BeforePrompt
+            }
             fn execute(&self, mut ctx: HookContext) -> HookContext {
                 ctx.metadata.insert("custom".to_string(), "ran".to_string());
                 ctx

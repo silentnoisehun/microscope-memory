@@ -228,23 +228,40 @@ fn find_single(
         Err(_) => return Vec::new(),
     };
 
-    let results = reader.find_text(query, k);
+    let append_path = Path::new(&config.paths.output_dir).join("append.bin");
+    let appended = read_append_log(&append_path);
+    let results = reader.find_text_all(config, query, k);
     results
         .iter()
         .enumerate()
-        .map(|(rank, &(_, idx))| {
-            let h = reader.header(idx);
-            FederatedResult {
-                text: reader.text(idx).to_string(),
-                depth: h.depth,
-                layer: LAYER_NAMES
-                    .get(h.layer_id as usize)
-                    .unwrap_or(&"?")
-                    .to_string(),
+        .filter_map(|(rank, &(depth, idx, is_main))| {
+            let (text, layer) = if is_main {
+                let h = reader.header(idx);
+                (
+                    reader.text(idx).to_string(),
+                    LAYER_NAMES
+                        .get(h.layer_id as usize)
+                        .unwrap_or(&"?")
+                        .to_string(),
+                )
+            } else {
+                let entry = appended.get(idx.saturating_sub(1_000_000))?;
+                (
+                    entry.text.clone(),
+                    LAYER_NAMES
+                        .get(entry.layer_id as usize)
+                        .unwrap_or(&"?")
+                        .to_string(),
+                )
+            };
+            Some(FederatedResult {
+                text,
+                depth,
+                layer,
                 score: rank as f32 / weight,
                 source_index: name.to_string(),
-                is_append: false,
-            }
+                is_append: !is_main,
+            })
         })
         .collect()
 }

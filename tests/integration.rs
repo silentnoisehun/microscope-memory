@@ -77,6 +77,83 @@ fn test_store_and_recall() {
 }
 
 #[test]
+fn test_find_includes_pending_append_entries() {
+    let (_tmp, mut config) = setup_test_env();
+    config.index.auto_rebuild = false;
+    microscope_memory::build::build(&config, true).unwrap();
+
+    let marker = "pending-search-marker-7f3a";
+    microscope_memory::store_memory(&config, marker, "long_term", 5).expect("store");
+
+    let reader = microscope_memory::reader::MicroscopeReader::open(&config).expect("open reader");
+    let results = reader.find_text_all(&config, marker, 10);
+    assert!(
+        results.iter().any(|(_, _, is_main)| !is_main),
+        "pending append entry should be searchable before rebuild"
+    );
+}
+
+#[test]
+fn test_auto_rebuild_after_configured_threshold() {
+    let (_tmp, mut config) = setup_test_env();
+    config.index.auto_rebuild = true;
+    config.index.auto_rebuild_entries = 2;
+    microscope_memory::build::build(&config, true).unwrap();
+
+    microscope_memory::store_memory(&config, "auto-rebuild-first", "long_term", 5)
+        .expect("first store");
+    let append_path = Path::new(&config.paths.output_dir).join("append.bin");
+    assert_eq!(microscope_memory::read_append_log(&append_path).len(), 1);
+
+    microscope_memory::store_memory(&config, "auto-rebuild-second", "long_term", 5)
+        .expect("second store");
+    assert!(
+        microscope_memory::read_append_log(&append_path).is_empty(),
+        "append log should be cleared after successful automatic rebuild"
+    );
+
+    let reader = microscope_memory::reader::MicroscopeReader::open(&config).expect("open reader");
+    assert!(!reader.find_text("auto-rebuild-second", 10).is_empty());
+}
+
+#[test]
+fn test_rebuild_rejects_shrink_and_restores_append_log() {
+    let (_tmp, mut config) = setup_test_env();
+    config.index.auto_rebuild = false;
+    microscope_memory::build::build(&config, true).unwrap();
+    let before = microscope_memory::reader::MicroscopeReader::open(&config)
+        .expect("open reader")
+        .block_count;
+
+    microscope_memory::store_memory(&config, "shrink-guard-pending", "long_term", 5)
+        .expect("store");
+    fs::write(
+        Path::new(&config.paths.layers_dir).join("long_term.txt"),
+        "tiny replacement source",
+    )
+    .unwrap();
+
+    let error = microscope_memory::build::rebuild_pending(&config, false)
+        .expect_err("shrinking rebuild must be rejected");
+    assert!(error.contains("refusing rebuild shrink"));
+
+    let append_path = Path::new(&config.paths.output_dir).join("append.bin");
+    assert!(
+        microscope_memory::read_append_log(&append_path)
+            .iter()
+            .any(|entry| entry.text.contains("shrink-guard-pending")),
+        "rollback must preserve pending append entries"
+    );
+    let after = microscope_memory::reader::MicroscopeReader::open(&config)
+        .expect("open restored reader")
+        .block_count;
+    assert_eq!(
+        after, before,
+        "rollback must restore the previous main index"
+    );
+}
+
+#[test]
 fn test_incremental_build_skips() {
     let (_tmp, config) = setup_test_env();
 

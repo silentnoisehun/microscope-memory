@@ -1,1 +1,3387 @@
 ﻿rust runtime state
+
+
+[2026-07-22 01:41:29] [Bridge info] Enter recall started | site=gemini input=DIV len=16
+
+[2026-07-22 01:41:29] [Bridge info] Page message count | count=22 isNewChat=false
+
+[2026-07-22 01:41:29] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 01:41:29] [Bridge info] Context cleaned | rawLen=1271 cleanLen=1149 keep=true
+
+[2026-07-22 01:41:29] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 01:41:42] [Bridge info] Assistant response saved | site=gemini len=723
+
+[2026-07-22 01:42:18] [Bridge info] Enter recall started | site=gemini input=DIV len=23
+
+[2026-07-22 01:42:18] [Bridge info] Page message count | count=25 isNewChat=false
+
+[2026-07-22 01:42:18] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 01:42:18] [Bridge info] Context cleaned | rawLen=1308 cleanLen=1178 keep=true
+
+[2026-07-22 01:42:18] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 01:42:30] [Bridge info] Assistant response saved | site=gemini len=934
+
+[2026-07-22 01:43:31] [Bridge info] Enter recall started | site=gemini input=DIV len=70
+
+[2026-07-22 01:43:31] [Bridge info] Page message count | count=28 isNewChat=false
+
+[2026-07-22 01:43:31] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 01:43:31] [Bridge info] Context cleaned | rawLen=1350 cleanLen=1172 keep=true
+
+[2026-07-22 01:43:31] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 01:43:49] [Bridge info] Assistant response saved | site=gemini len=1342
+
+[2026-07-22 01:45:05] [Bridge info] Enter recall started | site=gemini input=DIV len=46
+
+[2026-07-22 01:45:05] [Bridge info] Page message count | count=31 isNewChat=false
+
+[2026-07-22 01:45:05] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 01:45:05] [Bridge info] Context cleaned | rawLen=2133 cleanLen=327 keep=true
+
+[2026-07-22 01:45:05] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 01:45:20] [Bridge info] Assistant response saved | site=gemini len=3161
+
+[2026-07-22 01:46:08] [Bridge info] Enter recall started | site=gemini input=DIV len=32
+
+[2026-07-22 01:46:08] [Bridge info] Page message count | count=34 isNewChat=false
+
+[2026-07-22 01:46:08] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 01:46:08] [Bridge info] Context cleaned | rawLen=2660 cleanLen=563 keep=true
+
+[2026-07-22 01:46:08] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 01:46:18] [Bridge info] Assistant response saved | site=gemini len=745
+
+[2026-07-22 02:10:47] [Bridge info] Enter recall started | site=gemini input=DIV len=84
+
+[2026-07-22 02:10:47] [Bridge info] Page message count | count=37 isNewChat=false
+
+[2026-07-22 02:10:50] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 02:10:50] [Bridge info] Context cleaned | rawLen=1259 cleanLen=1069 keep=true
+
+[2026-07-22 02:10:51] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 02:11:05] [Bridge info] Assistant response saved | site=gemini len=1836
+
+[2026-07-22 02:12:05] [Bridge info] Enter recall started | site=gemini input=DIV len=8
+
+[2026-07-22 02:12:05] [Bridge info] Page message count | count=40 isNewChat=false
+
+[2026-07-22 02:12:06] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 02:12:06] [Bridge info] Context cleaned | rawLen=1843 cleanLen=1701 keep=true
+
+[2026-07-22 02:12:06] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 02:12:23] [Bridge info] Assistant response saved | site=gemini len=412
+
+[2026-07-22 02:12:37] [Bridge info] Enter recall started | site=gemini input=DIV len=35
+
+[2026-07-22 02:12:37] [Bridge info] Page message count | count=43 isNewChat=false
+
+[2026-07-22 02:12:38] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 02:12:38] [Bridge info] Context cleaned | rawLen=2145 cleanLen=283 keep=true
+
+[2026-07-22 02:12:38] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 02:12:49] [Bridge info] Assistant response saved | site=gemini len=534
+
+[2026-07-22 02:13:32] [Bridge info] Enter recall started | site=gemini input=DIV len=58
+
+[2026-07-22 02:13:32] [Bridge info] Page message count | count=46 isNewChat=false
+
+[2026-07-22 02:13:32] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 02:13:32] [Bridge info] Context cleaned | rawLen=2145 cleanLen=327 keep=true
+
+[2026-07-22 02:13:32] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 02:13:50] [Bridge info] Assistant response saved | site=gemini len=840
+
+[2026-07-22 02:16:18] [Bridge info] Enter recall started | site=gemini input=DIV len=17
+
+[2026-07-22 02:16:18] [Bridge info] Page message count | count=49 isNewChat=false
+
+[2026-07-22 02:16:18] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 02:16:18] [Bridge info] Context cleaned | rawLen=1300 cleanLen=1177 keep=true
+
+[2026-07-22 02:16:18] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 02:16:40] [Bridge info] Assistant response saved | site=gemini len=1080
+
+[2026-07-22 02:22:23] [Bridge info] Enter recall started | site=gemini input=DIV len=73
+
+[2026-07-22 02:22:23] [Bridge info] Page message count | count=52 isNewChat=false
+
+[2026-07-22 02:22:23] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 02:22:23] [Bridge info] Context cleaned | rawLen=1354 cleanLen=1173 keep=true
+
+[2026-07-22 02:22:23] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 02:22:35] [Bridge info] Assistant response saved | site=gemini len=265
+
+[2026-07-22 02:23:44] [Bridge info] Enter recall started | site=gemini input=DIV len=208
+
+[2026-07-22 02:23:44] [Bridge info] Page message count | count=55 isNewChat=false
+
+[2026-07-22 02:23:44] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 02:23:44] [Bridge info] Context cleaned | rawLen=1485 cleanLen=1168 keep=true
+
+[2026-07-22 02:23:44] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 02:23:58] [Bridge info] Assistant response saved | site=gemini len=2280
+
+[2026-07-22 02:24:54] [Bridge info] Enter recall started | site=gemini input=DIV len=49
+
+[2026-07-22 02:24:54] [Bridge info] Page message count | count=58 isNewChat=false
+
+[2026-07-22 02:24:54] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 02:24:54] [Bridge info] Context cleaned | rawLen=3299 cleanLen=517 keep=true
+
+[2026-07-22 02:24:54] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 02:25:09] [Bridge info] Assistant response saved | site=gemini len=2854
+
+[2026-07-22 02:32:49] [Bridge info] Enter recall started | site=gemini input=DIV len=42
+
+[2026-07-22 02:32:49] [Bridge info] Page message count | count=61 isNewChat=false
+
+[2026-07-22 02:32:49] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 02:32:49] [Bridge info] Context cleaned | rawLen=2384 cleanLen=2222 keep=true
+
+[2026-07-22 02:32:49] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 02:33:14] [Bridge info] Assistant response saved | site=gemini len=3724
+
+[2026-07-22 02:34:12] [Bridge info] Enter recall started | site=gemini input=DIV len=50
+
+[2026-07-22 02:34:12] [Bridge info] Page message count | count=64 isNewChat=false
+
+[2026-07-22 02:34:13] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 02:34:13] [Bridge info] Context cleaned | rawLen=1890 cleanLen=1730 keep=true
+
+[2026-07-22 02:34:13] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 02:34:26] [Bridge info] Assistant response saved | site=gemini len=2534
+
+[2026-07-22 02:36:46] [Bridge info] Enter recall started | site=gemini input=DIV len=71
+
+[2026-07-22 02:36:46] [Bridge info] Page message count | count=67 isNewChat=false
+
+[2026-07-22 02:36:46] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 02:36:46] [Bridge info] Context cleaned | rawLen=3224 cleanLen=327 keep=true
+
+[2026-07-22 02:36:47] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 02:36:58] [Bridge info] Assistant response saved | site=gemini len=1026
+
+[2026-07-22 02:38:49] [Bridge info] Enter recall started | site=gemini input=DIV len=35
+
+[2026-07-22 02:38:49] [Bridge info] Page message count | count=70 isNewChat=false
+
+[2026-07-22 02:38:52] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 02:38:52] [Bridge info] Context cleaned | rawLen=1312 cleanLen=1169 keep=true
+
+[2026-07-22 02:38:52] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 02:39:03] [Bridge info] Assistant response saved | site=gemini len=1029
+
+[2026-07-22 02:41:19] [Bridge info] Enter recall started | site=gemini input=DIV len=35
+
+[2026-07-22 02:41:19] [Bridge info] Page message count | count=73 isNewChat=false
+
+[2026-07-22 02:41:19] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 02:41:19] [Bridge info] Context cleaned | rawLen=1599 cleanLen=283 keep=true
+
+[2026-07-22 02:41:19] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 02:41:31] [Bridge info] Assistant response saved | site=gemini len=543
+
+[2026-07-22 02:42:39] [Bridge info] Enter recall started | site=gemini input=DIV len=46
+
+[2026-07-22 02:42:39] [Bridge info] Page message count | count=76 isNewChat=false
+
+[2026-07-22 02:42:39] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 02:42:39] [Bridge info] Context cleaned | rawLen=1322 cleanLen=1168 keep=true
+
+[2026-07-22 02:42:39] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 02:42:50] [Bridge info] Assistant response saved | site=gemini len=318
+
+[2026-07-22 02:43:37] [Bridge info] Enter recall started | site=gemini input=DIV len=70
+
+[2026-07-22 02:43:37] [Bridge info] Page message count | count=79 isNewChat=false
+
+[2026-07-22 02:43:37] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 02:43:37] [Bridge info] Context cleaned | rawLen=1348 cleanLen=1170 keep=true
+
+[2026-07-22 02:43:37] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 02:43:51] [Bridge info] Assistant response saved | site=gemini len=1205
+
+Microscope Bridge extension upgraded to v0.8.5: added autonomous agent mode with file I/O (read/write/patch/diff), shell command sandbox, git auto-commit/rollback safety, D:\codex workspace whitelist, and 6-second cancel-toast for destructive actions.
+
+[2026-07-22 02:45:43] [Bridge info] Enter recall started | site=gemini input=DIV len=145
+
+[2026-07-22 02:45:43] [Bridge info] Page message count | count=82 isNewChat=false
+
+[2026-07-22 02:45:44] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 02:45:44] [Bridge info] Context cleaned | rawLen=1767 cleanLen=1510 keep=true
+
+[2026-07-22 02:45:44] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 02:50:04] [Bridge info] Enter recall started | site=gemini input=DIV len=21
+
+[2026-07-22 02:50:04] [Bridge info] Page message count | count=85 isNewChat=false
+
+[2026-07-22 02:50:04] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 02:50:04] [Bridge info] Context cleaned | rawLen=3167 cleanLen=562 keep=true
+
+[2026-07-22 02:50:04] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 02:50:17] [Bridge info] Assistant response saved | site=gemini len=417
+
+[2026-07-22 02:51:36] [Bridge info] Enter recall started | site=gemini input=DIV len=137
+
+[2026-07-22 02:51:36] [Bridge info] Page message count | count=88 isNewChat=false
+
+[2026-07-22 02:51:36] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 02:51:36] [Bridge info] Context cleaned | rawLen=1417 cleanLen=1172 keep=true
+
+[2026-07-22 02:51:36] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 02:51:58] [Bridge info] Assistant response saved | site=gemini len=793
+
+[2026-07-22 02:52:26] [Bridge info] Enter recall started | site=gemini input=DIV len=54
+
+[2026-07-22 02:52:26] [Bridge info] Page message count | count=91 isNewChat=false
+
+[2026-07-22 02:52:26] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 02:52:26] [Bridge info] Context cleaned | rawLen=1337 cleanLen=1177 keep=true
+
+[2026-07-22 02:52:27] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 02:52:31] [Bridge info] Assistant response saved | site=gemini len=793
+
+[2026-07-22 03:03:28] [Bridge info] Enter recall started | site=gemini input=DIV len=15
+
+[2026-07-22 03:03:28] [Bridge info] Page message count | count=31 isNewChat=false
+
+[2026-07-22 03:03:32] [Bridge error] Context fetch failed | timeout
+
+[2026-07-22 03:03:32] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 03:03:42] [Bridge info] Assistant response saved | site=gemini len=435
+
+Initialized git repository at D:\codex workspace root with .gitignore for nested projects and runtime artifacts. Auto-commit from Microscope Bridge native host verified working.
+
+[2026-07-22 03:09:15] [Bridge info] Enter recall started | site=gemini input=DIV len=33
+
+[2026-07-22 03:09:15] [Bridge info] Page message count | count=34 isNewChat=false
+
+[2026-07-22 03:09:15] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 03:09:15] [Bridge info] Context cleaned | rawLen=1687 cleanLen=1536 keep=true
+
+[2026-07-22 03:09:15] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 03:09:30] [Bridge info] Assistant response saved | site=gemini len=2032
+
+[2026-07-22 03:14:20] [Bridge info] Enter recall started | site=gemini input=DIV len=99
+
+[2026-07-22 03:14:20] [Bridge info] Page message count | count=37 isNewChat=false
+
+[2026-07-22 03:14:20] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 03:14:20] [Bridge info] Context cleaned | rawLen=2890 cleanLen=327 keep=true
+
+[2026-07-22 03:14:21] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 03:14:45] [Bridge info] Assistant response saved | site=gemini len=4303
+
+Microscope Bridge whitelist expanded to D:\projektek in addition to D:\codex. Native host and content script now allow file operations in both workspace roots.
+
+[2026-07-22 04:07:52] [Bridge info] Enter recall started | site=gemini input=DIV len=2819
+
+[2026-07-22 04:07:52] [Bridge info] Page message count | count=40 isNewChat=false
+
+[2026-07-22 04:07:52] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 04:07:52] [Bridge info] Context cleaned | rawLen=4658 cleanLen=1725 keep=true
+
+[2026-07-22 04:07:53] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 04:08:13] [Bridge info] Assistant response saved | site=gemini len=1636
+
+[2026-07-22 04:08:43] [Bridge info] Enter recall started | site=gemini input=DIV len=66
+
+[2026-07-22 04:08:43] [Bridge info] Page message count | count=43 isNewChat=false
+
+[2026-07-22 04:08:43] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 04:08:43] [Bridge info] Context cleaned | rawLen=2383 cleanLen=2198 keep=true
+
+[2026-07-22 04:08:43] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 04:08:55] [Bridge info] Assistant response saved | site=gemini len=809
+
+[2026-07-22 04:10:08] [Bridge info] Enter recall started | site=gemini input=DIV len=751
+
+[2026-07-22 04:10:08] [Bridge info] Page message count | count=46 isNewChat=false
+
+[2026-07-22 04:10:12] [Bridge error] Context fetch failed | timeout
+
+[2026-07-22 04:10:12] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 04:10:19] [Bridge info] Assistant response saved | site=gemini len=809
+
+[2026-07-22 04:17:48] [Bridge info] Enter recall started | site=gemini input=DIV len=10671
+
+[2026-07-22 04:17:48] [Bridge info] Page message count | count=34 isNewChat=false
+
+[2026-07-22 04:17:49] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 04:17:49] [Bridge info] Context cleaned | rawLen=12833 cleanLen=327 keep=true
+
+[2026-07-22 04:17:50] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 04:18:05] [Bridge info] Assistant response saved | site=gemini len=2563
+
+Microscope Bridge content script prompt strengthened: explicit tool marker examples for write_file, patch_file, shell_command and microscope-action fence, with instruction to emit markers instead of describing edits.
+
+[2026-07-22 04:19:23] [Bridge info] Enter recall started | site=gemini input=DIV len=20
+
+[2026-07-22 04:19:23] [Bridge info] Page message count | count=37 isNewChat=false
+
+[2026-07-22 04:19:23] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 04:19:23] [Bridge info] Context cleaned | rawLen=2247 cleanLen=283 keep=true
+
+[2026-07-22 04:19:23] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 04:19:35] [Bridge info] Assistant response saved | site=gemini len=876
+
+[2026-07-22 04:20:00] [Bridge info] Enter recall started | site=gemini input=DIV len=39
+
+[2026-07-22 04:20:00] [Bridge info] Page message count | count=40 isNewChat=false
+
+[2026-07-22 04:20:01] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 04:20:01] [Bridge info] Context cleaned | rawLen=1313 cleanLen=1167 keep=true
+
+[2026-07-22 04:20:01] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 04:20:13] [Bridge info] Assistant response saved | site=gemini len=961
+
+[2026-07-22 04:21:06] [Bridge info] Enter recall started | site=gemini input=DIV len=113
+
+[2026-07-22 04:21:06] [Bridge info] Page message count | count=43 isNewChat=false
+
+[2026-07-22 04:21:06] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 04:21:06] [Bridge info] Context cleaned | rawLen=1395 cleanLen=1173 keep=true
+
+[2026-07-22 04:21:07] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 04:21:20] [Bridge info] Assistant response saved | site=gemini len=817
+
+[2026-07-22 04:47:35] [Bridge info] Enter recall started | site=gemini input=DIV len=46
+
+[2026-07-22 04:47:35] [Bridge info] Page message count | count=31 isNewChat=false
+
+[2026-07-22 04:47:36] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 04:47:36] [Bridge info] Context cleaned | rawLen=1300 cleanLen=82 keep=true
+
+[2026-07-22 04:47:36] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 04:47:47] [Bridge info] Assistant response saved | site=gemini len=156
+
+[2026-07-22 04:49:36] [Bridge info] Enter recall started | site=gemini input=DIV len=29
+
+[2026-07-22 04:49:36] [Bridge info] Page message count | count=34 isNewChat=false
+
+[2026-07-22 04:49:36] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 04:49:36] [Bridge info] Context cleaned | rawLen=1302 cleanLen=1164 keep=true
+
+[2026-07-22 04:49:37] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 04:49:53] [Bridge info] Assistant response saved | site=gemini len=1024
+
+[2026-07-22 04:50:29] [Bridge info] Enter recall started | site=gemini input=DIV len=56
+
+[2026-07-22 04:50:29] [Bridge info] Page message count | count=38 isNewChat=false
+
+[2026-07-22 04:50:29] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 04:50:29] [Bridge info] Context cleaned | rawLen=1629 cleanLen=283 keep=true
+
+[2026-07-22 04:50:29] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 04:50:40] [Bridge info] Assistant response saved | site=gemini len=413
+
+[2026-07-22 04:54:29] [Bridge info] Enter recall started | site=gemini input=DIV len=141
+
+[2026-07-22 04:54:29] [Bridge info] Page message count | count=41 isNewChat=false
+
+[2026-07-22 04:54:30] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 04:54:30] [Bridge info] Context cleaned | rawLen=1415 cleanLen=1166 keep=true
+
+[2026-07-22 04:54:30] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 04:54:42] [Bridge info] Assistant response saved | site=gemini len=504
+
+[2026-07-22 04:57:27] [Bridge info] Enter recall started | site=gemini input=DIV len=21
+
+[2026-07-22 04:57:27] [Bridge info] Page message count | count=1 isNewChat=false
+
+[2026-07-22 04:57:27] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 04:57:27] [Bridge info] Context cleaned | rawLen=1293 cleanLen=1164 keep=true
+
+[2026-07-22 04:57:27] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 04:57:45] [Bridge info] Assistant response saved | site=gemini len=313
+
+[2026-07-22 05:01:49] [Bridge info] Enter recall started | site=gemini input=DIV len=84
+
+[2026-07-22 05:01:49] [Bridge info] Page message count | count=35 isNewChat=false
+
+[2026-07-22 05:01:53] [Bridge error] Context fetch failed | timeout
+
+[2026-07-22 05:01:53] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 05:02:04] [Bridge info] Assistant response saved | site=gemini len=469
+
+[2026-07-22 05:36:46] [Bridge info] Enter recall started | site=gemini input=DIV len=46
+
+[2026-07-22 05:36:46] [Bridge info] Page message count | count=31 isNewChat=false
+
+[2026-07-22 05:36:46] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 05:36:46] [Bridge info] Context cleaned | rawLen=1452 cleanLen=1296 keep=true
+
+[2026-07-22 05:36:46] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 05:36:59] [Bridge info] Assistant response saved | site=gemini len=734
+
+[2026-07-22 05:39:41] [Bridge info] Enter recall started | site=gemini input=DIV len=58
+
+[2026-07-22 05:39:41] [Bridge info] Page message count | count=37 isNewChat=false
+
+[2026-07-22 05:39:42] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 05:39:42] [Bridge info] Context cleaned | rawLen=1334 cleanLen=1044 keep=true
+
+[2026-07-22 05:39:42] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 05:39:51] [Bridge info] Assistant response saved | site=gemini len=323
+
+[2026-07-22 05:42:50] [Bridge info] Enter recall started | site=gemini input=DIV len=146
+
+[2026-07-22 05:42:50] [Bridge info] Page message count | count=40 isNewChat=false
+
+[2026-07-22 05:42:51] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 05:42:51] [Bridge info] Context cleaned | rawLen=1427 cleanLen=1172 keep=true
+
+[2026-07-22 05:42:51] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 05:44:22] [Bridge info] Enter recall started | site=gemini input=DIV len=62
+
+[2026-07-22 05:44:22] [Bridge info] Page message count | count=43 isNewChat=false
+
+[2026-07-22 05:44:22] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 05:44:22] [Bridge info] Context cleaned | rawLen=2135 cleanLen=468 keep=true
+
+[2026-07-22 05:44:22] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 05:44:42] [Bridge info] Assistant response saved | site=gemini len=838
+
+[2026-07-22 05:45:28] [Bridge info] Enter recall started | site=gemini input=DIV len=146
+
+[2026-07-22 05:45:28] [Bridge info] Page message count | count=47 isNewChat=false
+
+[2026-07-22 05:45:28] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 05:45:28] [Bridge info] Context cleaned | rawLen=1430 cleanLen=1175 keep=true
+
+[2026-07-22 05:45:28] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 05:45:40] [Bridge info] Assistant response saved | site=gemini len=702
+
+[2026-07-22 05:46:12] [Bridge info] Enter recall started | site=gemini input=DIV len=557
+
+[2026-07-22 05:46:12] [Bridge info] Page message count | count=50 isNewChat=false
+
+[2026-07-22 05:46:12] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 05:46:12] [Bridge info] Context cleaned | rawLen=1840 cleanLen=1173 keep=true
+
+[2026-07-22 05:46:13] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 05:46:27] [Bridge info] Assistant response saved | site=gemini len=1737
+
+[2026-07-22 05:47:10] [Bridge info] Enter recall started | site=gemini input=DIV len=24
+
+[2026-07-22 05:47:10] [Bridge info] Page message count | count=53 isNewChat=false
+
+[2026-07-22 05:47:10] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 05:47:10] [Bridge info] Context cleaned | rawLen=1840 cleanLen=1707 keep=true
+
+[2026-07-22 05:47:10] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 05:47:20] [Bridge info] Assistant response saved | site=gemini len=404
+
+[2026-07-22 05:47:41] [Bridge info] Enter recall started | site=gemini input=DIV len=57
+
+[2026-07-22 05:47:41] [Bridge info] Page message count | count=56 isNewChat=false
+
+[2026-07-22 05:47:41] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 05:47:41] [Bridge info] Context cleaned | rawLen=1625 cleanLen=283 keep=true
+
+[2026-07-22 05:47:41] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 05:47:55] [Bridge info] Assistant response saved | site=gemini len=1868
+
+[2026-07-22 05:49:51] [Bridge info] Enter recall started | site=gemini input=DIV len=163
+
+[2026-07-22 05:49:51] [Bridge info] Page message count | count=59 isNewChat=false
+
+[2026-07-22 05:49:51] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 05:49:51] [Bridge info] Context cleaned | rawLen=1993 cleanLen=1718 keep=true
+
+[2026-07-22 05:49:51] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 05:50:03] [Bridge info] Assistant response saved | site=gemini len=1305
+
+[2026-07-22 05:51:01] [Bridge info] Enter recall started | site=gemini input=DIV len=80
+
+[2026-07-22 05:51:01] [Bridge info] Page message count | count=62 isNewChat=false
+
+[2026-07-22 05:51:05] [Bridge error] Context fetch failed | timeout
+
+[2026-07-22 05:51:05] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 05:51:16] [Bridge info] Assistant response saved | site=gemini len=847
+
+[2026-07-22 05:52:09] [Bridge info] Enter recall started | site=gemini input=DIV len=74
+
+[2026-07-22 05:52:09] [Bridge info] Page message count | count=65 isNewChat=false
+
+[2026-07-22 05:52:09] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 05:52:09] [Bridge info] Context cleaned | rawLen=2928 cleanLen=566 keep=true
+
+[2026-07-22 05:52:09] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 05:52:30] [Bridge info] Assistant response saved | site=gemini len=1130
+
+[2026-07-22 05:53:12] [Bridge info] Enter recall started | site=gemini input=DIV len=38
+
+[2026-07-22 05:53:12] [Bridge info] Page message count | count=68 isNewChat=false
+
+[2026-07-22 05:53:12] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 05:53:12] [Bridge info] Context cleaned | rawLen=1472 cleanLen=1325 keep=true
+
+[2026-07-22 05:53:12] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 05:53:27] [Bridge info] Assistant response saved | site=gemini len=1136
+
+[2026-07-22 05:54:41] [Bridge info] Enter recall started | site=gemini input=DIV len=190
+
+[2026-07-22 05:54:41] [Bridge info] Page message count | count=71 isNewChat=false
+
+[2026-07-22 05:54:41] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 05:54:41] [Bridge info] Context cleaned | rawLen=1472 cleanLen=1173 keep=true
+
+[2026-07-22 05:54:41] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 05:54:52] [Bridge info] Assistant response saved | site=gemini len=780
+
+[2026-07-22 05:57:05] [Bridge info] Enter recall started | site=gemini input=DIV len=202
+
+[2026-07-22 05:57:05] [Bridge info] Page message count | count=74 isNewChat=false
+
+[2026-07-22 05:57:05] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 05:57:05] [Bridge info] Context cleaned | rawLen=1484 cleanLen=1173 keep=true
+
+[2026-07-22 05:57:05] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 05:57:16] [Bridge info] Assistant response saved | site=gemini len=1020
+
+[2026-07-22 05:57:53] [Bridge info] Enter recall started | site=gemini input=DIV len=513
+
+[2026-07-22 05:57:53] [Bridge info] Page message count | count=77 isNewChat=false
+
+[2026-07-22 05:57:53] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 05:57:53] [Bridge info] Context cleaned | rawLen=2603 cleanLen=327 keep=true
+
+[2026-07-22 05:57:53] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 05:58:06] [Bridge info] Assistant response saved | site=gemini len=997
+
+[2026-07-22 06:04:18] [Bridge info] Enter recall started | site=gemini input=DIV len=149
+
+[2026-07-22 06:04:18] [Bridge info] Page message count | count=80 isNewChat=false
+
+[2026-07-22 06:04:18] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 06:04:18] [Bridge info] Context cleaned | rawLen=2246 cleanLen=504 keep=true
+
+[2026-07-22 06:04:18] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 06:04:32] [Bridge info] Assistant response saved | site=gemini len=2199
+
+[2026-07-22 06:05:12] [Bridge info] Enter recall started | site=gemini input=DIV len=39
+
+[2026-07-22 06:05:12] [Bridge info] Page message count | count=83 isNewChat=false
+
+[2026-07-22 06:05:12] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 06:05:12] [Bridge info] Context cleaned | rawLen=1844 cleanLen=1696 keep=true
+
+[2026-07-22 06:05:13] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 06:05:27] [Bridge info] Assistant response saved | site=gemini len=1891
+
+[2026-07-22 06:06:02] [Bridge info] Enter recall started | site=gemini input=DIV len=59
+
+[2026-07-22 06:06:02] [Bridge info] Page message count | count=86 isNewChat=false
+
+[2026-07-22 06:06:02] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 06:06:02] [Bridge info] Context cleaned | rawLen=2376 cleanLen=2200 keep=true
+
+[2026-07-22 06:06:03] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 06:06:16] [Bridge info] Assistant response saved | site=gemini len=708
+
+[2026-07-22 06:06:56] [Bridge info] Enter recall started | site=gemini input=DIV len=72
+
+[2026-07-22 06:06:56] [Bridge info] Page message count | count=89 isNewChat=false
+
+[2026-07-22 06:06:56] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 06:06:56] [Bridge info] Context cleaned | rawLen=2153 cleanLen=327 keep=true
+
+[2026-07-22 06:06:56] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 06:07:07] [Bridge info] Assistant response saved | site=gemini len=668
+
+[2026-07-22 06:08:01] [Bridge info] Enter recall started | site=gemini input=DIV len=434
+
+[2026-07-22 06:08:01] [Bridge info] Page message count | count=92 isNewChat=false
+
+[2026-07-22 06:08:02] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 06:08:02] [Bridge info] Context cleaned | rawLen=1726 cleanLen=1182 keep=true
+
+[2026-07-22 06:08:02] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 06:08:16] [Bridge info] Assistant response saved | site=gemini len=716
+
+[2026-07-22 06:09:02] [Bridge info] Enter recall started | site=gemini input=DIV len=38
+
+[2026-07-22 06:09:02] [Bridge info] Page message count | count=95 isNewChat=false
+
+[2026-07-22 06:09:06] [Bridge error] Context fetch failed | timeout
+
+[2026-07-22 06:09:06] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 06:10:16] [Bridge info] Enter recall started | site=gemini input=DIV len=95
+
+[2026-07-22 06:10:16] [Bridge info] Page message count | count=98 isNewChat=false
+
+[2026-07-22 06:10:16] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 06:10:16] [Bridge info] Context cleaned | rawLen=1489 cleanLen=1285 keep=true
+
+[2026-07-22 06:10:16] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 06:10:28] [Bridge info] Assistant response saved | site=gemini len=1193
+
+[2026-07-22 06:11:50] [Bridge info] Enter recall started | site=gemini input=DIV len=66
+
+[2026-07-22 06:11:50] [Bridge info] Page message count | count=101 isNewChat=false
+
+[2026-07-22 06:11:50] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 06:11:50] [Bridge info] Context cleaned | rawLen=1503 cleanLen=1327 keep=true
+
+[2026-07-22 06:11:50] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 06:11:58] [Bridge info] Enter recall started | site=gemini input=DIV len=1431
+
+[2026-07-22 06:11:58] [Bridge info] Enter recall skipped | empty=false hasContext=true
+
+[2026-07-22 06:14:08] [Bridge info] Enter recall started | site=gemini input=DIV len=659
+
+[2026-07-22 06:14:08] [Bridge info] Page message count | count=31 isNewChat=false
+
+[2026-07-22 06:14:12] [Bridge error] Context fetch failed | timeout
+
+[2026-07-22 06:14:12] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 06:14:27] [Bridge info] Assistant response saved | site=gemini len=2000
+
+[2026-07-22 06:14:55] [Bridge info] Enter recall started | site=gemini input=DIV len=42
+
+[2026-07-22 06:14:55] [Bridge info] Page message count | count=34 isNewChat=false
+
+[2026-07-22 06:14:55] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 06:14:55] [Bridge info] Context cleaned | rawLen=3573 cleanLen=563 keep=true
+
+[2026-07-22 06:14:55] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 06:15:07] [Bridge info] Assistant response saved | site=gemini len=798
+
+[2026-07-22 06:15:58] [Bridge info] Enter recall started | site=gemini input=DIV len=102
+
+[2026-07-22 06:15:58] [Bridge info] Page message count | count=37 isNewChat=false
+
+[2026-07-22 06:15:58] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 06:15:58] [Bridge info] Context cleaned | rawLen=2042 cleanLen=1821 keep=true
+
+[2026-07-22 06:15:59] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 06:16:10] [Bridge info] Assistant response saved | site=gemini len=959
+
+[2026-07-22 06:17:07] [Bridge info] Enter recall started | site=gemini input=DIV len=113
+
+[2026-07-22 06:17:07] [Bridge info] Page message count | count=40 isNewChat=false
+
+[2026-07-22 06:17:07] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 06:17:07] [Bridge info] Context cleaned | rawLen=1380 cleanLen=1158 keep=true
+
+[2026-07-22 06:17:07] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 06:17:22] [Bridge info] Assistant response saved | site=gemini len=1388
+
+[2026-07-22 06:18:06] [Bridge info] Enter recall started | site=gemini input=DIV len=74
+
+[2026-07-22 06:18:06] [Bridge info] Page message count | count=43 isNewChat=false
+
+[2026-07-22 06:18:06] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 06:18:06] [Bridge info] Context cleaned | rawLen=1348 cleanLen=1167 keep=true
+
+[2026-07-22 06:18:07] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 06:18:25] [Bridge info] Assistant response saved | site=gemini len=1233
+
+[2026-07-22 06:19:50] [Bridge info] Enter recall started | site=gemini input=DIV len=190
+
+[2026-07-22 06:19:50] [Bridge info] Page message count | count=49 isNewChat=false
+
+[2026-07-22 06:19:50] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 06:19:50] [Bridge info] Context cleaned | rawLen=1479 cleanLen=1180 keep=true
+
+[2026-07-22 06:19:51] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 06:20:03] [Bridge info] Assistant response saved | site=gemini len=1222
+
+[2026-07-22 06:21:23] [Bridge info] Enter recall started | site=gemini input=DIV len=58
+
+[2026-07-22 06:21:23] [Bridge info] Page message count | count=52 isNewChat=false
+
+[2026-07-22 06:21:24] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 06:21:24] [Bridge info] Context cleaned | rawLen=1619 cleanLen=283 keep=true
+
+[2026-07-22 06:21:24] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 06:21:36] [Bridge info] Assistant response saved | site=gemini len=1175
+
+[2026-07-22 06:22:24] [Bridge info] Enter recall started | site=gemini input=DIV len=96
+
+[2026-07-22 06:22:24] [Bridge info] Page message count | count=55 isNewChat=false
+
+[2026-07-22 06:22:24] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 06:22:24] [Bridge info] Context cleaned | rawLen=1378 cleanLen=1173 keep=true
+
+[2026-07-22 06:22:24] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 06:22:39] [Bridge info] Assistant response saved | site=gemini len=1994
+
+[2026-07-22 06:23:16] [Bridge info] Enter recall started | site=gemini input=DIV len=77
+
+[2026-07-22 06:23:16] [Bridge info] Page message count | count=58 isNewChat=false
+
+[2026-07-22 06:23:16] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 06:23:16] [Bridge info] Context cleaned | rawLen=2704 cleanLen=327 keep=true
+
+[2026-07-22 06:23:16] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 06:23:28] [Bridge info] Assistant response saved | site=gemini len=1095
+
+[2026-07-22 06:23:56] [Bridge info] Enter recall started | site=gemini input=DIV len=54
+
+[2026-07-22 06:23:56] [Bridge info] Page message count | count=61 isNewChat=false
+
+[2026-07-22 06:23:56] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 06:23:56] [Bridge info] Context cleaned | rawLen=1332 cleanLen=1172 keep=true
+
+[2026-07-22 06:23:57] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 06:24:09] [Bridge info] Assistant response saved | site=gemini len=1230
+
+[2026-07-22 06:25:12] [Bridge info] Enter recall started | site=gemini input=DIV len=92
+
+[2026-07-22 06:25:12] [Bridge info] Page message count | count=64 isNewChat=false
+
+[2026-07-22 06:25:12] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 06:25:12] [Bridge info] Context cleaned | rawLen=1379 cleanLen=1178 keep=true
+
+[2026-07-22 06:25:12] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 06:25:31] [Bridge info] Assistant response saved | site=gemini len=1095
+
+[2026-07-22 06:26:52] [Bridge info] Enter recall started | site=gemini input=DIV len=80
+
+[2026-07-22 06:26:52] [Bridge info] Page message count | count=67 isNewChat=false
+
+[2026-07-22 06:26:56] [Bridge error] Context fetch failed | timeout
+
+[2026-07-22 06:26:56] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 06:27:35] [Bridge info] Enter recall started | site=gemini input=DIV len=305
+
+[2026-07-22 06:27:35] [Bridge info] Page message count | count=70 isNewChat=false
+
+[2026-07-22 06:27:35] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 06:27:35] [Bridge info] Context cleaned | rawLen=1730 cleanLen=1313 keep=true
+
+[2026-07-22 06:27:35] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 06:27:47] [Bridge info] Assistant response saved | site=gemini len=814
+
+[2026-07-22 06:28:41] [Bridge info] Enter recall started | site=gemini input=DIV len=57
+
+[2026-07-22 06:28:41] [Bridge info] Page message count | count=74 isNewChat=false
+
+[2026-07-22 06:28:41] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 06:28:41] [Bridge info] Context cleaned | rawLen=1489 cleanLen=1323 keep=true
+
+[2026-07-22 06:28:41] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 06:28:55] [Bridge info] Assistant response saved | site=gemini len=848
+
+[2026-07-22 06:29:42] [Bridge info] Enter recall started | site=gemini input=DIV len=107
+
+[2026-07-22 06:29:42] [Bridge info] Page message count | count=77 isNewChat=false
+
+[2026-07-22 06:29:42] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 06:29:42] [Bridge info] Context cleaned | rawLen=1545 cleanLen=1327 keep=true
+
+[2026-07-22 06:29:42] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 06:29:54] [Bridge info] Assistant response saved | site=gemini len=815
+
+[2026-07-22 06:30:33] [Bridge info] Enter recall started | site=gemini input=DIV len=36
+
+[2026-07-22 06:30:33] [Bridge info] Page message count | count=80 isNewChat=false
+
+[2026-07-22 06:30:33] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 06:30:33] [Bridge info] Context cleaned | rawLen=2124 cleanLen=327 keep=true
+
+[2026-07-22 06:30:33] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 06:31:05] [Bridge info] Enter recall started | site=gemini input=DIV len=52
+
+[2026-07-22 06:31:05] [Bridge info] Page message count | count=83 isNewChat=false
+
+[2026-07-22 06:31:05] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 06:31:05] [Bridge info] Context cleaned | rawLen=1581 cleanLen=283 keep=true
+
+[2026-07-22 06:31:05] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 06:31:17] [Bridge info] Assistant response saved | site=gemini len=1433
+
+[2026-07-22 06:34:45] [Bridge info] Enter recall started | site=gemini input=DIV len=460
+
+[2026-07-22 06:34:45] [Bridge info] Page message count | count=86 isNewChat=false
+
+[2026-07-22 06:34:45] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 06:34:45] [Bridge info] Context cleaned | rawLen=2290 cleanLen=1719 keep=true
+
+[2026-07-22 06:34:45] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 06:34:58] [Bridge info] Assistant response saved | site=gemini len=1475
+
+[2026-07-22 06:36:14] [Bridge info] Enter recall started | site=gemini input=DIV len=161
+
+[2026-07-22 06:36:14] [Bridge info] Page message count | count=89 isNewChat=false
+
+[2026-07-22 06:36:15] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 06:36:15] [Bridge info] Context cleaned | rawLen=1976 cleanLen=1705 keep=true
+
+[2026-07-22 06:36:15] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 06:36:27] [Bridge info] Assistant response saved | site=gemini len=1112
+
+[2026-07-22 06:37:34] [Bridge info] Enter recall started | site=gemini input=DIV len=62
+
+[2026-07-22 06:37:34] [Bridge info] Page message count | count=92 isNewChat=false
+
+[2026-07-22 06:37:34] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 06:37:34] [Bridge info] Context cleaned | rawLen=1876 cleanLen=1705 keep=true
+
+[2026-07-22 06:37:34] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 06:37:47] [Bridge info] Assistant response saved | site=gemini len=1104
+
+[2026-07-22 06:38:33] [Bridge info] Enter recall started | site=gemini input=DIV len=113
+
+[2026-07-22 06:38:33] [Bridge info] Page message count | count=95 isNewChat=false
+
+[2026-07-22 06:38:37] [Bridge error] Context fetch failed | timeout
+
+[2026-07-22 06:38:37] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 06:38:50] [Bridge info] Assistant response saved | site=gemini len=2635
+
+[2026-07-22 06:40:03] [Bridge info] Enter recall started | site=gemini input=DIV len=254
+
+[2026-07-22 06:40:03] [Bridge info] Page message count | count=98 isNewChat=false
+
+[2026-07-22 06:40:03] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 06:40:03] [Bridge info] Context cleaned | rawLen=2987 cleanLen=568 keep=true
+
+[2026-07-22 06:40:03] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 06:40:12] [Bridge info] Assistant response saved | site=gemini len=518
+
+[2026-07-22 06:40:50] [Bridge info] Enter recall started | site=gemini input=DIV len=80
+
+[2026-07-22 06:40:50] [Bridge info] Page message count | count=101 isNewChat=false
+
+[2026-07-22 06:40:50] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 06:40:50] [Bridge info] Context cleaned | rawLen=2823 cleanLen=327 keep=true
+
+[2026-07-22 06:40:51] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 06:41:00] [Bridge info] Assistant response saved | site=gemini len=443
+
+[2026-07-22 06:41:22] [Bridge error] HEARTBEAT failed | Unknown type: HEARTBEAT
+
+[2026-07-22 06:41:23] [Bridge error] HEARTBEAT failed | Unknown type: HEARTBEAT
+
+[2026-07-22 06:41:23] [Bridge error] HEARTBEAT failed | Unknown type: HEARTBEAT
+
+[2026-07-22 07:51:10] [Bridge info] Enter recall started | site=arena input=DIV len=8
+
+[2026-07-22 07:51:10] [Bridge info] Page message count | count=0 isNewChat=true
+
+[2026-07-22 07:51:10] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 07:51:11] [Bridge info] Context cleaned | rawLen=1326 cleanLen=1162 keep=true
+
+[2026-07-22 07:51:11] [Bridge info] Clicking send button | label=Send message
+
+[2026-07-22 07:51:34] [Bridge info] Enter recall started | site=arena input=DIV len=32
+
+[2026-07-22 07:51:34] [Bridge info] Page message count | count=0 isNewChat=true
+
+[2026-07-22 07:51:34] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 07:51:35] [Bridge info] Context cleaned | rawLen=1277 cleanLen=1112 keep=true
+
+[2026-07-22 07:51:35] [Bridge info] Clicking send button | label=Send message
+
+[2026-07-22 07:52:00] [Bridge info] Enter recall started | site=arena input=DIV len=17
+
+[2026-07-22 07:52:00] [Bridge info] Page message count | count=0 isNewChat=true
+
+[2026-07-22 07:52:04] [Bridge error] Context fetch failed | timeout
+
+[2026-07-22 07:52:04] [Bridge info] Clicking send button | label=Send message
+
+[2026-07-22 07:53:54] [Bridge info] Enter recall started | site=arena input=DIV len=13
+
+[2026-07-22 07:53:54] [Bridge info] Page message count | count=0 isNewChat=true
+
+[2026-07-22 07:53:54] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 07:53:55] [Bridge info] Context cleaned | rawLen=1005 cleanLen=940 keep=true
+
+[2026-07-22 07:53:55] [Bridge info] Clicking send button | label=Send message
+
+[2026-07-22 07:55:19] [Bridge info] Enter recall started | site=arena input=DIV len=263
+
+[2026-07-22 07:55:19] [Bridge info] Page message count | count=0 isNewChat=true
+
+[2026-07-22 07:55:19] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 07:55:20] [Bridge info] Context cleaned | rawLen=1023 cleanLen=957 keep=true
+
+[2026-07-22 07:55:20] [Bridge info] Clicking send button | label=Send message
+
+[2026-07-22 07:56:15] [Bridge info] Enter recall started | site=arena input=DIV len=39
+
+[2026-07-22 07:56:15] [Bridge info] Page message count | count=0 isNewChat=true
+
+[2026-07-22 07:56:15] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 07:56:16] [Bridge info] Context cleaned | rawLen=1080 cleanLen=1015 keep=true
+
+[2026-07-22 07:56:16] [Bridge info] Clicking send button | label=Send message
+
+[2026-07-22 07:59:09] [Bridge info] Enter recall started | site=arena input=DIV len=106
+
+[2026-07-22 07:59:09] [Bridge info] Page message count | count=0 isNewChat=true
+
+[2026-07-22 07:59:09] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 07:59:09] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 07:59:11] [Bridge info] Context cleaned | rawLen=1051 cleanLen=985 keep=true
+
+[2026-07-22 07:59:12] [Bridge info] Clicking send button | label=Send message
+
+[2026-07-22 07:59:17] [Bridge BG error] native request failed | Native host timeout (id=63)
+
+[2026-07-22 07:59:17] [Bridge BG error] native request failed | Native host timeout (id=64)
+
+[2026-07-22 08:19:02] [Bridge info] Enter recall started | site=arena input=DIV len=49
+
+[2026-07-22 08:19:02] [Bridge info] Page message count | count=0 isNewChat=true
+
+[2026-07-22 08:19:02] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 08:19:02] [Bridge info] Context cleaned | rawLen=1233 cleanLen=1160 keep=true
+
+[2026-07-22 08:19:03] [Bridge info] Clicking send button | label=Send message
+
+[2026-07-22 08:25:27] [Bridge info] Enter recall started | site=arena input=DIV len=30
+
+[2026-07-22 08:25:27] [Bridge info] Page message count | count=0 isNewChat=true
+
+[2026-07-22 08:25:27] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 08:25:27] [Bridge info] Context cleaned | rawLen=1208 cleanLen=1134 keep=true
+
+[2026-07-22 08:25:28] [Bridge info] Clicking send button | label=Send message
+
+[2026-07-22 08:40:47] [Bridge info] Enter recall started | site=gemini input=DIV len=17
+
+[2026-07-22 08:40:47] [Bridge info] Page message count | count=7 isNewChat=false
+
+[2026-07-22 08:40:48] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 08:40:48] [Bridge info] Context cleaned | rawLen=1268 cleanLen=1143 keep=true
+
+[2026-07-22 08:40:49] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 08:41:12] [Bridge info] Assistant response saved | site=gemini len=532
+
+[2026-07-22 08:53:45] [Bridge info] Enter recall started | site=gemini input=DIV len=17
+
+[2026-07-22 08:53:45] [Bridge info] Page message count | count=11 isNewChat=false
+
+[2026-07-22 08:53:45] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 08:53:46] [Bridge info] Context cleaned | rawLen=1295 cleanLen=1169 keep=true
+
+[2026-07-22 08:53:46] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 08:53:56] [Bridge info] Assistant response saved | site=gemini len=1312
+
+[2026-07-22 09:04:59] [Bridge info] Enter recall started | site=gemini input=DIV len=30
+
+[2026-07-22 09:04:59] [Bridge info] Page message count | count=34 isNewChat=false
+
+[2026-07-22 09:05:00] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 09:05:00] [Bridge info] Context cleaned | rawLen=1310 cleanLen=45 keep=true
+
+[2026-07-22 09:05:00] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 09:05:10] [Bridge info] Assistant response saved | site=gemini len=381
+
+[2026-07-22 09:05:21] [Bridge info] Enter recall started | site=gemini input=DIV len=28
+
+[2026-07-22 09:05:21] [Bridge info] Page message count | count=37 isNewChat=false
+
+[2026-07-22 09:05:22] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 09:05:22] [Bridge info] Context cleaned | rawLen=2160 cleanLen=595 keep=true
+
+[2026-07-22 09:05:23] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 09:05:33] [Bridge info] Assistant response saved | site=gemini len=712
+
+[2026-07-22 09:11:25] [Bridge info] Enter recall started | site=gemini input=DIV len=40
+
+[2026-07-22 09:11:25] [Bridge info] Page message count | count=14 isNewChat=false
+
+[2026-07-22 09:11:25] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 09:11:26] [Bridge info] Context cleaned | rawLen=1322 cleanLen=1175 keep=true
+
+[2026-07-22 09:11:26] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 09:11:36] [Bridge info] Assistant response saved | site=gemini len=354
+
+[2026-07-22 09:12:11] [Bridge info] Enter recall started | site=arena input=DIV len=4192
+
+[2026-07-22 09:12:11] [Bridge info] Enter recall skipped | empty=false hasContext=true
+
+[2026-07-22 09:13:47] [Bridge info] Enter recall started | site=arena input=DIV len=18
+
+[2026-07-22 09:13:47] [Bridge info] Page message count | count=0 isNewChat=true
+
+[2026-07-22 09:13:47] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 09:13:48] [Bridge info] Context cleaned | rawLen=941 cleanLen=786 keep=true
+
+[2026-07-22 09:13:48] [Bridge info] Clicking send button | label=Send message
+
+[2026-07-22 09:16:58] [Bridge info] Enter recall started | site=arena input=DIV len=59
+
+[2026-07-22 09:16:58] [Bridge info] Page message count | count=0 isNewChat=true
+
+[2026-07-22 09:16:58] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 09:16:58] [Bridge info] Context cleaned | rawLen=871 cleanLen=808 keep=true
+
+[2026-07-22 09:16:59] [Bridge info] Clicking send button | label=Send message
+
+[2026-07-22 09:17:51] [Bridge info] Enter recall started | site=arena input=DIV len=63
+
+[2026-07-22 09:17:51] [Bridge info] Page message count | count=0 isNewChat=true
+
+[2026-07-22 09:17:51] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 09:17:52] [Bridge info] Context cleaned | rawLen=918 cleanLen=855 keep=true
+
+[2026-07-22 09:17:52] [Bridge info] Clicking send button | label=Send message
+
+[2026-07-22 09:30:17] [Bridge info] Enter recall started | site=gemini input=DIV len=95
+
+[2026-07-22 09:30:17] [Bridge info] Page message count | count=17 isNewChat=false
+
+[2026-07-22 09:30:17] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 09:30:18] [Bridge info] Context cleaned | rawLen=2160 cleanLen=564 keep=true
+
+[2026-07-22 09:30:18] [Bridge warn] No valid send button found, trying fallback
+
+[2026-07-22 09:30:23] [Bridge info] Assistant response saved | site=gemini len=354
+
+[2026-07-22 09:30:32] [Bridge info] Enter recall started | site=gemini input=DIV len=3645
+
+[2026-07-22 09:30:32] [Bridge info] Enter recall skipped | empty=false hasContext=true
+
+[2026-07-22 09:39:25] [Bridge info] Enter recall started | site=arena input=DIV len=222
+
+[2026-07-22 09:39:25] [Bridge info] Page message count | count=0 isNewChat=true
+
+[2026-07-22 09:39:25] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 09:39:26] [Bridge info] Context cleaned | rawLen=937 cleanLen=78 keep=true
+
+[2026-07-22 09:39:26] [Bridge info] Clicking send button | label=Send message
+
+[2026-07-22 09:39:55] [Bridge info] Enter recall started | site=gemini input=DIV len=222
+
+[2026-07-22 09:39:55] [Bridge info] Page message count | count=1 isNewChat=false
+
+[2026-07-22 09:39:56] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 09:39:56] [Bridge info] Context cleaned | rawLen=1490 cleanLen=1159 keep=true
+
+[2026-07-22 09:39:56] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 09:40:08] [Bridge info] Assistant response saved | site=gemini len=90
+
+[2026-07-22 10:06:11] [Bridge info] Enter recall started | site=arena input=DIV len=96
+
+[2026-07-22 10:06:11] [Bridge info] Page message count | count=0 isNewChat=true
+
+[2026-07-22 10:06:11] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 10:06:11] [Bridge info] Context cleaned | rawLen=908 cleanLen=831 keep=true
+
+[2026-07-22 10:06:12] [Bridge info] Clicking send button | label=Send message
+
+[2026-07-22 10:53:03] [Bridge info] Enter recall started | site=gemini input=DIV len=44
+
+[2026-07-22 10:53:03] [Bridge info] Page message count | count=31 isNewChat=false
+
+[2026-07-22 10:53:04] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 10:53:05] [Bridge info] Context cleaned | rawLen=1924 cleanLen=1770 keep=true
+
+[2026-07-22 10:53:14] [Bridge BG error] native request failed | Native host timeout (id=9)
+
+[2026-07-22 10:53:06] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 10:53:14] [Bridge BG error] native request failed | Native host timeout (id=10)
+
+[2026-07-22 10:53:06] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 10:53:14] [Bridge BG error] native request failed | Native host timeout (id=9)
+
+[2026-07-22 10:53:14] [Bridge BG error] native request failed | Native host timeout (id=10)
+
+[2026-07-22 10:53:22] [Bridge BG error] native request failed | Native host timeout (id=11)
+
+[2026-07-22 10:53:22] [Bridge BG error] native request failed | Native host timeout (id=12)
+
+[2026-07-22 10:53:26] [Bridge info] Assistant response saved | site=gemini len=1380
+
+[2026-07-22 10:54:13] [Bridge info] Enter recall started | site=gemini input=DIV len=43
+
+[2026-07-22 10:54:13] [Bridge info] Page message count | count=34 isNewChat=false
+
+[2026-07-22 10:54:13] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 10:54:14] [Bridge info] Context cleaned | rawLen=1783 cleanLen=1519 keep=true
+
+[2026-07-22 10:54:14] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 10:54:27] [Bridge info] Assistant response saved | site=gemini len=886
+
+[2026-07-22 10:59:00] [Bridge info] Enter recall started | site=gemini input=DIV len=60
+
+[2026-07-22 10:59:00] [Bridge info] Page message count | count=43 isNewChat=false
+
+[2026-07-22 10:59:00] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 10:59:00] [Bridge info] Enter recall started | site=gemini input=DIV len=60
+
+[2026-07-22 10:59:00] [Bridge info] Page message count | count=43 isNewChat=false
+
+[2026-07-22 10:59:00] [Bridge info] Context cleaned | rawLen=2066 cleanLen=283 keep=true
+
+[2026-07-22 10:59:01] [Bridge info] Enter recall started | site=gemini input=DIV len=4876
+
+[2026-07-22 10:59:01] [Bridge info] Enter recall skipped | empty=false hasContext=true
+
+[2026-07-22 10:59:01] [Bridge warn] No valid send button found, trying fallback
+
+[2026-07-22 10:59:04] [Bridge error] Context fetch failed | timeout
+
+[2026-07-22 10:59:05] [Bridge warn] No valid send button found, trying fallback
+
+[2026-07-22 10:59:14] [Bridge info] Assistant response saved | site=gemini len=1135
+
+[Hope controller] request=smoke-20260722 origin=microscope-bridge root=root-27336-1-1784717991266 path=D:/codex/chrome-extension/.hope-control-smoke.txt bytes=26 sha256=72f9fe77ed2d9a0031ba47f45278ed2e20dfb399bab57e0b372343dc280aac42
+
+[2026-07-22 11:01:56] [Bridge info] Enter recall started | site=gemini input=DIV len=205
+
+[2026-07-22 11:01:56] [Bridge info] Page message count | count=49 isNewChat=false
+
+[2026-07-22 11:01:57] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 11:01:57] [Bridge info] Context cleaned | rawLen=2450 cleanLen=327 keep=true
+
+[2026-07-22 11:01:58] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 11:02:10] [Bridge info] Assistant response saved | site=gemini len=1179
+
+[2026-07-22 11:02:35] [Bridge info] Enter recall started | site=gemini input=DIV len=28
+
+[2026-07-22 11:02:35] [Bridge info] Page message count | count=52 isNewChat=false
+
+[2026-07-22 11:02:35] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 11:02:36] [Bridge info] Context cleaned | rawLen=1456 cleanLen=1319 keep=true
+
+[2026-07-22 11:02:36] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 11:02:53] [Bridge info] Assistant response saved | site=gemini len=269
+
+[Hope controller] request=bridge-26632-2-1784718262607 origin=microscope-bridge root=root-26180-1-1784718263134 path=D:/codex/chrome-extension/.hope-native-smoke.txt bytes=25 sha256=3b23f3d4356990c481a44585fdfd1d77bfd3b6fce31d745f4c3f43fd1bc70fa8
+
+[Hope controller] request=bridge-14376-2-1784729030881 origin=microscope-bridge root=root-27628-1-1784729031447 path=\\?\D:\codex\chrome-extension\.hope-native-smoke.txt bytes=25 sha256=3b23f3d4356990c481a44585fdfd1d77bfd3b6fce31d745f4c3f43fd1bc70fa8
+
+[Hope controller] request=bridge-24492-2-1784729748035 origin=microscope-bridge root=root-22180-1-1784729748602 path=\\?\D:\codex\chrome-extension\.hope-native-smoke.txt bytes=25 sha256=3b23f3d4356990c481a44585fdfd1d77bfd3b6fce31d745f4c3f43fd1bc70fa8
+
+[2026-07-22 15:34:32] [Bridge info] Enter recall started | site=arena input=DIV len=6
+
+[2026-07-22 15:34:32] [Bridge info] Page message count | count=112 isNewChat=false
+
+[2026-07-22 15:34:33] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 15:34:33] [Bridge info] Context cleaned | rawLen=1833 cleanLen=1720 keep=true
+
+[2026-07-22 15:34:33] [Bridge info] Clicking send button | label=Send message
+
+[2026-07-22 15:35:44] [Bridge info] Enter recall started | site=arena input=DIV len=34
+
+[2026-07-22 15:35:44] [Bridge info] Page message count | count=118 isNewChat=false
+
+[2026-07-22 15:35:44] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 15:35:44] [Bridge info] Context cleaned | rawLen=1804 cleanLen=1660 keep=true
+
+[2026-07-22 15:35:45] [Bridge info] Clicking send button | label=Send message
+
+[2026-07-22 15:36:05] [Bridge info] Visual recall arm queued | site=arena pending=1
+
+[2026-07-22 15:36:05] [Bridge info] Assistant response saved | site=arena len=294
+
+[2026-07-22 15:36:34] [Bridge info] Enter recall started | site=arena input=DIV len=14
+
+[2026-07-22 15:36:34] [Bridge info] Visual recall arm delivered | site=arena k=5
+
+[2026-07-22 15:36:34] [Bridge info] Page message count | count=124 isNewChat=false
+
+[2026-07-22 15:36:34] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 15:36:35] [Bridge info] Context cleaned | rawLen=2645 cleanLen=343 keep=true
+
+[2026-07-22 15:36:35] [Bridge info] Clicking send button | label=Send message
+
+[2026-07-22 15:37:01] [Bridge info] Assistant response saved | site=arena len=856
+
+[2026-07-22 15:37:41] [Bridge info] Enter recall started | site=arena input=DIV len=36
+
+[2026-07-22 15:37:41] [Bridge info] Page message count | count=129 isNewChat=false
+
+[2026-07-22 15:37:41] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 15:37:41] [Bridge info] Context cleaned | rawLen=1314 cleanLen=1172 keep=true
+
+[2026-07-22 15:37:42] [Bridge info] Clicking send button | label=Send message
+
+[2026-07-22 15:43:04] [Bridge info] Enter recall started | site=arena input=DIV len=10
+
+[2026-07-22 15:43:04] [Bridge info] Page message count | count=134 isNewChat=false
+
+[2026-07-22 15:43:04] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 15:43:04] [Bridge info] Context cleaned | rawLen=2656 cleanLen=496 keep=true
+
+[2026-07-22 15:43:05] [Bridge info] Clicking send button | label=Send message
+
+[2026-07-22 15:43:38] [Bridge info] Assistant response saved | site=arena len=389
+
+[2026-07-22 15:50:49] [Bridge info] Enter recall started | site=arena input=DIV len=21
+
+[2026-07-22 15:50:49] [Bridge info] Page message count | count=139 isNewChat=false
+
+[2026-07-22 15:50:50] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 15:50:51] [Bridge info] Context cleaned | rawLen=1299 cleanLen=1170 keep=true
+
+[2026-07-22 15:50:51] [Bridge info] Clicking send button | label=Send message
+
+[2026-07-22 15:51:31] [Bridge info] Assistant response saved | site=arena len=440
+
+[2026-07-22 15:55:32] [Bridge info] Enter recall started | site=arena input=DIV len=116
+
+[2026-07-22 15:55:32] [Bridge info] Page message count | count=144 isNewChat=false
+
+[2026-07-22 15:55:33] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 15:55:34] [Bridge info] Context cleaned | rawLen=1390 cleanLen=1165 keep=true
+
+[2026-07-22 15:55:34] [Bridge info] Clicking send button | label=Send message
+
+[2026-07-22 15:56:05] [Bridge info] Assistant response saved | site=arena len=736
+
+[2026-07-22 15:56:36] [Bridge info] Enter recall started | site=arena input=DIV len=120
+
+[2026-07-22 15:56:36] [Bridge info] Page message count | count=150 isNewChat=false
+
+[2026-07-22 15:56:36] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 15:56:37] [Bridge info] Context cleaned | rawLen=1396 cleanLen=1168 keep=true
+
+[2026-07-22 15:56:37] [Bridge info] Clicking send button | label=Send message
+
+[2026-07-22 15:57:11] [Bridge info] Assistant response saved | site=arena len=292
+
+[2026-07-22 15:57:41] [Bridge info] Enter recall started | site=arena input=DIV len=69
+
+[2026-07-22 15:57:41] [Bridge info] Page message count | count=157 isNewChat=false
+
+[2026-07-22 15:57:41] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 15:57:41] [Bridge info] Context cleaned | rawLen=1326 cleanLen=1151 keep=true
+
+[2026-07-22 15:57:42] [Bridge info] Clicking send button | label=Send message
+
+[2026-07-22 15:58:13] [Bridge info] Assistant response saved | site=arena len=752
+
+[2026-07-22 15:58:53] [Bridge info] Enter recall started | site=arena input=DIV len=59
+
+[2026-07-22 15:58:53] [Bridge info] Page message count | count=164 isNewChat=false
+
+[2026-07-22 15:58:57] [Bridge error] Context fetch failed | timeout
+
+[2026-07-22 15:58:57] [Bridge info] Clicking send button | label=Send message
+
+[2026-07-22 16:00:14] [Bridge info] Enter recall started | site=arena input=DIV len=57
+
+[2026-07-22 16:00:14] [Bridge info] Page message count | count=167 isNewChat=false
+
+[2026-07-22 16:00:14] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 16:00:15] [Bridge info] Context cleaned | rawLen=1455 cleanLen=1289 keep=true
+
+[2026-07-22 16:00:15] [Bridge info] Clicking send button | label=Send message
+
+[2026-07-22 16:00:39] [Bridge info] Assistant response saved | site=arena len=626
+
+[2026-07-22 16:01:03] [Bridge info] Enter recall started | site=arena input=DIV len=24
+
+[2026-07-22 16:01:03] [Bridge info] Page message count | count=172 isNewChat=false
+
+[2026-07-22 16:01:04] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 16:01:04] [Bridge info] Context cleaned | rawLen=1451 cleanLen=1318 keep=true
+
+[2026-07-22 16:01:05] [Bridge info] Clicking send button | label=Send message
+
+[2026-07-22 16:01:06] [Bridge info] Enter recall started | site=arena input=DIV len=5905
+
+[2026-07-22 16:01:06] [Bridge info] Enter recall skipped | empty=false hasContext=true
+
+[2026-07-22 16:19:51] [Bridge info] Enter recall started | site=arena input=DIV len=18
+
+[2026-07-22 16:19:51] [Bridge info] Page message count | count=177 isNewChat=false
+
+[2026-07-22 16:19:51] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 16:19:51] [Bridge info] Context cleaned | rawLen=1455 cleanLen=1236 keep=true
+
+[2026-07-22 16:19:52] [Bridge info] Clicking send button | label=Send message
+
+[2026-07-22 16:20:27] [Bridge info] Assistant response saved | site=arena len=320
+
+[2026-07-22 22:07:39] [Bridge info] Enter recall started | site=gemini input=DIV len=7
+
+[2026-07-22 22:07:39] [Bridge info] Page message count | count=5 isNewChat=false
+
+[2026-07-22 22:07:40] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 22:07:42] [Bridge info] Context cleaned | rawLen=1065 cleanLen=920 keep=true
+
+[2026-07-22 22:07:42] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 22:07:52] [Bridge info] Assistant response saved | site=gemini len=237
+
+[2026-07-22 22:08:23] [Bridge info] Enter recall started | site=gemini input=DIV len=71
+
+[2026-07-22 22:08:23] [Bridge info] Page message count | count=4 isNewChat=false
+
+[2026-07-22 22:08:23] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 22:08:26] [Bridge info] Context cleaned | rawLen=2157 cleanLen=327 keep=true
+
+[2026-07-22 22:08:26] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 22:08:43] [Bridge info] Assistant response saved | site=gemini len=1930
+
+[2026-07-22 22:10:04] [Bridge info] Enter recall started | site=gemini input=DIV len=57
+
+[2026-07-22 22:10:04] [Bridge info] Page message count | count=7 isNewChat=false
+
+[2026-07-22 22:10:08] [Bridge error] Context fetch failed | timeout
+
+[2026-07-22 22:10:09] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 22:10:22] [Bridge info] Assistant response saved | site=gemini len=1140
+
+[2026-07-22 22:11:35] [Bridge info] Enter recall started | site=gemini input=DIV len=40
+
+[2026-07-22 22:11:35] [Bridge info] Page message count | count=10 isNewChat=false
+
+[2026-07-22 22:11:38] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 22:11:41] [Bridge info] Context cleaned | rawLen=1978 cleanLen=1820 keep=true
+
+[2026-07-22 22:11:41] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 22:11:54] [Bridge info] Assistant response saved | site=gemini len=841
+
+[2026-07-22 22:11:54] [Bridge info] Autonomous actions detected | count=1
+
+[Hope controller] request=bridge-29872-47-1784758317669 origin=microscope-bridge root=root-29504-1-1784758318234 path=D:/codex/octopus_test.txt bytes=60 sha256=9aefd14ee0590d5ef411245ca6b4dfd90e3f121cc83197e879d6ec846c09b53f
+
+[2026-07-22 22:12:00] [Bridge info] Action executed: code-writer | 🟨 Hope controller [CONTROL] ──
+├─ ◆ Octopus code-writer arm ──✓
+└─ ◆ local verification ──✓
+request: bridge-29872-47-17
+
+[2026-07-22 22:12:54] [Bridge info] Enter recall started | site=gemini input=DIV len=71
+
+[2026-07-22 22:12:54] [Bridge info] Page message count | count=13 isNewChat=false
+
+[2026-07-22 22:12:58] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 22:13:00] [Bridge info] Context cleaned | rawLen=2874 cleanLen=501 keep=true
+
+[2026-07-22 22:13:00] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 22:13:18] [Bridge info] Assistant response saved | site=gemini len=647
+
+[2026-07-22 22:14:05] [Bridge info] Enter recall started | site=gemini input=DIV len=39
+
+[2026-07-22 22:14:05] [Bridge info] Page message count | count=16 isNewChat=false
+
+[2026-07-22 22:14:06] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 22:14:06] [Bridge info] Context cleaned | rawLen=1320 cleanLen=1173 keep=true
+
+[2026-07-22 22:14:07] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 22:14:17] [Bridge info] Visual recall arm queued | site=gemini pending=1
+
+[2026-07-22 22:14:17] [Bridge info] Assistant response saved | site=gemini len=770
+
+[2026-07-22 22:14:23] [Bridge info] Enter recall started | site=gemini input=DIV len=3
+
+[2026-07-22 22:14:23] [Bridge info] Visual recall arm delivered | site=gemini k=5
+
+[2026-07-22 22:14:23] [Bridge info] Page message count | count=19 isNewChat=false
+
+[2026-07-22 22:14:23] [Bridge info] Enter recall started | site=gemini input=DIV len=3
+
+[2026-07-22 22:14:23] [Bridge info] Page message count | count=19 isNewChat=false
+
+[2026-07-22 22:14:23] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 22:14:24] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 22:14:24] [Bridge info] Context cleaned | rawLen=1283 cleanLen=1106 keep=true
+
+[2026-07-22 22:14:25] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 22:14:25] [Bridge info] Context cleaned | rawLen=2091 cleanLen=327 keep=true
+
+[2026-07-22 22:14:25] [Bridge warn] No valid send button found, trying fallback
+
+[2026-07-22 22:14:42] [Bridge info] Assistant response saved | site=gemini len=664
+
+[2026-07-22 22:16:04] [Bridge info] Enter recall started | site=gemini input=DIV len=3077
+
+[2026-07-22 22:16:04] [Bridge info] Page message count | count=25 isNewChat=false
+
+[2026-07-22 22:16:05] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 22:16:06] [Bridge info] Context cleaned | rawLen=5154 cleanLen=566 keep=true
+
+[2026-07-22 22:16:07] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 22:16:56] [Bridge info] Enter recall started | site=gemini input=DIV len=63
+
+[2026-07-22 22:16:56] [Bridge info] Page message count | count=28 isNewChat=false
+
+[2026-07-22 22:16:57] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 22:16:58] [Bridge info] Context cleaned | rawLen=1345 cleanLen=1175 keep=true
+
+[2026-07-22 22:16:59] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 22:17:14] [Bridge info] Assistant response saved | site=gemini len=1277
+
+[2026-07-22 22:17:59] [Bridge info] Enter recall started | site=gemini input=DIV len=63
+
+[2026-07-22 22:17:59] [Bridge info] Page message count | count=31 isNewChat=false
+
+[2026-07-22 22:18:00] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 22:18:01] [Bridge info] Context cleaned | rawLen=1344 cleanLen=1173 keep=true
+
+[2026-07-22 22:18:01] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 22:18:16] [Bridge info] Assistant response saved | site=gemini len=1786
+
+[2026-07-22 22:18:55] [Bridge info] Enter recall started | site=gemini input=DIV len=49
+
+[2026-07-22 22:18:55] [Bridge info] Page message count | count=34 isNewChat=false
+
+[2026-07-22 22:18:56] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 22:18:57] [Bridge info] Context cleaned | rawLen=1874 cleanLen=1714 keep=true
+
+[2026-07-22 22:18:58] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 22:19:09] [Bridge info] Assistant response saved | site=gemini len=1013
+
+[2026-07-22 22:20:19] [Bridge info] Enter recall started | site=gemini input=DIV len=150
+
+[2026-07-22 22:20:19] [Bridge info] Page message count | count=37 isNewChat=false
+
+[2026-07-22 22:20:20] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 22:20:21] [Bridge info] Context cleaned | rawLen=1981 cleanLen=1720 keep=true
+
+[2026-07-22 22:20:21] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 22:20:35] [Bridge info] Assistant response saved | site=gemini len=2349
+
+[2026-07-22 22:21:42] [Bridge info] Enter recall started | site=gemini input=DIV len=62
+
+[2026-07-22 22:21:42] [Bridge info] Page message count | count=40 isNewChat=false
+
+[2026-07-22 22:21:43] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 22:21:44] [Bridge info] Context cleaned | rawLen=2700 cleanLen=283 keep=true
+
+[2026-07-22 22:21:44] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 22:21:56] [Bridge info] Assistant response saved | site=gemini len=1061
+
+[2026-07-22 22:23:38] [Bridge info] Enter recall started | site=gemini input=DIV len=57
+
+[2026-07-22 22:23:38] [Bridge info] Page message count | count=43 isNewChat=false
+
+[2026-07-22 22:23:39] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 22:23:40] [Bridge info] Context cleaned | rawLen=3214 cleanLen=327 keep=true
+
+[2026-07-22 22:23:41] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 22:23:52] [Bridge info] Assistant response saved | site=gemini len=646
+
+[2026-07-22 22:24:46] [Bridge info] Enter recall started | site=gemini input=DIV len=22937
+
+[2026-07-22 22:24:46] [Bridge info] Page message count | count=46 isNewChat=false
+
+[2026-07-22 22:24:50] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 22:24:51] [Bridge info] Context cleaned | rawLen=25293 cleanLen=2234 keep=true
+
+[2026-07-22 22:24:54] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 22:25:06] [Bridge info] Assistant response saved | site=gemini len=1268
+
+[2026-07-22 22:26:14] [Bridge info] Enter recall started | site=gemini input=DIV len=84
+
+[2026-07-22 22:26:14] [Bridge info] Page message count | count=49 isNewChat=false
+
+[2026-07-22 22:26:18] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 22:26:20] [Bridge info] Context cleaned | rawLen=2432 cleanLen=2229 keep=true
+
+[2026-07-22 22:26:21] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 22:26:37] [Bridge info] Assistant response saved | site=gemini len=2898
+
+[2026-07-22 22:27:41] [Bridge info] Enter recall started | site=gemini input=DIV len=67
+
+[2026-07-22 22:27:41] [Bridge info] Page message count | count=52 isNewChat=false
+
+[2026-07-22 22:27:42] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 22:27:44] [Bridge info] Context cleaned | rawLen=1348 cleanLen=1173 keep=true
+
+[2026-07-22 22:27:45] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 22:28:00] [Bridge info] Assistant response saved | site=gemini len=2150
+
+[2026-07-22 22:29:32] [Bridge info] Enter recall started | site=gemini input=DIV len=85
+
+[2026-07-22 22:29:32] [Bridge info] Page message count | count=55 isNewChat=false
+
+[2026-07-22 22:29:32] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 22:29:33] [Bridge info] Context cleaned | rawLen=3266 cleanLen=517 keep=true
+
+[2026-07-22 22:29:34] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 22:29:48] [Bridge info] Assistant response saved | site=gemini len=1857
+
+[2026-07-22 22:31:21] [Bridge info] Enter recall started | site=gemini input=DIV len=87
+
+[2026-07-22 22:31:21] [Bridge info] Page message count | count=58 isNewChat=false
+
+[2026-07-22 22:31:22] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 22:31:22] [Bridge info] Context cleaned | rawLen=2406 cleanLen=2200 keep=true
+
+[2026-07-22 22:31:23] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 22:31:37] [Bridge info] Assistant response saved | site=gemini len=2172
+
+[2026-07-22 22:32:35] [Bridge info] Enter recall started | site=gemini input=DIV len=71
+
+[2026-07-22 22:32:35] [Bridge info] Page message count | count=62 isNewChat=false
+
+[2026-07-22 22:32:39] [Bridge error] Context fetch failed | timeout
+
+[2026-07-22 22:32:40] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 22:34:07] [Bridge info] Enter recall started | site=gemini input=DIV len=36
+
+[2026-07-22 22:34:07] [Bridge info] Page message count | count=65 isNewChat=false
+
+[2026-07-22 22:34:07] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 22:34:08] [Bridge info] Context cleaned | rawLen=2263 cleanLen=327 keep=true
+
+[2026-07-22 22:34:08] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 22:34:20] [Bridge info] Assistant response saved | site=gemini len=1958
+
+[2026-07-22 22:36:01] [Bridge info] Enter recall started | site=gemini input=DIV len=146
+
+[2026-07-22 22:36:01] [Bridge info] Page message count | count=68 isNewChat=false
+
+[2026-07-22 22:36:01] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 22:36:02] [Bridge info] Context cleaned | rawLen=2072 cleanLen=1807 keep=true
+
+[2026-07-22 22:36:02] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 22:36:15] [Bridge info] Assistant response saved | site=gemini len=2090
+
+[2026-07-22 22:37:24] [Bridge info] Enter recall started | site=gemini input=DIV len=85
+
+[2026-07-22 22:37:24] [Bridge info] Page message count | count=71 isNewChat=false
+
+[2026-07-22 22:37:24] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 22:37:24] [Bridge info] Context cleaned | rawLen=2805 cleanLen=283 keep=true
+
+[2026-07-22 22:37:25] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 22:37:38] [Bridge info] Assistant response saved | site=gemini len=1333
+
+[2026-07-22 22:38:21] [Bridge info] Enter recall started | site=gemini input=DIV len=53
+
+[2026-07-22 22:38:21] [Bridge info] Page message count | count=74 isNewChat=false
+
+[2026-07-22 22:38:21] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 22:38:21] [Bridge info] Context cleaned | rawLen=1335 cleanLen=1174 keep=true
+
+[2026-07-22 22:38:22] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 22:38:34] [Bridge info] Assistant response saved | site=gemini len=1604
+
+[2026-07-22 22:42:51] [Bridge info] Enter recall started | site=gemini input=DIV len=164
+
+[2026-07-22 22:42:51] [Bridge info] Page message count | count=77 isNewChat=false
+
+[2026-07-22 22:42:51] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 22:42:52] [Bridge info] Context cleaned | rawLen=1991 cleanLen=1717 keep=true
+
+[2026-07-22 22:42:52] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 22:43:04] [Bridge info] Assistant response saved | site=gemini len=1277
+
+[2026-07-22 22:43:37] [Bridge info] Enter recall started | site=gemini input=DIV len=48
+
+[2026-07-22 22:43:37] [Bridge info] Page message count | count=80 isNewChat=false
+
+[2026-07-22 22:43:37] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 22:43:37] [Bridge info] Context cleaned | rawLen=1873 cleanLen=1715 keep=true
+
+[2026-07-22 22:43:38] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 22:43:50] [Bridge info] Assistant response saved | site=gemini len=1980
+
+[2026-07-22 22:44:33] [Bridge info] Enter recall started | site=gemini input=DIV len=42
+
+[2026-07-22 22:44:33] [Bridge info] Page message count | count=83 isNewChat=false
+
+[2026-07-22 22:44:34] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 22:44:34] [Bridge info] Context cleaned | rawLen=1871 cleanLen=1720 keep=true
+
+[2026-07-22 22:44:35] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 22:44:47] [Bridge info] Assistant response saved | site=gemini len=1765
+
+[2026-07-22 22:45:14] [Bridge info] Enter recall started | site=gemini input=DIV len=31
+
+[2026-07-22 22:45:14] [Bridge info] Page message count | count=86 isNewChat=false
+
+[2026-07-22 22:45:14] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 22:45:15] [Bridge info] Context cleaned | rawLen=3964 cleanLen=515 keep=true
+
+[2026-07-22 22:45:15] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 22:45:28] [Bridge info] Assistant response saved | site=gemini len=1788
+
+[2026-07-22 22:47:21] [Bridge info] Enter recall started | site=gemini input=DIV len=234
+
+[2026-07-22 22:47:21] [Bridge info] Page message count | count=89 isNewChat=false
+
+[2026-07-22 22:47:21] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 22:47:21] [Bridge info] Context cleaned | rawLen=3072 cleanLen=2711 keep=true
+
+[2026-07-22 22:47:22] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 22:47:33] [Bridge info] Assistant response saved | site=gemini len=732
+
+[2026-07-22 22:48:46] [Bridge info] Enter recall started | site=gemini input=DIV len=68
+
+[2026-07-22 22:48:46] [Bridge info] Page message count | count=92 isNewChat=false
+
+[2026-07-22 22:48:46] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 22:48:46] [Bridge info] Context cleaned | rawLen=1348 cleanLen=1172 keep=true
+
+[2026-07-22 22:48:47] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 22:48:58] [Bridge info] Assistant response saved | site=gemini len=893
+
+[2026-07-22 22:49:38] [Bridge info] Enter recall started | site=gemini input=DIV len=76
+
+[2026-07-22 22:49:38] [Bridge info] Page message count | count=95 isNewChat=false
+
+[2026-07-22 22:49:38] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 22:49:39] [Bridge info] Context cleaned | rawLen=1354 cleanLen=1171 keep=true
+
+[2026-07-22 22:49:39] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 22:51:49] [Bridge info] Enter recall started | site=gemini input=DIV len=68
+
+[2026-07-22 22:51:49] [Bridge info] Page message count | count=31 isNewChat=false
+
+[2026-07-22 22:51:49] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 22:51:50] [Bridge info] Context cleaned | rawLen=1344 cleanLen=1169 keep=true
+
+[2026-07-22 22:51:50] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 22:52:03] [Bridge info] Assistant response saved | site=gemini len=2179
+
+[2026-07-22 22:55:13] [Bridge info] Enter recall started | site=gemini input=DIV len=16
+
+[2026-07-22 22:55:13] [Bridge info] Page message count | count=37 isNewChat=false
+
+[2026-07-22 22:55:13] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 22:55:14] [Bridge info] Context cleaned | rawLen=2156 cleanLen=500 keep=true
+
+[2026-07-22 22:55:14] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 22:55:29] [Bridge info] Assistant response saved | site=gemini len=1881
+
+[2026-07-22 22:56:15] [Bridge info] Enter recall started | site=gemini input=DIV len=50
+
+[2026-07-22 22:56:15] [Bridge info] Page message count | count=46 isNewChat=false
+
+[2026-07-22 22:56:15] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 22:56:16] [Bridge info] Context cleaned | rawLen=1887 cleanLen=1727 keep=true
+
+[2026-07-22 22:56:16] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 22:56:29] [Bridge info] Assistant response saved | site=gemini len=1931
+
+[2026-07-22 22:57:32] [Bridge info] Enter recall started | site=gemini input=DIV len=87
+
+[2026-07-22 22:57:32] [Bridge info] Page message count | count=53 isNewChat=false
+
+[2026-07-22 22:57:32] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 22:57:33] [Bridge info] Context cleaned | rawLen=3225 cleanLen=327 keep=true
+
+[2026-07-22 22:57:33] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 22:57:48] [Bridge info] Assistant response saved | site=gemini len=991
+
+[2026-07-22 22:59:09] [Bridge info] Enter recall started | site=gemini input=DIV len=47
+
+[2026-07-22 22:59:09] [Bridge info] Page message count | count=59 isNewChat=false
+
+[2026-07-22 22:59:09] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 22:59:09] [Bridge info] Context cleaned | rawLen=1325 cleanLen=1169 keep=true
+
+[2026-07-22 22:59:10] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 22:59:20] [Bridge info] Assistant response saved | site=gemini len=898
+
+[2026-07-22 23:00:04] [Bridge info] Enter recall started | site=gemini input=DIV len=60
+
+[2026-07-22 23:00:04] [Bridge info] Page message count | count=62 isNewChat=false
+
+[2026-07-22 23:00:04] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 23:00:04] [Bridge info] Context cleaned | rawLen=1340 cleanLen=1172 keep=true
+
+[2026-07-22 23:00:05] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 23:00:14] [Bridge info] Assistant response saved | site=gemini len=451
+
+[2026-07-22 23:00:30] [Bridge info] Enter recall started | site=gemini input=DIV len=54
+
+[2026-07-22 23:00:30] [Bridge info] Page message count | count=65 isNewChat=false
+
+[2026-07-22 23:00:30] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 23:00:31] [Bridge info] Context cleaned | rawLen=2127 cleanLen=516 keep=true
+
+[2026-07-22 23:00:31] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 23:00:43] [Bridge info] Assistant response saved | site=gemini len=725
+
+[2026-07-22 23:01:06] [Bridge info] Enter recall started | site=gemini input=DIV len=20
+
+[2026-07-22 23:01:06] [Bridge info] Page message count | count=68 isNewChat=false
+
+[2026-07-22 23:01:10] [Bridge error] Context fetch failed | timeout
+
+[2026-07-22 23:01:10] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 23:01:20] [Bridge info] Assistant response saved | site=gemini len=780
+
+[2026-07-22 23:02:09] [Bridge info] Enter recall started | site=gemini input=DIV len=66
+
+[2026-07-22 23:02:09] [Bridge info] Page message count | count=72 isNewChat=false
+
+[2026-07-22 23:02:09] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 23:02:09] [Bridge info] Context cleaned | rawLen=1498 cleanLen=1322 keep=true
+
+[2026-07-22 23:02:10] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 23:03:03] [Bridge info] Enter recall started | site=gemini input=DIV len=65
+
+[2026-07-22 23:03:03] [Bridge info] Page message count | count=75 isNewChat=false
+
+[2026-07-22 23:03:03] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 23:03:04] [Bridge info] Context cleaned | rawLen=1489 cleanLen=1314 keep=true
+
+[2026-07-22 23:03:04] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 23:04:23] [Bridge info] Enter recall started | site=gemini input=DIV len=93
+
+[2026-07-22 23:04:23] [Bridge info] Page message count | count=78 isNewChat=false
+
+[2026-07-22 23:04:23] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 23:04:24] [Bridge info] Context cleaned | rawLen=2321 cleanLen=327 keep=true
+
+[2026-07-22 23:04:24] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 23:04:35] [Bridge info] Assistant response saved | site=gemini len=1074
+
+[2026-07-22 23:05:45] [Bridge info] Enter recall started | site=gemini input=DIV len=65
+
+[2026-07-22 23:05:45] [Bridge info] Page message count | count=81 isNewChat=false
+
+[2026-07-22 23:05:45] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 23:05:45] [Bridge info] Context cleaned | rawLen=1631 cleanLen=283 keep=true
+
+[2026-07-22 23:05:46] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 23:05:58] [Bridge info] Assistant response saved | site=gemini len=1639
+
+[2026-07-22 23:07:44] [Bridge info] Enter recall started | site=gemini input=DIV len=158
+
+[2026-07-22 23:07:44] [Bridge info] Page message count | count=84 isNewChat=false
+
+[2026-07-22 23:07:45] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 23:07:45] [Bridge info] Context cleaned | rawLen=1974 cleanLen=1704 keep=true
+
+[2026-07-22 23:07:46] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 23:07:58] [Bridge info] Assistant response saved | site=gemini len=1367
+
+[2026-07-22 23:09:17] [Bridge info] Enter recall started | site=gemini input=DIV len=214
+
+[2026-07-22 23:09:17] [Bridge info] Page message count | count=87 isNewChat=false
+
+[2026-07-22 23:09:18] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 23:09:18] [Bridge info] Context cleaned | rawLen=2035 cleanLen=1709 keep=true
+
+[2026-07-22 23:09:19] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 23:09:32] [Bridge info] Assistant response saved | site=gemini len=2175
+
+[2026-07-22 23:10:17] [Bridge info] Enter recall started | site=gemini input=DIV len=81
+
+[2026-07-22 23:10:17] [Bridge info] Page message count | count=90 isNewChat=false
+
+[2026-07-22 23:10:18] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 23:10:18] [Bridge info] Context cleaned | rawLen=1895 cleanLen=1705 keep=true
+
+[2026-07-22 23:10:19] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 23:10:30] [Bridge info] Assistant response saved | site=gemini len=1272
+
+[2026-07-22 23:11:28] [Bridge info] Enter recall started | site=gemini input=DIV len=136
+
+[2026-07-22 23:11:28] [Bridge info] Page message count | count=93 isNewChat=false
+
+[2026-07-22 23:11:28] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 23:11:29] [Bridge info] Context cleaned | rawLen=1953 cleanLen=1705 keep=true
+
+[2026-07-22 23:11:29] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 23:11:40] [Bridge info] Assistant response saved | site=gemini len=1196
+
+[2026-07-22 23:13:37] [Bridge info] Enter recall started | site=gemini input=DIV len=206
+
+[2026-07-22 23:13:37] [Bridge info] Page message count | count=96 isNewChat=false
+
+[2026-07-22 23:13:38] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 23:13:38] [Bridge info] Context cleaned | rawLen=3399 cleanLen=519 keep=true
+
+[2026-07-22 23:13:39] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 23:13:57] [Bridge info] Assistant response saved | site=gemini len=1360
+
+[2026-07-22 23:14:29] [Bridge info] Enter recall started | site=gemini input=DIV len=46
+
+[2026-07-22 23:14:29] [Bridge info] Page message count | count=99 isNewChat=false
+
+[2026-07-22 23:14:29] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 23:14:29] [Bridge info] Context cleaned | rawLen=2134 cleanLen=327 keep=true
+
+[2026-07-22 23:14:30] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 23:16:30] [Bridge info] Enter recall started | site=gemini input=DIV len=43
+
+[2026-07-22 23:16:30] [Bridge info] Page message count | count=102 isNewChat=false
+
+[2026-07-22 23:16:30] [Bridge info] Enter recall started | site=gemini input=DIV len=43
+
+[2026-07-22 23:16:30] [Bridge info] Page message count | count=102 isNewChat=false
+
+[2026-07-22 23:16:30] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 23:16:30] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 23:16:31] [Bridge info] Context cleaned | rawLen=1296 cleanLen=1144 keep=true
+
+[2026-07-22 23:16:31] [Bridge info] Enter recall started | site=gemini input=DIV len=5706
+
+[2026-07-22 23:16:31] [Bridge info] Enter recall skipped | empty=false hasContext=true
+
+[2026-07-22 23:16:31] [Bridge info] Context cleaned | rawLen=1328 cleanLen=1130 keep=true
+
+[2026-07-22 23:16:32] [Bridge warn] No valid send button found, trying fallback
+
+[2026-07-22 23:16:32] [Bridge warn] No valid send button found, trying fallback
+
+[2026-07-22 23:16:34] [Bridge info] Enter recall started | site=gemini input=DIV len=5693
+
+[2026-07-22 23:16:34] [Bridge info] Enter recall skipped | empty=false hasContext=true
+
+[2026-07-22 23:16:52] [Bridge info] Assistant response saved | site=gemini len=1747
+
+[2026-07-22 23:19:56] [Bridge info] Enter recall started | site=gemini input=DIV len=135
+
+[2026-07-22 23:19:56] [Bridge info] Page message count | count=31 isNewChat=false
+
+[2026-07-22 23:19:57] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 23:19:57] [Bridge info] Context cleaned | rawLen=1416 cleanLen=1172 keep=true
+
+[2026-07-22 23:19:58] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 23:20:09] [Bridge info] Assistant response saved | site=gemini len=1069
+
+[2026-07-22 23:21:08] [Bridge info] Enter recall started | site=gemini input=DIV len=65
+
+[2026-07-22 23:21:08] [Bridge info] Page message count | count=34 isNewChat=false
+
+[2026-07-22 23:21:09] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 23:21:09] [Bridge info] Context cleaned | rawLen=1633 cleanLen=283 keep=true
+
+[2026-07-22 23:21:10] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 23:21:23] [Bridge info] Assistant response saved | site=gemini len=1258
+
+[2026-07-22 23:22:19] [Bridge info] Enter recall started | site=gemini input=DIV len=85
+
+[2026-07-22 23:22:19] [Bridge info] Page message count | count=37 isNewChat=false
+
+[2026-07-22 23:22:20] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 23:22:20] [Bridge info] Context cleaned | rawLen=1366 cleanLen=1174 keep=true
+
+[2026-07-22 23:22:21] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 23:22:41] [Bridge info] Assistant response saved | site=gemini len=1097
+
+[2026-07-22 23:23:19] [Bridge info] Enter recall started | site=gemini input=DIV len=58
+
+[2026-07-22 23:23:19] [Bridge info] Page message count | count=40 isNewChat=false
+
+[2026-07-22 23:23:19] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 23:23:20] [Bridge info] Context cleaned | rawLen=1338 cleanLen=1172 keep=true
+
+[2026-07-22 23:23:20] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 23:23:33] [Bridge info] Assistant response saved | site=gemini len=1550
+
+[2026-07-22 23:23:57] [Bridge info] Enter recall started | site=gemini input=DIV len=47
+
+[2026-07-22 23:23:57] [Bridge info] Page message count | count=43 isNewChat=false
+
+[2026-07-22 23:23:58] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 23:23:58] [Bridge info] Context cleaned | rawLen=2677 cleanLen=327 keep=true
+
+[2026-07-22 23:23:59] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 23:24:12] [Bridge info] Assistant response saved | site=gemini len=931
+
+[2026-07-22 23:24:41] [Bridge info] Enter recall started | site=gemini input=DIV len=54
+
+[2026-07-22 23:24:41] [Bridge info] Page message count | count=46 isNewChat=false
+
+[2026-07-22 23:24:42] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 23:24:42] [Bridge info] Context cleaned | rawLen=1881 cleanLen=1718 keep=true
+
+[2026-07-22 23:24:42] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 23:24:54] [Bridge info] Assistant response saved | site=gemini len=1304
+
+[2026-07-22 23:25:28] [Bridge info] Enter recall started | site=gemini input=DIV len=53
+
+[2026-07-22 23:25:28] [Bridge info] Page message count | count=49 isNewChat=false
+
+[2026-07-22 23:25:28] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 23:25:29] [Bridge info] Context cleaned | rawLen=2134 cleanLen=569 keep=true
+
+[2026-07-22 23:25:29] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 23:26:03] [Bridge info] Enter recall started | site=gemini input=DIV len=14
+
+[2026-07-22 23:26:03] [Bridge info] Page message count | count=52 isNewChat=false
+
+[2026-07-22 23:26:03] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 23:26:03] [Bridge info] Context cleaned | rawLen=1270 cleanLen=1148 keep=true
+
+[2026-07-22 23:26:04] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 23:26:13] [Bridge info] Assistant response saved | site=gemini len=585
+
+[2026-07-22 23:26:50] [Bridge info] Enter recall started | site=gemini input=DIV len=71
+
+[2026-07-22 23:26:50] [Bridge info] Page message count | count=55 isNewChat=false
+
+[2026-07-22 23:26:50] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 23:26:51] [Bridge info] Context cleaned | rawLen=1354 cleanLen=1175 keep=true
+
+[2026-07-22 23:26:51] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 23:27:02] [Bridge info] Assistant response saved | site=gemini len=745
+
+[2026-07-22 23:27:42] [Bridge info] Enter recall started | site=gemini input=DIV len=73
+
+[2026-07-22 23:27:42] [Bridge info] Page message count | count=58 isNewChat=false
+
+[2026-07-22 23:27:46] [Bridge error] Context fetch failed | timeout
+
+[2026-07-22 23:27:46] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 23:29:48] [Bridge info] Enter recall started | site=gemini input=DIV len=50
+
+[2026-07-22 23:29:48] [Bridge info] Page message count | count=61 isNewChat=false
+
+[2026-07-22 23:29:48] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 23:29:49] [Bridge info] Context cleaned | rawLen=1475 cleanLen=1315 keep=true
+
+[2026-07-22 23:29:50] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 23:31:43] [Bridge info] Enter recall started | site=gemini input=DIV len=63
+
+[2026-07-22 23:31:43] [Bridge info] Page message count | count=64 isNewChat=false
+
+[2026-07-22 23:31:43] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-22 23:31:44] [Bridge info] Context cleaned | rawLen=3137 cleanLen=674 keep=true
+
+[2026-07-22 23:31:44] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-22 23:31:54] [Bridge info] Assistant response saved | site=gemini len=504
+
+[2026-07-23 00:02:34] [Bridge info] Enter recall started | site=gemini input=DIV len=313
+
+[2026-07-23 00:02:34] [Bridge info] Page message count | count=31 isNewChat=false
+
+[2026-07-23 00:02:34] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-23 00:02:34] [Bridge info] Context cleaned | rawLen=1744 cleanLen=1319 keep=true
+
+[2026-07-23 00:02:35] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-23 00:02:50] [Bridge info] Assistant response saved | site=gemini len=5801
+
+[2026-07-23 00:25:36] [Bridge info] Enter recall started | site=gemini input=DIV len=213
+
+[2026-07-23 00:25:36] [Bridge info] Page message count | count=34 isNewChat=false
+
+[2026-07-23 00:25:36] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-23 00:25:37] [Bridge info] Context cleaned | rawLen=2059 cleanLen=1736 keep=true
+
+[2026-07-23 00:25:38] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-23 00:25:51] [Bridge info] Assistant response saved | site=gemini len=1911
+
+[2026-07-23 00:27:00] [Bridge info] Enter recall started | site=gemini input=DIV len=25
+
+[2026-07-23 00:27:00] [Bridge info] Page message count | count=37 isNewChat=false
+
+[2026-07-23 00:27:01] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-23 00:27:01] [Bridge info] Context cleaned | rawLen=2378 cleanLen=2234 keep=true
+
+[2026-07-23 00:27:02] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-23 00:27:13] [Bridge info] Assistant response saved | site=gemini len=1291
+
+[2026-07-23 00:45:49] [Bridge info] Enter recall started | site=gemini input=DIV len=53
+
+[2026-07-23 00:45:49] [Bridge info] Page message count | count=40 isNewChat=false
+
+[2026-07-23 00:45:50] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-23 00:45:50] [Bridge info] Context cleaned | rawLen=2403 cleanLen=2233 keep=true
+
+[2026-07-23 00:45:51] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-23 00:46:07] [Bridge info] Assistant response saved | site=gemini len=1535
+
+[2026-07-23 00:46:26] [Bridge info] Enter recall started | site=gemini input=DIV len=31
+
+[2026-07-23 00:46:26] [Bridge info] Page message count | count=46 isNewChat=false
+
+[2026-07-23 00:46:26] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-23 00:46:27] [Bridge info] Context cleaned | rawLen=2681 cleanLen=571 keep=true
+
+[2026-07-23 00:46:27] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-23 00:46:42] [Bridge info] Assistant response saved | site=gemini len=3314
+
+[2026-07-23 00:47:31] [Bridge info] Enter recall started | site=gemini input=DIV len=44
+
+[2026-07-23 00:47:31] [Bridge info] Page message count | count=51 isNewChat=false
+
+[2026-07-23 00:47:32] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-23 00:47:33] [Bridge info] Context cleaned | rawLen=2370 cleanLen=2207 keep=true
+
+[2026-07-23 00:47:33] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-23 00:47:50] [Bridge info] Assistant response saved | site=gemini len=4771
+
+[2026-07-23 00:48:11] [Bridge info] Enter recall started | site=gemini input=DIV len=246
+
+[2026-07-23 00:48:11] [Bridge info] Page message count | count=56 isNewChat=false
+
+[2026-07-23 00:48:11] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-23 00:48:11] [Bridge info] Context cleaned | rawLen=3882 cleanLen=327 keep=true
+
+[2026-07-23 00:48:12] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-23 00:48:12] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-23 00:48:20] [Bridge BG error] native request failed | Native host timeout (id=857)
+
+[2026-07-23 00:48:28] [Bridge info] Assistant response saved | site=gemini len=4524
+
+[2026-07-23 00:55:43] [Bridge info] Enter recall started | site=gemini input=DIV len=3
+
+[2026-07-23 00:55:43] [Bridge info] Page message count | count=61 isNewChat=false
+
+[2026-07-23 00:55:43] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-23 00:55:44] [Bridge info] Context cleaned | rawLen=1916 cleanLen=1796 keep=true
+
+[2026-07-23 00:55:44] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-23 00:55:57] [Bridge info] Assistant response saved | site=gemini len=1294
+
+[2026-07-23 00:59:18] [Bridge info] Enter recall started | site=gemini input=DIV len=64
+
+[2026-07-23 00:59:18] [Bridge info] Page message count | count=64 isNewChat=false
+
+[2026-07-23 00:59:18] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-23 00:59:19] [Bridge info] Context cleaned | rawLen=1976 cleanLen=1794 keep=true
+
+[2026-07-23 00:59:19] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-23 00:59:34] [Bridge info] Assistant response saved | site=gemini len=2766
+
+[2026-07-23 00:59:47] [Bridge info] Enter recall started | site=gemini input=DIV len=23
+
+[2026-07-23 00:59:47] [Bridge info] Page message count | count=67 isNewChat=false
+
+[2026-07-23 00:59:47] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-23 00:59:47] [Bridge info] Context cleaned | rawLen=2380 cleanLen=2202 keep=true
+
+[2026-07-23 00:59:48] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-23 01:00:00] [Bridge info] Assistant response saved | site=gemini len=1117
+
+[2026-07-23 01:00:14] [Bridge info] Enter recall started | site=gemini input=DIV len=46
+
+[2026-07-23 01:00:14] [Bridge info] Page message count | count=70 isNewChat=false
+
+[2026-07-23 01:00:14] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-23 01:00:15] [Bridge info] Context cleaned | rawLen=1613 cleanLen=283 keep=true
+
+[2026-07-23 01:00:15] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-23 01:00:29] [Bridge info] Assistant response saved | site=gemini len=3178
+
+[2026-07-23 01:03:08] [Bridge info] Enter recall started | site=gemini input=DIV len=28
+
+[2026-07-23 01:03:08] [Bridge info] Page message count | count=73 isNewChat=false
+
+[2026-07-23 01:03:09] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-23 01:03:09] [Bridge info] Context cleaned | rawLen=1853 cleanLen=1715 keep=true
+
+[2026-07-23 01:03:10] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-23 01:03:24] [Bridge info] Assistant response saved | site=gemini len=2269
+
+[2026-07-23 01:03:50] [Bridge info] Enter recall started | site=gemini input=DIV len=17
+
+[2026-07-23 01:03:50] [Bridge info] Page message count | count=76 isNewChat=false
+
+[2026-07-23 01:03:50] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-23 01:03:51] [Bridge info] Context cleaned | rawLen=2346 cleanLen=2211 keep=true
+
+[2026-07-23 01:03:51] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-23 01:04:06] [Bridge info] Assistant response saved | site=gemini len=1748
+
+[2026-07-23 01:04:34] [Bridge info] Enter recall started | site=gemini input=DIV len=33
+
+[2026-07-23 01:04:34] [Bridge info] Page message count | count=79 isNewChat=false
+
+[2026-07-23 01:04:34] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-23 01:04:35] [Bridge info] Context cleaned | rawLen=1800 cleanLen=1655 keep=true
+
+[2026-07-23 01:04:35] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-23 01:04:50] [Bridge info] Assistant response saved | site=gemini len=2221
+
+[2026-07-23 01:05:50] [Bridge info] Enter recall started | site=gemini input=DIV len=83
+
+[2026-07-23 01:05:50] [Bridge info] Page message count | count=83 isNewChat=false
+
+[2026-07-23 01:05:50] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-23 01:05:51] [Bridge info] Context cleaned | rawLen=3204 cleanLen=327 keep=true
+
+[2026-07-23 01:05:51] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-23 01:06:04] [Bridge info] Assistant response saved | site=gemini len=441
+
+[2026-07-23 01:10:04] [Bridge info] Enter recall started | site=gemini input=DIV len=30
+
+[2026-07-23 01:10:04] [Bridge info] Page message count | count=88 isNewChat=false
+
+[2026-07-23 01:10:05] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-23 01:10:05] [Bridge info] Context cleaned | rawLen=3760 cleanLen=514 keep=true
+
+[2026-07-23 01:10:06] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-23 01:10:06] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-23 01:10:14] [Bridge BG error] native request failed | Native host timeout (id=970)
+
+[2026-07-23 01:10:20] [Bridge info] Assistant response saved | site=gemini len=2143
+
+[2026-07-23 01:11:23] [Bridge info] Enter recall started | site=gemini input=DIV len=151
+
+[2026-07-23 01:11:23] [Bridge info] Page message count | count=92 isNewChat=false
+
+[2026-07-23 01:11:23] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-23 01:11:23] [Bridge info] Enter recall started | site=gemini input=DIV len=151
+
+[2026-07-23 01:11:23] [Bridge info] Page message count | count=92 isNewChat=false
+
+[2026-07-23 01:11:24] [Bridge info] Context cleaned | rawLen=2128 cleanLen=1857 keep=true
+
+[2026-07-23 01:11:24] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-23 01:11:24] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-23 01:11:25] [Bridge info] Context cleaned | rawLen=2124 cleanLen=1680 keep=true
+
+[2026-07-23 01:11:26] [Bridge warn] No valid send button found, trying fallback
+
+[2026-07-23 01:11:41] [Bridge info] Assistant response saved | site=gemini len=2717
+
+[2026-07-23 01:12:26] [Bridge info] Enter recall started | site=gemini input=DIV len=50
+
+[2026-07-23 01:12:26] [Bridge info] Page message count | count=95 isNewChat=false
+
+[2026-07-23 01:12:26] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-23 01:12:26] [Bridge info] Context cleaned | rawLen=2520 cleanLen=2344 keep=true
+
+[2026-07-23 01:12:27] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-23 01:12:48] [Bridge info] Assistant response saved | site=gemini len=1640
+
+[2026-07-23 01:13:28] [Bridge info] Enter recall started | site=gemini input=DIV len=82
+
+[2026-07-23 01:13:28] [Bridge info] Page message count | count=98 isNewChat=false
+
+[2026-07-23 01:13:28] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-23 01:13:29] [Bridge info] Context cleaned | rawLen=1362 cleanLen=1171 keep=true
+
+[2026-07-23 01:13:29] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-23 01:13:46] [Bridge info] Assistant response saved | site=gemini len=2573
+
+[2026-07-23 01:14:38] [Bridge info] Enter recall started | site=gemini input=DIV len=105
+
+[2026-07-23 01:14:38] [Bridge info] Page message count | count=101 isNewChat=false
+
+[2026-07-23 01:14:39] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-23 01:14:39] [Bridge info] Context cleaned | rawLen=2213 cleanLen=283 keep=true
+
+[2026-07-23 01:14:40] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-23 01:14:56] [Bridge info] Assistant response saved | site=gemini len=3185
+
+[2026-07-23 01:15:30] [Bridge info] Enter recall started | site=gemini input=DIV len=29
+
+[2026-07-23 01:15:30] [Bridge info] Page message count | count=104 isNewChat=false
+
+[2026-07-23 01:15:30] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-23 01:15:31] [Bridge info] Context cleaned | rawLen=3149 cleanLen=327 keep=true
+
+[2026-07-23 01:15:31] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-23 01:16:53] [Bridge info] Enter recall started | site=gemini input=DIV len=30
+
+[2026-07-23 01:16:53] [Bridge info] Page message count | count=107 isNewChat=false
+
+[2026-07-23 01:16:57] [Bridge error] Context fetch failed | timeout
+
+[2026-07-23 01:16:57] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-23 02:11:25] [Bridge info] Enter recall started | site=gemini input=DIV len=9607
+
+[2026-07-23 02:11:25] [Bridge info] Page message count | count=110 isNewChat=false
+
+[2026-07-23 02:11:26] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-23 02:11:28] [Bridge info] Context cleaned | rawLen=10953 cleanLen=1235 keep=true
+
+[2026-07-23 02:11:31] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-23 02:11:45] [Bridge info] Assistant response saved | site=gemini len=1874
+
+[2026-07-23 02:17:58] [Bridge info] Enter recall started | site=gemini input=DIV len=26
+
+[2026-07-23 02:17:58] [Bridge info] Page message count | count=113 isNewChat=false
+
+[2026-07-23 02:17:58] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-23 02:17:59] [Bridge info] Context cleaned | rawLen=1981 cleanLen=1837 keep=true
+
+[2026-07-23 02:17:59] [Bridge info] Context cleaned | rawLen=1981 cleanLen=1837 keep=true
+
+[2026-07-23 02:18:00] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-23 02:18:07] [Bridge BG error] native request failed | Native host timeout (id=1109)
+
+[2026-07-23 02:18:16] [Bridge info] Assistant response saved | site=gemini len=763
+
+[2026-07-23 02:21:23] [Bridge info] Enter recall started | site=gemini input=DIV len=34
+
+[2026-07-23 02:21:23] [Bridge info] Page message count | count=116 isNewChat=false
+
+[2026-07-23 02:21:23] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-23 02:21:24] [Bridge info] Context cleaned | rawLen=2317 cleanLen=569 keep=true
+
+[2026-07-23 02:21:24] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-23 02:21:35] [Bridge info] Assistant response saved | site=gemini len=549
+
+[2026-07-23 02:22:35] [Bridge info] Enter recall started | site=gemini input=DIV len=1
+
+[2026-07-23 02:22:35] [Bridge info] Page message count | count=119 isNewChat=false
+
+[2026-07-23 02:22:35] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-23 02:22:36] [Bridge info] Context cleaned | rawLen=1419 cleanLen=1284 keep=true
+
+[2026-07-23 02:22:37] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-23 02:22:48] [Bridge info] Assistant response saved | site=gemini len=1134
+
+[2026-07-23 02:23:50] [Bridge info] Enter recall started | site=gemini input=DIV len=21
+
+[2026-07-23 02:23:50] [Bridge info] Page message count | count=128 isNewChat=false
+
+[2026-07-23 02:23:50] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-23 02:23:53] [Bridge info] Context cleaned | rawLen=1479 cleanLen=1349 keep=true
+
+[2026-07-23 02:23:54] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-23 02:23:58] [Bridge BG error] native request failed | Native host timeout (id=1144)
+
+[2026-07-23 02:24:04] [Bridge info] Assistant response saved | site=gemini len=91
+
+[2026-07-23 02:24:14] [Bridge info] Enter recall started | site=gemini input=DIV len=5452
+
+[2026-07-23 02:24:14] [Bridge info] Enter recall skipped | empty=false hasContext=true
+
+[2026-07-23 02:24:45] [Bridge info] Enter recall started | site=gemini input=DIV len=37
+
+[2026-07-23 02:24:45] [Bridge info] Page message count | count=134 isNewChat=false
+
+[2026-07-23 02:24:45] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-23 02:24:46] [Bridge info] Context cleaned | rawLen=1506 cleanLen=1266 keep=true
+
+[2026-07-23 02:24:47] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-23 02:24:56] [Bridge info] Assistant response saved | site=gemini len=439
+
+[2026-07-23 02:25:26] [Bridge info] Enter recall started | site=gemini input=DIV len=25
+
+[2026-07-23 02:25:26] [Bridge info] Page message count | count=137 isNewChat=false
+
+[2026-07-23 02:25:26] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-23 02:25:27] [Bridge info] Context cleaned | rawLen=2287 cleanLen=327 keep=true
+
+[2026-07-23 02:25:27] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-23 02:25:39] [Bridge info] Assistant response saved | site=gemini len=949
+
+[2026-07-23 02:25:47] [Bridge BG error] native request failed | Native host timeout (id=1175)
+
+[2026-07-23 02:25:39] [Bridge info] Assistant response saved | site=gemini len=949
+
+[2026-07-23 02:32:33] [Bridge info] Enter recall started | site=gemini input=DIV len=51
+
+[2026-07-23 02:32:33] [Bridge info] Page message count | count=140 isNewChat=false
+
+[2026-07-23 02:32:33] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-23 02:32:34] [Bridge info] Context cleaned | rawLen=1516 cleanLen=1330 keep=true
+
+[2026-07-23 02:32:35] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-23 02:32:46] [Bridge info] Assistant response saved | site=gemini len=333
+
+[2026-07-23 02:34:17] [Bridge info] Enter recall started | site=gemini input=DIV len=10
+
+[2026-07-23 02:34:17] [Bridge info] Page message count | count=146 isNewChat=false
+
+[2026-07-23 02:34:17] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-23 02:34:18] [Bridge info] Context cleaned | rawLen=1473 cleanLen=1353 keep=true
+
+[2026-07-23 02:34:19] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-23 02:34:32] [Bridge info] Assistant response saved | site=gemini len=1637
+
+[2026-07-23 02:35:06] [Bridge info] Enter recall started | site=gemini input=DIV len=22
+
+[2026-07-23 02:35:06] [Bridge info] Page message count | count=149 isNewChat=false
+
+[2026-07-23 02:35:07] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-23 02:35:08] [Bridge info] Context cleaned | rawLen=2871 cleanLen=622 keep=true
+
+[2026-07-23 02:35:08] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-23 02:35:08] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-23 02:35:16] [Bridge BG error] native request failed | Native host timeout (id=1214)
+
+[2026-07-23 02:35:21] [Bridge info] Assistant response saved | site=gemini len=1523
+
+[2026-07-23 02:36:57] [Bridge info] Enter recall started | site=gemini input=DIV len=48
+
+[2026-07-23 02:36:57] [Bridge info] Page message count | count=152 isNewChat=false
+
+[2026-07-23 02:36:57] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-23 02:36:58] [Bridge info] Context cleaned | rawLen=2029 cleanLen=1862 keep=true
+
+[2026-07-23 02:36:59] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-23 02:37:09] [Bridge info] Assistant response saved | site=gemini len=752
+
+[2026-07-23 02:38:26] [Bridge info] Enter recall started | site=gemini input=DIV len=91
+
+[2026-07-23 02:38:26] [Bridge info] Page message count | count=155 isNewChat=false
+
+[2026-07-23 02:38:26] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-23 02:38:27] [Bridge info] Context cleaned | rawLen=2059 cleanLen=1849 keep=true
+
+[2026-07-23 02:38:28] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-23 02:38:40] [Bridge info] Assistant response saved | site=gemini len=1387
+
+[2026-07-23 02:40:39] [Bridge info] Enter recall started | site=gemini input=DIV len=837
+
+[2026-07-23 02:40:39] [Bridge info] Page message count | count=158 isNewChat=false
+
+[2026-07-23 02:40:39] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-23 02:40:39] [Bridge info] Context cleaned | rawLen=2802 cleanLen=1845 keep=true
+
+[2026-07-23 02:40:39] [Bridge info] Context cleaned | rawLen=2802 cleanLen=1845 keep=true
+
+[2026-07-23 02:40:40] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-23 02:40:40] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-23 02:40:47] [Bridge BG error] native request failed | Native host timeout (id=1248)
+
+[2026-07-23 02:40:48] [Bridge BG error] native request failed | Native host timeout (id=1249)
+
+[2026-07-23 02:40:48] [Bridge BG error] native request failed | Native host timeout (id=1250)
+
+[2026-07-23 02:40:53] [Bridge info] Assistant response saved | site=gemini len=1844
+
+[2026-07-23 02:41:32] [Bridge info] Enter recall started | site=gemini input=DIV len=40
+
+[2026-07-23 02:41:32] [Bridge info] Page message count | count=161 isNewChat=false
+
+[2026-07-23 02:41:32] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-23 02:41:33] [Bridge info] Context cleaned | rawLen=2153 cleanLen=1987 keep=true
+
+[2026-07-23 02:41:34] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-23 04:50:49] [Bridge info] Enter recall started | site=gemini input=DIV len=12
+
+[2026-07-23 04:50:49] [Bridge info] Page message count | count=167 isNewChat=false
+
+[2026-07-23 04:50:49] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-23 04:50:52] [Bridge info] Context cleaned | rawLen=3699 cleanLen=550 keep=true
+
+[2026-07-23 04:50:52] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-23 04:51:05] [Bridge info] Assistant response saved | site=gemini len=1253
+
+[2026-07-23 04:51:44] [Bridge info] Enter recall started | site=gemini input=DIV len=22
+
+[2026-07-23 04:51:44] [Bridge info] Page message count | count=170 isNewChat=false
+
+[2026-07-23 04:51:45] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-23 04:51:47] [Bridge info] Context cleaned | rawLen=2129 cleanLen=1981 keep=true
+
+[2026-07-23 04:51:47] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-23 04:52:02] [Bridge info] Assistant response saved | site=gemini len=2520
+
+[2026-07-23 04:55:56] [Bridge info] Enter recall started | site=gemini input=DIV len=136
+
+[2026-07-23 04:55:56] [Bridge info] Page message count | count=174 isNewChat=false
+
+[2026-07-23 04:55:58] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-23 04:55:59] [Bridge info] Context cleaned | rawLen=2612 cleanLen=2348 keep=true
+
+[2026-07-23 04:56:01] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-23 04:56:13] [Bridge info] Assistant response saved | site=gemini len=1456
+
+[2026-07-23 04:57:15] [Bridge info] Enter recall started | site=gemini input=DIV len=30
+
+[2026-07-23 04:57:15] [Bridge info] Page message count | count=177 isNewChat=false
+
+[2026-07-23 04:57:16] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-23 04:57:17] [Bridge info] Context cleaned | rawLen=2504 cleanLen=2347 keep=true
+
+[2026-07-23 04:57:18] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-23 04:57:28] [Bridge info] Assistant response saved | site=gemini len=567
+
+[2026-07-23 04:58:36] [Bridge info] Enter recall started | site=gemini input=DIV len=80
+
+[2026-07-23 04:58:36] [Bridge info] Page message count | count=180 isNewChat=false
+
+[2026-07-23 04:58:37] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-23 04:58:38] [Bridge info] Context cleaned | rawLen=2554 cleanLen=2349 keep=true
+
+[2026-07-23 04:58:39] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-23 04:58:56] [Bridge info] Assistant response saved | site=gemini len=2875
+
+[2026-07-23 05:00:50] [Bridge info] Enter recall started | site=gemini input=DIV len=49
+
+[2026-07-23 05:00:50] [Bridge info] Page message count | count=184 isNewChat=false
+
+[2026-07-23 05:00:51] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-23 05:00:52] [Bridge info] Context cleaned | rawLen=3179 cleanLen=283 keep=true
+
+[2026-07-23 05:00:53] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-23 05:01:09] [Bridge info] Assistant response saved | site=gemini len=2861
+
+[2026-07-23 05:06:06] [Bridge info] Enter recall started | site=gemini input=DIV len=1
+
+[2026-07-23 05:06:06] [Bridge info] Page message count | count=188 isNewChat=false
+
+[2026-07-23 05:06:08] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-23 05:06:09] [Bridge info] Context cleaned | rawLen=2841 cleanLen=2616 keep=true
+
+[2026-07-23 05:06:10] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-23 05:06:21] [Bridge info] Assistant response saved | site=gemini len=691
+
+[2026-07-23 05:07:21] [Bridge info] Enter recall started | site=gemini input=DIV len=111
+
+[2026-07-23 05:07:21] [Bridge info] Page message count | count=192 isNewChat=false
+
+[2026-07-23 05:07:24] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-23 05:07:25] [Bridge info] Context cleaned | rawLen=2959 cleanLen=2722 keep=true
+
+[2026-07-23 05:07:26] [Bridge warn] No valid send button found, trying fallback
+
+[2026-07-23 05:07:37] [Bridge info] Assistant response saved | site=gemini len=957
+
+[2026-07-23 05:08:25] [Bridge info] Enter recall started | site=gemini input=DIV len=45
+
+[2026-07-23 05:08:25] [Bridge info] Page message count | count=195 isNewChat=false
+
+[2026-07-23 05:08:27] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-23 05:08:28] [Bridge info] Context cleaned | rawLen=3699 cleanLen=327 keep=true
+
+[2026-07-23 05:08:29] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-23 05:08:40] [Bridge info] Assistant response saved | site=gemini len=1065
+
+[2026-07-23 05:09:21] [Bridge info] Enter recall started | site=gemini input=DIV len=53
+
+[2026-07-23 05:09:21] [Bridge info] Page message count | count=203 isNewChat=false
+
+[2026-07-23 05:09:22] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-23 05:09:23] [Bridge info] Context cleaned | rawLen=2900 cleanLen=2721 keep=true
+
+[2026-07-23 05:09:24] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-23 05:09:40] [Bridge info] Assistant response saved | site=gemini len=2522
+
+[2026-07-23 05:11:36] [Bridge info] Enter recall started | site=gemini input=DIV len=139
+
+[2026-07-23 05:11:36] [Bridge info] Page message count | count=206 isNewChat=false
+
+[2026-07-23 05:11:37] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-23 05:11:39] [Bridge info] Context cleaned | rawLen=2988 cleanLen=2722 keep=true
+
+[2026-07-23 05:11:40] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-23 05:18:52] [Bridge info] Enter recall started | site=gemini input=DIV len=69
+
+[2026-07-23 05:18:52] [Bridge info] Page message count | count=211 isNewChat=false
+
+[2026-07-23 05:18:52] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-23 05:18:53] [Bridge info] Context cleaned | rawLen=2713 cleanLen=512 keep=true
+
+[2026-07-23 05:18:53] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-23 05:19:05] [Bridge info] Assistant response saved | site=gemini len=746
+
+[2026-07-23 05:20:09] [Bridge info] Enter recall started | site=gemini input=DIV len=61
+
+[2026-07-23 05:20:09] [Bridge info] Page message count | count=217 isNewChat=false
+
+[2026-07-23 05:20:09] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-23 05:20:10] [Bridge info] Context cleaned | rawLen=1345 cleanLen=1177 keep=true
+
+[2026-07-23 05:20:11] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-23 05:20:23] [Bridge info] Assistant response saved | site=gemini len=1483
+
+[2026-07-23 05:24:48] [Bridge info] Enter recall started | site=gemini input=DIV len=45
+
+[2026-07-23 05:24:48] [Bridge info] Page message count | count=220 isNewChat=false
+
+[2026-07-23 05:24:49] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-23 05:24:50] [Bridge info] Context cleaned | rawLen=1853 cleanLen=1696 keep=true
+
+[2026-07-23 05:24:51] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-23 05:25:04] [Bridge info] Assistant response saved | site=gemini len=1811
+
+[2026-07-23 05:25:04] [Bridge info] Assistant response saved | site=gemini len=1811
+
+[2026-07-23 05:25:12] [Bridge BG error] native request failed | Native host timeout (id=1559)
+
+[2026-07-23 05:32:05] [Bridge info] Enter recall started | site=arena input=DIV len=49
+
+[2026-07-23 05:32:05] [Bridge info] Page message count | count=1 isNewChat=false
+
+[2026-07-23 05:32:06] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-23 05:32:06] [Bridge info] Context cleaned | rawLen=1514 cleanLen=1228 keep=true
+
+[2026-07-23 05:32:06] [Bridge info] Clicking send button | label=Send message
+
+[2026-07-23 05:32:30] [Bridge info] Assistant response saved | site=arena len=359
+
+[2026-07-23 05:33:37] [Bridge info] Enter recall started | site=arena input=DIV len=16
+
+[2026-07-23 05:33:37] [Bridge info] Page message count | count=5 isNewChat=false
+
+[2026-07-23 05:33:37] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-23 05:33:37] [Bridge info] Context cleaned | rawLen=2276 cleanLen=327 keep=true
+
+[2026-07-23 05:33:38] [Bridge info] Clicking send button | label=Send message
+
+[2026-07-23 05:34:07] [Bridge info] Assistant response saved | site=arena len=857
+
+[2026-07-23 05:34:57] [Bridge info] Enter recall started | site=arena input=DIV len=24
+
+[2026-07-23 05:34:57] [Bridge info] Page message count | count=9 isNewChat=false
+
+[2026-07-23 05:34:58] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-23 05:34:58] [Bridge info] Context cleaned | rawLen=1758 cleanLen=283 keep=true
+
+[2026-07-23 05:34:58] [Bridge info] Clicking send button | label=Send message
+
+[2026-07-23 05:36:35] [Bridge info] Enter recall started | site=arena input=DIV len=8
+
+[2026-07-23 05:36:35] [Bridge info] Page message count | count=13 isNewChat=false
+
+[2026-07-23 05:36:35] [Bridge info] Enter recall started | site=arena input=DIV len=8
+
+[2026-07-23 05:36:35] [Bridge info] Page message count | count=13 isNewChat=false
+
+[2026-07-23 05:36:39] [Bridge error] Context fetch failed | timeout
+
+[2026-07-23 05:36:39] [Bridge info] Clicking send button | label=Send message
+
+[2026-07-23 05:36:43] [Bridge BG error] native request failed | Native host timeout (id=1600)
+
+[2026-07-23 05:36:43] [Bridge BG error] native request failed | Native host timeout (id=1601)
+
+[2026-07-23 05:36:43] [Bridge BG error] native request failed | Native host timeout (id=1602)
+
+[2026-07-23 05:37:35] [Bridge info] Enter recall started | site=arena input=DIV len=91
+
+[2026-07-23 05:37:35] [Bridge info] Page message count | count=15 isNewChat=false
+
+[2026-07-23 05:37:36] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-23 05:37:36] [Bridge info] Context cleaned | rawLen=1818 cleanLen=1467 keep=true
+
+[2026-07-23 05:37:37] [Bridge info] Clicking send button | label=Send message
+
+[2026-07-23 05:38:00] [Bridge info] Assistant response saved | site=arena len=1042
+
+[2026-07-23 05:39:46] [Bridge info] Enter recall started | site=arena input=DIV len=202
+
+[2026-07-23 05:39:46] [Bridge info] Page message count | count=19 isNewChat=false
+
+[2026-07-23 05:39:47] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-23 05:39:47] [Bridge info] Context cleaned | rawLen=1905 cleanLen=1577 keep=true
+
+[2026-07-23 05:39:47] [Bridge info] Clicking send button | label=Send message
+
+[2026-07-23 05:40:08] [Bridge info] Assistant response saved | site=arena len=981
+
+[2026-07-23 05:40:08] [Bridge info] Assistant response saved | site=arena len=981
+
+[2026-07-23 05:40:16] [Bridge BG error] native request failed | Native host timeout (id=1631)
+
+[2026-07-23 05:40:17] [Bridge BG error] native request failed | Native host timeout (id=1632)
+
+[2026-07-23 05:40:18] [Bridge BG error] native request failed | Native host timeout (id=1633)
+
+[2026-07-23 05:42:13] [Bridge info] Enter recall started | site=arena input=DIV len=206
+
+[2026-07-23 05:42:13] [Bridge info] Page message count | count=23 isNewChat=false
+
+[2026-07-23 05:42:13] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-23 05:42:14] [Bridge info] Context cleaned | rawLen=2777 cleanLen=512 keep=true
+
+[2026-07-23 05:42:14] [Bridge info] Clicking send button | label=Send message
+
+[2026-07-23 05:42:40] [Bridge info] Assistant response saved | site=arena len=1177
+
+[2026-07-23 05:43:24] [Bridge info] Enter recall started | site=arena input=DIV len=18
+
+[2026-07-23 05:43:24] [Bridge info] Page message count | count=27 isNewChat=false
+
+[2026-07-23 05:43:24] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-23 05:43:25] [Bridge info] Context cleaned | rawLen=2550 cleanLen=327 keep=true
+
+[2026-07-23 05:43:25] [Bridge info] Clicking send button | label=Send message
+
+[2026-07-23 05:43:45] [Bridge info] Assistant response saved | site=arena len=645
+
+[2026-07-23 05:44:14] [Bridge info] Enter recall started | site=arena input=DIV len=46
+
+[2026-07-23 05:44:14] [Bridge info] Page message count | count=31 isNewChat=false
+
+[2026-07-23 05:44:14] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-23 05:44:15] [Bridge info] Context cleaned | rawLen=1771 cleanLen=1600 keep=true
+
+[2026-07-23 05:44:15] [Bridge info] Clicking send button | label=Send message
+
+[2026-07-23 05:44:15] [Bridge info] Clicking send button | label=Send message
+
+[2026-07-23 05:44:23] [Bridge BG error] native request failed | Native host timeout (id=1667)
+
+[2026-07-23 05:44:23] [Bridge BG error] native request failed | Native host timeout (id=1668)
+
+[2026-07-23 05:44:35] [Bridge info] Assistant response saved | site=arena len=435
+
+[2026-07-23 05:58:05] [Bridge info] Enter recall started | site=arena input=DIV len=1335
+
+[2026-07-23 05:58:05] [Bridge info] Page message count | count=42 isNewChat=false
+
+[2026-07-23 05:58:05] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-23 05:58:06] [Bridge info] Context cleaned | rawLen=2941 cleanLen=1487 keep=true
+
+[2026-07-23 05:58:06] [Bridge info] Clicking send button | label=Send message
+
+[2026-07-23 05:58:41] [Bridge info] Assistant response saved | site=arena len=1146
+
+[2026-07-23 05:59:32] [Bridge info] Enter recall started | site=arena input=DIV len=42
+
+[2026-07-23 05:59:32] [Bridge info] Page message count | count=42 isNewChat=false
+
+[2026-07-23 05:59:32] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-23 05:59:33] [Bridge info] Context cleaned | rawLen=1633 cleanLen=1471 keep=true
+
+[2026-07-23 05:59:33] [Bridge info] Clicking send button | label=Send message
+
+[2026-07-23 05:59:57] [Bridge info] Assistant response saved | site=arena len=1317
+
+[2026-07-23 06:00:45] [Bridge info] Enter recall started | site=arena input=DIV len=35
+
+[2026-07-23 06:00:45] [Bridge info] Page message count | count=46 isNewChat=false
+
+[2026-07-23 06:00:45] [Bridge info] Page message count | count=46 isNewChat=false
+
+[2026-07-23 06:00:49] [Bridge error] Context fetch failed | timeout
+
+[2026-07-23 06:00:50] [Bridge info] Clicking send button | label=Send message
+
+[2026-07-23 06:00:53] [Bridge BG error] native request failed | Native host timeout (id=1710)
+
+[2026-07-23 06:00:53] [Bridge BG error] native request failed | Native host timeout (id=1711)
+
+[2026-07-23 06:01:56] [Bridge info] Enter recall started | site=arena input=DIV len=34
+
+[2026-07-23 06:01:56] [Bridge info] Page message count | count=47 isNewChat=false
+
+[2026-07-23 06:01:56] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-23 06:01:57] [Bridge info] Context cleaned | rawLen=1748 cleanLen=1590 keep=true
+
+[2026-07-23 06:01:57] [Bridge info] Clicking send button | label=Send message
+
+[2026-07-23 06:02:20] [Bridge info] Assistant response saved | site=arena len=1140
+
+[2026-07-23 06:02:49] [Bridge info] Enter recall started | site=arena input=DIV len=47
+
+[2026-07-23 06:02:49] [Bridge info] Page message count | count=51 isNewChat=false
+
+[2026-07-23 06:02:50] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-23 06:02:50] [Bridge info] Context cleaned | rawLen=2553 cleanLen=327 keep=true
+
+[2026-07-23 06:02:51] [Bridge info] Clicking send button | label=Send message
+
+[2026-07-23 06:03:50] [Bridge info] Enter recall started | site=arena input=DIV len=65
+
+[2026-07-23 06:03:50] [Bridge info] Page message count | count=55 isNewChat=false
+
+[2026-07-23 06:03:50] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-23 06:03:50] [Bridge info] Context cleaned | rawLen=1747 cleanLen=1558 keep=true
+
+[2026-07-23 06:03:51] [Bridge info] Clicking send button | label=Send message
+
+[2026-07-23 06:04:13] [Bridge info] Assistant response saved | site=arena len=945
+
+[2026-07-23 06:04:59] [Bridge info] Enter recall started | site=arena input=DIV len=56
+
+[2026-07-23 06:04:59] [Bridge info] Page message count | count=59 isNewChat=false
+
+[2026-07-23 06:04:59] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-23 06:05:00] [Bridge info] Context cleaned | rawLen=2127 cleanLen=515 keep=true
+
+[2026-07-23 06:05:00] [Bridge info] Clicking send button | label=Send message
+
+[2026-07-23 06:48:10] [Bridge info] Enter recall started | site=gemini input=DIV len=2
+
+[2026-07-23 06:48:10] [Bridge info] Page message count | count=225 isNewChat=false
+
+[2026-07-23 06:48:10] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-23 06:48:12] [Bridge info] Enter recall started | site=gemini input=DIV len=1
+
+[2026-07-23 06:48:12] [Bridge info] Page message count | count=225 isNewChat=false
+
+[2026-07-23 06:48:13] [Bridge info] Context cleaned | rawLen=1261 cleanLen=1124 keep=true
+
+[2026-07-23 06:48:14] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-23 06:48:16] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-23 06:48:18] [Bridge info] Context cleaned | rawLen=1283 cleanLen=1105 keep=true
+
+[2026-07-23 06:48:19] [Bridge warn] No valid send button found, trying fallback
+
+[2026-07-23 06:48:25] [Bridge info] Assistant response saved | site=gemini len=1277
+
+[2026-07-23 06:48:25] [Bridge info] Octopus contract acknowledged | site=gemini mode=semantic
+
+[2026-07-23 06:59:29] [Bridge info] Enter recall started | site=grok input=DIV len=31
+
+[2026-07-23 06:59:29] [Bridge info] Page message count | count=0 isNewChat=true
+
+[2026-07-23 06:59:29] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-23 06:59:29] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-23 06:59:32] [Bridge info] Context cleaned | rawLen=945 cleanLen=883 keep=true
+
+[2026-07-23 06:59:32] [Bridge warn] No valid send button found, trying fallback
+
+[2026-07-23 06:59:32] [Bridge info] Context cleaned | rawLen=945 cleanLen=883 keep=true
+
+[2026-07-23 06:59:32] [Bridge warn] No valid send button found, trying fallback
+
+[2026-07-23 06:59:37] [Bridge BG error] native request failed | Native host timeout (id=1834)
+
+[2026-07-23 06:59:37] [Bridge BG error] native request failed | Native host timeout (id=1835)
+
+[2026-07-23 06:59:40] [Bridge BG error] native request failed | Native host timeout (id=1836)
+
+[2026-07-23 06:59:40] [Bridge BG error] native request failed | Native host timeout (id=1837)
+
+[2026-07-23 06:59:40] [Bridge BG error] native request failed | Native host timeout (id=1838)
+
+[2026-07-23 07:00:06] [Bridge info] Enter recall started | site=grok input=DIV len=19
+
+[2026-07-23 07:00:06] [Bridge info] Page message count | count=2 isNewChat=false
+
+[2026-07-23 07:00:06] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-23 07:00:06] [Bridge info] Context cleaned | rawLen=1772 cleanLen=1495 keep=true
+
+[2026-07-23 07:00:07] [Bridge warn] No valid send button found, trying fallback
+
+[2026-07-23 07:00:15] [Bridge info] Enter recall started | site=grok input=DIV len=10
+
+[2026-07-23 07:00:15] [Bridge info] Page message count | count=4 isNewChat=false
+
+[2026-07-23 07:00:15] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-23 07:00:16] [Bridge info] Context cleaned | rawLen=1689 cleanLen=1557 keep=true
+
+[2026-07-23 07:00:16] [Bridge warn] No valid send button found, trying fallback
+
+[2026-07-23 07:00:46] [Bridge info] Enter recall started | site=grok input=DIV len=62
+
+[2026-07-23 07:00:46] [Bridge info] Page message count | count=6 isNewChat=false
+
+[2026-07-23 07:00:50] [Bridge error] Context fetch failed | timeout
+
+[2026-07-23 07:00:50] [Bridge warn] No valid send button found, trying fallback
+
+[2026-07-23 07:02:19] [Bridge info] Enter recall started | site=grok input=DIV len=62
+
+[2026-07-23 07:02:19] [Bridge info] Page message count | count=8 isNewChat=false
+
+[2026-07-23 07:02:19] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-23 07:02:20] [Bridge info] Context cleaned | rawLen=1461 cleanLen=1291 keep=true
+
+[2026-07-23 07:02:20] [Bridge warn] No valid send button found, trying fallback
+
+[2026-07-23 11:14:19] [Bridge info] Enter recall started | site=grok input=DIV len=22
+
+[2026-07-23 11:14:19] [Bridge info] Page message count | count=10 isNewChat=false
+
+[2026-07-23 11:14:19] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-23 11:14:20] [Bridge info] Context cleaned | rawLen=1438 cleanLen=45 keep=true
+
+[2026-07-23 11:14:20] [Bridge warn] No valid send button found, trying fallback
+
+[2026-07-23 11:23:49] [Bridge info] Enter recall started | site=grok input=DIV len=43
+
+[2026-07-23 11:23:49] [Bridge info] Page message count | count=12 isNewChat=false
+
+[2026-07-23 11:23:49] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-23 11:23:50] [Bridge info] Context cleaned | rawLen=2573 cleanLen=641 keep=true
+
+[2026-07-23 11:23:50] [Bridge warn] No valid send button found, trying fallback
+
+[2026-07-23 11:23:50] [Bridge warn] No valid send button found, trying fallback
+
+[2026-07-23 11:23:58] [Bridge BG error] native request failed | Native host timeout (id=2151)
+
+[2026-07-23 11:23:58] [Bridge BG error] native request failed | Native host timeout (id=2152)
+
+[2026-07-23 11:25:08] [Bridge info] Enter recall started | site=grok input=DIV len=29
+
+[2026-07-23 11:25:08] [Bridge info] Page message count | count=14 isNewChat=false
+
+[2026-07-23 11:25:09] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-23 11:25:09] [Bridge info] Context cleaned | rawLen=1634 cleanLen=1490 keep=true
+
+[2026-07-23 11:25:10] [Bridge warn] No valid send button found, trying fallback
+
+[2026-07-23 11:38:16] [Bridge info] Enter recall started | site=grok input=DIV len=117
+
+[2026-07-23 11:38:16] [Bridge info] Page message count | count=16 isNewChat=false
+
+[2026-07-23 11:38:18] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-23 11:38:19] [Bridge info] Context cleaned | rawLen=1671 cleanLen=1437 keep=true
+
+[2026-07-23 11:38:19] [Bridge warn] No valid send button found, trying fallback
+
+[2026-07-23 11:40:05] [Bridge info] Enter recall started | site=grok input=DIV len=33
+
+[2026-07-23 11:40:05] [Bridge info] Page message count | count=20 isNewChat=false
+
+[2026-07-23 11:40:06] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-23 11:40:06] [Bridge info] Context cleaned | rawLen=1630 cleanLen=1482 keep=true
+
+[2026-07-23 11:40:06] [Bridge warn] No valid send button found, trying fallback
+
+[2026-07-23 11:40:55] [Bridge info] Enter recall started | site=grok input=DIV len=81
+
+[2026-07-23 11:40:55] [Bridge info] Page message count | count=22 isNewChat=false
+
+[2026-07-23 11:40:55] [Bridge info] Page message count | count=22 isNewChat=false
+
+[2026-07-23 11:40:59] [Bridge error] Context fetch failed | timeout
+
+[2026-07-23 11:40:59] [Bridge warn] No valid send button found, trying fallback
+
+[2026-07-23 11:41:03] [Bridge BG error] native request failed | Native host timeout (id=2197)
+
+[2026-07-23 11:41:03] [Bridge BG error] native request failed | Native host timeout (id=2198)
+
+[2026-07-23 15:53:15] [Bridge info] Enter recall started | site=gemini input=DIV len=4
+
+[2026-07-23 15:53:15] [Bridge info] Page message count | count=5 isNewChat=false
+
+[2026-07-23 15:53:15] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-23 15:53:18] [Bridge info] Context cleaned | rawLen=1700 cleanLen=1572 keep=true
+
+[2026-07-23 15:53:18] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-23 15:53:18] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-23 15:53:26] [Bridge BG error] native request failed | Native host timeout (id=9)
+
+[2026-07-23 15:53:26] [Bridge BG error] native request failed | Native host timeout (id=10)
+
+[2026-07-23 15:53:29] [Bridge info] Assistant response saved | site=gemini len=130
+
+[2026-07-23 15:53:52] [Bridge info] Enter recall started | site=gemini input=DIV len=59
+
+[2026-07-23 15:53:52] [Bridge info] Page message count | count=4 isNewChat=false
+
+[2026-07-23 15:53:52] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-23 15:53:55] [Bridge info] Context cleaned | rawLen=1656 cleanLen=1478 keep=true
+
+[2026-07-23 15:53:55] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-23 15:54:13] [Bridge info] Assistant response saved | site=gemini len=130
+
+[2026-07-23 16:05:59] [Bridge info] Enter recall started | site=gemini input=DIV len=40
+
+[2026-07-23 16:05:59] [Bridge info] Page message count | count=15 isNewChat=false
+
+[2026-07-23 16:05:59] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-23 16:06:00] [Bridge info] Context cleaned | rawLen=1634 cleanLen=1476 keep=true
+
+[2026-07-23 16:06:00] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-23 16:06:15] [Bridge info] Assistant response saved | site=gemini len=3036
+
+[2026-07-23 16:06:15] [Bridge info] Assistant response saved | site=gemini len=3036
+
+[2026-07-23 16:06:23] [Bridge BG error] native request failed | Native host timeout (id=48)
+
+[2026-07-23 16:11:07] [Bridge info] Enter recall started | site=gemini input=DIV len=43
+
+[2026-07-23 16:11:07] [Bridge info] Page message count | count=5 isNewChat=false
+
+[2026-07-23 16:11:08] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-23 16:11:08] [Bridge info] Context cleaned | rawLen=2312 cleanLen=327 keep=true
+
+[2026-07-23 16:11:09] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-23 16:11:22] [Bridge info] Assistant response saved | site=gemini len=1533
+
+[2026-07-23 16:11:22] [Bridge info] Octopus contract acknowledged | site=gemini mode=semantic
+
+[2026-07-23 16:15:56] [Bridge info] Enter recall started | site=gemini input=DIV len=31059
+
+[2026-07-23 16:15:56] [Bridge info] Page message count | count=5 isNewChat=false
+
+[2026-07-23 16:15:59] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-23 16:15:59] [Bridge info] Context cleaned | rawLen=33865 cleanLen=518 keep=true
+
+[2026-07-23 16:16:03] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-23 16:16:13] [Bridge info] Assistant response saved | site=gemini len=149
+
+[2026-07-23 16:17:59] [Bridge info] Enter recall started | site=gemini input=DIV len=148
+
+[2026-07-23 16:17:59] [Bridge info] Page message count | count=4 isNewChat=false
+
+[2026-07-23 16:17:59] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-23 16:17:59] [Bridge info] Context cleaned | rawLen=2117 cleanLen=1851 keep=true
+
+[2026-07-23 16:18:00] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-23 16:18:00] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-23 16:18:08] [Bridge BG error] native request failed | Native host timeout (id=89)
+
+[2026-07-23 16:18:16] [Bridge info] Assistant response saved | site=gemini len=3468
+
+[2026-07-23 16:18:16] [Bridge info] Octopus contract acknowledged | site=gemini mode=semantic
+
+[2026-07-23 16:19:24] [Bridge info] Enter recall started | site=gemini input=DIV len=115
+
+[2026-07-23 16:19:24] [Bridge info] Page message count | count=10 isNewChat=false
+
+[2026-07-23 16:19:24] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-23 16:19:25] [Bridge info] Context cleaned | rawLen=2090 cleanLen=1857 keep=true
+
+[2026-07-23 16:19:25] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-23 16:19:44] [Bridge info] Assistant response saved | site=gemini len=4063
+
+[2026-07-23 16:20:45] [Bridge info] Enter recall started | site=gemini input=DIV len=30
+
+[2026-07-23 16:20:45] [Bridge info] Page message count | count=13 isNewChat=false
+
+[2026-07-23 16:20:46] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-07-23 16:20:46] [Bridge info] Context cleaned | rawLen=2516 cleanLen=2360 keep=true
+
+[2026-07-23 16:20:46] [Bridge info] Clicking send button | label=Üzenet küldése
+
+[2026-07-23 16:20:59] [Bridge info] Assistant response saved | site=gemini len=1802

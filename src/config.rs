@@ -1,6 +1,22 @@
-﻿use serde::{Deserialize, Serialize};
+use crate::types::ProjectId;
+use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct HooksConfig {
+    pub read_only: bool,
+    pub write_enabled: bool,
+}
+
+impl Default for HooksConfig {
+    fn default() -> Self {
+        Self {
+            read_only: true,
+            write_enabled: false,
+        }
+    }
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Config {
@@ -16,6 +32,10 @@ pub struct Config {
     pub server: Server,
     #[serde(default)]
     pub federation: Federation,
+    #[serde(default)]
+    pub hooks: HooksConfig,
+    #[serde(default = "default_project_id")]
+    pub project_id: ProjectId,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -29,6 +49,21 @@ pub struct Paths {
 pub struct Index {
     pub max_depth: u8,
     pub header_size: usize,
+    #[serde(default = "default_auto_rebuild")]
+    pub auto_rebuild: bool,
+    #[serde(default = "default_auto_rebuild_entries")]
+    pub auto_rebuild_entries: usize,
+    /// Maximum persisted entries per layer. Zero keeps the full history.
+    #[serde(default)]
+    pub layer_retention_entries: usize,
+}
+
+fn default_auto_rebuild() -> bool {
+    true
+}
+
+fn default_auto_rebuild_entries() -> usize {
+    25
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -159,6 +194,10 @@ fn default_weight() -> f32 {
     1.0
 }
 
+fn default_project_id() -> ProjectId {
+    ProjectId::GLOBAL
+}
+
 impl Config {
     /// Loads config from a TOML file.
     pub fn load<P: AsRef<Path>>(path: P) -> Result<Self, Box<dyn std::error::Error>> {
@@ -191,12 +230,15 @@ impl Default for Config {
             },
             index: Index {
                 max_depth: 8,
-                header_size: 32,
+                header_size: 50,
+                auto_rebuild: default_auto_rebuild(),
+                auto_rebuild_entries: default_auto_rebuild_entries(),
+                layer_retention_entries: 0,
             },
             search: Search {
                 default_k: 10,
                 zoom_weight: 3.0,   // boost recent memories more
-                keyword_boost: 0.4,   // tuned for better recall precision
+                keyword_boost: 0.4, // tuned for better recall precision
                 semantic_weight: 0.0,
                 emotional_bias_weight: 0.0,
                 emotion_21d_weight: 0.0,
@@ -225,6 +267,8 @@ impl Default for Config {
             embedding: Embedding::default(),
             server: Server::default(),
             federation: Federation::default(),
+            hooks: HooksConfig::default(),
+            project_id: ProjectId::GLOBAL,
         }
     }
 }

@@ -997,3 +997,11 @@ Episodic memory binds events with their spatiotemporal context for later reconst
 Semantic memory stores factual world knowledge abstracted from specific experiences
 
 Working memory maintains task-relevant information in an active accessible buffer
+
+Benchmark test memory entry about quantum computing
+
+Benchmark pre-stored memory entry
+
+Benchmark test memory entry about quantum computing
+
+Benchmark pre-stored memory entry

@@ -20,6 +20,21 @@ use crate::LAYER_NAMES;
 /// How many items to include in the auto-context snapshot.
 pub const TIMELINE_TOP_N: usize = 5;
 pub const LOOPS_TOP_N: usize = 5;
+/// Max core memories to embed (full text, not just metadata).
+pub const CORE_MEMORIES_TOP_N: usize = 3;
+/// Importance threshold for core memories (0-10).
+pub const CORE_MEMORIES_MIN_IMP: u8 = 7;
+/// Max chars per core memory.
+pub const CORE_MEMORY_MAX_CHARS: usize = 500;
+
+/// A core memory entry with full text content.
+#[derive(Debug, Clone, Default)]
+pub struct CoreMemory {
+    pub text: String,
+    pub layer: String,
+    pub importance: u8,
+    pub depth: u8,
+}
 
 /// Assembled auto-context, ready to format for an LLM prompt.
 #[derive(Debug, Clone, Default)]
@@ -30,6 +45,8 @@ pub struct AutoContext {
     pub depth_breakdown: Vec<(u8, usize)>,
     pub append_log_size: usize,
     pub last_session_anchor_ms: Option<u64>,
+    /// Full-text top memories for direct LLM consumption.
+    pub core_memories: Vec<CoreMemory>,
 }
 
 /// Build the auto-context from disk + in-memory state.
@@ -67,6 +84,30 @@ pub fn build(output_dir: &Path, reader: &crate::reader::MicroscopeReader) -> Aut
             ctx.append_log_size = (total / AVG_ENTRY) as usize;
         }
     }
+
+    // Core memories: find top-importance blocks and embed their full text.
+    // Scan append log first (most recent stores with importance field).
+    let appended = crate::reader::read_append_log(&append_path);
+    let mut candidates: Vec<CoreMemory> = appended
+        .iter()
+        .filter(|e| e.importance >= CORE_MEMORIES_MIN_IMP)
+        .map(|e| {
+            let layer = LAYER_NAMES
+                .get(e.layer_id as usize)
+                .unwrap_or(&"?")
+                .to_string();
+            CoreMemory {
+                text: crate::safe_truncate(&e.text, CORE_MEMORY_MAX_CHARS).to_string(),
+                layer,
+                importance: e.importance,
+                depth: 0,
+            }
+        })
+        .collect();
+    // Sort by importance desc, then take top N.
+    candidates.sort_by_key(|a| std::cmp::Reverse(a.importance));
+    candidates.truncate(CORE_MEMORIES_TOP_N);
+    ctx.core_memories = candidates;
 
     ctx
 }
@@ -146,6 +187,28 @@ pub fn render(ctx: &AutoContext) -> String {
         }
     } else {
         out.push_str("║ OPEN LOOPS: none\n");
+    }
+
+    // Core memories — full text for direct LLM consumption (no hallucination needed)
+    if !ctx.core_memories.is_empty() {
+        out.push_str(&format!(
+            "║\n║ CORE MEMORIES (imp>={}, full text):\n",
+            CORE_MEMORIES_MIN_IMP
+        ));
+        for (i, m) in ctx.core_memories.iter().enumerate() {
+            out.push_str(&format!(
+                "║ [{}/{}] [{}] imp={} >>>\n",
+                i + 1,
+                ctx.core_memories.len(),
+                m.layer,
+                m.importance,
+            ));
+            // Indent each line of the memory text
+            for line in m.text.lines() {
+                out.push_str(&format!("║   {}\n", line));
+            }
+            out.push_str("║   <<<\n");
+        }
     }
 
     out.push_str("╚═══════════════════════════════════════════════════════╝\n");

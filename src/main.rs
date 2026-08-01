@@ -211,7 +211,7 @@ fn recall(config: &Config, query: &str, k: usize) {
                 let dy = h.y - qy;
                 let dz = h.z - qz;
                 let spatial_dist = dx * dx + dy * dy + dz * dz;
-                let boost = keyword_hits as f32 * 0.1;
+                let boost = keyword_hits as f32 * config.search.keyword_boost;
                 let combined = (spatial_dist - boost).max(0.0);
                 all_results.push((combined, i, true));
             }
@@ -230,7 +230,7 @@ fn recall(config: &Config, query: &str, k: usize) {
             .iter()
             .filter(|&&kw| text_lower.contains(kw))
             .count();
-        let boost = keyword_hits as f32 * 0.1;
+        let boost = keyword_hits as f32 * config.search.keyword_boost;
         if dist < 0.1 || keyword_hits > 0 {
             all_results.push(((dist - boost).max(0.0), ai + 1_000_000, false));
         }
@@ -512,9 +512,7 @@ fn recall(config: &Config, query: &str, k: usize) {
 
 fn semantic_search(config: &Config, query: &str, k: usize, metric: &str) {
     use microscope_memory::embedding_index::EmbeddingIndex;
-    use microscope_memory::embeddings::{
-        cosine_similarity_simd, EmbeddingProvider, MockEmbeddingProvider,
-    };
+    use microscope_memory::embeddings::{cosine_similarity_simd, EmbeddingProvider};
 
     let t0 = Instant::now();
     println!(
@@ -535,20 +533,8 @@ fn semantic_search(config: &Config, query: &str, k: usize, metric: &str) {
             idx.dim()
         );
 
-        #[cfg(feature = "embeddings")]
-        let provider: Box<dyn EmbeddingProvider> = if config.embedding.provider == "candle" {
-            match microscope_memory::embeddings::CandleEmbeddingProvider::new(
-                &config.embedding.model,
-            ) {
-                Ok(p) => Box::new(p),
-                Err(_) => Box::new(MockEmbeddingProvider::new(idx.dim())),
-            }
-        } else {
-            Box::new(MockEmbeddingProvider::new(idx.dim()))
-        };
-
-        #[cfg(not(feature = "embeddings"))]
-        let provider: Box<dyn EmbeddingProvider> = Box::new(MockEmbeddingProvider::new(idx.dim()));
+        let provider: Box<dyn EmbeddingProvider> =
+            microscope_memory::embeddings::provider_from_config(&config.embedding, idx.dim());
 
         let query_embedding = match provider.embed(query) {
             Ok(e) => e,
@@ -583,7 +569,10 @@ fn semantic_search(config: &Config, query: &str, k: usize, metric: &str) {
     }
 
     println!("  No embedding index â€” computing on-the-fly (slow)");
-    let provider = MockEmbeddingProvider::new(128);
+    let provider = microscope_memory::embeddings::provider_from_config(
+        &config.embedding,
+        config.embedding.dim,
+    );
 
     let query_embedding = match provider.embed(query) {
         Ok(e) => e,
@@ -808,7 +797,7 @@ fn verify_merkle(config: &Config) {
 
     let meta = fs::read(&meta_path).expect("read meta.bin");
     let magic = &meta[0..4];
-    if magic != b"MSC2" && magic != b"MSC3" {
+    if magic != b"MSC2" && magic != b"MSC3" && magic != b"MSC4" {
         println!(
             "  {} meta.bin is v1 (MSCM) â€” no merkle root stored. Rebuild first.",
             "WARN".yellow()
@@ -1036,9 +1025,15 @@ fn init_demo(config: &Config, force: bool) -> Result<(), String> {
 
 #[tokio::main]
 async fn main() {
-    let config = Config::load(DEFAULT_CONFIG_PATH).unwrap_or_else(|_| {
+    let config_path =
+        std::env::var("MICROSCOPE_CONFIG").unwrap_or_else(|_| DEFAULT_CONFIG_PATH.to_string());
+    let config = Config::load(&config_path).unwrap_or_else(|_| {
         // Redir warning to stderr for MCP compatibility
-        eprintln!("  {} Using default configuration", "WARN:".yellow());
+        eprintln!(
+            "  {} Could not load '{}'; using default configuration",
+            "WARN:".yellow(),
+            config_path
+        );
         Config::default()
     });
 
@@ -1357,12 +1352,18 @@ async fn main() {
         Cmd::Find { query, k } => {
             let r = open_reader(&config);
             println!("{} '{}':", "FIND".cyan().bold(), query);
-            let res = r.find_text(&query, k);
+            let append_path = Path::new(&config.paths.output_dir).join("append.bin");
+            let appended = read_append_log(&append_path);
+            let res = r.find_text_all(&config, &query, k);
             if res.is_empty() {
                 println!("  (none)");
             }
-            for (_d, i) in res {
-                r.print_result(i, 0.0);
+            for (_d, i, is_main) in res {
+                if is_main {
+                    r.print_result(i, 0.0);
+                } else {
+                    print_append_result(&appended, i, 0.0);
+                }
             }
         }
         Cmd::Fingerprint => {
@@ -1471,10 +1472,12 @@ async fn main() {
         }
         Cmd::Rebuild => {
             println!("{}", "Rebuilding with append log...".cyan());
-            microscope_memory::build::build(&config, true).expect("rebuild failed");
-            let append_path = Path::new(&config.paths.output_dir).join("append.bin");
-            let _ = fs::remove_file(append_path);
-            println!("  Append log cleared.");
+            let outcome =
+                microscope_memory::build::rebuild_pending(&config, true).expect("rebuild failed");
+            println!(
+                "  Append log cleared after consolidating {} entries.",
+                outcome.pending_entries
+            );
         }
         Cmd::GpuBench => {
             gpu_bench(&config);

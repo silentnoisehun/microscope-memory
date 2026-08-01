@@ -16,6 +16,7 @@ use std::fs;
 use std::path::Path;
 
 use crate::hebbian;
+use crate::types::{BlockHeader, MemoryQueryOptions, ProjectId};
 
 // ─── Constants ──────────────────────────────────────
 
@@ -25,6 +26,13 @@ const MAX_PULSES: usize = 2000;
 const PULSE_TTL_MS: u64 = 172_800_000;
 /// Minimum activation count to emit a pulse.
 const MIN_ACTIVATIONS_FOR_PULSE: usize = 2;
+
+/// Zero-copy project-isolation visibility check for a block header.
+#[inline(always)]
+pub fn is_block_visible(block: &BlockHeader, opts: &MemoryQueryOptions) -> bool {
+    block.is_visible_to(opts.active_project, opts.include_global)
+        && block.importance >= opts.min_importance
+}
 
 // ─── Types ──────────────────────────────────────────
 
@@ -191,6 +199,25 @@ impl ResonanceState {
         local_headers: &[(f32, f32, f32)],
         proximity_threshold: f32,
     ) -> usize {
+        self.integrate_into_hebbian_with_projects(
+            hebb,
+            local_headers,
+            proximity_threshold,
+            None,
+            None,
+        )
+    }
+
+    /// Project-aware variant. `project_ids` must match `local_headers` length.
+    pub fn integrate_into_hebbian_with_projects(
+        &mut self,
+        hebb: &mut hebbian::HebbianState,
+        local_headers: &[(f32, f32, f32)],
+        proximity_threshold: f32,
+        project_ids: Option<&[ProjectId]>,
+        opts: Option<&MemoryQueryOptions>,
+    ) -> usize {
+        let opts = opts.cloned().unwrap_or_default();
         let mut influenced = 0usize;
 
         for received in &mut self.incoming {
@@ -200,14 +227,25 @@ impl ResonanceState {
 
             for &(px, py, pz, score) in &received.pulse.activations {
                 for (block_idx, (lx, ly, lz)) in local_headers.iter().enumerate() {
+                    if block_idx >= hebb.activations.len() {
+                        continue;
+                    }
+                    if let Some(pids) = project_ids {
+                        if let Some(&pid) = pids.get(block_idx) {
+                            if pid != opts.active_project
+                                && !(opts.include_global && pid.is_global())
+                            {
+                                continue;
+                            }
+                        }
+                    }
+
                     let dx = px - lx;
                     let dy = py - ly;
                     let dz = pz - lz;
                     let dist_sq = dx * dx + dy * dy + dz * dz;
 
-                    if dist_sq < proximity_threshold * proximity_threshold
-                        && block_idx < hebb.activations.len()
-                    {
+                    if dist_sq < proximity_threshold * proximity_threshold {
                         // Gentle energy boost from resonance (not full activation)
                         let boost = score
                             * 0.1

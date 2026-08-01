@@ -108,11 +108,21 @@ pub fn run_doctor(config: &Config, fix: bool) -> Result<(), String> {
             println!("  [{}] Append log is empty.", "OK".green());
         } else {
             let mut pos = 0;
-            let is_v2 = data.len() >= 4 && &data[0..4] == b"APv2";
-            if is_v2 {
+            let (is_v2, is_v3) = if data.len() >= 4 {
+                (&data[0..4] == b"APv2", &data[0..4] == b"APv3")
+            } else {
+                (false, false)
+            };
+            if is_v2 || is_v3 {
                 pos = 4;
             }
-            let header_size = if is_v2 { 19 } else { 18 };
+            let header_size = if is_v3 {
+                35
+            } else if is_v2 {
+                19
+            } else {
+                18
+            };
 
             let mut valid_pos = pos;
             let mut count = 0;

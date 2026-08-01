@@ -6,9 +6,9 @@
 //! Not available on WASM targets (no stdio).
 
 use crate::config::Config;
-use microscope_hooks::*;
 use crate::reader::MicroscopeReader;
 use crate::{read_append_log, store_memory, store_memory_with_emotion, LAYER_NAMES};
+use microscope_hooks::*;
 use serde_json::{json, Value};
 use std::collections::{HashMap, HashSet};
 use std::io::{self, BufRead, BufReader, Read, Write};
@@ -34,8 +34,10 @@ pub fn run(config: Config) {
     let hook_manager = HookManager::new(hook_config);
     let mut session_started = false;
 
-    eprintln!("[hooks] manager initialized (read_only={}, write_enabled={})",
-        config.hooks.read_only, config.hooks.write_enabled);
+    eprintln!(
+        "[hooks] manager initialized (read_only={}, write_enabled={})",
+        config.hooks.read_only, config.hooks.write_enabled
+    );
 
     let stdin = io::stdin();
     let stdout = io::stdout();
@@ -99,7 +101,12 @@ pub fn run(config: Config) {
     }
 }
 
-fn handle_tools_call_with_hooks(id: &Value, request: &Value, config: &Config, hook_manager: &HookManager) -> Value {
+fn handle_tools_call_with_hooks(
+    id: &Value,
+    request: &Value,
+    config: &Config,
+    hook_manager: &HookManager,
+) -> Value {
     let params = request.get("params").cloned().unwrap_or(json!({}));
     let tool_name = params
         .get("name")
@@ -108,8 +115,7 @@ fn handle_tools_call_with_hooks(id: &Value, request: &Value, config: &Config, ho
     let args = params.get("arguments").cloned().unwrap_or(json!({}));
 
     // Run before_tool_call hook
-    let before_ctx = HookContext::new(HookEvent::BeforeToolCall)
-        .with_tool(tool_name, args.clone());
+    let before_ctx = HookContext::new(HookEvent::BeforeToolCall).with_tool(tool_name, args.clone());
     let _ = hook_manager.execute(HookEvent::BeforeToolCall, before_ctx);
 
     // Execute the tool
@@ -174,8 +180,11 @@ fn handle_tools_call_with_hooks(id: &Value, request: &Value, config: &Config, ho
                 .with_response(&content);
             let hook_ctx = hook_manager.execute(HookEvent::AfterToolCall, after_ctx);
             if !hook_ctx.memory_candidates.is_empty() {
-                eprintln!("[hooks] after_tool_call: {} candidate(s) from '{}'",
-                    hook_ctx.memory_candidates.len(), tool_name);
+                eprintln!(
+                    "[hooks] after_tool_call: {} candidate(s) from '{}'",
+                    hook_ctx.memory_candidates.len(),
+                    tool_name
+                );
             }
 
             json!({
@@ -207,7 +216,6 @@ fn handle_tools_call_with_hooks(id: &Value, request: &Value, config: &Config, ho
         }
     }
 }
-
 
 struct IncomingMessage {
     payload: String,
@@ -866,7 +874,6 @@ fn handle_tools_list(id: &Value) -> Value {
     })
 }
 
-
 fn tool_status(config: &Config) -> Result<String, String> {
     let reader = MicroscopeReader::open(config)?;
 
@@ -1051,36 +1058,12 @@ fn tool_recall(config: &Config, args: &Value) -> Result<String, String> {
     };
 
     let q_lower = query.to_lowercase();
-    let mut keyword_list: Vec<String> = q_lower
+    let keyword_list: Vec<String> = q_lower
         .split_whitespace()
         .filter(|w| w.len() > 2)
         .map(|s| s.to_string())
         .collect();
 
-    let session_path = Path::new(&config.paths.layers_dir).join("session.txt");
-    if session_path.exists() {
-        if let Ok(sess) = std::fs::read_to_string(&session_path) {
-            let recent: Vec<&str> = sess
-                .split("\n\n")
-                .filter(|s| !s.trim().is_empty())
-                .collect();
-            let context_start = if recent.len() > 5 {
-                recent.len() - 5
-            } else {
-                0
-            };
-            for entry in &recent[context_start..] {
-                for word in entry.split_whitespace() {
-                    let w = word
-                        .trim_matches(|c: char| !c.is_alphanumeric())
-                        .to_lowercase();
-                    if w.len() > 3 && !keyword_list.contains(&w) {
-                        keyword_list.push(w);
-                    }
-                }
-            }
-        }
-    }
     let keywords: Vec<&str> = keyword_list.iter().map(|s| s.as_str()).collect();
 
     // Load emotions.bin lookup for main-index emotional recall
@@ -1102,7 +1085,7 @@ fn tool_recall(config: &Config, args: &Value) -> Result<String, String> {
                 let dy = h.y - qy;
                 let dz = h.z - qz;
                 let spatial_dist = dx * dx + dy * dy + dz * dz;
-                let boost = keyword_hits as f32 * 0.1;
+                let boost = keyword_hits as f32 * config.search.keyword_boost;
                 // Emotional similarity boost (if query emotion AND emotions.bin data available)
                 let emo_boost = query_emotion
                     .as_ref()
@@ -1141,7 +1124,7 @@ fn tool_recall(config: &Config, args: &Value) -> Result<String, String> {
             .iter()
             .filter(|&&kw| text_lower.contains(kw))
             .count();
-        let boost = keyword_hits as f32 * 0.1;
+        let boost = keyword_hits as f32 * config.search.keyword_boost;
         // Emotional boost from inline append entry emotion
         let emo_boost = query_emotion
             .as_ref()
@@ -1320,35 +1303,6 @@ fn tool_recall(config: &Config, args: &Value) -> Result<String, String> {
 
         attention.mark_recall();
 
-        // Echo cache: store top-k recall results for fast re-access
-        for (i, (_, idx, is_main)) in all_results.iter().enumerate() {
-            if i >= 3 {
-                break;
-            }
-            let text = if *is_main {
-                format!(
-                    "RECALL[{}]: {} -> {}",
-                    i,
-                    query,
-                    crate::safe_truncate(reader.text(*idx), 180)
-                )
-            } else {
-                appended
-                    .get(idx - 1_000_000)
-                    .map(|e| {
-                        format!(
-                            "RECALL[{}]: {} -> {}",
-                            i,
-                            query,
-                            crate::safe_truncate(&e.text, 180)
-                        )
-                    })
-                    .unwrap_or_default()
-            };
-            if !text.is_empty() {
-                let _ = store_memory(config, &text, "echo_cache", 8 - i as u8);
-            }
-        }
         // Associative: link top-3 results that share keywords
         for (i, &(_, idx_a, is_a)) in all_results.iter().take(3).enumerate() {
             for &(_, idx_b, is_b) in all_results.iter().take(5).skip(i + 1) {
@@ -1397,23 +1351,35 @@ fn tool_find(config: &Config, args: &Value) -> Result<String, String> {
     let k = args.get("k").and_then(|v: &Value| v.as_u64()).unwrap_or(10) as usize;
 
     let reader = MicroscopeReader::open(config)?;
-    let results = reader.find_text(query, k);
+    let append_path = Path::new(&config.paths.output_dir).join("append.bin");
+    let appended = crate::read_append_log(&append_path);
+    let results = reader.find_text_all(config, query, k);
 
     if results.is_empty() {
         return Ok(format!("No results for '{}'", query));
     }
 
     let mut output = format!("Text search '{}': {} results\n\n", query, results.len());
-    for (_depth, idx) in &results {
-        let h = reader.header(*idx);
-        let text = reader.text(*idx);
-        let layer = LAYER_NAMES.get(h.layer_id as usize).unwrap_or(&"?");
-        output.push_str(&format!(
-            "[D{} {}] {}\n",
-            h.depth,
-            layer,
-            crate::safe_truncate(text, 150)
-        ));
+    for (depth, idx, is_main) in &results {
+        if *is_main {
+            let h = reader.header(*idx);
+            let text = reader.text(*idx);
+            let layer = LAYER_NAMES.get(h.layer_id as usize).unwrap_or(&"?");
+            output.push_str(&format!(
+                "[D{} {}] {}\n",
+                h.depth,
+                layer,
+                crate::safe_truncate(text, 150)
+            ));
+        } else if let Some(entry) = appended.get(idx.saturating_sub(1_000_000)) {
+            let layer = LAYER_NAMES.get(entry.layer_id as usize).unwrap_or(&"?");
+            output.push_str(&format!(
+                "[D{} {}/new] {}\n",
+                depth,
+                layer,
+                crate::safe_truncate(&entry.text, 150)
+            ));
+        }
     }
 
     Ok(output)
@@ -2565,20 +2531,26 @@ fn tool_embed(config: &Config, args: &Value) -> Result<String, String> {
         .unwrap_or("cosine");
 
     use crate::embedding_index::EmbeddingIndex;
-    use crate::embeddings::{EmbeddingProvider, MockEmbeddingProvider};
 
     let reader = MicroscopeReader::open(config)?;
     let output_dir = Path::new(&config.paths.output_dir);
     let emb_path = output_dir.join("embeddings.bin");
 
-    let provider: Box<dyn EmbeddingProvider> = Box::new(MockEmbeddingProvider::new(128));
+    // Match the provider dimension to the index; fall back to the configured
+    // dim when embeddings.bin is absent so recall never queries at dim 128.
+    let index = EmbeddingIndex::open(&emb_path);
+    let idx_dim = index
+        .as_ref()
+        .map(|idx| idx.dim())
+        .unwrap_or(config.embedding.dim);
+    let provider = crate::embeddings::provider_from_config(&config.embedding, idx_dim);
     let query_embedding = provider
         .embed(query)
         .map_err(|e| format!("Embedding failed: {}", e))?;
 
     let mut output = format!("Semantic Search '{}' (metric: {}):\n\n", query, metric);
 
-    if let Some(idx) = EmbeddingIndex::open(&emb_path) {
+    if let Some(idx) = index {
         let results = idx.search(&query_embedding, k);
         if results.is_empty() {
             output.push_str("(no results)\n");
@@ -3016,14 +2988,14 @@ fn tool_doctor(config: &Config, args: &Value) -> Result<String, String> {
 // ─── Rebuild Tool ───────────────────────────────────
 
 fn tool_rebuild(config: &Config, _args: &Value) -> Result<String, String> {
-    crate::build::build(config, true).map_err(|e| format!("Rebuild failed: {}", e))?;
-    let append_path = Path::new(&config.paths.output_dir).join("append.bin");
-    let _ = std::fs::remove_file(&append_path);
+    let outcome = crate::build::rebuild_pending(config, true)
+        .map_err(|e| format!("Rebuild failed: {}", e))?;
     let reader = MicroscopeReader::open(config)?;
     Ok(format!(
-        "Rebuild complete: {} blocks across {} depths.\nAppend log cleared.",
+        "Rebuild complete: {} blocks across {} depths.\nAppend log cleared after consolidating {} entries.",
         reader.block_count,
-        reader.depth_ranges.iter().filter(|&&(_, c)| c > 0).count()
+        reader.depth_ranges.iter().filter(|&&(_, c)| c > 0).count(),
+        outcome.pending_entries
     ))
 }
 
@@ -3175,11 +3147,10 @@ fn tool_autonomous(config: &Config, args: &Value) -> Result<String, String> {
     Ok(output)
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use microscope_hooks::*;
+    use crate::types::ProjectId;
 
     // ── Helper: create a test config ───────────────────────────────────────
 
@@ -3191,9 +3162,11 @@ mod tests {
                 temp_dir: "./tmp".to_string(),
             },
             index: crate::config::Index {
-                block_size: 256,
                 max_depth: 8,
                 header_size: 32,
+                auto_rebuild: false,
+                auto_rebuild_entries: 25,
+                layer_retention_entries: 0,
             },
             search: crate::config::Search {
                 default_k: 10,
@@ -3226,6 +3199,7 @@ mod tests {
             server: crate::config::Server::default(),
             federation: crate::config::Federation::default(),
             hooks: crate::config::HooksConfig::default(),
+            project_id: ProjectId::GLOBAL,
         }
     }
 
@@ -3235,8 +3209,14 @@ mod tests {
     fn test_hooks_read_only_public_mode() {
         let config = test_config();
         // Default HooksConfig has read_only=true
-        assert!(config.hooks.read_only, "public demo must be read-only by default");
-        assert!(!config.hooks.write_enabled, "write must be disabled in public mode");
+        assert!(
+            config.hooks.read_only,
+            "public demo must be read-only by default"
+        );
+        assert!(
+            !config.hooks.write_enabled,
+            "write must be disabled in public mode"
+        );
 
         let hook_config = if config.hooks.read_only {
             HookConfig::read_only()
@@ -3293,29 +3273,40 @@ mod tests {
         let result = manager.execute(HookEvent::AfterToolCall, ctx);
 
         // In read-only mode, candidates should be cleared
-        assert!(result.memory_candidates.is_empty(),
-            "read-only mode must clear all memory candidates");
+        assert!(
+            result.memory_candidates.is_empty(),
+            "read-only mode must clear all memory candidates"
+        );
     }
 
     // ── Test: after_tool_call creates candidates in full mode ───────────────
 
     #[test]
     fn test_after_tool_call_candidate_full_mode() {
-        let config = test_config();
+        let _config = test_config();
         let hook_config = HookConfig::full();
         let manager = HookManager::new(hook_config);
 
         let mut ctx = HookContext::new(HookEvent::AfterToolCall)
             .with_tool("memory_recall", serde_json::json!({"query": "test"}));
-        ctx.tool_result = Some("Found 3 relevant memories about the project requirements.".to_string());
+        ctx.tool_result =
+            Some("Found 3 relevant memories about the project requirements.".to_string());
 
         let result = manager.execute(HookEvent::AfterToolCall, ctx);
 
         // In full mode, candidates should be created
-        assert!(!result.memory_candidates.is_empty(),
-            "full mode must create memory candidates");
-        assert_eq!(result.memory_candidates[0].source_tool, Some("memory_recall".to_string()));
-        assert_eq!(result.memory_candidates[0].source_event, HookEvent::AfterToolCall);
+        assert!(
+            !result.memory_candidates.is_empty(),
+            "full mode must create memory candidates"
+        );
+        assert_eq!(
+            result.memory_candidates[0].source_tool,
+            Some("memory_recall".to_string())
+        );
+        assert_eq!(
+            result.memory_candidates[0].source_event,
+            HookEvent::AfterToolCall
+        );
     }
 
     // ── Test: error hook execution ──────────────────────────────────────────
@@ -3337,15 +3328,17 @@ mod tests {
         let result = manager.execute(HookEvent::Error, ctx);
 
         // In read-only mode, error candidates should be cleared
-        assert!(result.memory_candidates.is_empty(),
-            "read-only mode must clear error candidates");
+        assert!(
+            result.memory_candidates.is_empty(),
+            "read-only mode must clear error candidates"
+        );
     }
 
     // ── Test: error hook creates candidates in full mode ────────────────────
 
     #[test]
     fn test_error_hook_full_mode() {
-        let config = test_config();
+        let _config = test_config();
         let hook_config = HookConfig::full();
         let manager = HookManager::new(hook_config);
 
@@ -3355,8 +3348,10 @@ mod tests {
 
         let result = manager.execute(HookEvent::Error, ctx);
 
-        assert!(!result.memory_candidates.is_empty(),
-            "full mode must create error candidates");
+        assert!(
+            !result.memory_candidates.is_empty(),
+            "full mode must create error candidates"
+        );
         assert!(result.memory_candidates[0].is_error);
         assert_eq!(result.memory_candidates[0].importance, 7);
     }
@@ -3367,19 +3362,27 @@ mod tests {
     fn test_write_hook_disabled_by_default() {
         let config = test_config();
         // Default HooksConfig has write_enabled=false
-        assert!(!config.hooks.write_enabled, "write must be disabled by default");
+        assert!(
+            !config.hooks.write_enabled,
+            "write must be disabled by default"
+        );
 
         let hook_config = HookConfig::default();
-        assert!(!hook_config.can_write(), "HookConfig must deny writes by default");
-        assert!(!hook_config.is_enabled(&HookEvent::AfterResponse),
-            "after_response hook must be disabled by default");
+        assert!(
+            !hook_config.can_write(),
+            "HookConfig must deny writes by default"
+        );
+        assert!(
+            !hook_config.is_enabled(&HookEvent::AfterResponse),
+            "after_response hook must be disabled by default"
+        );
     }
 
     // ── Test: secret filtering ─────────────────────────────────────────────
 
     #[test]
     fn test_secret_filtering() {
-        let config = test_config();
+        let _config = test_config();
         let hook_config = HookConfig::full();
         let manager = HookManager::new(hook_config);
 
@@ -3392,10 +3395,16 @@ mod tests {
 
         // Secret filtering should remove candidates containing secrets
         for candidate in &result.memory_candidates {
-            assert!(!candidate.text.to_lowercase().contains("password"),
-                "candidate must not contain secrets: {}", candidate.text);
-            assert!(!candidate.text.to_lowercase().contains("sk-"),
-                "candidate must not contain API keys: {}", candidate.text);
+            assert!(
+                !candidate.text.to_lowercase().contains("password"),
+                "candidate must not contain secrets: {}",
+                candidate.text
+            );
+            assert!(
+                !candidate.text.to_lowercase().contains("sk-"),
+                "candidate must not contain API keys: {}",
+                candidate.text
+            );
         }
     }
 
@@ -3403,7 +3412,7 @@ mod tests {
 
     #[test]
     fn test_secret_filtering_read_only() {
-        let config = test_config();
+        let _config = test_config();
         let hook_config = HookConfig::read_only();
         let manager = HookManager::new(hook_config);
 
@@ -3414,8 +3423,10 @@ mod tests {
         let result = manager.execute(HookEvent::AfterToolCall, ctx);
 
         // In read-only mode, all candidates are cleared regardless
-        assert!(result.memory_candidates.is_empty(),
-            "read-only mode must clear all candidates even with secrets");
+        assert!(
+            result.memory_candidates.is_empty(),
+            "read-only mode must clear all candidates even with secrets"
+        );
     }
 
     // ── Test: session start hook ────────────────────────────────────────────
@@ -3434,16 +3445,22 @@ mod tests {
         let result = manager.execute(HookEvent::SessionStart, ctx);
 
         // Session start should load memory contract
-        assert!(result.memory_contract.is_some(), "session start must load memory contract");
+        assert!(
+            result.memory_contract.is_some(),
+            "session start must load memory contract"
+        );
         // Session start should load constraints
-        assert!(!result.constraints.is_empty(), "session start must load constraints");
+        assert!(
+            !result.constraints.is_empty(),
+            "session start must load constraints"
+        );
     }
 
     // ── Test: full lifecycle chain ─────────────────────────────────────────
 
     #[test]
     fn test_full_lifecycle_chain() {
-        let config = test_config();
+        let _config = test_config();
         let hook_config = HookConfig::full();
         let manager = HookManager::new(hook_config);
 
@@ -3462,7 +3479,8 @@ mod tests {
                     chain_ctx.with_tool("memory_recall", serde_json::json!({"query": "test"}))
                 }
                 HookEvent::AfterToolCall => {
-                    chain_ctx.tool_result = Some("Found relevant results from the memory search.".to_string());
+                    chain_ctx.tool_result =
+                        Some("Found relevant results from the memory search.".to_string());
                     chain_ctx
                 }
                 _ => chain_ctx,
@@ -3471,12 +3489,15 @@ mod tests {
         }
 
         // After full chain with full mode, should have candidates
-        assert!(!chain_ctx.memory_candidates.is_empty(),
-            "full lifecycle chain should produce candidates");
-        assert!(chain_ctx.memory_contract.is_some(),
-            "memory contract should be loaded from session start");
+        assert!(
+            !chain_ctx.memory_candidates.is_empty(),
+            "full lifecycle chain should produce candidates"
+        );
+        assert!(
+            chain_ctx.memory_contract.is_some(),
+            "memory contract should be loaded from session start"
+        );
     }
-
 
     // ── Smoke tests: public demo release ──────────────────────────────────
 
@@ -3485,13 +3506,20 @@ mod tests {
         let response = handle_tools_list(&serde_json::json!("test"));
         let tools = response["result"]["tools"].as_array().unwrap();
         assert!(!tools.is_empty(), "tools/list must return tools");
-        let names: Vec<&str> = tools.iter()
-            .filter_map(|t| t["name"].as_str())
-            .collect();
-        assert!(names.contains(&"memory_status"), "must include memory_status");
-        assert!(names.contains(&"memory_recall"), "must include memory_recall");
+        let names: Vec<&str> = tools.iter().filter_map(|t| t["name"].as_str()).collect();
+        assert!(
+            names.contains(&"memory_status"),
+            "must include memory_status"
+        );
+        assert!(
+            names.contains(&"memory_recall"),
+            "must include memory_recall"
+        );
         assert!(names.contains(&"memory_find"), "must include memory_find");
-        assert!(names.contains(&"memory_auto_context"), "must include memory_auto_context");
+        assert!(
+            names.contains(&"memory_auto_context"),
+            "must include memory_auto_context"
+        );
     }
 
     #[test]
@@ -3499,16 +3527,23 @@ mod tests {
         // Verify that tools/list returns tools that are safe for read-only use
         let response = handle_tools_list(&serde_json::json!("test"));
         let tools = response["result"]["tools"].as_array().unwrap();
-        let names: Vec<&str> = tools.iter()
-            .filter_map(|t| t["name"].as_str())
-            .collect();
+        let names: Vec<&str> = tools.iter().filter_map(|t| t["name"].as_str()).collect();
 
         // Read tools must be present
-        assert!(names.contains(&"memory_status"), "must include memory_status");
-        assert!(names.contains(&"memory_recall"), "must include memory_recall");
+        assert!(
+            names.contains(&"memory_status"),
+            "must include memory_status"
+        );
+        assert!(
+            names.contains(&"memory_recall"),
+            "must include memory_recall"
+        );
         assert!(names.contains(&"memory_find"), "must include memory_find");
         assert!(names.contains(&"memory_look"), "must include memory_look");
-        assert!(names.contains(&"memory_auto_context"), "must include memory_auto_context");
+        assert!(
+            names.contains(&"memory_auto_context"),
+            "must include memory_auto_context"
+        );
 
         // All tools must have inputSchema with no required dangerous fields
         for tool in tools {
@@ -3520,28 +3555,32 @@ mod tests {
 
     #[test]
     fn test_public_demo_safe_query() {
-        let config = test_config();
+        let _config = test_config();
         let hook_config = HookConfig::read_only();
         let manager = HookManager::new(hook_config);
         let ctx = HookContext::new(HookEvent::BeforeToolCall)
             .with_tool("memory_recall", serde_json::json!({"query": "safe query"}));
         let result = manager.execute(HookEvent::BeforeToolCall, ctx);
-        assert!(result.memory_candidates.is_empty(),
-            "safe query must not produce memory candidates in public mode");
+        assert!(
+            result.memory_candidates.is_empty(),
+            "safe query must not produce memory candidates in public mode"
+        );
         assert_eq!(result.tool_name, Some("memory_recall".to_string()));
     }
 
     #[test]
     fn test_public_demo_secret_query_filtered() {
-        let config = test_config();
+        let _config = test_config();
         let hook_config = HookConfig::read_only();
         let manager = HookManager::new(hook_config);
         let mut ctx = HookContext::new(HookEvent::AfterToolCall)
             .with_tool("memory_recall", serde_json::json!({"query": "test"}));
         ctx.tool_result = Some("Found result with password=secret123".to_string());
         let result = manager.execute(HookEvent::AfterToolCall, ctx);
-        assert!(result.memory_candidates.is_empty(),
-            "secret-containing results must not create candidates in public mode");
+        assert!(
+            result.memory_candidates.is_empty(),
+            "secret-containing results must not create candidates in public mode"
+        );
     }
 
     #[test]
@@ -3552,5 +3591,4 @@ mod tests {
         assert_eq!(response["result"]["protocolVersion"], "2024-11-05");
         assert!(response["result"]["capabilities"]["tools"].is_object());
     }
-
 }

@@ -1,4 +1,4 @@
-//! MicroscopeReader â high-performance memory-mapped reader for the binary index.
+//! MicroscopeReader Ă˘Â€Â” high-performance memory-mapped reader for the binary index.
 
 use colored::Colorize;
 use rayon::prelude::*;
@@ -7,43 +7,16 @@ use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
 use crate::config::Config;
+use crate::types::{AppendEntry, BlockHeader, MemoryQueryOptions, ProjectId};
 use crate::{
     auto_depth, content_coords_blended, layer_to_id, safe_truncate, BLOCK_DATA_SIZE,
-    DEPTH_ENTRY_SIZE, HEADER_SIZE, LAYER_NAMES, META_HEADER_SIZE,
+    DEPTH_ENTRY_SIZE, HEADER_SIZE, LAYER_NAMES, LEGACY_HEADER_SIZE, META_HEADER_SIZE,
 };
 
 #[cfg(windows)]
 use windows_sys::Win32::System::Memory::{
     VirtualQuery, MEMORY_BASIC_INFORMATION, PAGE_GUARD, PAGE_NOACCESS,
 };
-
-/// Block header: 32 bytes, packed, mmap-ready.
-#[repr(C, packed)]
-#[derive(Clone, Copy)]
-pub struct BlockHeader {
-    pub x: f32,
-    pub y: f32,
-    pub z: f32,
-    pub zoom: f32,
-    pub depth: u8,
-    pub layer_id: u8,
-    pub data_offset: u32,
-    pub data_len: u16,
-    pub parent_idx: u32,
-    pub child_count: u16,
-    pub crc16: [u8; 2],
-}
-
-// Meta header: 48 bytes at start of meta.bin
-#[repr(C, packed)]
-#[derive(Clone, Copy)]
-#[allow(dead_code)]
-pub struct MetaHeader {
-    pub magic: [u8; 4],
-    pub version: u32,
-    pub block_count: u32,
-    pub depth_count: u32,
-}
 
 pub fn layer_color(id: u8) -> &'static str {
     match id {
@@ -90,7 +63,7 @@ fn l2_dist_sq_simd(h: &BlockHeader, x: f32, y: f32, z: f32, qz: f32, zw: f32) ->
     }
 }
 
-/// Backing store for block data â either memory-mapped or decompressed in-memory.
+/// Backing store for block data Ă˘Â€Â” either memory-mapped or decompressed in-memory.
 pub enum DataStore {
     /// Normal mmap path (uncompressed data.bin)
     Mmap(memmap2::Mmap),
@@ -115,6 +88,7 @@ pub struct MicroscopeReader {
     pub headers: memmap2::Mmap,
     pub data: DataStore,
     pub block_count: usize,
+    pub header_stride: usize,
     pub depth_ranges: [(u32, u32); 9],
 }
 
@@ -130,13 +104,18 @@ impl MicroscopeReader {
         let dat_path = output_dir.join("data.bin");
 
         let meta = fs::read(&meta_path)
-            .map_err(|e| format!("open meta.bin â run 'build' first: {}", e))?;
+            .map_err(|e| format!("open meta.bin Ă˘Â€Â” run 'build' first: {}", e))?;
         if meta.len() < 12 {
             return Err("meta.bin too small".to_string());
         }
         let magic = &meta[0..4];
-        if magic != b"MSCM" && magic != b"MSC2" && magic != b"MSC3" {
-            return Err("invalid magic: expected MSCM, MSC2 or MSC3".to_string());
+        let header_stride = if magic == b"MSC4" {
+            HEADER_SIZE
+        } else {
+            LEGACY_HEADER_SIZE
+        };
+        if magic != b"MSCM" && magic != b"MSC2" && magic != b"MSC3" && magic != b"MSC4" {
+            return Err("invalid magic: expected MSCM, MSC2, MSC3 or MSC4".to_string());
         }
         let block_count = u32::from_le_bytes(
             meta[8..12]
@@ -217,6 +196,7 @@ impl MicroscopeReader {
             headers,
             data,
             block_count,
+            header_stride,
             depth_ranges,
         })
     }
@@ -246,9 +226,46 @@ impl MicroscopeReader {
     }
 
     #[inline(always)]
-    pub fn header(&self, i: usize) -> &BlockHeader {
+    pub fn header(&self, i: usize) -> BlockHeader {
         debug_assert!(i < self.block_count);
-        unsafe { &*(self.headers.as_ptr().add(i * HEADER_SIZE) as *const BlockHeader) }
+        let off = i * self.header_stride;
+        let ptr = unsafe { self.headers.as_ptr().add(off) };
+        if self.header_stride == HEADER_SIZE {
+            unsafe { std::ptr::read_unaligned(ptr as *const BlockHeader) }
+        } else {
+            // Legacy MSC3 header: 32 bytes, no project/importance/flags fields.
+            let mut bytes = [0u8; LEGACY_HEADER_SIZE];
+            unsafe {
+                std::ptr::copy_nonoverlapping(ptr, bytes.as_mut_ptr(), LEGACY_HEADER_SIZE);
+            }
+            let x = f32::from_le_bytes(bytes[0..4].try_into().unwrap());
+            let y = f32::from_le_bytes(bytes[4..8].try_into().unwrap());
+            let z = f32::from_le_bytes(bytes[8..12].try_into().unwrap());
+            let zoom = f32::from_le_bytes(bytes[12..16].try_into().unwrap());
+            let depth = bytes[16];
+            let layer_id = bytes[17];
+            let data_offset = u32::from_le_bytes(bytes[18..22].try_into().unwrap());
+            let data_len = u16::from_le_bytes(bytes[22..24].try_into().unwrap());
+            let parent_idx = u32::from_le_bytes(bytes[24..28].try_into().unwrap());
+            let child_count = u16::from_le_bytes(bytes[28..30].try_into().unwrap());
+            let crc16 = [bytes[30], bytes[31]];
+            BlockHeader {
+                x,
+                y,
+                z,
+                zoom,
+                depth,
+                layer_id,
+                data_offset,
+                data_len,
+                parent_idx,
+                child_count,
+                crc16,
+                project_id: ProjectId::GLOBAL,
+                importance: 0,
+                flags: 0,
+            }
+        }
     }
 
     #[inline(always)]
@@ -331,7 +348,7 @@ impl MicroscopeReader {
             .into_par_iter()
             .map(|i| {
                 let h = self.header(i);
-                (l2_dist_sq_simd(h, x, y, z, qz, zw), i, true)
+                (l2_dist_sq_simd(&h, x, y, z, qz, zw), i, true)
             })
             .collect();
 
@@ -380,7 +397,7 @@ impl MicroscopeReader {
                 .filter_map(|i| {
                     let h = self.header(i);
                     let qz = depth as f32 / 8.0;
-                    let dist_sq = l2_dist_sq_simd(h, x, y, z, qz, 0.0); // no zoom weight for radial
+                    let dist_sq = l2_dist_sq_simd(&h, x, y, z, qz, 0.0); // no zoom weight for radial
                     if dist_sq <= radius_sq {
                         Some((dist_sq, i, true))
                     } else {
@@ -471,6 +488,31 @@ impl MicroscopeReader {
         results
     }
 
+    /// Text search across both the immutable main index and the hot append log.
+    /// Append entries use virtual indices starting at 1_000_000.
+    pub fn find_text_all(&self, config: &Config, query: &str, k: usize) -> Vec<(u8, usize, bool)> {
+        let q = query.to_lowercase();
+        let mut results: Vec<(u8, usize, bool)> = self
+            .find_text(query, k)
+            .into_iter()
+            .map(|(depth, idx)| (depth, idx, true))
+            .collect();
+
+        let append_path = Path::new(&config.paths.output_dir).join("append.bin");
+        let appended = read_append_log(&append_path);
+        results.extend(appended.iter().enumerate().filter_map(|(idx, entry)| {
+            entry
+                .text
+                .to_lowercase()
+                .contains(&q)
+                .then_some((entry.depth, idx + 1_000_000, false))
+        }));
+
+        results.sort_by_key(|&(depth, _, is_main)| (depth, is_main));
+        results.truncate(k);
+        results
+    }
+
     pub fn print_result(&self, i: usize, dist: f32) {
         let h = self.header(i);
         let text = self.text(i);
@@ -486,20 +528,299 @@ impl MicroscopeReader {
     }
 }
 
-// âââ APPEND LOG ââââââââââââââââââââââââââââââââââââââ
+// Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€ APPEND LOG Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€
 
-#[allow(dead_code)]
-pub struct AppendEntry {
-    pub text: String,
-    pub layer_id: u8,
-    pub importance: u8,
-    pub depth: u8,
-    pub x: f32,
-    pub y: f32,
-    pub z: f32,
-    pub emotion: [f32; 21],
+#[inline(always)]
+fn entry_visible(entry: &AppendEntry, active: ProjectId, include_global: bool) -> bool {
+    entry.project_id == active || (include_global && entry.project_id.is_global())
 }
 
+impl MicroscopeReader {
+    /// Project-scoped variant of `look`.
+    #[allow(clippy::too_many_arguments)]
+    pub fn look_with_options(
+        &self,
+        config: &Config,
+        x: f32,
+        y: f32,
+        z: f32,
+        zoom: u8,
+        k: usize,
+        opts: Option<&MemoryQueryOptions>,
+    ) -> Vec<(f32, usize, bool)> {
+        let opts = opts.cloned().unwrap_or_default();
+        let (start, count) = self.depth_ranges[zoom as usize];
+        let (start, count) = (start as usize, count as usize);
+
+        let mut results: Vec<(f32, usize, bool)> = Vec::with_capacity(count + 10);
+        if count > 0 {
+            for i in start..(start + count) {
+                let h = self.header(i);
+                if !h.is_visible_to(opts.active_project, opts.include_global)
+                    || h.importance < opts.min_importance
+                {
+                    continue;
+                }
+                let dx = h.x - x;
+                let dy = h.y - y;
+                let dz = h.z - z;
+                results.push((dx * dx + dy * dy + dz * dz, i, true));
+            }
+        }
+
+        let append_path = Path::new(&config.paths.output_dir).join("append.bin");
+        let appended = read_append_log(&append_path);
+        for (ai, entry) in appended.iter().enumerate() {
+            if entry.depth != zoom {
+                continue;
+            }
+            if !entry_visible(entry, opts.active_project, opts.include_global)
+                || entry.importance < opts.min_importance
+            {
+                continue;
+            }
+            let dx = entry.x - x;
+            let dy = entry.y - y;
+            let dz = entry.z - z;
+            results.push((dx * dx + dy * dy + dz * dz, ai + 1_000_000, false));
+        }
+
+        let k = k.min(results.len());
+        if k == 0 {
+            return vec![];
+        }
+        results.select_nth_unstable_by(k - 1, |a, b| a.0.partial_cmp(&b.0).unwrap());
+        results.truncate(k);
+        results.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+        results
+    }
+
+    /// Project-scoped variant of `look_soft`.
+    #[allow(clippy::too_many_arguments)]
+    pub fn look_soft_with_options(
+        &self,
+        config: &Config,
+        x: f32,
+        y: f32,
+        z: f32,
+        zoom: u8,
+        k: usize,
+        zw: f32,
+        opts: Option<&MemoryQueryOptions>,
+    ) -> Vec<(f32, usize, bool)> {
+        let opts = opts.cloned().unwrap_or_default();
+        let qz = zoom as f32 / 8.0;
+        let mut results: Vec<(f32, usize, bool)> = (0..self.block_count)
+            .into_par_iter()
+            .filter_map(|i| {
+                let h = self.header(i);
+                if !h.is_visible_to(opts.active_project, opts.include_global)
+                    || h.importance < opts.min_importance
+                {
+                    return None;
+                }
+                Some((l2_dist_sq_simd(&h, x, y, z, qz, zw), i, true))
+            })
+            .collect();
+
+        let append_path = Path::new(&config.paths.output_dir).join("append.bin");
+        let appended = read_append_log(&append_path);
+        for (ai, entry) in appended.iter().enumerate() {
+            if !entry_visible(entry, opts.active_project, opts.include_global)
+                || entry.importance < opts.min_importance
+            {
+                continue;
+            }
+            let dx = entry.x - x;
+            let dy = entry.y - y;
+            let dz = entry.z - z;
+            let entry_zoom = entry.depth as f32 / 8.0;
+            let dw = (entry_zoom - qz) * zw;
+            results.push((dx * dx + dy * dy + dz * dz + dw * dw, ai + 1_000_000, false));
+        }
+
+        let k = k.min(results.len());
+        if k == 0 {
+            return vec![];
+        }
+        results.select_nth_unstable_by(k - 1, |a, b| a.0.partial_cmp(&b.0).unwrap());
+        results.truncate(k);
+        results.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+        results
+    }
+
+    /// Project-scoped variant of `radial_search`.
+    #[allow(clippy::too_many_arguments)]
+    pub fn radial_search_with_options(
+        &self,
+        config: &Config,
+        x: f32,
+        y: f32,
+        z: f32,
+        depth: u8,
+        radius: f32,
+        k: usize,
+        opts: Option<&MemoryQueryOptions>,
+    ) -> ResultSet {
+        let opts = opts.cloned().unwrap_or_default();
+        let radius_sq = radius * radius;
+        let (start, count) = self.depth_ranges[depth as usize];
+        let (start, count) = (start as usize, count as usize);
+
+        let mut candidates: Vec<(f32, usize, bool)> = if count > 0 {
+            (start..(start + count))
+                .into_par_iter()
+                .filter_map(|i| {
+                    let h = self.header(i);
+                    if !h.is_visible_to(opts.active_project, opts.include_global)
+                        || h.importance < opts.min_importance
+                    {
+                        return None;
+                    }
+                    let qz = depth as f32 / 8.0;
+                    let dist_sq = l2_dist_sq_simd(&h, x, y, z, qz, 0.0); // no zoom weight for radial
+                    if dist_sq <= radius_sq {
+                        Some((dist_sq, i, true))
+                    } else {
+                        None
+                    }
+                })
+                .collect()
+        } else {
+            Vec::new()
+        };
+
+        let append_path = Path::new(&config.paths.output_dir).join("append.bin");
+        let appended = read_append_log(&append_path);
+        for (ai, entry) in appended.iter().enumerate() {
+            if entry.depth != depth {
+                continue;
+            }
+            if !entry_visible(entry, opts.active_project, opts.include_global)
+                || entry.importance < opts.min_importance
+            {
+                continue;
+            }
+            let dx = entry.x - x;
+            let dy = entry.y - y;
+            let dz = entry.z - z;
+            let dist_sq = dx * dx + dy * dy + dz * dz;
+            if dist_sq <= radius_sq {
+                candidates.push((dist_sq, ai + 1_000_000, false));
+            }
+        }
+
+        candidates.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+
+        let primary = candidates
+            .first()
+            .map(|&(dist, idx, is_main)| RadialResult {
+                block_idx: idx,
+                dist_sq: dist,
+                weight: 1.0,
+                is_main,
+            });
+
+        let neighbors: Vec<RadialResult> = candidates
+            .iter()
+            .skip(1)
+            .take(k.saturating_sub(1))
+            .map(|&(dist_sq, idx, is_main)| {
+                let weight = if dist_sq > 0.0001 {
+                    (radius_sq - dist_sq) / radius_sq
+                } else {
+                    1.0
+                };
+                RadialResult {
+                    block_idx: idx,
+                    dist_sq,
+                    weight,
+                    is_main,
+                }
+            })
+            .collect();
+
+        let total_within_radius = candidates.len();
+
+        ResultSet {
+            primary,
+            neighbors,
+            center: (x, y, z),
+            depth,
+            radius,
+            total_within_radius,
+        }
+    }
+
+    /// Project-scoped variant of `find_text`.
+    pub fn find_text_with_options(
+        &self,
+        query: &str,
+        k: usize,
+        opts: Option<&MemoryQueryOptions>,
+    ) -> Vec<(u8, usize)> {
+        let opts = opts.cloned().unwrap_or_default();
+        let q = query.to_lowercase();
+        let mut results: Vec<(u8, usize)> = (0..self.block_count)
+            .into_par_iter()
+            .filter_map(|i| {
+                let h = self.header(i);
+                if !h.is_visible_to(opts.active_project, opts.include_global)
+                    || h.importance < opts.min_importance
+                {
+                    return None;
+                }
+                if self.text(i).to_lowercase().contains(&q) {
+                    Some((h.depth, i))
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        results.sort_by_key(|&(d, _)| d);
+        results.truncate(k);
+        results
+    }
+
+    /// Project-scoped variant of `find_text_all`.
+    pub fn find_text_all_with_options(
+        &self,
+        config: &Config,
+        query: &str,
+        k: usize,
+        opts: Option<&MemoryQueryOptions>,
+    ) -> Vec<(u8, usize, bool)> {
+        let opts = opts.cloned().unwrap_or_default();
+        let q = query.to_lowercase();
+        let mut results: Vec<(u8, usize, bool)> = self
+            .find_text_with_options(query, k, Some(&opts))
+            .into_iter()
+            .map(|(depth, idx)| (depth, idx, true))
+            .collect();
+
+        let append_path = Path::new(&config.paths.output_dir).join("append.bin");
+        let appended = read_append_log(&append_path);
+        results.extend(appended.iter().enumerate().filter_map(|(idx, entry)| {
+            if !entry_visible(entry, opts.active_project, opts.include_global)
+                || entry.importance < opts.min_importance
+            {
+                return None;
+            }
+            entry
+                .text
+                .to_lowercase()
+                .contains(&q)
+                .then_some((entry.depth, idx + 1_000_000, false))
+        }));
+
+        results.sort_by_key(|&(depth, _, is_main)| (depth, is_main));
+        results.truncate(k);
+        results
+    }
+}
+
+#[allow(dead_code)]
 pub fn read_append_log(path: &Path) -> Vec<AppendEntry> {
     if !path.exists() {
         return vec![];
@@ -512,22 +833,45 @@ pub fn read_append_log(path: &Path) -> Vec<AppendEntry> {
     let mut entries = Vec::new();
     let mut pos = 0;
 
-    let is_v2 = data.len() >= 4 && &data[0..4] == b"APv2";
-    if is_v2 {
+    let (is_v2, is_v3) = if data.len() >= 4 {
+        (&data[0..4] == b"APv2", &data[0..4] == b"APv3")
+    } else {
+        (false, false)
+    };
+    if is_v2 || is_v3 {
         pos = 4;
     }
 
-    let header_size = if is_v2 { 19 } else { 18 };
+    // v2: len(4)+lid(1)+imp(1)+depth(1)+coords(12) = 19
+    // v3: len(4)+lid(1)+imp(1)+depth(1)+project_id(16)+coords(12) = 35
+    let header_size = if is_v3 {
+        35
+    } else if is_v2 {
+        19
+    } else {
+        18
+    };
 
     while pos + header_size <= data.len() {
         let len = u32::from_le_bytes(data[pos..pos + 4].try_into().unwrap()) as usize;
         let lid = data[pos + 4];
         let imp = data[pos + 5];
+        let depth = if is_v2 || is_v3 { data[pos + 6] } else { 4u8 };
 
-        let (depth, coords_start) = if is_v2 {
-            (data[pos + 6], pos + 7)
+        let project_id = if is_v3 {
+            let mut pid = [0u8; 16];
+            pid.copy_from_slice(&data[pos + 7..pos + 23]);
+            ProjectId(pid)
         } else {
-            (4u8, pos + 6)
+            ProjectId::GLOBAL
+        };
+
+        let coords_start = if is_v3 {
+            pos + 23
+        } else if is_v2 {
+            pos + 7
+        } else {
+            pos + 6
         };
 
         let x = f32::from_le_bytes(data[coords_start..coords_start + 4].try_into().unwrap());
@@ -552,6 +896,7 @@ pub fn read_append_log(path: &Path) -> Vec<AppendEntry> {
             y,
             z,
             emotion: [0.0f32; 21],
+            project_id,
         });
     }
     entries
@@ -573,7 +918,7 @@ pub fn print_append_result(appended: &[AppendEntry], idx: usize, dist: f32) {
     }
 }
 
-// âââ RADIAL SEARCH TYPES âââââââââââââââââââââââââââââ
+// Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€ RADIAL SEARCH TYPES Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€
 
 /// A single result from radial search.
 #[derive(Debug, Clone)]
@@ -615,24 +960,70 @@ impl ResultSet {
     }
 }
 
-const LAYER_ROLLING_WINDOW: usize = 50;
+/// A lock file is considered stale when untouched for this many seconds,
+/// regardless of content (covers lock files from older versions that carry no
+/// owner token at all).
+const LOCK_STALE_SECS: u64 = 300;
 
-struct FileLock {
+/// Total time we are willing to wait for a live lock before giving up.
+const LOCK_ACQUIRE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(15);
+
+pub(crate) struct FileLock {
     path: PathBuf,
+    token: String,
 }
 
 impl FileLock {
-    fn acquire(config: &Config) -> Result<Self, String> {
+    pub(crate) fn acquire(config: &Config) -> Result<Self, String> {
         let lock_path = Path::new(&config.paths.output_dir).join("microscope.lock");
+        Self::acquire_inner(&lock_path, LOCK_ACQUIRE_TIMEOUT)
+    }
+
+    fn acquire_inner(lock_path: &Path, timeout: std::time::Duration) -> Result<Self, String> {
+        let deadline = std::time::Instant::now() + timeout;
         loop {
             match fs::OpenOptions::new()
                 .write(true)
                 .create_new(true)
-                .open(&lock_path)
+                .open(lock_path)
             {
-                Ok(_f) => return Ok(FileLock { path: lock_path }),
+                Ok(mut file) => {
+                    let token = lock_token();
+                    if let Err(e) = file
+                        .write_all(token.as_bytes())
+                        .and_then(|()| file.flush())
+                    {
+                        // Never leave a partially-owned lock behind.
+                        let _ = fs::remove_file(lock_path);
+                        return Err(format!("lock acquire: write owner token: {}", e));
+                    }
+                    return Ok(FileLock {
+                        path: lock_path.to_path_buf(),
+                        token,
+                    });
+                }
                 Err(e) if e.kind() == io::ErrorKind::AlreadyExists => {
-                    std::thread::sleep(std::time::Duration::from_millis(5));
+                    if lock_is_stale(lock_path) {
+                        // Another process may race us to remove and recreate the
+                        // file; just retry create_new after the removal.
+                        let _ = fs::remove_file(lock_path);
+                        continue;
+                    }
+                    if std::time::Instant::now() >= deadline {
+                        let mtime = fs::metadata(lock_path)
+                            .and_then(|m| m.modified())
+                            .map(|t| format!("{:?}", t))
+                            .unwrap_or_else(|_| "unknown".to_string());
+                        let content = fs::read_to_string(lock_path)
+                            .unwrap_or_else(|_| "<unreadable>".to_string());
+                        return Err(format!(
+                            "store lock held by {} since {}; remove {} if stale",
+                            content,
+                            mtime,
+                            lock_path.display()
+                        ));
+                    }
+                    std::thread::sleep(std::time::Duration::from_millis(25));
                 }
                 Err(e) => return Err(format!("lock acquire: {}", e)),
             }
@@ -640,9 +1031,77 @@ impl FileLock {
     }
 }
 
+/// Ownership token: "<pid>:<unix milliseconds>". pid:unix_ms is unique enough
+/// for the lifetime of a lock file; no random suffix is needed.
+fn lock_token() -> String {
+    let unix_ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis())
+        .unwrap_or(0);
+    format!("{}:{}", std::process::id(), unix_ms)
+}
+
+/// First field (before ':') of a lock token, when present and numeric.
+#[cfg(windows)]
+fn lock_owner_pid(content: &str) -> Option<u32> {
+    content.split(':').next()?.trim().parse().ok()
+}
+
+/// Returns true when the existing lock file can safely be broken.
+fn lock_is_stale(path: &Path) -> bool {
+    // Primary check: file age. A lock untouched for LOCK_STALE_SECS is stale
+    // even if it has no readable owner token.
+    if let Ok(meta) = fs::metadata(path) {
+        if let Ok(modified) = meta.modified() {
+            if let Ok(age) = modified.elapsed() {
+                if age.as_secs() > LOCK_STALE_SECS {
+                    return true;
+                }
+            }
+        }
+    }
+    // Secondary check (Windows only): the recorded owner PID is no longer
+    // alive. On non-Windows platforms we deliberately rely on the mtime check
+    // alone: std has no portable process-existence probe and adding libc just
+    // for this would be a new dependency.
+    #[cfg(windows)]
+    {
+        if let Ok(content) = fs::read_to_string(path) {
+            if let Some(pid) = lock_owner_pid(&content) {
+                return !pid_is_alive(pid);
+            }
+        }
+    }
+    false
+}
+
+/// Windows-only process liveness probe using the already-available
+/// windows-sys dependency (OpenProcess with the limited query right).
+#[cfg(windows)]
+fn pid_is_alive(pid: u32) -> bool {
+    use windows_sys::Win32::Foundation::CloseHandle;
+    use windows_sys::Win32::System::Threading::{OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION};
+    unsafe {
+        let handle = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid);
+        if handle == 0 {
+            return false;
+        }
+        CloseHandle(handle);
+        true
+    }
+}
+
 impl Drop for FileLock {
     fn drop(&mut self) {
-        let _ = fs::remove_file(&self.path);
+        // Only delete the lock if it still carries OUR token. If another
+        // process re-acquired the lock after we released it, removing the file
+        // would break their mutual exclusion, so leave it alone.
+        match fs::read_to_string(&self.path) {
+            Ok(content) if content == self.token => {
+                let _ = fs::remove_file(&self.path);
+            }
+            _ => {}
+        }
     }
 }
 
@@ -670,8 +1129,9 @@ fn persist_to_layer_file(config: &Config, text: &str, layer: &str) -> Result<(),
         .filter(|s| !s.trim().is_empty())
         .collect();
     entries.push(entry_text);
-    if entries.len() > LAYER_ROLLING_WINDOW {
-        let start = entries.len() - LAYER_ROLLING_WINDOW;
+    let retention = config.index.layer_retention_entries;
+    if retention > 0 && entries.len() > retention {
+        let start = entries.len() - retention;
         entries.drain(..start);
     }
     let result = entries.join("\n\n");
@@ -727,6 +1187,58 @@ fn is_leap(y: u64) -> bool {
     (y.is_multiple_of(4) && !y.is_multiple_of(100)) || y.is_multiple_of(400)
 }
 
+#[derive(Clone, Copy)]
+enum AppendFormat {
+    V2,
+    V3,
+}
+
+fn detect_append_format(path: &Path) -> AppendFormat {
+    match fs::read(path) {
+        Ok(data) if data.len() >= 4 => {
+            if &data[0..4] == b"APv3" {
+                AppendFormat::V3
+            } else if &data[0..4] == b"APv2" {
+                AppendFormat::V2
+            } else {
+                AppendFormat::V3
+            }
+        }
+        _ => AppendFormat::V3,
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn write_append_entry(
+    f: &mut fs::File,
+    lid: u8,
+    importance: u8,
+    depth: u8,
+    project_id: ProjectId,
+    x: f32,
+    y: f32,
+    z: f32,
+    text_bytes: &[u8],
+    format: AppendFormat,
+) -> Result<(), String> {
+    let write = |f: &mut fs::File, data: &[u8]| -> Result<(), String> {
+        f.write_all(data)
+            .map_err(|e| format!("write append log: {}", e))
+    };
+    write(f, &(text_bytes.len() as u32).to_le_bytes())?;
+    write(f, &[lid])?;
+    write(f, &[importance])?;
+    write(f, &[depth])?;
+    if matches!(format, AppendFormat::V3) {
+        write(f, &project_id.0)?;
+    }
+    write(f, &x.to_le_bytes())?;
+    write(f, &y.to_le_bytes())?;
+    write(f, &z.to_le_bytes())?;
+    write(f, text_bytes)?;
+    Ok(())
+}
+
 pub fn store_memory(
     config: &Config,
     text: &str,
@@ -772,26 +1284,36 @@ pub fn store_memory_temporary(
         .open(&append_path)
         .map_err(|e| format!("open append log: {}", e))?;
 
-    let write = |f: &mut fs::File, data: &[u8]| -> Result<(), String> {
-        f.write_all(data)
-            .map_err(|e| format!("write append log: {}", e))
+    let format = if needs_magic {
+        AppendFormat::V3
+    } else {
+        detect_append_format(&append_path)
     };
 
     if needs_magic {
-        write(&mut file, b"APv2")?;
+        let magic = match format {
+            AppendFormat::V2 => b"APv2",
+            AppendFormat::V3 => b"APv3",
+        };
+        file.write_all(magic)
+            .map_err(|e| format!("write append log: {}", e))?;
     }
 
     let text_bytes = text.as_bytes();
     let len = text_bytes.len().min(BLOCK_DATA_SIZE);
 
-    write(&mut file, &(len as u32).to_le_bytes())?;
-    write(&mut file, &[lid])?;
-    write(&mut file, &[importance])?;
-    write(&mut file, &[depth])?;
-    write(&mut file, &x.to_le_bytes())?;
-    write(&mut file, &y.to_le_bytes())?;
-    write(&mut file, &z.to_le_bytes())?;
-    write(&mut file, &text_bytes[..len])?;
+    write_append_entry(
+        &mut file,
+        lid,
+        importance,
+        depth,
+        config.project_id,
+        x,
+        y,
+        z,
+        &text_bytes[..len],
+        format,
+    )?;
 
     // Timeline log (always)
     let output_dir = Path::new(&config.paths.output_dir);
@@ -839,32 +1361,44 @@ pub fn store_memory_with_status(
         .open(&append_path)
         .map_err(|e| format!("open append log: {}", e))?;
 
-    let write = |f: &mut fs::File, data: &[u8]| -> Result<(), String> {
-        f.write_all(data)
-            .map_err(|e| format!("write append log: {}", e))
+    let format = if needs_magic {
+        AppendFormat::V3
+    } else {
+        detect_append_format(&append_path)
     };
 
     if needs_magic {
-        write(&mut file, b"APv2")?;
+        let magic = match format {
+            AppendFormat::V2 => b"APv2",
+            AppendFormat::V3 => b"APv3",
+        };
+        file.write_all(magic)
+            .map_err(|e| format!("write append log: {}", e))?;
     }
 
     let text_bytes = text.as_bytes();
     let len = text_bytes.len().min(BLOCK_DATA_SIZE);
 
-    write(&mut file, &(len as u32).to_le_bytes())?;
-    write(&mut file, &[lid])?;
-    write(&mut file, &[importance])?;
-    write(&mut file, &[depth])?;
-    write(&mut file, &x.to_le_bytes())?;
-    write(&mut file, &y.to_le_bytes())?;
-    write(&mut file, &z.to_le_bytes())?;
-    write(&mut file, &text_bytes[..len])?;
+    write_append_entry(
+        &mut file,
+        lid,
+        importance,
+        depth,
+        config.project_id,
+        x,
+        y,
+        z,
+        &text_bytes[..len],
+        format,
+    )?;
+    file.flush()
+        .map_err(|e| format!("flush append log: {}", e))?;
 
     if let Err(e) = persist_to_layer_file(config, text, layer) {
         eprintln!("  {} persist to layer file: {}", "WARN".yellow(), e);
     }
 
-    // âââ Timeline log (always) ââââââââââââââââââââââââââââ
+    // Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€ Timeline log (always) Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€
     let output_dir = Path::new(&config.paths.output_dir);
     let timeline_status = match status.unwrap_or("normal") {
         "open" => crate::timeline::STATUS_OPEN,
@@ -884,7 +1418,7 @@ pub fn store_memory_with_status(
         eprintln!("  {} append timeline: {}", "WARN".yellow(), e);
     }
 
-    // âââ Open loops (only when status=open) ââââââââââââââââ
+    // Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€ Open loops (only when status=open) Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€
     if status == Some("open") {
         match crate::open_loops::append_open(output_dir, text, importance) {
             Ok(loop_id) => {
@@ -896,7 +1430,7 @@ pub fn store_memory_with_status(
         }
     }
 
-    // ─── Emotion log (when provided) ─────────────────────────
+    // â”€â”€â”€ Emotion log (when provided) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // Previously the emotion vector was accepted but never written anywhere,
     // silently dropping all 21D emotion data. Now we persist it to emotion_log.bin
     // (rebuilt into emotions.bin during `build_emotions_from_log`).
@@ -904,6 +1438,21 @@ pub fn store_memory_with_status(
         if let Err(e) = append_emotion_log(output_dir, text, &emo) {
             eprintln!("  {} append emotion log: {}", "WARN".yellow(), e);
         }
+    }
+
+    // Release the writer and process lock before a possible rebuild. The
+    // rebuild helper acquires the same lock and rechecks the threshold.
+    drop(file);
+    drop(_lock);
+
+    match crate::build::maybe_auto_rebuild(config) {
+        Ok(Some(count)) => println!(
+            "  {} {} append entries consolidated",
+            "AUTO-REBUILD".cyan().bold(),
+            count
+        ),
+        Ok(None) => {}
+        Err(e) => eprintln!("  {} auto-rebuild: {}", "WARN".yellow(), e),
     }
 
     let elapsed = t0.elapsed();
@@ -931,7 +1480,7 @@ pub fn store_memory_with_status(
     Ok(())
 }
 
-// ¦¦¦ Emotion constants ¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦
+// Â¦Â¦Â¦ Emotion constants Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦
 pub const EMOTION_VECTOR_SIZE: usize = 21;
 
 /// Emotion dimension labels for the 21D emotion vector.
@@ -1127,5 +1676,65 @@ pub fn format_emotion(emotion: &[f32; 21]) -> String {
         "neutral".to_string()
     } else {
         parts.join(", ")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::Duration;
+
+    #[test]
+    fn lock_token_contains_pid_and_timestamp() {
+        let token = lock_token();
+        let mut parts = token.splitn(2, ':');
+        let pid = parts.next().unwrap().parse::<u32>().unwrap();
+        assert_eq!(pid, std::process::id());
+        let ms = parts.next().unwrap().parse::<u128>().unwrap();
+        assert!(ms > 0);
+    }
+
+    #[test]
+    fn acquire_releases_on_temp_dir() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("microscope.lock");
+        {
+            let lock = FileLock::acquire_inner(&path, Duration::from_secs(2)).unwrap();
+            assert!(path.exists());
+            assert_eq!(fs::read_to_string(&path).unwrap(), lock.token);
+        }
+        assert!(!path.exists(), "drop must remove our own lock");
+    }
+
+    #[test]
+    fn live_lock_errors_in_bounded_time() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("microscope.lock");
+        fs::write(&path, lock_token()).unwrap();
+        let t0 = std::time::Instant::now();
+        match FileLock::acquire_inner(&path, Duration::from_millis(300)) {
+            Ok(_) => panic!("a fresh live lock must not be stolen"),
+            Err(err) => {
+                assert!(
+                    t0.elapsed() < Duration::from_secs(5),
+                    "acquire must give up within the timeout"
+                );
+                assert!(
+                    err.contains("microscope.lock"),
+                    "error should mention the lock path: {}",
+                    err
+                );
+            }
+        }
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn dead_owner_pid_is_broken() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("microscope.lock");
+        fs::write(&path, "4294967295:0").unwrap();
+        let lock = FileLock::acquire_inner(&path, Duration::from_secs(2)).unwrap();
+        assert_eq!(fs::read_to_string(&path).unwrap(), lock.token);
     }
 }

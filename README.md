@@ -50,7 +50,25 @@ cargo build --release
 
 # Recall
 ./target/release/microscope-mem.exe recall "Microscope" --k 5
+
+# Exact text search also includes memories still in append.bin
+./target/release/microscope-mem.exe find "Microscope" 10
 ```
+
+New stores are searchable immediately through `recall`, `find`, MCP, REST,
+MQL, and federated search. The hot append log is consolidated into the main
+index automatically after the configured number of entries:
+
+```toml
+[index]
+auto_rebuild = true
+auto_rebuild_entries = 25
+layer_retention_entries = 0 # preserve full source history
+```
+
+Automatic rebuild uses the store lock, rechecks the threshold after acquiring
+it, snapshots the complete index before building, rejects unexpected block
+shrinkage, and removes `append.bin` only after a successful index build.
 
 **One-click start (Windows):** `OneClick_Start.bat` builds and launches the full stack. The Electron tray app is at `electron/`.
 

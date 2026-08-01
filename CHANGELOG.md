@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.2] - 2026-07-17
+
+### Added
+- **auto-context CORE MEMORIES section**: `auto_context.rs` now embeds full text (up to 500 chars) of the top 3 highest-importance memories (imp >= 7) directly into every auto-context snapshot. LLMs receive actual memory content, not just metadata — eliminating hallucination on foundation memories.
+
+### Changed
+- **Recall truncation limit**: `blade-microscope-memory` recall output increased from 150 to 4000 chars per block, ensuring full context reaches the LLM via MCP/tool-server.
+
 ## [0.8.1] - 2026-06-23
 
 ### Fixed

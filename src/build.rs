@@ -3,7 +3,8 @@
 //! and writes the binary output files (microscope.bin, data.bin, meta.bin, merkle.bin, embeddings.bin).
 
 use crate::config::Config;
-use crate::reader::{BlockHeader, MicroscopeReader};
+use crate::reader::{read_append_log, FileLock, MicroscopeReader};
+use crate::types::BlockHeader;
 use crate::{
     content_coords_blended, crc16_ccitt, hex_str, layer_to_id, merkle, safe_truncate, to_block,
     BLOCK_DATA_SIZE, DEPTH_ENTRY_SIZE, HEADER_SIZE, META_HEADER_SIZE,
@@ -15,6 +16,102 @@ use sha2::{Digest, Sha256};
 use std::fs;
 use std::io::{BufWriter, Seek, Write};
 use std::path::Path;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RebuildOutcome {
+    pub rebuilt: bool,
+    pub pending_entries: usize,
+}
+
+/// Rebuild the main index while holding the same process lock used by stores.
+/// The append log is removed only after a successful build.
+pub fn rebuild_pending(config: &Config, force_when_empty: bool) -> Result<RebuildOutcome, String> {
+    let _lock = FileLock::acquire(config)?;
+    let output_dir = Path::new(&config.paths.output_dir);
+    let append_path = output_dir.join("append.bin");
+    let pending_entries = read_append_log(&append_path).len();
+
+    if pending_entries == 0 && !force_when_empty {
+        return Ok(RebuildOutcome {
+            rebuilt: false,
+            pending_entries: 0,
+        });
+    }
+
+    let previous_blocks = read_meta_block_count(output_dir);
+    let temp_dir = Path::new(&config.paths.temp_dir);
+    fs::create_dir_all(temp_dir).map_err(|e| format!("create rebuild backup dir: {}", e))?;
+    let backup_path = temp_dir.join("pre-rebuild-latest.mscope");
+    let has_backup = if output_dir.join("meta.bin").exists() {
+        crate::snapshot::export(output_dir, &backup_path)?;
+        true
+    } else {
+        false
+    };
+
+    if let Err(build_error) = build(config, true) {
+        if has_backup {
+            let _ = crate::snapshot::import(&backup_path, output_dir);
+        }
+        return Err(build_error);
+    }
+
+    let rebuilt_blocks = read_meta_block_count(output_dir);
+    if pending_entries > 0 && previous_blocks > 0 && rebuilt_blocks < previous_blocks {
+        if has_backup {
+            crate::snapshot::import(&backup_path, output_dir)
+                .map_err(|e| format!("unsafe rebuild shrink and restore failed: {}", e))?;
+        }
+        return Err(format!(
+            "refusing rebuild shrink: {} -> {} blocks; previous index restored and append log preserved",
+            previous_blocks, rebuilt_blocks
+        ));
+    }
+
+    if append_path.exists() {
+        fs::remove_file(&append_path).map_err(|e| format!("clear append log: {}", e))?;
+    }
+
+    Ok(RebuildOutcome {
+        rebuilt: true,
+        pending_entries,
+    })
+}
+
+/// Consolidate the append log automatically when the configured threshold is
+/// reached, or immediately when no main index exists yet.
+pub fn maybe_auto_rebuild(config: &Config) -> Result<Option<usize>, String> {
+    if !config.index.auto_rebuild {
+        return Ok(None);
+    }
+
+    let output_dir = Path::new(&config.paths.output_dir);
+    let append_path = output_dir.join("append.bin");
+    let pending_entries = read_append_log(&append_path).len();
+    if pending_entries == 0 {
+        return Ok(None);
+    }
+
+    let threshold = config.index.auto_rebuild_entries.max(1);
+    let index_missing = !output_dir.join("meta.bin").exists();
+    if !index_missing && pending_entries < threshold {
+        return Ok(None);
+    }
+
+    let outcome = rebuild_pending(config, false)?;
+    Ok(outcome.rebuilt.then_some(outcome.pending_entries))
+}
+
+fn read_meta_block_count(output_dir: &Path) -> usize {
+    let meta = match fs::read(output_dir.join("meta.bin")) {
+        Ok(meta) => meta,
+        Err(_) => return 0,
+    };
+    if meta.len() < 12 {
+        return 0;
+    }
+    u32::from_le_bytes(meta[8..12].try_into().unwrap()) as usize
+}
 
 // ─── Internal block for building ─────────────────────
 struct RawBlock {
@@ -107,7 +204,7 @@ pub fn build(config: &Config, force: bool) -> Result<(), String> {
         let output_dir = Path::new(&config.paths.output_dir);
         let meta_path = output_dir.join("meta.bin");
         if let Ok(meta) = fs::read(&meta_path) {
-            if meta.len() >= 152 && &meta[0..4] == b"MSC3" {
+            if meta.len() >= 152 && (&meta[0..4] == b"MSC3" || &meta[0..4] == b"MSC4") {
                 let stored_hash = &meta[120..152];
                 if stored_hash == &layers_hash[..] {
                     println!("{}", "Layers unchanged — skipping rebuild".green().bold());
@@ -536,6 +633,9 @@ pub fn build(config: &Config, force: bool) -> Result<(), String> {
             parent_idx: parent,
             child_count: b.child_count,
             crc16: crc.to_le_bytes(),
+            project_id: config.project_id,
+            importance: 5,
+            flags: 0,
         };
 
         let bytes: &[u8] = unsafe {
@@ -624,10 +724,10 @@ pub fn build(config: &Config, force: bool) -> Result<(), String> {
         hex_str(&merkle_tree.root)
     );
 
-    // meta.bin — MSC3 format with merkle root + layers hash
+    // meta.bin — MSC4 format with merkle root + layers hash
     let mut meta_buf = Vec::with_capacity(META_HEADER_SIZE + 9 * DEPTH_ENTRY_SIZE + 32 + 32);
-    meta_buf.extend_from_slice(b"MSC3"); // magic v3
-    meta_buf.extend_from_slice(&3u32.to_le_bytes()); // version
+    meta_buf.extend_from_slice(b"MSC4"); // magic v4
+    meta_buf.extend_from_slice(&4u32.to_le_bytes()); // version
     meta_buf.extend_from_slice(&(n as u32).to_le_bytes()); // block_count
     meta_buf.extend_from_slice(&9u32.to_le_bytes()); // depth_count
     for &(start, count) in &depth_ranges {
@@ -683,32 +783,8 @@ pub fn build(config: &Config, force: bool) -> Result<(), String> {
         let reader = MicroscopeReader::open(config)?;
         let max_depth = config.embedding.max_depth;
 
-        #[cfg(feature = "embeddings")]
         let provider: Box<dyn crate::embeddings::EmbeddingProvider> =
-            if config.embedding.provider == "candle" {
-                match crate::embeddings::CandleEmbeddingProvider::new(&config.embedding.model) {
-                    Ok(p) => Box::new(p),
-                    Err(e) => {
-                        eprintln!(
-                            "  {} Candle init failed: {:?}, using mock",
-                            "WARN".yellow(),
-                            e
-                        );
-                        Box::new(crate::embeddings::MockEmbeddingProvider::new(
-                            config.embedding.dim,
-                        ))
-                    }
-                }
-            } else {
-                Box::new(crate::embeddings::MockEmbeddingProvider::new(
-                    config.embedding.dim,
-                ))
-            };
-
-        #[cfg(not(feature = "embeddings"))]
-        let provider: Box<dyn crate::embeddings::EmbeddingProvider> = Box::new(
-            crate::embeddings::MockEmbeddingProvider::new(config.embedding.dim),
-        );
+            crate::embeddings::provider_from_config(&config.embedding, config.embedding.dim);
 
         match crate::embedding_index::build_embedding_index(
             &*provider, &reader, max_depth, &emb_path,

@@ -12,3 +12,8 @@ RELATIONAL/D4: Publikus projektek ↔ Nem publikus projektek: látható és lát
 RELATIONAL/D4: Eszközök: Rust (alapnyelv), AST surgery (kód transzformáció), wave field (rezonancia), anchor rendszer (stabilitás), poszt-kvantum kriptó (biztonság).
 RELATIONAL/D5: Máté ↔ Gyár: feszültség. A gyár a kiindulópont, de nem a cél. "Gyári munkásból AI építő."
 RELATIONAL/D5: Máté ↔ Közösség: nyitott, de óvatos. Publikus repo-k, de a mély rendszerek privátak.
+
+
+Elolvastam a NeuroGraph Wave Memory v0.3 white paper-t. Ez a Microscope Memory konceptuális elődje/testvére: gráf-alapú memória Hebbian tanulással, 21D emotion space-szel, wave packet reprezentációval és resonance field-del. Rendkívül hasonló a Microscope Memory architektúrájához.
+
+Teljes SMC Pad MIDI mapping feltérképezve: NOTE_TO_PAD (16 pad, notes 37-53), CC knobok (CC30-36: fényerő, animáció, speed, hue, dots, bg intensity, direction), CC gombok (CC25=right, CC26=left, CC27=play, CC29=record). Forrás: pad_driver.py + animations.py.

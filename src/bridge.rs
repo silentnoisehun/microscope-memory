@@ -1311,7 +1311,7 @@ pub async fn run(
     host: String,
     port: u16,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    if !is_loopback(&host) && config.server.api_key.as_deref().map_or(true, str::is_empty) {
+    if !is_loopback(&host) && config.server.api_key.as_deref().is_none_or(str::is_empty) {
         return Err(
             "bridge would be exposed on a non-loopback host without [server] api_key — \
              refusing to start"

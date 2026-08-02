@@ -4,6 +4,11 @@
 //! using fixed 256-byte binary commands over Unix domain sockets or named pipes.
 //!
 //! Zero-JSON, zero-copy, zero-latency communication protocol.
+//!
+//! **Experimental and currently UNWIRED**: this module is not referenced from
+//! `main.rs`, `mcp.rs` or `bridge.rs`. Do not rely on its integrity claims —
+//! `update_merkle_tree` fails loudly until the incremental Merkle path exists,
+//! so a stale root can never be reported as freshly verified.
 
 use crate::config::Config;
 use crate::reader::MicroscopeReader;
@@ -160,15 +165,19 @@ impl AIAdapter {
     }
 
     /// Force immediate Merkle tree update for dirty blocks.
+    ///
+    /// The incremental Merkle update is not implemented yet. When blocks are
+    /// dirty this returns an explicit error instead of clearing the dirty set
+    /// and pretending the tree was updated — a stale Merkle root must never be
+    /// reported as freshly verified.
     pub fn update_merkle_tree(&mut self) -> Result<(), String> {
         if self.dirty_blocks.is_empty() {
             return Ok(());
         }
-
-        // TODO: Implement incremental Merkle tree update for dirty blocks
-        // For now, mark as clean
-        self.dirty_blocks.clear();
-        Ok(())
+        Err(format!(
+            "incremental Merkle update not implemented ({} dirty blocks pending)",
+            self.dirty_blocks.len()
+        ))
     }
 
     /// Get current Merkle root for integrity verification.
@@ -308,5 +317,31 @@ mod tests {
         // Note: This will fail without actual memory files
         // let adapter = AIAdapter::new(config);
         // assert!(adapter.is_ok());
+    }
+
+    #[test]
+    fn update_merkle_tree_is_honest_about_dirty_blocks() {
+        let tmp = tempfile::tempdir().unwrap();
+        let mut config = Config::default();
+        config.paths.layers_dir = tmp.path().join("layers").to_string_lossy().to_string();
+        config.paths.output_dir = tmp.path().join("data").to_string_lossy().to_string();
+        config.memory_layers.layers = vec!["long_term".to_string()];
+        config.embedding.provider = "none".to_string();
+        std::fs::create_dir_all(&config.paths.layers_dir).unwrap();
+        crate::build::build(&config, true).unwrap();
+
+        let mut adapter = AIAdapter::new(config).unwrap();
+
+        // Clean state: no pending work, Ok.
+        assert!(adapter.update_merkle_tree().is_ok());
+
+        // Dirty state: must fail loudly and must NOT clear the dirty set.
+        adapter.dirty_blocks.insert(42);
+        let err = adapter.update_merkle_tree().unwrap_err();
+        assert!(err.contains("not implemented"), "err: {err}");
+        assert!(
+            adapter.dirty_blocks.contains(&42),
+            "dirty set must survive a failed update"
+        );
     }
 }

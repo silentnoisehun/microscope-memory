@@ -5,6 +5,8 @@ use crate::{MicroscopeReader, LAYER_NAMES};
 use axum::{
     extract::{Json, Query, State},
     http::StatusCode,
+    middleware,
+    response::IntoResponse,
     routing::{get, post},
     Router,
 };
@@ -18,6 +20,42 @@ use std::str::FromStr;
 use std::sync::{Arc, Mutex};
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::TraceLayer;
+
+const API_KEY_HEADER: &str = "x-api-key";
+
+fn is_loopback(host: &str) -> bool {
+    matches!(host, "127.0.0.1" | "localhost" | "::1")
+}
+
+/// Optional shared API key check for inbound bridge requests.
+///
+/// When `[server] api_key` is configured, every request must carry
+/// `X-API-Key: <key>`. Without a configured key the bridge runs open
+/// (single-user localhost default); `run()` refuses to start on a non-loopback
+/// host without a key, so the open mode can never be accidentally exposed.
+async fn api_key_auth(
+    State(state): State<Arc<AppState>>,
+    req: axum::extract::Request,
+    next: middleware::Next,
+) -> Result<axum::response::Response, axum::response::Response> {
+    if let Some(expected) = state.config.server.api_key.as_deref() {
+        if !expected.is_empty() {
+            let provided = req
+                .headers()
+                .get(API_KEY_HEADER)
+                .and_then(|v| v.to_str().ok())
+                .unwrap_or("");
+            if provided != expected {
+                return Err((
+                    StatusCode::UNAUTHORIZED,
+                    "missing or invalid X-API-Key header",
+                )
+                    .into_response());
+            }
+        }
+    }
+    Ok(next.run(req).await)
+}
 
 #[derive(Clone)]
 pub struct AppState {
@@ -1273,6 +1311,13 @@ pub async fn run(
     host: String,
     port: u16,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    if !is_loopback(&host) && config.server.api_key.as_deref().map_or(true, str::is_empty) {
+        return Err(
+            "bridge would be exposed on a non-loopback host without [server] api_key — \
+             refusing to start"
+                .into(),
+        );
+    }
     let state = Arc::new(AppState {
         config,
         active_project: Arc::new(Mutex::new(None)),
@@ -1320,6 +1365,7 @@ pub async fn run(
         .route("/project/switch", post(switch_project))
         .route("/project/recall", post(recall_request_handler))
         .route("/openapi.json", get(get_openapi))
+        .layer(middleware::from_fn_with_state(state.clone(), api_key_auth))
         .layer(TraceLayer::new_for_http())
         .layer(cors)
         .with_state(state);
@@ -1338,4 +1384,86 @@ pub async fn run(
     axum::serve(listener, app).await?;
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::body::Body;
+    use axum::http::Request;
+    use tower::ServiceExt;
+
+    fn state_with_key(key: Option<&str>) -> Arc<AppState> {
+        let mut config = Config::default();
+        config.server.api_key = key.map(|s| s.to_string());
+        Arc::new(AppState {
+            config,
+            active_project: Arc::new(Mutex::new(None)),
+        })
+    }
+
+    #[tokio::test]
+    async fn api_key_middleware_rejects_missing_and_accepts_valid_key() {
+        let state = state_with_key(Some("secret"));
+        let app = Router::new()
+            .route("/ping", get(|| async { "pong" }))
+            .layer(middleware::from_fn_with_state(state.clone(), api_key_auth))
+            .with_state(state);
+
+        let resp = app
+            .clone()
+            .oneshot(Request::builder().uri("/ping").body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+
+        let resp = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/ping")
+                    .header(API_KEY_HEADER, "wrong")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .uri("/ping")
+                    .header(API_KEY_HEADER, "secret")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn api_key_middleware_passes_through_without_configured_key() {
+        let state = state_with_key(None);
+        let app = Router::new()
+            .route("/ping", get(|| async { "pong" }))
+            .layer(middleware::from_fn_with_state(state.clone(), api_key_auth))
+            .with_state(state);
+
+        let resp = app
+            .oneshot(Request::builder().uri("/ping").body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+    }
+
+    #[test]
+    fn loopback_detection() {
+        assert!(is_loopback("127.0.0.1"));
+        assert!(is_loopback("localhost"));
+        assert!(is_loopback("::1"));
+        assert!(!is_loopback("0.0.0.0"));
+        assert!(!is_loopback("192.168.1.10"));
+    }
 }

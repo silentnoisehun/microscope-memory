@@ -179,6 +179,11 @@ pub struct Server {
     pub openai_api_key: Option<String>,
     #[serde(default)]
     pub gemini_api_key: Option<String>,
+    /// Optional shared API key for inbound HTTP requests. Empty = no auth
+    /// (single-user localhost default). When set, every bridge request must
+    /// carry `X-API-Key: <key>`. Required when binding on a non-loopback host.
+    #[serde(default)]
+    pub api_key: Option<String>,
 }
 
 fn default_port() -> u16 {
@@ -192,6 +197,7 @@ impl Default for Server {
             cors_origin: None,
             openai_api_key: None,
             gemini_api_key: None,
+            api_key: None,
         }
     }
 }

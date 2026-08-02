@@ -52,6 +52,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **NaN-safe ranking**: 64 `partial_cmp(&...).unwrap()` f32 comparators across
   the recall/rank/sort paths replaced with `total_cmp`, so a NaN score can
   never panic a hot path.
+- **Bridge auth**: optional `[server] api_key` — when set, every inbound bridge
+  request must carry `X-API-Key: <key>` (checked before the handlers, after
+  CORS so preflight keeps working). The bridge refuses to start on a
+  non-loopback host without a key, and the single-user localhost default is
+  documented in the README.
 
 ### Changed
 - **Bounded layer retention**: `layer_retention_entries` default is now 2000

@@ -325,6 +325,19 @@ microscope-mem config generic     # any MCP-compatible client
 
 `microscope-mem serve` runs a small TCP/HTTP file server on port 8080 that serves the 3D viewer (`viewer.html`) and the PWA chat (`chat.html`). For programmatic access, the legacy axum-based REST API in `src/bridge.rs` exposes `/v1/recall`, `/v1/remember`, `/v1/status` but is not started by the `spine` CLI command (the napi-rs addon is the recommended path).
 
+#### Bridge auth model
+
+The bridge is **single-user by default**: it binds to `127.0.0.1` and is open
+with no authentication, which is safe only while it stays on the local machine.
+The `/mobile/*` endpoints take a `user_id` from the client without binding it
+to the caller's identity — treat them as single-user convenience APIs, not
+multi-tenant storage.
+
+Before exposing the bridge on any non-loopback address, set `api_key` under
+`[server]` in `config.toml`; every request must then carry an
+`X-API-Key: <key>` header. The bridge **refuses to start** on a non-loopback
+host without a configured key, so the open mode cannot be accidentally exposed.
+
 ---
 
 ## 🖥 Electron Tray App
@@ -848,5 +861,4 @@ Download the [HOPE-Architect style whitepaper](docs/microscope-memory-public-dem
 
 - microscope-memory root crate: 322 tests
 - **Total verified by `cargo test`: 322 passing, 0 failed**
-
 

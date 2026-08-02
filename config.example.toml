@@ -100,6 +100,9 @@ max_depth = 4
 [server]
 # HTTP server port
 port = 6060
+# Shared API key for inbound HTTP requests (X-API-Key header). Empty = no auth
+# (single-user localhost default). Required when binding on a non-loopback host.
+api_key = ""
 
 # CORS origin
 cors_origin = "*"

@@ -311,7 +311,7 @@ impl ArchitectureSimulator {
 
         // Metrikák számítása
         if !latencies.is_empty() {
-            latencies.sort_by(|a, b| a.partial_cmp(b).unwrap());
+            latencies.sort_by(|a, b| a.total_cmp(b));
             let len = latencies.len();
             metrics.avg_latency_ms = latencies.iter().sum::<f64>() / len as f64;
             metrics.p95_latency_ms = latencies[(len as f64 * 0.95) as usize];

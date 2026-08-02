@@ -451,6 +451,16 @@ impl EnforcementEngine {
         }
     }
 
+    /// Executor boundary gate: the native executor MUST run an action only if
+    /// this returns `true`. Internally this runs the same mandatory `decide()`
+    /// (attribution check, `K_t` selection, `violates()`, `justifiedOverride()`)
+    /// and persists the decision to the audit chain. `Blocked` and
+    /// `AttributionError` both yield `false`, so a non-permitted action never
+    /// reaches an executor that respects this gate.
+    pub fn can_execute(&mut self, event: &ActionEvent, justification: Option<&str>) -> bool {
+        self.decide(event, justification).is_valid()
+    }
+
     /// Restrict a candidate set to A_t^valid.
     pub fn select_valid(&mut self, candidates: &[ActionEvent]) -> Vec<ActionEvent> {
         let decisions: Vec<Decision> = candidates.iter().map(|c| self.decide(c, None)).collect();

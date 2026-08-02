@@ -70,6 +70,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Self-defensive multimodal decoding**: `decode_image_meta` and
   `decode_audio_meta` now return `Option` and reject short input up front
   instead of relying on every caller to bounds-check first.
+- **Honest seqlock scope**: `consciousness_seqlock` docs now state clearly that
+  the seqlock is in-process only (`Arc<SharedSnapshot>`); the cross-process
+  mmap "federation without serialization" path is not implemented, and the
+  struct's heap-backed fast-path fields make the current layout non-mmap-ready.
 
 ### Changed
 - **Bounded layer retention**: `layer_retention_entries` default is now 2000

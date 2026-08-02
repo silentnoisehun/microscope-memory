@@ -1,12 +1,11 @@
-//! Lock-free shared-memory consciousness snapshot.
+//! Lock-free consciousness snapshot, protected by a **seqlock** protocol.
 //!
 //! # What is this?
 //!
-//! A snapshot of the consciousness stream's state, protected by a **seqlock**
-//! (sequence-locked) protocol. The stream's background cycle publishes a
-//! `SharedSnapshot` once per tick; any number of readers (in this process or
-//! another) can read it **without taking a Mutex**, **without copying**,
-//! **without serializing**.
+//! A snapshot of the consciousness stream's state. The stream's background
+//! cycle publishes a `SharedSnapshot` once per tick; any number of readers in
+//! the **same process** can read it **without taking a Mutex**, **without
+//! copying**, **without serializing**.
 //!
 //! # Why is this useful?
 //!
@@ -30,11 +29,15 @@
 //! For 28k-element data, retries are extremely rare because the writer
 //! holds the lock for microseconds and the reader holds for nanoseconds.
 //!
-//! # Cross-process
+//! # Scope: in-process only
 //!
-//! The snapshot is a fixed-layout `#[repr(C)]` struct, designed to be
-//! mmap'd to a file. Two processes looking at the same file see the same
-//! snapshot. This is the "federation without serialization" path.
+//! This module is an **in-process** seqlock today: `ConsciousnessStream` owns
+//! the snapshot as `Arc<SharedSnapshot>`, and no file/mmap layer exists. The
+//! seqlock header plus `SnapshotData` block is `#[repr(C)]`, but the struct
+//! also embeds heap-backed fast-path fields (`RwLock<String>`, atomics), so
+//! the current layout is **not** mmap-ready. The cross-process "federation
+//! without serialization" path is **not implemented** — do not rely on
+//! cross-process reads.
 
 use std::cell::UnsafeCell;
 use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
@@ -49,7 +52,8 @@ pub const SNAPSHOT_MAX_RETRIES: u32 = 8;
 
 /// 96-byte snapshot of the consciousness stream. All fields are
 /// pre-computed by the writer; readers do no derivation.
-/// `#[repr(C)]` guarantees a stable layout for mmap'd files.
+/// `#[repr(C)]` keeps the seqlock header and data block layout stable
+/// (relevant if a future file-mmap layer is ever built).
 /// The data fields live inside `UnsafeCell` so the writer can mutate them
 /// through `&self` (required for the seqlock protocol). The seqlock
 /// guarantees readers never see a torn write.
@@ -57,7 +61,7 @@ pub const SNAPSHOT_MAX_RETRIES: u32 = 8;
 pub struct SharedSnapshot {
     /// Seqlock counter. Even = stable, odd = write in progress.
     pub sequence: AtomicU64,
-    /// `SNAPSHOT_MAGIC`. Lets readers detect a fresh/uninitialized file.
+    /// `SNAPSHOT_MAGIC`. Lets readers detect a fresh/uninitialized snapshot.
     pub magic: u32,
     /// `SNAPSHOT_VERSION`. Bumped on layout change.
     pub version: u32,
@@ -69,7 +73,7 @@ pub struct SharedSnapshot {
     /// `#[repr(C)]` and explicit field types.
     data: UnsafeCell<SnapshotData>,
 
-    // ─── Fast-path fields (not in mmap layout) ───────────
+    // ─── Fast-path fields (heap-backed, in-process only) ───────────
     /// Pre-formatted consciousness string. Updated by the background cycle.
     /// Readers clone this in O(1) without any format!() calls.
     cached_format: RwLock<String>,

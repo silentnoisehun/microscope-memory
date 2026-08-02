@@ -2203,7 +2203,12 @@ async fn main() {
             let output_dir = Path::new(&config.paths.output_dir);
             let reader = open_reader(&config);
             println!("{}", "DREAM CONSOLIDATION".cyan().bold());
-            match microscope_memory::dream::dream_consolidate(output_dir, reader.block_count) {
+            match microscope_memory::dream::dream_consolidate(
+                output_dir,
+                reader.block_count,
+                config.index.max_blocks,
+                config.index.protect_min_importance,
+            ) {
                 Ok(cycle) => {
                     let mut dream_state =
                         microscope_memory::dream::DreamState::load_or_init(output_dir);

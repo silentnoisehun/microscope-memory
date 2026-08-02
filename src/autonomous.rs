@@ -369,7 +369,12 @@ impl AutonomousEngine {
             Ok(r) => r.block_count,
             Err(_) => 100,
         };
-        match dream::dream_consolidate(output_dir, block_count) {
+        match dream::dream_consolidate(
+            output_dir,
+            block_count,
+            config.index.max_blocks,
+            config.index.protect_min_importance,
+        ) {
             Ok(cycle) => {
                 let msg = format!("💤 Álom: {} fingerprint, {} megerősítve, {} ritkítva, {} elfelejtve, energia: {:.2} → {:.2}",
                     cycle.replayed_fingerprints, cycle.strengthened_pairs,

@@ -388,7 +388,12 @@ pub fn dream(config: &Config) {
     let output_dir = Path::new(&config.paths.output_dir);
     println!("{} consolidating...", "DREAM".magenta().bold());
 
-    match dream::dream_consolidate(output_dir, reader.block_count) {
+    match dream::dream_consolidate(
+        output_dir,
+        reader.block_count,
+        config.index.max_blocks,
+        config.index.protect_min_importance,
+    ) {
         Ok(cycle) => {
             println!(
                 "  {} fingerprints replayed, {} strengthened, {} pairs pruned, {} activations pruned ({} ms)",

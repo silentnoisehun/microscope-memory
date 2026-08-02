@@ -18,6 +18,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   unbounded growth is visible from one command.
 
 ### Changed
+- **Size-bounded memory eviction**: `max_blocks` (0 = unbounded) and
+  `protect_min_importance` (default 8) under `[index]`. When the index exceeds
+  the cap, the dream cycle evicts the lowest-scoring blocks — score =
+  importance × 10 + recall energy − age penalty — and rewrites `embeddings.bin`
+  in sync. Blocks with importance >= `protect_min_importance` are never evicted.
+
+### Changed
 - **Bounded layer retention**: `layer_retention_entries` default is now 2000
   (was 0 / unlimited). Each layer file keeps at most 2000 newest entries and
   trims the oldest past that cap, so `layers/*.txt` cannot grow without bound.

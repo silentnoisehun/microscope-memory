@@ -175,7 +175,12 @@ impl DreamState {
 /// 5. Detect thought patterns across recent sessions
 /// 6. Decay resonance field
 /// 7. Clean up expired predictive cache entries
-pub fn dream_consolidate(output_dir: &Path, block_count: usize) -> Result<DreamCycle, String> {
+pub fn dream_consolidate(
+    output_dir: &Path,
+    block_count: usize,
+    max_blocks: usize,
+    protect_min_importance: u8,
+) -> Result<DreamCycle, String> {
     let t0 = now_ms();
 
     let mut hebb = HebbianState::load_or_init(output_dir, block_count);
@@ -300,7 +305,21 @@ pub fn dream_consolidate(output_dir: &Path, block_count: usize) -> Result<DreamC
     pred_cache.dream_cleanup();
 
     // Step 8: Forget old internal thoughts (autonomous mode outputs)
-    let forgotten = forget_old_thoughts(output_dir, block_count)?;
+    let mut forgotten = forget_old_thoughts(output_dir, block_count)?;
+
+    // Step 8b: Size-bounded eviction — drop lowest-scoring blocks when the
+    // index exceeds max_blocks. Blocks with importance >= protect_min_importance
+    // are never evicted.
+    let evicted = evict_over_capacity(output_dir, max_blocks, protect_min_importance)?;
+    if evicted > 0 {
+        println!(
+            "  [EVICT] {} blokk eltávolítva (plafon: {}, maradt: {})",
+            evicted,
+            max_blocks,
+            block_count.saturating_sub(evicted as usize)
+        );
+    }
+    forgotten += evicted;
 
     // Measure energy after
     let energy_after: f32 = hebb.activations.iter().map(|r| r.energy).sum();
@@ -490,6 +509,149 @@ pub fn forget_old_thoughts(output_dir: &Path, _block_count: usize) -> Result<u32
     Ok(forgotten)
 }
 
+/// Evict the lowest-scoring blocks when the index exceeds `max_blocks`.
+///
+/// Approved policy: eviction score = importance × 10 + recall energy − age
+/// penalty, where age is the block position normalized to [0, 1]. Blocks with
+/// importance >= `protect_min_importance` are never evicted; if the cap cannot
+/// be reached without touching protected memory, nothing is evicted. The
+/// embeddings index is rewritten together with the block index so semantic
+/// rows stay aligned.
+pub fn evict_over_capacity(
+    output_dir: &Path,
+    max_blocks: usize,
+    protect_min_importance: u8,
+) -> Result<u32, String> {
+    use crate::{BLOCK_DATA_SIZE, DEPTH_ENTRY_SIZE, HEADER_SIZE, META_HEADER_SIZE};
+
+    let hdr_path = output_dir.join("microscope.bin");
+    let dat_path = output_dir.join("data.bin");
+    let meta_path = output_dir.join("meta.bin");
+    if !hdr_path.exists() || !dat_path.exists() || !meta_path.exists() {
+        return Ok(0);
+    }
+    let headers = fs::read(&hdr_path).map_err(|e| format!("read microscope.bin: {e}"))?;
+    let data = fs::read(&dat_path).map_err(|e| format!("read data.bin: {e}"))?;
+    let meta = fs::read(&meta_path).map_err(|e| format!("read meta.bin: {e}"))?;
+
+    let actual_blocks = headers.len() / HEADER_SIZE;
+    if actual_blocks == 0 || max_blocks == 0 || actual_blocks <= max_blocks {
+        return Ok(0);
+    }
+    let target = actual_blocks - max_blocks;
+
+    // Recall signal: per-block energy from the Hebbian state.
+    let hebb = crate::hebbian::HebbianState::load_or_init(output_dir, actual_blocks);
+
+    let mut scored: Vec<(usize, f32)> = Vec::with_capacity(actual_blocks);
+    for i in 0..actual_blocks {
+        let off = i * HEADER_SIZE;
+        let importance = headers[off + 13]; // byte 13: importance
+        if importance >= protect_min_importance {
+            continue; // protected core memory is never evicted
+        }
+        let energy = hebb.activations.get(i).map(|r| r.energy).unwrap_or(0.0);
+        let age = i as f32 / actual_blocks as f32;
+        scored.push((i, importance as f32 * 10.0 + energy - age * 5.0));
+    }
+    if scored.len() <= target {
+        // Reaching the cap would require evicting protected memory.
+        return Ok(0);
+    }
+
+    scored.sort_by(|a, b| a.1.total_cmp(&b.1)); // lowest score first
+    let victims: std::collections::HashSet<usize> =
+        scored.iter().take(target).map(|(idx, _)| *idx).collect();
+    let keep_indices: Vec<usize> = (0..actual_blocks).filter(|i| !victims.contains(i)).collect();
+
+    // Rewrite the binary index, keeping only the surviving blocks.
+    let mut new_headers = Vec::with_capacity(keep_indices.len() * HEADER_SIZE);
+    let mut new_data = Vec::with_capacity(keep_indices.len() * BLOCK_DATA_SIZE);
+    for &idx in &keep_indices {
+        let hdr_off = idx * HEADER_SIZE;
+        let dat_off = idx * BLOCK_DATA_SIZE;
+        new_headers.extend_from_slice(&headers[hdr_off..hdr_off + HEADER_SIZE]);
+        if dat_off + BLOCK_DATA_SIZE <= data.len() {
+            new_data.extend_from_slice(&data[dat_off..dat_off + BLOCK_DATA_SIZE]);
+        } else {
+            new_data.extend_from_slice(&[0u8; BLOCK_DATA_SIZE]);
+        }
+    }
+    let hdr_tmp = output_dir.join("microscope.bin.tmp");
+    let dat_tmp = output_dir.join("data.bin.tmp");
+    fs::write(&hdr_tmp, &new_headers).map_err(|e| format!("write microscope.bin: {e}"))?;
+    fs::write(&dat_tmp, &new_data).map_err(|e| format!("write data.bin: {e}"))?;
+    fs::rename(&hdr_tmp, &hdr_path).map_err(|e| format!("rename microscope.bin: {e}"))?;
+    fs::rename(&dat_tmp, &dat_path).map_err(|e| format!("rename data.bin: {e}"))?;
+
+    // Rebuild meta.bin with the new block count and depth ranges.
+    let n = keep_indices.len();
+    let mut new_meta = Vec::with_capacity(META_HEADER_SIZE + 9 * DEPTH_ENTRY_SIZE);
+    if meta.len() >= 8 {
+        new_meta.extend_from_slice(&meta[..8]);
+    } else {
+        new_meta.extend_from_slice(b"MSC4\x04\0\0\0");
+    }
+    new_meta.extend_from_slice(&(n as u32).to_le_bytes());
+    let mut depth_counts = [0u32; 9];
+    for &idx in &keep_indices {
+        let off = idx * HEADER_SIZE;
+        let depth = headers[off + 14]; // byte 14: depth
+        if (depth as usize) < 9 {
+            depth_counts[depth as usize] += 1;
+        }
+    }
+    let mut running_start = 0u32;
+    for &count in &depth_counts[..9] {
+        new_meta.extend_from_slice(&running_start.to_le_bytes());
+        new_meta.extend_from_slice(&count.to_le_bytes());
+        running_start += count;
+    }
+    let meta_tail_start = META_HEADER_SIZE + 9 * DEPTH_ENTRY_SIZE;
+    if meta_tail_start < meta.len() {
+        new_meta.extend_from_slice(&meta[meta_tail_start..]);
+    }
+    let meta_tmp = output_dir.join("meta.bin.tmp");
+    fs::write(&meta_tmp, &new_meta).map_err(|e| format!("write meta.bin: {e}"))?;
+    fs::rename(&meta_tmp, &meta_path).map_err(|e| format!("rename meta.bin: {e}"))?;
+
+    trim_embeddings(output_dir, &keep_indices)?;
+
+    Ok(target as u32)
+}
+
+/// Drop the evicted rows from embeddings.bin so semantic rows stay aligned
+/// with the compacted block index. A mismatched or missing file is left alone
+/// (the next embedding rebuild regenerates it).
+fn trim_embeddings(output_dir: &Path, keep_indices: &[usize]) -> Result<(), String> {
+    let emb_path = output_dir.join("embeddings.bin");
+    if !emb_path.exists() {
+        return Ok(());
+    }
+    let emb = fs::read(&emb_path).map_err(|e| format!("read embeddings.bin: {e}"))?;
+    if emb.len() < 12 {
+        return Ok(());
+    }
+    let block_count = u32::from_le_bytes(emb[0..4].try_into().unwrap()) as usize;
+    let dim = u32::from_le_bytes(emb[4..8].try_into().unwrap()) as usize;
+    let expected = 12 + block_count * dim * 4;
+    if dim == 0 || block_count == 0 || emb.len() < expected {
+        return Ok(());
+    }
+    let mut out = Vec::with_capacity(12 + keep_indices.len() * dim * 4);
+    out.extend_from_slice(&(keep_indices.len() as u32).to_le_bytes());
+    out.extend_from_slice(&(dim as u32).to_le_bytes());
+    out.extend_from_slice(&emb[8..12]); // max_depth
+    for &idx in keep_indices {
+        let off = 12 + idx * dim * 4;
+        out.extend_from_slice(&emb[off..off + dim * 4]);
+    }
+    let tmp = output_dir.join("embeddings.bin.tmp");
+    fs::write(&tmp, &out).map_err(|e| format!("write embeddings.bin: {e}"))?;
+    fs::rename(&tmp, &emb_path).map_err(|e| format!("rename embeddings.bin: {e}"))?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -549,6 +711,81 @@ mod tests {
     }
 
     #[test]
+    fn eviction_respects_importance_protection() {
+        use crate::{BLOCK_DATA_SIZE, DEPTH_ENTRY_SIZE, HEADER_SIZE, META_HEADER_SIZE};
+        use std::fs;
+
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let dir = tmp.path();
+        let n = 10usize;
+        let mut headers = Vec::new();
+        let mut data = Vec::new();
+        for i in 0..n {
+            let mut h = vec![0u8; HEADER_SIZE];
+            h[12] = 1; // layer_id
+            h[13] = if i < 2 { 8 } else { 5 }; // first two blocks are core memories
+            h[14] = (i % 9) as u8; // depth
+            headers.extend_from_slice(&h);
+            data.extend_from_slice(&[b'a'; BLOCK_DATA_SIZE]);
+        }
+        let mut meta = Vec::new();
+        meta.extend_from_slice(b"MSC4\x04\0\0\0");
+        meta.extend_from_slice(&(n as u32).to_le_bytes());
+        for _ in 0..9 {
+            meta.extend_from_slice(&0u32.to_le_bytes());
+            meta.extend_from_slice(&0u32.to_le_bytes());
+        }
+        fs::write(dir.join("microscope.bin"), &headers).unwrap();
+        fs::write(dir.join("data.bin"), &data).unwrap();
+        fs::write(dir.join("meta.bin"), &meta).unwrap();
+
+        let evicted = evict_over_capacity(dir, 4, 8).unwrap();
+        assert_eq!(evicted, 6);
+
+        let new_headers = fs::read(dir.join("microscope.bin")).unwrap();
+        assert_eq!(new_headers.len() / HEADER_SIZE, 4);
+        let mut protected_survivors = 0;
+        let mut min_imp = u8::MAX;
+        for i in 0..4 {
+            let imp = new_headers[i * HEADER_SIZE + 13];
+            if imp >= 8 {
+                protected_survivors += 1;
+            }
+            min_imp = min_imp.min(imp);
+        }
+        assert_eq!(protected_survivors, 2, "both protected blocks survive");
+        assert!(min_imp >= 5, "no protected block is evicted");
+    }
+
+    #[test]
+    fn eviction_is_noop_below_cap_or_without_candidates() {
+        use crate::{BLOCK_DATA_SIZE, HEADER_SIZE};
+        use std::fs;
+
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let dir = tmp.path();
+        let n = 6usize;
+        let mut headers = Vec::new();
+        let mut data = Vec::new();
+        for _ in 0..n {
+            let mut h = vec![0u8; HEADER_SIZE];
+            h[13] = 8; // everything protected
+            headers.extend_from_slice(&h);
+            data.extend_from_slice(&[b'a'; BLOCK_DATA_SIZE]);
+        }
+        fs::write(dir.join("microscope.bin"), &headers).unwrap();
+        fs::write(dir.join("data.bin"), &data).unwrap();
+        fs::write(dir.join("meta.bin"), b"MSC4\x04\0\0\0").unwrap();
+
+        // Below the cap: no-op.
+        assert_eq!(evict_over_capacity(dir, 100, 8).unwrap(), 0);
+        // Cap cannot be reached without evicting protected memory: no-op.
+        assert_eq!(evict_over_capacity(dir, 2, 8).unwrap(), 0);
+        let after = fs::read(dir.join("microscope.bin")).unwrap();
+        assert_eq!(after.len() / HEADER_SIZE, n);
+    }
+
+    #[test]
     fn test_dream_strengthens_repeated_coactivations() {
         let tmp = tempfile::tempdir().expect("tempdir");
         let mut hebb = make_hebb(10);
@@ -586,7 +823,7 @@ mod tests {
         let arc = ArchetypeState::load_or_init(tmp.path());
         arc.save(tmp.path()).unwrap();
 
-        let cycle = dream_consolidate(tmp.path(), 10).unwrap();
+        let cycle = dream_consolidate(tmp.path(), 10, 0, 8).unwrap();
         assert!(cycle.strengthened_pairs > 0);
 
         // Verify the pair was strengthened
@@ -635,7 +872,7 @@ mod tests {
             .save(tmp.path())
             .unwrap();
 
-        let cycle = dream_consolidate(tmp.path(), 5).unwrap();
+        let cycle = dream_consolidate(tmp.path(), 5, 0, 8).unwrap();
         assert_eq!(cycle.pruned_pairs, 1);
 
         let hebb2 = HebbianState::load_or_init(tmp.path(), 5);
@@ -672,7 +909,7 @@ mod tests {
             .save(tmp.path())
             .unwrap();
 
-        let cycle = dream_consolidate(tmp.path(), 5).unwrap();
+        let cycle = dream_consolidate(tmp.path(), 5, 0, 8).unwrap();
         assert_eq!(cycle.replayed_fingerprints, 1);
 
         let hebb2 = HebbianState::load_or_init(tmp.path(), 5);
@@ -697,7 +934,7 @@ mod tests {
             .save(tmp.path())
             .unwrap();
 
-        let cycle = dream_consolidate(tmp.path(), 5).unwrap();
+        let cycle = dream_consolidate(tmp.path(), 5, 0, 8).unwrap();
         assert_eq!(cycle.replayed_fingerprints, 0);
         assert_eq!(cycle.strengthened_pairs, 0);
         assert_eq!(cycle.pruned_pairs, 0);

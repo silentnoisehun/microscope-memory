@@ -56,6 +56,13 @@ pub struct Index {
     /// Maximum persisted entries per layer. Zero keeps the full history.
     #[serde(default = "default_layer_retention_entries")]
     pub layer_retention_entries: usize,
+    /// Maximum blocks in the index before low-score blocks are evicted.
+    /// Zero keeps the index unbounded.
+    #[serde(default = "default_max_blocks")]
+    pub max_blocks: usize,
+    /// Blocks with importance >= this value are never evicted.
+    #[serde(default = "default_protect_min_importance")]
+    pub protect_min_importance: u8,
 }
 
 fn default_auto_rebuild() -> bool {
@@ -64,6 +71,14 @@ fn default_auto_rebuild() -> bool {
 
 fn default_layer_retention_entries() -> usize {
     2000
+}
+
+fn default_max_blocks() -> usize {
+    0
+}
+
+fn default_protect_min_importance() -> u8 {
+    8
 }
 
 fn default_auto_rebuild_entries() -> usize {
@@ -238,6 +253,8 @@ impl Default for Config {
                 auto_rebuild: default_auto_rebuild(),
                 auto_rebuild_entries: default_auto_rebuild_entries(),
                 layer_retention_entries: default_layer_retention_entries(),
+                max_blocks: default_max_blocks(),
+                protect_min_importance: default_protect_min_importance(),
             },
             search: Search {
                 default_k: 10,

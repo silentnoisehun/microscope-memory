@@ -1246,7 +1246,12 @@ async fn dream_consolidation(
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     let block_count = reader.block_count;
     drop(reader);
-    match crate::dream::dream_consolidate(output_dir, block_count) {
+    match crate::dream::dream_consolidate(
+        output_dir,
+        block_count,
+        state.config.index.max_blocks,
+        state.config.index.protect_min_importance,
+    ) {
         Ok(cycle) => Ok(Json(serde_json::json!({
             "status": "ok",
             "duration_ms": cycle.duration_ms,

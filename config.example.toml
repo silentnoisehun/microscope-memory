@@ -29,6 +29,8 @@ auto_rebuild_entries = 250
 
 # Maximum source entries per layer. Zero preserves the complete history.
 layer_retention_entries = 2000  # bound each layer file; oldest entries are trimmed past this
+max_blocks = 0                   # 0 = unbounded; >0 evicts lowest-score blocks when the index exceeds this
+protect_min_importance = 8       # never evict blocks with importance >= this
 
 [search]
 # Default number of results

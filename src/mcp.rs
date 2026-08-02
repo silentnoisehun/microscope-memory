@@ -1702,7 +1702,12 @@ fn tool_dream(config: &Config, _args: &Value) -> Result<String, String> {
     let block_count = reader.block_count;
     drop(reader);
 
-    match crate::dream::dream_consolidate(output_dir, block_count) {
+    match crate::dream::dream_consolidate(
+        output_dir,
+        block_count,
+        config.index.max_blocks,
+        config.index.protect_min_importance,
+    ) {
         Ok(cycle) => Ok(format!(
             "Dream consolidation complete:\n\
              Duration: {}ms\n\
@@ -3111,7 +3116,12 @@ fn tool_autonomous(config: &Config, args: &Value) -> Result<String, String> {
     ));
 
     // Dream
-    match crate::dream::dream_consolidate(output_dir, reader.block_count) {
+    match crate::dream::dream_consolidate(
+        output_dir,
+        reader.block_count,
+        config.index.max_blocks,
+        config.index.protect_min_importance,
+    ) {
         Ok(cycle) => {
             output.push_str(&format!(
                 "\nDream: {}ms, {} strengthened, {} pruned, energy {:.3}→{:.3}\n",
@@ -3157,6 +3167,8 @@ mod tests {
                 auto_rebuild: false,
                 auto_rebuild_entries: 25,
                 layer_retention_entries: 2000,
+                max_blocks: 0,
+                protect_min_importance: 8,
             },
             search: crate::config::Search {
                 default_k: 10,

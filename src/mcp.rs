@@ -1006,6 +1006,7 @@ fn tool_recall(config: &Config, args: &Value) -> Result<String, String> {
 
     let (qx, qy, qz) =
         crate::content_coords_blended(query, "long_term", config.search.semantic_weight);
+    let relevance_query = crate::relevance::RelevanceQuery::new(query);
 
     let (mut attention, hebb_pre, tg_pre, pc_pre) =
         if let Some(stream) = crate::consciousness_stream::global_stream() {
@@ -1057,15 +1058,6 @@ fn tool_recall(config: &Config, args: &Value) -> Result<String, String> {
         _ => (2, 5),
     };
 
-    let q_lower = query.to_lowercase();
-    let keyword_list: Vec<String> = q_lower
-        .split_whitespace()
-        .filter(|w| w.len() > 2)
-        .map(|s| s.to_string())
-        .collect();
-
-    let keywords: Vec<&str> = keyword_list.iter().map(|s| s.as_str()).collect();
-
     // Load emotions.bin lookup for main-index emotional recall
     let emotion_lookup = query_emotion
         .as_ref()
@@ -1077,15 +1069,14 @@ fn tool_recall(config: &Config, args: &Value) -> Result<String, String> {
         let (start, count) = reader.depth_ranges[zoom as usize];
         let (start, count) = (start as usize, count as usize);
         for i in start..(start + count) {
-            let text = reader.text(i).to_lowercase();
-            let keyword_hits = keywords.iter().filter(|&&kw| text.contains(kw)).count();
-            if keyword_hits > 0 {
+            let text = reader.text(i);
+            let lexical = relevance_query.lexical_score(text);
+            if lexical > 0.0 {
                 let h = reader.header(i);
                 let dx = h.x - qx;
                 let dy = h.y - qy;
                 let dz = h.z - qz;
                 let spatial_dist = dx * dx + dy * dy + dz * dz;
-                let boost = keyword_hits as f32 * config.search.keyword_boost;
                 // Emotional similarity boost (if query emotion AND emotions.bin data available)
                 let emo_boost = query_emotion
                     .as_ref()
@@ -1099,14 +1090,13 @@ fn tool_recall(config: &Config, args: &Value) -> Result<String, String> {
                             })
                     })
                     .unwrap_or(0.0);
-                let layer_imp = match h.layer_id {
-                    li if LAYER_NAMES.get(li as usize) == Some(&"session") => 8.0,
-                    li if LAYER_NAMES.get(li as usize) == Some(&"short_term") => 6.0,
-                    li if LAYER_NAMES.get(li as usize) == Some(&"long_term") => 5.0,
-                    _ => 4.0,
-                };
-                let imp_weight = 2.0 / (1.0 + layer_imp * 0.1);
-                let combined = (spatial_dist - boost - emo_boost).max(0.0) * imp_weight;
+                let base = crate::relevance::rank_distance_from_score(
+                    lexical,
+                    spatial_dist,
+                    config.search.keyword_boost,
+                    h.importance,
+                );
+                let combined = crate::relevance::apply_boost(base, emo_boost);
                 all_results.push((combined, i, true));
             }
         }
@@ -1119,20 +1109,20 @@ fn tool_recall(config: &Config, args: &Value) -> Result<String, String> {
         let dy = entry.y - qy;
         let dz = entry.z - qz;
         let dist = dx * dx + dy * dy + dz * dz;
-        let text_lower = entry.text.to_lowercase();
-        let keyword_hits = keywords
-            .iter()
-            .filter(|&&kw| text_lower.contains(kw))
-            .count();
-        let boost = keyword_hits as f32 * config.search.keyword_boost;
+        let lexical = relevance_query.lexical_score(&entry.text);
         // Emotional boost from inline append entry emotion
         let emo_boost = query_emotion
             .as_ref()
             .map(|qe| crate::emotional_similarity(qe, &entry.emotion) * emotional_recall_weight)
             .unwrap_or(0.0);
-        if dist < 0.1 || keyword_hits > 0 || emo_boost > 0.0 {
-            let imp_weight = 2.0 / (1.0 + entry.importance as f32 * 0.1);
-            let combined = (dist - boost - emo_boost).max(0.0) * imp_weight;
+        if dist < 0.1 || lexical > 0.0 || emo_boost > 0.0 {
+            let base = crate::relevance::rank_distance_from_score(
+                lexical,
+                dist,
+                config.search.keyword_boost,
+                entry.importance,
+            );
+            let combined = crate::relevance::apply_boost(base, emo_boost);
             all_results.push((combined, ai + 1_000_000, false));
         }
     }
@@ -1164,7 +1154,7 @@ fn tool_recall(config: &Config, args: &Value) -> Result<String, String> {
                 } else {
                     for (dist, ri, rim) in &mut all_results {
                         if *rim && *ri == linked_idx {
-                            *dist = (*dist - *sim * 0.08).max(0.0);
+                            *dist = crate::relevance::apply_boost(*dist, *sim * 0.08);
                             break;
                         }
                     }
@@ -1196,7 +1186,7 @@ fn tool_recall(config: &Config, args: &Value) -> Result<String, String> {
         let cached_set: HashSet<u32> = cached_blocks.iter().copied().collect();
         for (dist, idx, is_main) in &mut all_results {
             if *is_main && cached_set.contains(&(*idx as u32)) {
-                *dist = (*dist - boost).max(0.0);
+                *dist = crate::relevance::apply_boost(*dist, boost);
             }
         }
     }
@@ -1208,7 +1198,7 @@ fn tool_recall(config: &Config, args: &Value) -> Result<String, String> {
         for (dist, idx, is_main) in &mut all_results {
             if *is_main {
                 if let Some(&boost) = pattern_boosts.get(&(*idx as u32)) {
-                    *dist = (*dist - boost * tg_scale).max(0.0);
+                    *dist = crate::relevance::apply_boost(*dist, boost * tg_scale);
                 }
             }
         }
@@ -3166,7 +3156,7 @@ mod tests {
                 header_size: 32,
                 auto_rebuild: false,
                 auto_rebuild_entries: 25,
-                layer_retention_entries: 0,
+                layer_retention_entries: 2000,
             },
             search: crate::config::Search {
                 default_k: 10,

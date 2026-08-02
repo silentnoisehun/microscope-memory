@@ -1,0 +1,20 @@
+octopus_generic	Octopus executes independent work arms under one decision-making head.
+snapshot_generic	A snapshot captures durable runtime state for later inspection.
+lifecycle_generic	The component lifecycle has start running and completed states.
+rebuild_generic	A rebuild consolidates pending entries into the binary index.
+recall_generic	Recall searches the memory index for matching information.
+memory_generic	Microscope Memory is a hierarchical cognitive memory engine.
+quality_generic	Quality needs observable evidence and repeatable measurements.
+embedding_generic	Embedding vectors support semantic similarity search.
+mcp_generic	The MCP server exposes tools over a standard protocol.
+project_generic	Each project has configuration and local source files.
+octopus_snapshot	Octopus durable snapshot lifecycle records every arm completion and failure.
+rollback	Transactional rebuild rollback restores the previous main index and preserves the append log.
+append_recall	New append log entries are immediately searchable through recall before rebuild.
+relevance_benchmark	A reproducible relevance benchmark measures Recall at three and mean reciprocal rank.
+hungarian_quality	A visszakeresési minőség mérhető Recall három és MRR benchmark segítségével.
+embedding_failure	Failed embedding vectors are excluded while valid vectors remain searchable.
+mcp_ranking	CLI and MCP recall use one shared hybrid lexical spatial ranking formula.
+project_isolation	Project isolation hides foreign memories while optionally including global memories.
+attention_quality	Attention outcome quality must be learned from explicit feedback instead of timing alone.
+semantic_coordinates	Semantic coordinates blend embedding signals with deterministic content hashes.

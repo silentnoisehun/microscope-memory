@@ -130,8 +130,7 @@ fn recall_single(
     };
 
     let (qx, qy, qz) = content_coords_blended(query, "long_term", config.search.semantic_weight);
-    let q_lower = query.to_lowercase();
-    let keywords: Vec<&str> = q_lower.split_whitespace().filter(|w| w.len() > 2).collect();
+    let relevance_query = crate::relevance::RelevanceQuery::new(query);
 
     let (zoom_lo, zoom_hi) = match query.len() {
         0..=10 => (0u8, 3u8),
@@ -146,19 +145,19 @@ fn recall_single(
         let (start, count) = (start as usize, count as usize);
         for i in start..(start + count) {
             let text = reader.text(i);
-            let text_lower = text.to_lowercase();
-            let hits = keywords
-                .iter()
-                .filter(|&&kw| text_lower.contains(kw))
-                .count();
-            if hits > 0 {
+            let lexical = relevance_query.lexical_score(text);
+            if lexical > 0.0 {
                 let h = reader.header(i);
                 let dx = h.x - qx;
                 let dy = h.y - qy;
                 let dz = h.z - qz;
                 let dist = dx * dx + dy * dy + dz * dz;
-                let boost = hits as f32 * 0.1;
-                let score = (dist - boost).max(0.0) / weight; // lower weight = better score
+                let score = crate::relevance::rank_distance_from_score(
+                    lexical,
+                    dist,
+                    config.search.keyword_boost,
+                    h.importance,
+                ) / weight.max(0.01);
                 results.push((
                     score,
                     FederatedResult {
@@ -185,14 +184,14 @@ fn recall_single(
         let dy = entry.y - qy;
         let dz = entry.z - qz;
         let dist = dx * dx + dy * dy + dz * dz;
-        let text_lower = entry.text.to_lowercase();
-        let hits = keywords
-            .iter()
-            .filter(|&&kw| text_lower.contains(kw))
-            .count();
-        if dist < 0.1 || hits > 0 {
-            let boost = hits as f32 * 0.1;
-            let score = (dist - boost).max(0.0) / weight;
+        let lexical = relevance_query.lexical_score(&entry.text);
+        if dist < 0.1 || lexical > 0.0 {
+            let score = crate::relevance::rank_distance_from_score(
+                lexical,
+                dist,
+                config.search.keyword_boost,
+                entry.importance,
+            ) / weight.max(0.01);
             results.push((
                 score,
                 FederatedResult {

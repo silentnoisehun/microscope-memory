@@ -129,6 +129,7 @@ fn recall(config: &Config, query: &str, k: usize) {
     println!("{} '{}':", "RECALL".cyan().bold(), query);
 
     let (qx, qy, qz) = content_coords_blended(query, "long_term", config.search.semantic_weight);
+    let relevance_query = microscope_memory::relevance::RelevanceQuery::new(query);
 
     // â”€â”€â”€ Attention: compute layer weights from context â”€â”€
     let output_dir_att = Path::new(&config.paths.output_dir);
@@ -196,23 +197,24 @@ fn recall(config: &Config, query: &str, k: usize) {
 
     let mut all_results: Vec<(f32, usize, bool)> = Vec::new();
 
-    let q_lower = query.to_lowercase();
-    let keywords: Vec<&str> = q_lower.split_whitespace().filter(|w| w.len() > 2).collect();
-
     for zoom in zoom_lo..=zoom_hi {
         let (start, count) = reader.depth_ranges[zoom as usize];
         let (start, count) = (start as usize, count as usize);
         for i in start..(start + count) {
-            let text = reader.text(i).to_lowercase();
-            let keyword_hits = keywords.iter().filter(|&&kw| text.contains(kw)).count();
-            if keyword_hits > 0 {
+            let text = reader.text(i);
+            let lexical = relevance_query.lexical_score(text);
+            if lexical > 0.0 {
                 let h = reader.header(i);
                 let dx = h.x - qx;
                 let dy = h.y - qy;
                 let dz = h.z - qz;
                 let spatial_dist = dx * dx + dy * dy + dz * dz;
-                let boost = keyword_hits as f32 * config.search.keyword_boost;
-                let combined = (spatial_dist - boost).max(0.0);
+                let combined = microscope_memory::relevance::rank_distance_from_score(
+                    lexical,
+                    spatial_dist,
+                    config.search.keyword_boost,
+                    h.importance,
+                );
                 all_results.push((combined, i, true));
             }
         }
@@ -225,14 +227,15 @@ fn recall(config: &Config, query: &str, k: usize) {
         let dy = entry.y - qy;
         let dz = entry.z - qz;
         let dist = dx * dx + dy * dy + dz * dz;
-        let text_lower = entry.text.to_lowercase();
-        let keyword_hits = keywords
-            .iter()
-            .filter(|&&kw| text_lower.contains(kw))
-            .count();
-        let boost = keyword_hits as f32 * config.search.keyword_boost;
-        if dist < 0.1 || keyword_hits > 0 {
-            all_results.push(((dist - boost).max(0.0), ai + 1_000_000, false));
+        let lexical = relevance_query.lexical_score(&entry.text);
+        if dist < 0.1 || lexical > 0.0 {
+            let combined = microscope_memory::relevance::rank_distance_from_score(
+                lexical,
+                dist,
+                config.search.keyword_boost,
+                entry.importance,
+            );
+            all_results.push((combined, ai + 1_000_000, false));
         }
     }
 
@@ -251,7 +254,7 @@ fn recall(config: &Config, query: &str, k: usize) {
         let cached_set: std::collections::HashSet<u32> = cached_blocks.iter().copied().collect();
         for (dist, idx, is_main) in &mut all_results {
             if *is_main && cached_set.contains(&(*idx as u32)) {
-                *dist = (*dist - boost).max(0.0);
+                *dist = microscope_memory::relevance::apply_boost(*dist, boost);
             }
         }
         println!(
@@ -270,7 +273,7 @@ fn recall(config: &Config, query: &str, k: usize) {
         for (dist, idx, is_main) in &mut all_results {
             if *is_main {
                 if let Some(&boost) = pattern_boosts.get(&(*idx as u32)) {
-                    *dist = (*dist - boost * tg_scale).max(0.0);
+                    *dist = microscope_memory::relevance::apply_boost(*dist, boost * tg_scale);
                 }
             }
         }

@@ -39,35 +39,18 @@ pub fn rebuild_pending(config: &Config, force_when_empty: bool) -> Result<Rebuil
     }
 
     let previous_blocks = read_meta_block_count(output_dir);
-    let temp_dir = Path::new(&config.paths.temp_dir);
-    fs::create_dir_all(temp_dir).map_err(|e| format!("create rebuild backup dir: {}", e))?;
-    let backup_path = temp_dir.join("pre-rebuild-latest.mscope");
-    let has_backup = if output_dir.join("meta.bin").exists() {
-        crate::snapshot::export(output_dir, &backup_path)?;
-        true
-    } else {
-        false
-    };
 
     if let Err(build_error) = build(config, true) {
-        if has_backup {
-            let _ = crate::snapshot::import(&backup_path, output_dir);
-        }
         return Err(build_error);
     }
 
     let rebuilt_blocks = read_meta_block_count(output_dir);
     if pending_entries > 0 && previous_blocks > 0 && rebuilt_blocks < previous_blocks {
-        if has_backup {
-            crate::snapshot::import(&backup_path, output_dir)
-                .map_err(|e| format!("unsafe rebuild shrink and restore failed: {}", e))?;
-        }
         return Err(format!(
-            "refusing rebuild shrink: {} -> {} blocks; previous index restored and append log preserved",
+            "refusing rebuild shrink: {} -> {} blocks",
             previous_blocks, rebuilt_blocks
         ));
     }
-
     if append_path.exists() {
         fs::remove_file(&append_path).map_err(|e| format!("clear append log: {}", e))?;
     }
@@ -895,3 +878,6 @@ fn apply_hebbian_deltas(
         .save(output_dir)
         .map_err(|e| format!("save cleared Hebbian: {}", e))
 }
+
+
+

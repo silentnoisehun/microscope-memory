@@ -1,0 +1,10 @@
+octopus snapshot lifecycle	octopus_snapshot
+transactional rebuild rollback	rollback
+append log immediate recall	append_recall
+relevance benchmark reciprocal rank	relevance_benchmark
+visszakeresési minőség benchmark	hungarian_quality
+failed embedding vectors searchable	embedding_failure
+shared CLI MCP ranking	mcp_ranking
+project isolation global memories	project_isolation
+attention explicit outcome quality	attention_quality
+semantic coordinates content hashes	semantic_coordinates

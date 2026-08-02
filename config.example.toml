@@ -28,7 +28,7 @@ auto_rebuild = true
 auto_rebuild_entries = 250
 
 # Maximum source entries per layer. Zero preserves the complete history.
-layer_retention_entries = 0
+layer_retention_entries = 2000  # bound each layer file; oldest entries are trimmed past this
 
 [search]
 # Default number of results

@@ -48,6 +48,7 @@ pub fn recall(config: &Config, query: &str, k: usize, emotion: Option<[f32; 21]>
     }
 
     let (qx, qy, qz) = content_coords_blended(query, "long_term", config.search.semantic_weight);
+    let relevance_query = relevance::RelevanceQuery::new(query);
 
     // █████ Attention: compute layer weights from context █████
     let output_dir_att = Path::new(&config.paths.output_dir);
@@ -107,9 +108,6 @@ pub fn recall(config: &Config, query: &str, k: usize, emotion: Option<[f32; 21]>
 
     let mut all_results: Vec<(f32, usize, bool)> = Vec::new();
 
-    let q_lower = query.to_lowercase();
-    let keywords: Vec<&str> = q_lower.split_whitespace().filter(|w| w.len() > 2).collect();
-
     // Load emotions.bin for main-index emotional recall
     let emotion_lookup = emotion.as_ref().and_then(|_| {
         load_emotion_lookup(Path::new(&config.paths.output_dir))
@@ -124,15 +122,14 @@ pub fn recall(config: &Config, query: &str, k: usize, emotion: Option<[f32; 21]>
         let (start, count) = reader.depth_ranges[zoom as usize];
         let (start, count) = (start as usize, count as usize);
         for i in start..(start + count) {
-            let text = reader.text(i).to_lowercase();
-            let keyword_hits = keywords.iter().filter(|&&kw| text.contains(kw)).count();
-            if keyword_hits > 0 {
+            let text = reader.text(i);
+            let lexical = relevance_query.lexical_score(text);
+            if lexical > 0.0 {
                 let h = reader.header(i);
                 let dx = h.x - qx;
                 let dy = h.y - qy;
                 let dz = h.z - qz;
                 let spatial_dist = dx * dx + dy * dy + dz * dz;
-                let boost = keyword_hits as f32 * 0.1;
                 // Emotional similarity boost (if query emotion + emotions.bin data)
                 let emo_boost = emotion.as_ref().and_then(|qe| {
                     emotion_lookup.as_ref().and_then(|lookup| lookup(i))
@@ -140,7 +137,13 @@ pub fn recall(config: &Config, query: &str, k: usize, emotion: Option<[f32; 21]>
                 }).unwrap_or(0.0);
                 // Spaced repetition boost: due blocks surface more easily
                 let sr_boost = spaced.spacing_boost(i as u32);
-                let combined = (spatial_dist - boost - emo_boost - sr_boost).max(0.0);
+                let base = relevance::rank_distance_from_score(
+                    lexical,
+                    spatial_dist,
+                    config.search.keyword_boost,
+                    h.importance,
+                );
+                let combined = relevance::apply_boost(base, emo_boost + sr_boost);
                 all_results.push((combined, i, true));
             }
         }
@@ -154,18 +157,19 @@ pub fn recall(config: &Config, query: &str, k: usize, emotion: Option<[f32; 21]>
         let dy = entry.y - qy;
         let dz = entry.z - qz;
         let dist = dx * dx + dy * dy + dz * dz;
-        let text_lower = entry.text.to_lowercase();
-        let keyword_hits = keywords
-            .iter()
-            .filter(|&&kw| text_lower.contains(kw))
-            .count();
-        let boost = keyword_hits as f32 * 0.1;
+        let lexical = relevance_query.lexical_score(&entry.text);
         // Emotional boost from inline append entry emotion
         let emo_boost = emotion.as_ref()
             .map(|qe| emotional_similarity(qe, &entry.emotion) * emotional_recall_weight)
             .unwrap_or(0.0);
-        if dist < 0.1 || keyword_hits > 0 || emo_boost > 0.0 {
-            all_results.push(((dist - boost - emo_boost).max(0.0), ai + 1_000_000, false));
+        if dist < 0.1 || lexical > 0.0 || emo_boost > 0.0 {
+            let base = relevance::rank_distance_from_score(
+                lexical,
+                dist,
+                config.search.keyword_boost,
+                entry.importance,
+            );
+            all_results.push((relevance::apply_boost(base, emo_boost), ai + 1_000_000, false));
         }
     }
 
@@ -184,7 +188,7 @@ pub fn recall(config: &Config, query: &str, k: usize, emotion: Option<[f32; 21]>
         let cached_set: std::collections::HashSet<u32> = cached_blocks.iter().copied().collect();
         for (dist, idx, is_main) in &mut all_results {
             if *is_main && cached_set.contains(&(*idx as u32)) {
-                *dist = (*dist - boost).max(0.0);
+                *dist = relevance::apply_boost(*dist, boost);
             }
         }
         println!(
@@ -203,7 +207,7 @@ pub fn recall(config: &Config, query: &str, k: usize, emotion: Option<[f32; 21]>
         for (dist, idx, is_main) in &mut all_results {
             if *is_main {
                 if let Some(&boost) = pattern_boosts.get(&(*idx as u32)) {
-                    *dist = (*dist - boost * tg_scale).max(0.0);
+                    *dist = relevance::apply_boost(*dist, boost * tg_scale);
                 }
             }
         }

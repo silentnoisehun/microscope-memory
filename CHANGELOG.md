@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **Shared hybrid lexical-spatial relevance ranker** (`relevance.rs`): query-token
+  coverage, phrase evidence, spatial distance and a small importance prior replace
+  the legacy clamped keyword-distance formula. Deterministic regression gate:
+  Recall@3 = 1.000, MRR = 1.000 on the fixture corpus (`tests/relevance_benchmark.rs`).
+
+### Changed
+- **Bounded layer retention**: `layer_retention_entries` default is now 2000
+  (was 0 / unlimited). Each layer file keeps at most 2000 newest entries and
+  trims the oldest past that cap, so `layers/*.txt` cannot grow without bound.
+
 ## [0.8.2] - 2026-07-17
 
 ### Added

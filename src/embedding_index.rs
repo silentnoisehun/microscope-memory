@@ -1,7 +1,10 @@
 //! Embedding index: mmap-backed pre-computed embedding vectors.
 //!
-//! Format: [u32 block_count][u32 dim][u32 max_depth][f32 × dim × embedded_count]
-//! Only blocks at depth 0..max_depth are embedded.
+//! Format: [u32 block_count][u32 dim][u32 max_depth][f32 × dim × block_count]
+//! Blocks at depth > max_depth or with trivial text (< 3 chars) are stored
+//! with a NaN sentinel in the first f32 element. embedding() returns None
+//! for these blocks. Zero vectors (all 0.0) indicate a failed embedding
+//! for a block within max_depth.
 
 use std::fs;
 use std::path::Path;
@@ -62,7 +65,12 @@ impl EmbeddingIndex {
         }
         // Safety: data is aligned to f32 by construction during build
         let ptr = self.data[offset..end].as_ptr() as *const f32;
-        Some(unsafe { std::slice::from_raw_parts(ptr, self.dim as usize) })
+        let emb = unsafe { std::slice::from_raw_parts(ptr, self.dim as usize) };
+        // NaN sentinel marks blocks outside max_depth or with trivial text
+        if emb.first().map_or(false, |&v| v.is_nan()) {
+            return None;
+        }
+        Some(emb)
     }
 
     /// Number of embedded blocks.
@@ -92,7 +100,7 @@ impl EmbeddingIndex {
             .into_par_iter()
             .filter_map(|i| {
                 let emb = self.embedding(i)?;
-                // Check for zero embedding (unembedded block placeholder)
+                // Check for zero embedding (failed embed for a block within max_depth)
                 let is_zero = emb.iter().all(|&v| v == 0.0);
                 if is_zero {
                     return None;
@@ -136,7 +144,7 @@ pub fn build_embedding_index(
     );
 
     // Build embeddings buffer: header + flat f32 vectors
-    // Blocks outside max_depth get zero vectors
+    // Blocks outside max_depth or with trivial text get NaN sentinel in first element.
     let total_blocks = reader.block_count;
     let mut buf = Vec::with_capacity(HEADER_SIZE + total_blocks * dim * 4);
 
@@ -153,25 +161,35 @@ pub fn build_embedding_index(
         let h = reader.header(i);
         if h.depth <= max_depth {
             let text = reader.text(i);
-            match provider.embed(text) {
-                Ok(emb) => {
-                    for &v in &emb {
-                        buf.extend_from_slice(&v.to_le_bytes());
-                    }
-                    embedded += 1;
-                    if embedded.is_multiple_of(1000) {
-                        eprint!("\r  Embedded {}/{}", embedded, embed_count);
-                    }
+            if text.len() < 3 {
+                // Trivial/empty text: write NaN sentinel instead of zero vector
+                buf.extend_from_slice(&f32::NAN.to_le_bytes());
+                for _ in 1..dim {
+                    buf.extend_from_slice(&0.0f32.to_le_bytes());
                 }
-                Err(_) => {
-                    for &v in &zero_vec {
-                        buf.extend_from_slice(&v.to_le_bytes());
+            } else {
+                match provider.embed(text) {
+                    Ok(emb) => {
+                        for &v in &emb {
+                            buf.extend_from_slice(&v.to_le_bytes());
+                        }
+                        embedded += 1;
+                        if embedded.is_multiple_of(1000) {
+                            eprint!("\r  Embedded {}/{}", embedded, embed_count);
+                        }
+                    }
+                    Err(_) => {
+                        for &v in &zero_vec {
+                            buf.extend_from_slice(&v.to_le_bytes());
+                        }
                     }
                 }
             }
         } else {
-            for &v in &zero_vec {
-                buf.extend_from_slice(&v.to_le_bytes());
+            // Block outside max_depth: write NaN sentinel instead of zero vector
+            buf.extend_from_slice(&f32::NAN.to_le_bytes());
+            for _ in 1..dim {
+                buf.extend_from_slice(&0.0f32.to_le_bytes());
             }
         }
     }
@@ -200,9 +218,9 @@ mod tests {
         let _ = fs::create_dir_all(&dir);
         let path = dir.join("embeddings.bin");
 
-        // Build a small test file: 3 blocks, dim=4
+        // Build a small test file: 4 blocks, dim=4
         let mut buf = Vec::new();
-        buf.extend_from_slice(&3u32.to_le_bytes()); // block_count
+        buf.extend_from_slice(&4u32.to_le_bytes()); // block_count
         buf.extend_from_slice(&4u32.to_le_bytes()); // dim
         buf.extend_from_slice(&2u32.to_le_bytes()); // max_depth
 
@@ -214,16 +232,22 @@ mod tests {
         for &v in &[0.0f32, 1.0, 0.0, 0.0] {
             buf.extend_from_slice(&v.to_le_bytes());
         }
-        // Block 2: zero (not embedded)
+        // Block 2: zero (failed embed within max_depth)
         for &v in &[0.0f32, 0.0, 0.0, 0.0] {
             buf.extend_from_slice(&v.to_le_bytes());
+        }
+
+        // Block 3: NaN sentinel (outside max_depth)
+        buf.extend_from_slice(&f32::NAN.to_le_bytes());
+        for _ in 1..4 {
+            buf.extend_from_slice(&0.0f32.to_le_bytes());
         }
 
         let mut f = fs::File::create(&path).unwrap();
         f.write_all(&buf).unwrap();
 
         let idx = EmbeddingIndex::open(&path).unwrap();
-        assert_eq!(idx.block_count(), 3);
+        assert_eq!(idx.block_count(), 4);
         assert_eq!(idx.dim(), 4);
         assert_eq!(idx.max_depth(), 2);
 
@@ -234,6 +258,13 @@ mod tests {
         let results = idx.search(&[1.0, 0.0, 0.0, 0.0], 2);
         assert!(!results.is_empty());
         assert_eq!(results[0].1, 0); // block 0 should be most similar
+
+        // Block 3 (NaN sentinel) should return None from embedding()
+        assert!(idx.embedding(3).is_none());
+
+        // Search should not return block 3
+        let results = idx.search(&[1.0, 0.0, 0.0, 0.0], 10);
+        assert!(!results.iter().any(|&(_, i)| i == 3));
 
         let _ = fs::remove_dir_all(&dir);
     }

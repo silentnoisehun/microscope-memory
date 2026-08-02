@@ -3385,3 +3385,63 @@ request: bridge-29872-47-17
 [2026-07-23 16:20:46] [Bridge info] Clicking send button | label=Üzenet küldése
 
 [2026-07-23 16:20:59] [Bridge info] Assistant response saved | site=gemini len=1802
+
+[2026-08-01 15:42:43] [Bridge info] Enter recall started | site=meta input=DIV len=7
+
+[2026-08-01 15:42:43] [Bridge info] Page message count | count=762 isNewChat=false
+
+[2026-08-01 15:42:50] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-08-01 15:43:04] [Bridge info] Context cleaned | rawLen=2193 cleanLen=2062 keep=true
+
+[2026-08-01 15:43:09] [Bridge warn] No valid send button found, trying fallback
+
+[2026-08-01 15:43:48] [Bridge info] Enter recall started | site=meta input=DIV len=1
+
+[2026-08-01 15:43:48] [Bridge info] Page message count | count=766 isNewChat=false
+
+[2026-08-01 15:43:49] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-08-01 15:43:50] [Bridge info] Context cleaned | rawLen=2087 cleanLen=1964 keep=true
+
+[2026-08-01 15:43:51] [Bridge info] Clicking send button | label=Küldés
+
+[2026-08-01 15:44:31] [Bridge info] Enter recall started | site=meta input=DIV len=420
+
+[2026-08-01 15:44:31] [Bridge info] Page message count | count=1540 isNewChat=false
+
+[2026-08-01 15:44:32] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-08-01 15:44:33] [Bridge info] Context cleaned | rawLen=2588 cleanLen=1943 keep=true
+
+[2026-08-01 15:44:34] [Bridge info] Clicking send button | label=Küldés
+
+[2026-08-01 15:45:45] [Bridge info] Enter recall started | site=meta input=DIV len=480
+
+[2026-08-01 15:45:45] [Bridge info] Page message count | count=1544 isNewChat=false
+
+[2026-08-01 15:45:47] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-08-01 15:45:49] [Bridge info] Context cleaned | rawLen=2647 cleanLen=2042 keep=true
+
+[2026-08-01 15:45:54] [Bridge info] Clicking send button | label=Küldés
+
+[2026-08-01 15:46:59] [Bridge info] Enter recall started | site=meta input=DIV len=334
+
+[2026-08-01 15:46:59] [Bridge info] Page message count | count=1548 isNewChat=false
+
+[2026-08-01 15:46:59] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-08-01 15:47:00] [Bridge info] Context cleaned | rawLen=2536 cleanLen=26 keep=true
+
+[2026-08-01 15:47:01] [Bridge info] Clicking send button | label=Küldés
+
+[2026-08-01 19:08:23] [Bridge info] Enter recall started | site=meta input=DIV len=10
+
+[2026-08-01 19:08:23] [Bridge info] Page message count | count=2009 isNewChat=false
+
+[2026-08-01 19:08:23] [Bridge info] Context response received | ok=true hasText=true
+
+[2026-08-01 19:08:24] [Bridge info] Context cleaned | rawLen=2184 cleanLen=2038 keep=true
+
+[2026-08-01 19:08:25] [Bridge info] Clicking send button | label=Küldés

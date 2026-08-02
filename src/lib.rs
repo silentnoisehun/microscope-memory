@@ -113,6 +113,7 @@ pub mod pattern_recognition;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod planning;
 pub mod predictive_cache;
+pub mod relevance;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod structural_plasticity;
 #[cfg(not(target_arch = "wasm32"))]

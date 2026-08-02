@@ -54,12 +54,16 @@ pub struct Index {
     #[serde(default = "default_auto_rebuild_entries")]
     pub auto_rebuild_entries: usize,
     /// Maximum persisted entries per layer. Zero keeps the full history.
-    #[serde(default)]
+    #[serde(default = "default_layer_retention_entries")]
     pub layer_retention_entries: usize,
 }
 
 fn default_auto_rebuild() -> bool {
     true
+}
+
+fn default_layer_retention_entries() -> usize {
+    2000
 }
 
 fn default_auto_rebuild_entries() -> usize {
@@ -233,7 +237,7 @@ impl Default for Config {
                 header_size: 50,
                 auto_rebuild: default_auto_rebuild(),
                 auto_rebuild_entries: default_auto_rebuild_entries(),
-                layer_retention_entries: 0,
+                layer_retention_entries: default_layer_retention_entries(),
             },
             search: Search {
                 default_k: 10,

@@ -7,7 +7,7 @@
 
 [![Rust](https://img.shields.io/badge/language-Rust-orange.svg)](https://www.rust-lang.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/Tests-285%20passing-brightgreen.svg)](#-testing)
+[![Tests](https://img.shields.io/badge/Tests-322%20passing-brightgreen.svg)](#-testing)
 
 **Microscope Memory** is a Rust-native binary memory engine for AI agents.
 
@@ -67,7 +67,7 @@ layer_retention_entries = 0 # preserve full source history
 ```
 
 Automatic rebuild uses the store lock, rechecks the threshold after acquiring
-it, snapshots the complete index before building, rejects unexpected block
+it, preserves pending append entries on failure, rejects unexpected block
 shrinkage, and removes `append.bin` only after a successful index build.
 
 **One-click start (Windows):** `OneClick_Start.bat` builds and launches the full stack. The Electron tray app is at `electron/`.
@@ -184,7 +184,7 @@ Measured on this build (28,679 blocks loaded):
  4. Compute query coordinates (content hash + semantic blend)
  5. Check predictive cache — instant boost if hit        (L7)
  6. Apply emotional bias warp                           (L5)
- 7. Search across zoom-appropriate depths               (L2 distance + keyword)
+ 7. Rank zoom-appropriate candidates                    (normalized lexical coverage + spatial distance + importance)
  8. Apply ThoughtGraph pattern boost                    (L6)
  9. Sort and display
 10. Record Hebbian activation + co-activations           (L1)
@@ -400,13 +400,18 @@ cargo build --release --target wasm32-unknown-unknown --features wasm
 ## 🧪 Testing
 
 ```bash
-cargo test                     # 295 unit + integration tests
+cargo test                     # 322 unit + integration tests
 cargo test --test integration  # integration only
 cargo test --lib               # library only
+cargo test --test relevance_benchmark -- --nocapture
 cargo bench                    # criterion benchmarks
 ```
 
-Coverage spans all 13 consciousness layers, MQL, CRC, Merkle, snapshot, embedding index, multimodal, dream, attention, and more. See `WHITEPAPER.md` §8 for the full per-module breakdown.
+The deterministic relevance gate uses a versioned 20-memory, 10-query English/Hungarian corpus. It reports Recall@3 and mean reciprocal rank (MRR), compares the legacy clamped-distance formula with the shared hybrid ranker, and fails below `Recall@3 = 0.90` or `MRR = 0.80`.
+
+Current verified quality result: legacy `Recall@3 = 0.900`, `MRR = 0.492`; hybrid `Recall@3 = 1.000`, `MRR = 1.000`. The full `cargo test` run passes 322 tests, including the existing consciousness performance checks. See [docs/RELEVANCE_BENCHMARK.md](docs/RELEVANCE_BENCHMARK.md) for the reproducible dataset and measurement contract.
+
+Coverage spans all 13 consciousness layers, relevance ranking, MQL, CRC, Merkle, snapshot, embedding index, multimodal, dream, attention, and more. See `WHITEPAPER.md` §8 for the full per-module breakdown.
 
 ---
 
@@ -474,6 +479,7 @@ microscope-local/
 │   ├── dream.rs               # L11
 │   ├── emotional_contagion.rs # L12
 │   ├── multimodal.rs          # L13
+│   ├── relevance.rs           # shared lexical-spatial recall ranking
 │   ├── mcp.rs                 # MCP server
 │   ├── bridge.rs              # legacy HTTP API (axum)
 │   └── commands/              # CLI command handlers
@@ -731,10 +737,9 @@ See [docs/HOOKS.md](docs/HOOKS.md) for full documentation.
 
 ### Test Coverage
 
-- microscope-memory: 253 tests
-- microscope-hooks: 16 tests
-- MCP integration: 11 tests
-- **Total: 285 tests passing**
+- microscope-memory root crate: 322 tests
+- includes 277 library tests and 45 integration/performance/relevance tests
+- **Total verified by `cargo test`: 322 passing, 0 failed**
 
 
 ## Public Demo Mode
@@ -841,8 +846,7 @@ Download the [HOPE-Architect style whitepaper](docs/microscope-memory-public-dem
 
 ### Test Coverage
 
-- microscope-memory: 269 tests
-- microscope-hooks: 16 tests
-- **Total: 285 tests passing**
+- microscope-memory root crate: 322 tests
+- **Total verified by `cargo test`: 322 passing, 0 failed**
 
 

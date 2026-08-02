@@ -1,6 +1,11 @@
 # Rust
 target/
 
+# Scratch backups and Python caches
+*.bak
+__pycache__/
+*.pyc
+
 # IDEs
 .vscode/
 .idea/

@@ -38,7 +38,8 @@
 //! byte-identical to `SharedSnapshot`'s layout — so two processes looking at
 //! the same file see the same snapshot with the same seqlock protocol. The
 //! heap-backed fast-path fields (`RwLock<String>`, hot atomics) stay
-//! in-process only.
+//! in-process only. This mmap layer is a standalone, tested building block:
+//! `ConsciousnessStream` does not publish to it yet.
 
 use std::cell::UnsafeCell;
 use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};

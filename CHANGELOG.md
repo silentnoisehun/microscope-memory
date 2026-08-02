@@ -70,10 +70,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Self-defensive multimodal decoding**: `decode_image_meta` and
   `decode_audio_meta` now return `Option` and reject short input up front
   instead of relying on every caller to bounds-check first.
-- **Honest seqlock scope**: `consciousness_seqlock` docs now state clearly that
-  the seqlock is in-process only (`Arc<SharedSnapshot>`); the cross-process
-  mmap "federation without serialization" path is not implemented, and the
-  struct's heap-backed fast-path fields make the current layout non-mmap-ready.
+- **Cross-process snapshot mmap**: `consciousness_seqlock` now ships a real
+  file-backed mmap layer (`MappedSnapshot` / `MappedSnapshotWriter`) mapping
+  the `#[repr(C)]` seqlock header + `SnapshotData` block via `memmap2`, so two
+  processes sharing a file see the same snapshot with the same seqlock
+  protocol (odd/even sequence, retry on torn reads). The heap-backed fast-path
+  fields remain in-process only. Covered by roundtrip, uninitialized-file and
+  no-torn-reads-under-concurrency tests.
 
 ### Changed
 - **Bounded layer retention**: `layer_retention_entries` default is now 2000

@@ -29,15 +29,16 @@
 //! For 28k-element data, retries are extremely rare because the writer
 //! holds the lock for microseconds and the reader holds for nanoseconds.
 //!
-//! # Scope: in-process only
+//! # Cross-process (mmap) layer
 //!
-//! This module is an **in-process** seqlock today: `ConsciousnessStream` owns
-//! the snapshot as `Arc<SharedSnapshot>`, and no file/mmap layer exists. The
-//! seqlock header plus `SnapshotData` block is `#[repr(C)]`, but the struct
-//! also embeds heap-backed fast-path fields (`RwLock<String>`, atomics), so
-//! the current layout is **not** mmap-ready. The cross-process "federation
-//! without serialization" path is **not implemented** — do not rely on
-//! cross-process reads.
+//! The in-process path (`SharedSnapshot` behind `Arc`) is used by
+//! `ConsciousnessStream`. For cross-process federation, the file-backed mmap
+//! layer below (`MappedSnapshot` / `MappedSnapshotWriter`) maps the seqlock
+//! header + `SnapshotData` block — the `#[repr(C)]` prefix that is
+//! byte-identical to `SharedSnapshot`'s layout — so two processes looking at
+//! the same file see the same snapshot with the same seqlock protocol. The
+//! heap-backed fast-path fields (`RwLock<String>`, hot atomics) stay
+//! in-process only.
 
 use std::cell::UnsafeCell;
 use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
@@ -271,6 +272,245 @@ impl SharedSnapshot {
     }
 }
 
+/// File-backed, cross-process seqlock snapshot.
+///
+/// Only the seqlock header and the `SnapshotData` block are shared; the layout
+/// is the `#[repr(C)]` prefix of `SharedSnapshot`, so the two are
+/// byte-compatible. The seqlock protocol (odd/even sequence, retry on torn
+/// reads) is identical across processes — the OS guarantees coherence of
+/// `MAP_SHARED` pages.
+#[cfg(not(target_arch = "wasm32"))]
+#[repr(C)]
+pub struct MmapSnapshot {
+    sequence: AtomicU64,
+    magic: u32,
+    version: u32,
+    _pad: [u32; 2],
+    data: UnsafeCell<SnapshotData>,
+}
+
+// SAFETY: `MmapSnapshot` is a seqlock. The protocol guarantees readers never
+// observe a torn write, and the single writer must hold the seqlock before
+// touching `data`. This mirrors the `SharedSnapshot` safety argument.
+#[cfg(not(target_arch = "wasm32"))]
+unsafe impl Sync for MmapSnapshot {}
+#[cfg(not(target_arch = "wasm32"))]
+unsafe impl Send for MmapSnapshot {}
+
+#[cfg(not(target_arch = "wasm32"))]
+impl MmapSnapshot {
+    /// Required file size in bytes for a shared snapshot mapping.
+    pub const FILE_SIZE: usize = size_of::<MmapSnapshot>();
+
+    /// Validate the magic/version header.
+    fn header_valid(&self) -> bool {
+        self.magic == SNAPSHOT_MAGIC && self.version == SNAPSHOT_VERSION
+    }
+
+    /// Publish a full `SnapshotData` under the seqlock.
+    pub fn write(&self, data: &SnapshotData) -> Result<(), String> {
+        if !self.header_valid() {
+            return Err("snapshot file is not initialized (wrong magic/version)".to_string());
+        }
+        let s = self.sequence.fetch_add(1, Ordering::AcqRel); // odd: write in progress
+        std::sync::atomic::fence(Ordering::Release);
+        // SAFETY: sequence is odd, so readers retry; only one writer exists.
+        unsafe {
+            *self.data.get() = *data;
+        }
+        std::sync::atomic::fence(Ordering::Release);
+        self.sequence.store(s + 2, Ordering::Release); // even: stable
+        Ok(())
+    }
+
+    /// Begin an in-place write; returns the token for `end_write`.
+    pub fn begin_write(&self) -> Result<u64, String> {
+        if !self.header_valid() {
+            return Err("snapshot file is not initialized (wrong magic/version)".to_string());
+        }
+        let s = self.sequence.fetch_add(1, Ordering::AcqRel);
+        std::sync::atomic::fence(Ordering::Release);
+        Ok(s + 1)
+    }
+
+    /// End an in-place write started with `begin_write`.
+    pub fn end_write(&self, expected: u64) {
+        std::sync::atomic::fence(Ordering::Release);
+        self.sequence.store(expected + 1, Ordering::Release);
+    }
+
+    /// Exclusive `&mut` access to the data block while the seqlock is held.
+    ///
+    /// # Safety
+    /// Caller must hold the seqlock (`begin_write`, not yet `end_write`).
+    #[allow(clippy::mut_from_ref)]
+    pub unsafe fn data_mut(&self) -> &mut SnapshotData {
+        &mut *self.data.get()
+    }
+
+    /// Read the snapshot; `None` after `SNAPSHOT_MAX_RETRIES` torn reads or
+    /// while the file is not initialized.
+    pub fn read(&self) -> Option<SnapshotData> {
+        if !self.header_valid() {
+            return None;
+        }
+        for _ in 0..SNAPSHOT_MAX_RETRIES {
+            let s1 = self.sequence.load(Ordering::Acquire);
+            if s1 & 1 == 1 {
+                std::hint::spin_loop();
+                continue;
+            }
+            std::sync::atomic::fence(Ordering::Acquire);
+            // SAFETY: sequence is even and stable; torn reads are detected by
+            // the post-read sequence check.
+            let data = unsafe { *self.data.get() };
+            std::sync::atomic::fence(Ordering::Acquire);
+            let s2 = self.sequence.load(Ordering::Acquire);
+            if s1 == s2 {
+                return Some(data);
+            }
+        }
+        None
+    }
+
+    fn from_raw(ptr: *mut u8) -> &'static MmapSnapshot {
+        // SAFETY: callers guarantee the mapping is at least `FILE_SIZE` bytes
+        // and page-aligned (memmap2 mappings are). The seqlock protocol
+        // protects every access to `data`.
+        unsafe { &*(ptr as *const MmapSnapshot) }
+    }
+}
+
+/// Read-only file mapping of a shared consciousness snapshot.
+#[cfg(not(target_arch = "wasm32"))]
+pub struct MappedSnapshot {
+    _file: std::fs::File,
+    _mmap: memmap2::Mmap,
+    shared: &'static MmapSnapshot,
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+impl MappedSnapshot {
+    /// Map an existing snapshot file for reading.
+    pub fn open(path: &std::path::Path) -> Result<Self, String> {
+        let file = std::fs::File::open(path).map_err(|e| format!("open snapshot file: {e}"))?;
+        if file.metadata().map_err(|e| e.to_string())?.len() < MmapSnapshot::FILE_SIZE as u64 {
+            return Err(format!(
+                "snapshot file too small ({} bytes, need {})",
+                file.metadata().map_err(|e| e.to_string())?.len(),
+                MmapSnapshot::FILE_SIZE
+            ));
+        }
+        let mmap = unsafe { memmap2::Mmap::map(&file) }
+            .map_err(|e| format!("mmap snapshot file: {e}"))?;
+        let shared = MmapSnapshot::from_raw(mmap.as_ptr() as *mut u8);
+        Ok(Self {
+            _file: file,
+            _mmap: mmap,
+            shared,
+        })
+    }
+
+    /// Read the latest published snapshot.
+    pub fn read(&self) -> Option<SnapshotData> {
+        self.shared.read()
+    }
+
+    /// True once a writer has initialized the file.
+    pub fn is_initialized(&self) -> bool {
+        self.shared.header_valid()
+    }
+}
+
+/// Writable file mapping of a shared consciousness snapshot (single writer).
+#[cfg(not(target_arch = "wasm32"))]
+pub struct MappedSnapshotWriter {
+    _file: std::fs::File,
+    _mmap: memmap2::MmapMut,
+    shared: &'static MmapSnapshot,
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+impl MappedSnapshotWriter {
+    /// Create (or truncate) the snapshot file and initialize its header.
+    pub fn create(path: &std::path::Path) -> Result<Self, String> {
+        let file = std::fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(path)
+            .map_err(|e| format!("create snapshot file: {e}"))?;
+        file.set_len(MmapSnapshot::FILE_SIZE as u64)
+            .map_err(|e| format!("size snapshot file: {e}"))?;
+        let mut mmap = unsafe { memmap2::MmapMut::map_mut(&file) }
+            .map_err(|e| format!("mmap snapshot file: {e}"))?;
+        let raw = mmap.as_mut_ptr() as *mut MmapSnapshot;
+        // SAFETY: fresh file, single writer; header is written once before
+        // any reader can observe a valid magic.
+        unsafe {
+            (*raw).magic = SNAPSHOT_MAGIC;
+            (*raw).version = SNAPSHOT_VERSION;
+            (*raw).sequence.store(0, Ordering::Release);
+        }
+        let shared = MmapSnapshot::from_raw(mmap.as_mut_ptr());
+        Ok(Self {
+            _file: file,
+            _mmap: mmap,
+            shared,
+        })
+    }
+
+    /// Open an existing snapshot file for writing.
+    pub fn open(path: &std::path::Path) -> Result<Self, String> {
+        let file = std::fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(path)
+            .map_err(|e| format!("open snapshot file: {e}"))?;
+        if file.metadata().map_err(|e| e.to_string())?.len() < MmapSnapshot::FILE_SIZE as u64 {
+            return Err("snapshot file too small for a shared snapshot".to_string());
+        }
+        let mut mmap = unsafe { memmap2::MmapMut::map_mut(&file) }
+            .map_err(|e| format!("mmap snapshot file: {e}"))?;
+        let shared = MmapSnapshot::from_raw(mmap.as_mut_ptr());
+        if !shared.header_valid() {
+            return Err("snapshot file is not initialized (wrong magic/version)".to_string());
+        }
+        Ok(Self {
+            _file: file,
+            _mmap: mmap,
+            shared,
+        })
+    }
+
+    /// Publish a full `SnapshotData` and flush the mapping.
+    pub fn write(&self, data: &SnapshotData) -> Result<(), String> {
+        self.shared.write(data)?;
+        let _ = self._mmap.flush();
+        Ok(())
+    }
+
+    /// Begin an in-place write (mirrors `SharedSnapshot::begin_write`).
+    pub fn begin_write(&self) -> Result<u64, String> {
+        self.shared.begin_write()
+    }
+
+    /// End an in-place write.
+    pub fn end_write(&self, expected: u64) {
+        self.shared.end_write(expected);
+    }
+
+    /// Exclusive data access while the seqlock is held.
+    ///
+    /// # Safety
+    /// Caller must hold the seqlock (`begin_write`, not yet `end_write`).
+    #[allow(clippy::mut_from_ref)]
+    pub unsafe fn data_mut(&self) -> &mut SnapshotData {
+        self.shared.data_mut()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -297,5 +537,75 @@ mod tests {
         assert_eq!(s.sequence.load(Ordering::Acquire) & 1, 1);
         s.end_write(token);
         assert_eq!(s.sequence.load(Ordering::Acquire) & 1, 0);
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn mmap_snapshot_roundtrip() {
+        let tmp = tempfile::tempdir().unwrap();
+        let path = tmp.path().join("snapshot.bin");
+
+        let writer = MappedSnapshotWriter::create(&path).unwrap();
+        let mut data = SnapshotData::zeroed();
+        data.cycle = 42;
+        data.activations_count = 7;
+        data.surprise_level = 0.25;
+        writer.write(&data).unwrap();
+
+        let reader = MappedSnapshot::open(&path).unwrap();
+        assert!(reader.is_initialized());
+        let read = reader.read().expect("published snapshot must be readable");
+        assert_eq!(read.cycle, 42);
+        assert_eq!(read.activations_count, 7);
+        assert_eq!(read.surprise_level, 0.25);
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn mmap_snapshot_uninitialized_file_reads_none() {
+        let tmp = tempfile::tempdir().unwrap();
+        let path = tmp.path().join("empty.bin");
+        std::fs::write(&path, vec![0u8; MmapSnapshot::FILE_SIZE]).unwrap();
+
+        let reader = MappedSnapshot::open(&path).unwrap();
+        assert!(!reader.is_initialized());
+        assert!(reader.read().is_none(), "uninitialized file must not yield data");
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn mmap_snapshot_no_torn_reads_under_concurrency() {
+        let tmp = tempfile::tempdir().unwrap();
+        let path = tmp.path().join("live.bin");
+        let writer = MappedSnapshotWriter::create(&path).unwrap();
+
+        let writer_handle = std::thread::spawn(move || {
+            for cycle in 1..=200u64 {
+                let mut data = SnapshotData::zeroed();
+                data.cycle = cycle;
+                // Distinct marker so a torn read would be detectable:
+                data.activations_count = (cycle * 7) as u32;
+                writer.write(&data).unwrap();
+            }
+        });
+
+        let reader = MappedSnapshot::open(&path).unwrap();
+        let mut last_seen = 0u64;
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
+        while last_seen < 200 && std::time::Instant::now() < deadline {
+            if let Some(data) = reader.read() {
+                // Every successful read must be internally consistent:
+                assert_eq!(
+                    data.activations_count,
+                    (data.cycle * 7) as u32,
+                    "torn read observed: cycle={} count={}",
+                    data.cycle,
+                    data.activations_count
+                );
+                last_seen = last_seen.max(data.cycle);
+            }
+        }
+        writer_handle.join().unwrap();
+        assert_eq!(last_seen, 200, "reader must observe the final snapshot");
     }
 }

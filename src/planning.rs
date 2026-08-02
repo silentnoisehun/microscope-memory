@@ -28,7 +28,7 @@
 
 use std::collections::HashMap;
 
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, Mutex, RwLock};
 
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -50,6 +50,8 @@ pub enum PlanStatus {
     InProgress,
     Completed,
     Failed(String),
+    /// A step was hard-blocked by the commitment gate.
+    Blocked(String),
     Replanning,
 }
 
@@ -140,6 +142,10 @@ pub struct Planner {
     config: Arc<RwLock<PlanningConfig>>,
 
     next_id: Arc<RwLock<u64>>,
+
+    /// Mandatory commitment gate. Every candidate action selected by
+    /// `execute_step` must pass through this before it can run.
+    enforcement: Arc<Mutex<crate::enforcement::EnforcementEngine>>,
 }
 
 impl Default for Planner {
@@ -158,7 +164,23 @@ impl Planner {
             config: Arc::new(RwLock::new(PlanningConfig::default())),
 
             next_id: Arc::new(RwLock::new(1)),
+
+            enforcement: Arc::new(Mutex::new(crate::enforcement::EnforcementEngine::new())),
         }
+    }
+
+    /// Install a shared enforcement engine so commitments added via the CLI
+    /// (or tests) are the exact same commitments the gate enforces.
+    pub fn set_enforcement(
+        &mut self,
+        enforcement: Arc<Mutex<crate::enforcement::EnforcementEngine>>,
+    ) {
+        self.enforcement = enforcement;
+    }
+
+    /// Access the shared enforcement gate (e.g. to seed commitments).
+    pub fn enforcement(&self) -> Arc<Mutex<crate::enforcement::EnforcementEngine>> {
+        Arc::clone(&self.enforcement)
     }
 
     fn nid(&self) -> u64 {
@@ -391,30 +413,78 @@ impl Planner {
         plan
     }
 
-    /// Terv végrehajtásának előre léptetése
-    pub fn execute_step(&self, plan_id: u64) -> Option<Action> {
-        let mut plans = crate::sync_guard::write_lock(&self.plans);
-
-        let plan = plans.get_mut(&plan_id)?;
+    /// Select the next candidate action and submit it to the mandatory
+    /// commitment gate. A non-permitted action is **blocked** (returns an
+    /// error) instead of merely warned; only actions in `A_t^valid` advance.
+    fn gated_step(
+        &self,
+        plans: &mut std::sync::RwLockWriteGuard<'_, std::collections::HashMap<u64, Plan>>,
+        plan_id: u64,
+        justification: Option<&str>,
+    ) -> Result<Option<Action>, crate::enforcement::EnforcementError> {
+        let plan = match plans.get_mut(&plan_id) {
+            Some(p) => p,
+            None => return Ok(None),
+        };
 
         if plan.executed_step >= plan.actions.len() {
             plan.status = PlanStatus::Completed;
-
             if let Some(g) = crate::sync_guard::write_lock(&self.goals).get_mut(&plan.goal_id) {
                 g.status = GoalStatus::Completed;
                 g.progress = 1.0;
             }
-
-            return None;
+            return Ok(None);
         }
 
         let action = plan.actions[plan.executed_step].clone();
+        let event = crate::enforcement::ActionEvent {
+            actor: "planner".to_string(),
+            action: action.name.clone(),
+            content: plan.name.clone(),
+            ts_ms: self.now(),
+            scope: format!("plan:{}:goal:{}", plan.id, plan.goal_id),
+            provenance: "planner/execute_step".to_string(),
+        };
 
-        plan.executed_step += 1;
+        let mut gate = crate::sync_guard::mutex_lock(&self.enforcement);
+        match gate.decide(&event, justification) {
+            crate::enforcement::Decision::Allowed { .. }
+            | crate::enforcement::Decision::Overridden { .. } => {
+                // A member of A_t^valid; the decision was already appended to
+                // the audit chain inside decide().
+                plan.executed_step += 1;
+                plan.status = PlanStatus::InProgress;
+                Ok(Some(action))
+            }
+            crate::enforcement::Decision::Blocked { action, reason, .. } => {
+                plan.status = PlanStatus::Blocked(reason.clone());
+                Err(crate::enforcement::EnforcementError::Blocked { action, reason })
+            }
+            crate::enforcement::Decision::AttributionError { reason } => {
+                plan.status = PlanStatus::Failed(reason.clone());
+                Err(crate::enforcement::EnforcementError::FaultyAttribution { reason })
+            }
+        }
+    }
 
-        plan.status = PlanStatus::InProgress;
+    /// Terv végrehajtásának előre léptetése a kötelező gate-en keresztül.
+    pub fn execute_step(
+        &self,
+        plan_id: u64,
+    ) -> Result<Option<Action>, crate::enforcement::EnforcementError> {
+        let mut plans = crate::sync_guard::write_lock(&self.plans);
+        self.gated_step(&mut plans, plan_id, None)
+    }
 
-        Some(action)
+    /// A documented `justifiedOverride()` útvonal: ugyanaz a gate, de az
+    /// akció egy rögzített indoklással léphet (ha jogosult a felülírás).
+    pub fn execute_step_with_override(
+        &self,
+        plan_id: u64,
+        justification: &str,
+    ) -> Result<Option<Action>, crate::enforcement::EnforcementError> {
+        let mut plans = crate::sync_guard::write_lock(&self.plans);
+        self.gated_step(&mut plans, plan_id, Some(justification))
     }
 
     /// Rollback: visszalépés az utolsó végrehajtott lépésről, ha az sikertelen volt.
@@ -444,7 +514,9 @@ impl Planner {
 
         let old = plans.get(&plan_id)?.clone();
 
-        let _goal = crate::sync_guard::read_lock(&self.goals).get(&old.goal_id)?.clone();
+        let _goal = crate::sync_guard::read_lock(&self.goals)
+            .get(&old.goal_id)?
+            .clone();
 
         drop(plans);
 

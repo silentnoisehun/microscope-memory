@@ -22,8 +22,8 @@ pub mod emotional_state;
 pub mod federation;
 pub mod fingerprint;
 pub mod hebbian;
-pub mod types;
 pub mod sync_guard;
+pub mod types;
 
 #[cfg(not(target_arch = "wasm32"))]
 pub mod ai_adapter;
@@ -79,6 +79,8 @@ pub mod autopoiesis;
 pub mod chatgpt;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod code_memory;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod enforcement;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod executive;
 #[cfg(not(target_arch = "wasm32"))]

@@ -599,7 +599,7 @@ fn test_planning_create_and_execute() {
     planner.decompose_goal(gid);
     let plan = planner.create_plan(gid);
     assert_eq!(plan.status, microscope_memory::planning::PlanStatus::Draft);
-    let step = planner.execute_step(plan.id);
+    let step = planner.execute_step(plan.id).expect("plan step");
     assert!(step.is_some(), "Should execute first step");
 }
 

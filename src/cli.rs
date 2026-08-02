@@ -351,6 +351,52 @@ pub enum Cmd {
         #[command(subcommand)]
         action: ZenKeyAction,
     },
+    /// Commitment enforcement — the A_t^valid gate, documented override,
+    /// and hash-chained audit.
+    Enforce {
+        #[command(subcommand)]
+        action: EnforceAction,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum EnforceAction {
+    /// Add a commitment (a prohibition) to the history H_t
+    Commit {
+        /// Actor bound by the commitment ("*" = all actors)
+        actor: String,
+        /// Forbidden action glob ("*" = all actions)
+        action: String,
+        /// Scope the commitment applies to ("*" = all scopes)
+        scope: String,
+        /// Human-readable content / reason
+        #[arg(long, default_value = "commitment")]
+        content: String,
+        /// Expiry in epoch milliseconds (omit = never expires)
+        #[arg(long)]
+        expires_ms: Option<u64>,
+    },
+    /// List active commitments K_t subset of H_t
+    List,
+    /// Run a plan through the gate to demonstrate A_t^valid selection
+    RunPlan {
+        /// Goal name for the generated plan
+        goal: String,
+    },
+    /// Ask the gate about a candidate action (persists the decision in audit)
+    Gate {
+        actor: String,
+        action: String,
+        scope: String,
+        /// Optional content carried on the event
+        #[arg(long)]
+        content: Option<String>,
+        /// Documented justification to attempt an override
+        #[arg(long)]
+        override_justification: Option<String>,
+    },
+    /// Show the audit chain and verify its integrity
+    Audit,
 }
 
 #[derive(Subcommand)]

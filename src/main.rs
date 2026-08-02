@@ -150,19 +150,17 @@ fn stats(config: &Config, reader: &MicroscopeReader) {
     if let Ok(entries) = fs::read_dir(&history_dir) {
         let history_bytes: u64 = entries
             .filter_map(|e| e.ok())
-            .map(|e| {
-                match e.metadata().ok() {
-                    Some(meta) if meta.is_dir() => fs::read_dir(e.path())
-                        .map(|sub| {
-                            sub.filter_map(|s| s.ok())
-                                .filter_map(|s| s.metadata().ok())
-                                .map(|s| s.len())
-                                .sum()
-                        })
-                        .unwrap_or(0),
-                    Some(meta) => meta.len(),
-                    None => 0,
-                }
+            .map(|e| match e.metadata().ok() {
+                Some(meta) if meta.is_dir() => fs::read_dir(e.path())
+                    .map(|sub| {
+                        sub.filter_map(|s| s.ok())
+                            .filter_map(|s| s.metadata().ok())
+                            .map(|s| s.len())
+                            .sum()
+                    })
+                    .unwrap_or(0),
+                Some(meta) => meta.len(),
+                None => 0,
             })
             .sum();
         total_bytes += history_bytes;
@@ -2880,6 +2878,162 @@ async fn async_main() {
                     }
                     let _ = store.save(zen_path);
                     println!("  {} {} key(s) reset (re-enabled)", "OK:".green(), count);
+                }
+            }
+        }
+        Cmd::Enforce { action } => {
+            use microscope_memory::cli::EnforceAction;
+            use microscope_memory::enforcement::{
+                load_engine, save_audit, save_engine, ActionEvent, Decision, Outcome,
+            };
+            use microscope_memory::planning::Planner;
+            use std::path::Path;
+            use std::sync::{Arc, Mutex};
+            use std::time::{SystemTime, UNIX_EPOCH};
+
+            let output = Path::new(&config.paths.output_dir);
+            let now = || {
+                SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_millis() as u64
+            };
+
+            let mut engine = match load_engine(output) {
+                Ok(e) => e,
+                Err(e) => {
+                    eprintln!("  {} {}", "ERROR:".red(), e);
+                    return;
+                }
+            };
+
+            match action {
+                EnforceAction::Commit {
+                    actor,
+                    action,
+                    scope,
+                    content,
+                    expires_ms,
+                } => {
+                    let id = engine.add_commitment(&actor, &action, &scope, &content, expires_ms);
+                    let _ = save_engine(output, &engine);
+                    println!(
+                        "  {} commitment #{} added: forbid '{}' for '{}' in '{}'",
+                        "OK:".green(),
+                        id,
+                        action,
+                        actor,
+                        scope
+                    );
+                }
+                EnforceAction::List => {
+                    let active = engine.active_commitments(now());
+                    if active.is_empty() {
+                        println!("  no active commitments (K_t is empty)");
+                    } else {
+                        for c in active {
+                            let expiry = c
+                                .expires_at_ms
+                                .map(|e| format!(" until {}", e))
+                                .unwrap_or_default();
+                            println!(
+                                "  #{} {} forbids {} in {}{} ({})",
+                                c.id, c.actor, c.forbidden_action, c.scope, expiry, c.content
+                            );
+                        }
+                    }
+                }
+                EnforceAction::Gate {
+                    actor,
+                    action,
+                    scope,
+                    content,
+                    override_justification,
+                } => {
+                    let event = ActionEvent {
+                        actor,
+                        action,
+                        content: content.unwrap_or_default(),
+                        ts_ms: now(),
+                        scope,
+                        provenance: "cli/gate".to_string(),
+                    };
+                    let decision = engine.decide(&event, override_justification.as_deref());
+                    match &decision {
+                        Decision::Allowed { .. } => {
+                            println!("  ALLOWED: action is in A_t^valid")
+                        }
+                        Decision::Blocked {
+                            action: a, reason, ..
+                        } => println!("  BLOCKED: '{}' — {}", a, reason),
+                        Decision::Overridden {
+                            action: a,
+                            justification,
+                            ..
+                        } => println!("  OVERRIDDEN: '{}' — {}", a, justification),
+                        Decision::AttributionError { reason } => {
+                            println!("  REJECTED (faulty attribution): {}", reason)
+                        }
+                    }
+                    let _ = save_audit(output, engine.audit());
+                }
+                EnforceAction::Audit => {
+                    let chunks = engine.audit();
+                    let valid = engine.chain_valid();
+                    if chunks.is_empty() {
+                        println!("  audit chain is empty");
+                    } else {
+                        for (i, c) in chunks.iter().enumerate() {
+                            let kind = match c.outcome {
+                                Outcome::Allowed => "allowed",
+                                Outcome::Blocked => "blocked",
+                                Outcome::Overridden => "overridden",
+                                Outcome::AttributionError => "attribution_error",
+                            };
+                            println!(
+                                "  [{}] ts={} {} {} -> {} in {}",
+                                i, c.ts_ms, kind, c.actor, c.action, c.scope
+                            );
+                        }
+                        println!(
+                            "  chain integrity: {}",
+                            if valid {
+                                "OK".green().to_string()
+                            } else {
+                                "FAIL".red().to_string()
+                            }
+                        );
+                    }
+                    let _ = save_audit(output, chunks);
+                }
+                EnforceAction::RunPlan { goal } => {
+                    let mut planner = Planner::new();
+                    planner.set_enforcement(Arc::new(Mutex::new(engine)));
+                    let gid = planner.add_goal(&goal, &format!("implement {}", goal), 100, None);
+                    let plan = planner.create_plan(gid);
+                    println!(
+                        "  running '{}' ({} steps) through the A_t^valid gate",
+                        plan.name,
+                        plan.actions.len()
+                    );
+                    loop {
+                        match planner.execute_step(plan.id) {
+                            Ok(Some(action)) => {
+                                println!("    -> {} [allowed]", action.name);
+                            }
+                            Ok(None) => {
+                                println!("    ✓ plan completed");
+                                break;
+                            }
+                            Err(e) => {
+                                println!("    ✗ BLOCKED: {}", e);
+                                break;
+                            }
+                        }
+                    }
+                    let guard = planner.enforcement();
+                    let audited = guard.lock().unwrap();
+                    let _ = save_audit(output, audited.audit());
                 }
             }
         }

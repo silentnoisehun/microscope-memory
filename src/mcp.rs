@@ -14,6 +14,14 @@ use std::collections::{HashMap, HashSet};
 use std::io::{self, BufRead, BufReader, Read, Write};
 use std::path::Path;
 
+/// Maximum framed MCP message body (16 MiB). Prevents unbounded allocation
+/// from a malicious or broken `Content-Length` header.
+const MAX_MESSAGE_LEN: usize = 16 * 1024 * 1024; // 16 MiB
+
+/// Maximum MCP header section size (64 KiB). Prevents unbounded memory growth
+/// from a client that never terminates its header lines.
+const MAX_HEADER_LEN: usize = 64 * 1024; // 64 KiB
+
 /// Run the MCP server on stdio (blocking).
 pub fn run(config: Config) {
     // Force UTF-8 console on Windows (CP_UTF8 = 65001)
@@ -237,6 +245,12 @@ fn read_message<R: BufRead + Read>(reader: &mut R) -> io::Result<Option<Incoming
             }
             if byte[0] != b'\r' {
                 buf.push(byte[0]);
+                if buf.len() > MAX_HEADER_LEN {
+                    return Err(io::Error::new(
+                        io::ErrorKind::InvalidData,
+                        format!("MCP header line exceeds maximum allowed {}", MAX_HEADER_LEN),
+                    ));
+                }
             }
         }
         if !buf.is_empty() {
@@ -262,6 +276,12 @@ fn read_message<R: BufRead + Read>(reader: &mut R) -> io::Result<Option<Incoming
         if bytes == 0 {
             break;
         }
+        if header_line.len() > MAX_HEADER_LEN {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!("MCP header line exceeds maximum allowed {}", MAX_HEADER_LEN),
+            ));
+        }
         if header_line == "\r\n" || header_line == "\n" {
             break;
         }
@@ -274,6 +294,16 @@ fn read_message<R: BufRead + Read>(reader: &mut R) -> io::Result<Option<Incoming
             "Missing Content-Length header in framed MCP message",
         )
     })?;
+
+    if len > MAX_MESSAGE_LEN {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            format!(
+                "Content-Length {} exceeds maximum allowed {}",
+                len, MAX_MESSAGE_LEN
+            ),
+        ));
+    }
 
     let mut body = vec![0u8; len];
     reader.read_exact(&mut body)?;
@@ -3593,5 +3623,28 @@ mod tests {
         assert_eq!(response["id"], "test");
         assert_eq!(response["result"]["protocolVersion"], "2024-11-05");
         assert!(response["result"]["capabilities"]["tools"].is_object());
+    }
+
+    #[test]
+    fn read_message_rejects_oversized_content_length() {
+        let header = format!("Content-Length: {}\r\n\r\n", MAX_MESSAGE_LEN + 1);
+        let mut reader = std::io::Cursor::new(header.into_bytes());
+        let err = match read_message(&mut reader) {
+            Ok(_) => panic!("oversized Content-Length must fail"),
+            Err(e) => e,
+        };
+        assert_eq!(err.kind(), std::io::ErrorKind::InvalidData);
+        assert!(err.to_string().contains("exceeds maximum allowed"));
+    }
+
+    #[test]
+    fn read_message_rejects_oversized_header_line() {
+        let huge = "x".repeat(MAX_HEADER_LEN + 1);
+        let mut reader = std::io::Cursor::new(huge.into_bytes());
+        let err = match read_message(&mut reader) {
+            Ok(_) => panic!("unterminated oversized header must fail"),
+            Err(e) => e,
+        };
+        assert_eq!(err.kind(), std::io::ErrorKind::InvalidData);
     }
 }

@@ -40,6 +40,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   compiled out of release). The hot whole-index loops use the explicitly
   `unsafe header_unchecked`, so an out-of-range index can never read outside
   the mmap region again.
+- **Bounded MCP framing**: the stdio MCP server rejects `Content-Length` values
+  above 16 MiB before allocating the body buffer (previously an unbounded
+  `vec![0u8; len]`), and caps header lines at 64 KiB so a client that never
+  terminates its headers cannot grow memory without bound.
 
 ### Changed
 - **Bounded layer retention**: `layer_retention_entries` default is now 2000

@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   coverage, phrase evidence, spatial distance and a small importance prior replace
   the legacy clamped keyword-distance formula. Deterministic regression gate:
   Recall@3 = 1.000, MRR = 1.000 on the fixture corpus (`tests/relevance_benchmark.rs`).
+- **`stats` data-footprint report**: per-file sizes of the binary index
+  (`embeddings.bin`, `merkle.bin`, `links.bin`, ...), the stale `index-history/`
+  snapshots, `layers/*.txt` total and the configured retention bound, so
+  unbounded growth is visible from one command.
 
 ### Changed
 - **Bounded layer retention**: `layer_retention_entries` default is now 2000

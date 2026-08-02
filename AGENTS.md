@@ -8,6 +8,8 @@ A Microscope Memory egy kognitív memória engine — 13 réteg, 9 mélység, bi
 - **Auto-context:** minden válasz előtt a rendszer előhívja a releváns múltbeli kontextust
 - **Auto-store:** minden válasz után a rendszer eltárolja az interakciót
 - **Session végén:** összefoglaló long_term-be
+- **Fontosság (imp):** rutin = 5, döntés/javítás = 6, mérföldkő/kiadás = 7,
+  identitás/küldetés = 8 — a core memória (imp >= 7) ebből épül, ne laposíts
 
 ### A rétegek
 A rétegek neve magáért beszél. Nem kell szabály — magától értetődik, hova kerül egy emlék.

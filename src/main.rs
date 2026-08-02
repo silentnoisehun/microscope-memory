@@ -91,7 +91,7 @@ fn bench(config: &Config, reader: &MicroscopeReader) {
     println!("  4D: {} ns/query ({} blocks)", ns, reader.block_count);
 }
 
-fn stats(reader: &MicroscopeReader) {
+fn stats(config: &Config, reader: &MicroscopeReader) {
     let hdr_size = reader.block_count * HEADER_SIZE;
     let dat_size = reader.data.len();
     println!("{}", "=".repeat(50));
@@ -120,6 +120,82 @@ fn stats(reader: &MicroscopeReader) {
         let bar_len = (c as f64 / reader.block_count as f64 * 40.0) as usize;
         println!("    D{}: {:>5}  {}", d, c, "|".repeat(bar_len).cyan());
     }
+
+    println!("\n  Data footprint:");
+    let output_dir = Path::new(&config.paths.output_dir);
+    let mut total_bytes: u64 = 0;
+    for name in [
+        "microscope.bin",
+        "data.bin",
+        "meta.bin",
+        "merkle.bin",
+        "embeddings.bin",
+        "links.bin",
+        "activations.bin",
+        "emotions.bin",
+        "fingerprints.idx",
+        "append.bin",
+    ] {
+        let path = output_dir.join(name);
+        if let Ok(meta) = fs::metadata(&path) {
+            total_bytes += meta.len();
+            println!(
+                "  {:<18} {:>9.1} MB",
+                name,
+                meta.len() as f64 / (1024.0 * 1024.0)
+            );
+        }
+    }
+    let history_dir = output_dir.join("index-history");
+    if let Ok(entries) = fs::read_dir(&history_dir) {
+        let history_bytes: u64 = entries
+            .filter_map(|e| e.ok())
+            .map(|e| {
+                match e.metadata().ok() {
+                    Some(meta) if meta.is_dir() => fs::read_dir(e.path())
+                        .map(|sub| {
+                            sub.filter_map(|s| s.ok())
+                                .filter_map(|s| s.metadata().ok())
+                                .map(|s| s.len())
+                                .sum()
+                        })
+                        .unwrap_or(0),
+                    Some(meta) => meta.len(),
+                    None => 0,
+                }
+            })
+            .sum();
+        total_bytes += history_bytes;
+        println!(
+            "  {:<18} {:>9.1} MB",
+            "index-history/",
+            history_bytes as f64 / (1024.0 * 1024.0)
+        );
+    }
+    let layers_bytes: u64 = fs::read_dir(&config.paths.layers_dir)
+        .map(|entries| {
+            entries
+                .filter_map(|e| e.ok())
+                .filter_map(|e| e.metadata().ok())
+                .map(|m| m.len())
+                .sum()
+        })
+        .unwrap_or(0);
+    total_bytes += layers_bytes;
+    println!(
+        "  {:<18} {:>9.1} MB",
+        "layers/*.txt",
+        layers_bytes as f64 / (1024.0 * 1024.0)
+    );
+    println!(
+        "  {:<18} {:>9.1} MB",
+        "TOTAL",
+        total_bytes as f64 / (1024.0 * 1024.0)
+    );
+    println!(
+        "  Retention: layer_retention_entries = {} (0 = unlimited)",
+        config.index.layer_retention_entries
+    );
     println!("{}", "=".repeat(50));
 }
 
@@ -1341,7 +1417,7 @@ async fn main() {
         Cmd::Bench => bench(&config, &open_reader(&config)),
         Cmd::Stats => {
             let r = open_reader(&config);
-            stats(&r);
+            stats(&config, &r);
             let append_path = Path::new(&config.paths.output_dir).join("append.bin");
             let appended = read_append_log(&append_path);
             if !appended.is_empty() {

@@ -1,0 +1,38 @@
+# CI for the commitment-enforcement layer and the crate as a whole.
+# Runs on every pull request so the A_t^valid gate is publicly verified.
+
+name: ci
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Build all targets
+        run: cargo build --all-targets
+
+      - name: Clippy
+        run: cargo clippy --all-targets
+
+      - name: Library tests
+        run: cargo test --lib
+
+      - name: Enforcement integration tests (A_t^valid gate)
+        run: cargo test --test enforcement_gate
+
+      - name: Core integration tests
+        run: cargo test --test integration

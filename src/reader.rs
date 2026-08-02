@@ -227,7 +227,21 @@ impl MicroscopeReader {
 
     #[inline(always)]
     pub fn header(&self, i: usize) -> BlockHeader {
-        debug_assert!(i < self.block_count);
+        assert!(
+            i < self.block_count,
+            "block header index {i} out of bounds (block_count={})",
+            self.block_count
+        );
+        unsafe { self.header_unchecked(i) }
+    }
+
+    /// Read the header for block `i` without a bounds check.
+    ///
+    /// # Safety
+    /// `i` must be strictly less than `self.block_count`. Violating this reads
+    /// outside the mmap region, which is undefined behavior.
+    #[inline(always)]
+    pub unsafe fn header_unchecked(&self, i: usize) -> BlockHeader {
         let off = i * self.header_stride;
         let ptr = unsafe { self.headers.as_ptr().add(off) };
         if self.header_stride == HEADER_SIZE {
@@ -347,7 +361,7 @@ impl MicroscopeReader {
         let mut results: Vec<(f32, usize, bool)> = (0..self.block_count)
             .into_par_iter()
             .map(|i| {
-                let h = self.header(i);
+                let h = unsafe { self.header_unchecked(i) };
                 (l2_dist_sq_simd(&h, x, y, z, qz, zw), i, true)
             })
             .collect();
@@ -476,7 +490,7 @@ impl MicroscopeReader {
             .into_par_iter()
             .filter_map(|i| {
                 if self.text(i).to_lowercase().contains(&q) {
-                    Some((self.header(i).depth, i))
+                    Some((unsafe { self.header_unchecked(i) }.depth, i))
                 } else {
                     None
                 }
@@ -613,7 +627,7 @@ impl MicroscopeReader {
         let mut results: Vec<(f32, usize, bool)> = (0..self.block_count)
             .into_par_iter()
             .filter_map(|i| {
-                let h = self.header(i);
+                let h = unsafe { self.header_unchecked(i) };
                 if !h.is_visible_to(opts.active_project, opts.include_global)
                     || h.importance < opts.min_importance
                 {
@@ -764,7 +778,7 @@ impl MicroscopeReader {
         let mut results: Vec<(u8, usize)> = (0..self.block_count)
             .into_par_iter()
             .filter_map(|i| {
-                let h = self.header(i);
+                let h = unsafe { self.header_unchecked(i) };
                 if !h.is_visible_to(opts.active_project, opts.include_global)
                     || h.importance < opts.min_importance
                 {
@@ -1779,5 +1793,33 @@ mod tests {
             parse_imp_marker("(imp=12) túl magas érték"),
             ("túl magas érték", 12)
         );
+    }
+
+    #[test]
+    fn header_reads_valid_index_and_panics_out_of_bounds() {
+        let dir = tempfile::tempdir().unwrap();
+        let hdr_file = dir.path().join("microscope.bin");
+        fs::write(&hdr_file, vec![0u8; HEADER_SIZE]).unwrap();
+        let dat_file = dir.path().join("data.bin");
+        fs::write(&dat_file, vec![0u8; 1]).unwrap();
+        let map = unsafe { memmap2::Mmap::map(&std::fs::File::open(&hdr_file).unwrap()) }.unwrap();
+        let dmap = unsafe { memmap2::Mmap::map(&std::fs::File::open(&dat_file).unwrap()) }.unwrap();
+        let reader = MicroscopeReader {
+            headers: map,
+            data: DataStore::Mmap(dmap),
+            block_count: 1,
+            header_stride: HEADER_SIZE,
+            depth_ranges: [(0, 0); 9],
+        };
+
+        // Valid index reads the (dummy, zeroed) header without issue.
+        let h = reader.header(0);
+        assert_eq!(h.depth, 0);
+
+        // Out-of-bounds index must panic even in release builds.
+        let result = std::panic::catch_unwind(|| {
+            let _ = reader.header(1);
+        });
+        assert!(result.is_err(), "out-of-bounds header read must panic");
     }
 }

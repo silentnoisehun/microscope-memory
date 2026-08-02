@@ -35,6 +35,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   layer entry by exact FNV-1a hash equality of the marker-stripped text instead
   of substring matching, so overlapping entries can never receive a wrong bump
   and at most one entry changes per promoted block.
+- **Release-safe header reads**: `MicroscopeReader::header` is now bounds
+  checked with `assert!` in all builds (previously `debug_assert!`, which is
+  compiled out of release). The hot whole-index loops use the explicitly
+  `unsafe header_unchecked`, so an out-of-range index can never read outside
+  the mmap region again.
 
 ### Changed
 - **Bounded layer retention**: `layer_retention_entries` default is now 2000

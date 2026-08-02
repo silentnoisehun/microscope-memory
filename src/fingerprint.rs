@@ -304,7 +304,7 @@ fn find_links(fingerprints: &[BlockFingerprint]) -> Vec<StructuralLink> {
     links
 }
 
-fn fnv1a_hash(data: &[u8]) -> u64 {
+pub(crate) fn fnv1a_hash(data: &[u8]) -> u64 {
     let mut h: u64 = 0xcbf29ce484222325;
     for &b in data {
         h ^= b as u64;

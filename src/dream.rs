@@ -731,7 +731,7 @@ pub fn promote_recalled_blocks(
                 let content = updated_files
                     .entry(path.clone())
                     .or_insert_with(|| fs::read_to_string(&path).unwrap_or_default());
-                if let Some(next) = bump_entry_marker(content, &block_text, new_imp) {
+                if let Some(next) = bump_entry_by_text_hash(content, &block_text, new_imp) {
                     *content = next;
                     break;
                 }
@@ -747,22 +747,30 @@ pub fn promote_recalled_blocks(
     Ok(bumps.len() as u32)
 }
 
-/// Replace the `(imp=N)` marker of the first entry containing `needle`.
-fn bump_entry_marker(content: &str, needle: &str, new_imp: u8) -> Option<String> {
+/// Replace the `(imp=N)` marker of the layer entry whose text hash exactly
+/// matches the promoted block's text.
+///
+/// Matching is exact hash equality (FNV-1a over the marker-stripped, trimmed
+/// text), never substring matching, so overlapping or duplicated entries cannot
+/// be modified by mistake. At most one entry changes: the first exact match.
+fn bump_entry_by_text_hash(content: &str, block_text: &str, new_imp: u8) -> Option<String> {
+    let needle_hash = crate::fingerprint::fnv1a_hash(block_text.trim().as_bytes());
     let mut entries: Vec<String> = content
         .split("\n\n")
         .map(|s| s.to_string())
         .collect();
-    let mut changed = false;
     for entry in &mut entries {
-        if entry.contains(needle) && entry.starts_with("(imp=") {
-            if let Some(end) = entry.find(')') {
-                *entry = format!("(imp={}){}", new_imp, &entry[end + 1..]);
-                changed = true;
+        let (stripped, _imp) = crate::reader::parse_imp_marker(entry);
+        if crate::fingerprint::fnv1a_hash(stripped.trim().as_bytes()) == needle_hash {
+            if entry.starts_with("(imp=") {
+                if let Some(end) = entry.find(')') {
+                    *entry = format!("(imp={}){}", new_imp, &entry[end + 1..]);
+                    return Some(entries.join("\n\n"));
+                }
             }
         }
     }
-    changed.then(|| entries.join("\n\n"))
+    None
 }
 
 #[cfg(test)]
@@ -956,6 +964,25 @@ mod tests {
             "layer source must mirror the promotion"
         );
         assert!(layer.contains("(imp=5) emlék szöveg blokk 2"));
+    }
+
+    #[test]
+    fn bump_entry_matches_exact_text_not_substring() {
+        let content = "(imp=5) fontos dolog\n\n(imp=5) ez fontos dolog";
+        let result = bump_entry_by_text_hash(content, "fontos dolog", 7).unwrap();
+        assert!(result.starts_with("(imp=7) fontos dolog"));
+        assert!(
+            result.contains("\n\n(imp=5) ez fontos dolog"),
+            "overlapping entry must stay untouched"
+        );
+    }
+
+    #[test]
+    fn bump_entry_changes_at_most_one_entry() {
+        let content = "(imp=5) ugyanaz\n\n(imp=5) ugyanaz";
+        let result = bump_entry_by_text_hash(content, "ugyanaz", 7).unwrap();
+        assert_eq!(result.matches("(imp=7) ugyanaz").count(), 1);
+        assert_eq!(result.matches("(imp=5) ugyanaz").count(), 1);
     }
 
     #[test]

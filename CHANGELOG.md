@@ -30,6 +30,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   0.35): energy >= threshold bumps importance by one, capped at the protection
   floor, mirrored back into the layer source.
 
+### Fixed
+- **Precise layer promotion**: the dream's importance mirror now matches the
+  layer entry by exact FNV-1a hash equality of the marker-stripped text instead
+  of substring matching, so overlapping entries can never receive a wrong bump
+  and at most one entry changes per promoted block.
+
 ### Changed
 - **Bounded layer retention**: `layer_retention_entries` default is now 2000
   (was 0 / unlimited). Each layer file keeps at most 2000 newest entries and

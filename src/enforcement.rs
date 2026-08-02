@@ -601,6 +601,48 @@ pub fn load_engine(output_dir: &Path) -> Result<EnforcementEngine, String> {
     Ok(engine)
 }
 
+/// Fail-closed loader for a guard. Returns an `Err` if the state or the audit
+/// cannot be loaded cleanly or the chain is invalid. A caller that turns this
+/// error into "do not run the guarded operation" gives a genuinely
+/// fail-closed boundary: corruption means denial, never a silent default.
+pub fn load_engine_strict(output_dir: &Path) -> Result<EnforcementEngine, String> {
+    let state_path = output_dir.join("enforcement-state.bin");
+    let has_state = state_path.exists();
+    let audit_path = output_dir.join("enforcement-audit.bin");
+    let has_audit = audit_path.exists();
+
+    if has_audit || has_state {
+        if !output_dir.is_dir() {
+            return Err("enforcement state dir is not a directory".to_string());
+        }
+    }
+
+    let engine = if has_state {
+        load_engine(output_dir)?
+    } else {
+        EnforcementEngine::new()
+    };
+
+    if has_audit {
+        // Load the audit independently to surface corruption.
+        let chunks = load_audit(output_dir)
+            .map_err(|e| format!("enforcement audit unreadable: {e}"))?;
+        // Validate the whole chain: a single bad link means fail-closed.
+        if !chunks.is_empty() {
+            let mut probe = EnforcementEngine::new();
+            probe.restore_audit(chunks);
+            if !probe.chain_valid() {
+                return Err("enforcement audit chain is invalid".to_string());
+            }
+        }
+    }
+
+    if !engine.chain_valid() {
+        return Err("enforcement audit chain is invalid".to_string());
+    }
+    Ok(engine)
+}
+
 /// Rewrite the audit chain to a binary file (magic EAU1).
 pub fn save_audit(output_dir: &Path, chunks: &[AuditChunk]) -> Result<(), String> {
     let bytes = bincode::serialize(chunks).map_err(|e| format!("serialize audit: {}", e))?;
@@ -855,5 +897,39 @@ mod tests {
         save_engine(dir.path(), &eng).unwrap();
         let reloaded = load_engine(dir.path()).unwrap();
         assert_eq!(reloaded.state(), eng.state());
+    }
+
+    #[test]
+    fn strict_loader_fails_closed_on_corruption() {
+        // Corrupt state file -> must refuse (fail-closed).
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("enforcement-state.bin"), b"not-bincode").unwrap();
+        assert!(load_engine_strict(dir.path()).is_err());
+
+        // Corrupt audit file -> must refuse.
+        let dir2 = tempfile::tempdir().unwrap();
+        std::fs::write(dir2.path().join("enforcement-audit.bin"), b"EAU1junk").unwrap();
+        assert!(load_engine_strict(dir2.path()).is_err());
+
+        // Tampered chain link -> must refuse.
+        let dir3 = tempfile::tempdir().unwrap();
+        let mut eng = EnforcementEngine::new();
+        eng.decide(&event("a", "b", "c", 0, "t"), None);
+        save_audit(dir3.path(), eng.audit()).unwrap();
+        save_engine(dir3.path(), &eng).unwrap();
+        let path = dir3.path().join("enforcement-audit.bin");
+        let mut bytes = std::fs::read(&path).unwrap();
+        let last = bytes.len() - 1;
+        bytes[last] ^= 0xFF;
+        std::fs::write(&path, bytes).unwrap();
+        assert!(load_engine_strict(dir3.path()).is_err());
+
+        // A healthy state + audit loads fine.
+        let dir4 = tempfile::tempdir().unwrap();
+        let mut ok = EnforcementEngine::new();
+        ok.decide(&event("lea", "append", "prod", 1, "cli"), None);
+        save_engine(dir4.path(), &ok).unwrap();
+        save_audit(dir4.path(), ok.audit()).unwrap();
+        assert!(load_engine_strict(dir4.path()).is_ok());
     }
 }

@@ -379,6 +379,13 @@ fn strip_user_scope(text: &str, user_id: &str) -> Option<String> {
     text.strip_prefix(&prefix).map(str::to_string)
 }
 
+/// The effective memory scope: the verified bearer identity wins over any
+/// client-claimed `user_id`; without a bearer token the claim is used
+/// (shared-key / single-user mode).
+fn effective_user_id<'a>(auth: &'a AuthenticatedUser, claimed: &'a str) -> &'a str {
+    auth.0.as_deref().unwrap_or(claimed)
+}
+
 #[derive(Deserialize)]
 pub struct SwitchProjectRequest {
     pub project_path: String,
@@ -716,7 +723,7 @@ async fn mobile_recall(
     Json(payload): Json<MobileRecallRequest>,
 ) -> Result<Json<Vec<MemoryResponse>>, (StatusCode, String)> {
     let k = payload.k.unwrap_or(10);
-    let uid = auth.0.as_deref().unwrap_or(&payload.user_id);
+    let uid = effective_user_id(&auth, &payload.user_id);
     Ok(Json(recall_internal(
         &state,
         &payload.query,
@@ -732,7 +739,7 @@ async fn mobile_remember(
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
     let layer = payload.layer.unwrap_or_else(|| "long_term".to_string());
     let importance = payload.importance.unwrap_or(7);
-    let uid = auth.0.as_deref().unwrap_or(&payload.user_id);
+    let uid = effective_user_id(&auth, &payload.user_id);
     let scoped_text = scope_user_text(uid, &payload.text);
 
     let cfg = project_aware_config(&state);
@@ -994,7 +1001,7 @@ async fn mobile_chat(
     Json(payload): Json<MobileChatRequest>,
 ) -> Result<Json<MobileChatResponse>, (StatusCode, String)> {
     let k = payload.recall_k.unwrap_or(8);
-    let uid = auth.0.as_deref().unwrap_or(&payload.user_id);
+    let uid = effective_user_id(&auth, &payload.user_id);
     let recalled = recall_internal(&state, &payload.message, k, Some(uid))?;
 
     let memory_context = if recalled.is_empty() {
@@ -1534,6 +1541,15 @@ mod tests {
         assert!(user_token("", "alice").is_err());
     }
 
+    #[test]
+    fn effective_user_id_prefers_verified_identity() {
+        assert_eq!(
+            effective_user_id(&AuthenticatedUser(Some("alice".to_string())), "bob"),
+            "alice"
+        );
+        assert_eq!(effective_user_id(&AuthenticatedUser(None), "bob"), "bob");
+    }
+
     #[tokio::test]
     async fn bearer_token_binds_identity() {
         let master = "test-master-secret";
@@ -1578,6 +1594,62 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn bearer_identity_overrides_body_user_id_end_to_end() {
+        let tmp = tempfile::tempdir().unwrap();
+        let mut config = Config::default();
+        config.paths.layers_dir = tmp.path().join("layers").to_string_lossy().to_string();
+        config.paths.output_dir = tmp.path().join("data").to_string_lossy().to_string();
+        config.memory_layers.layers = vec!["long_term".to_string()];
+        config.embedding.provider = "none".to_string();
+        std::fs::create_dir_all(&config.paths.layers_dir).unwrap();
+        crate::build::build(&config, true).unwrap();
+
+        let stored = "alice private note";
+        crate::store_memory(&config, &scope_user_text("alice", stored), "long_term", 5).unwrap();
+        crate::build::build(&config, true).unwrap();
+
+        let master = "master-key";
+        let token = user_token(master, "alice").unwrap();
+        let mut cfg = config.clone();
+        cfg.server.api_key = Some(master.to_string());
+        let state = Arc::new(AppState {
+            config: cfg,
+            active_project: Arc::new(Mutex::new(None)),
+        });
+        let app = Router::new()
+            .route("/mobile/recall", post(mobile_recall))
+            .layer(middleware::from_fn_with_state(state.clone(), api_key_auth))
+            .with_state(state);
+
+        // Body claims "bob"; the valid bearer token says "alice". Alice must win.
+        let body = serde_json::json!({
+            "user_id": "bob",
+            "query": format!("[user:alice] {stored}"),
+            "k": 10
+        })
+        .to_string();
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/mobile/recall")
+                    .header(axum::http::header::AUTHORIZATION, format!("Bearer {token}"))
+                    .header("content-type", "application/json")
+                    .body(Body::from(body))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        let bytes = axum::body::to_bytes(resp.into_body(), 64 * 1024).await.unwrap();
+        let text = String::from_utf8(bytes.to_vec()).unwrap();
+        assert!(
+            text.contains(stored),
+            "verified bearer identity must override the body user_id: {text}"
+        );
     }
 
     #[tokio::test]

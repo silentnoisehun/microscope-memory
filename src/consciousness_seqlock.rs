@@ -38,8 +38,9 @@
 //! byte-identical to `SharedSnapshot`'s layout — so two processes looking at
 //! the same file see the same snapshot with the same seqlock protocol. The
 //! heap-backed fast-path fields (`RwLock<String>`, hot atomics) stay
-//! in-process only. This mmap layer is a standalone, tested building block:
-//! `ConsciousnessStream` does not publish to it yet.
+//! in-process only. The stream's background cycle publishes to it once per
+//! tick (see `consciousness_stream`), so another process can map the file and
+//! read the live snapshot.
 
 use std::cell::UnsafeCell;
 use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
@@ -51,6 +52,8 @@ pub const SNAPSHOT_MAGIC: u32 = 0x534E_4F43;
 pub const SNAPSHOT_VERSION: u32 = 1;
 /// Maximum retries on a torn read before giving up.
 pub const SNAPSHOT_MAX_RETRIES: u32 = 8;
+/// File name (inside the configured output dir) for the shared snapshot.
+pub const SNAPSHOT_FILE_NAME: &str = "consciousness_snapshot.bin";
 
 /// 96-byte snapshot of the consciousness stream. All fields are
 /// pre-computed by the writer; readers do no derivation.
@@ -462,6 +465,62 @@ impl MappedSnapshotWriter {
         })
     }
 
+    /// Open an existing snapshot file for writing, or create a fresh one —
+    /// **without truncating** an existing live mapping.
+    ///
+    /// This is what stream processes use: a second instance must never clobber
+    /// the file out from under the first process's mmap (truncating a mapped
+    /// file invalidates the other mapping and can crash it). Each whole-copy
+    /// `write()` is published under one odd/even seqlock window, so even
+    /// concurrent writers produce complete, non-torn snapshots.
+    pub fn open_or_create(path: &std::path::Path) -> Result<Self, String> {
+        let existing = path.exists();
+        let file = std::fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .open(path)
+            .map_err(|e| format!("open snapshot file: {e}"))?;
+
+        if !existing {
+            file.set_len(MmapSnapshot::FILE_SIZE as u64)
+                .map_err(|e| format!("size snapshot file: {e}"))?;
+            let mut mmap = unsafe { memmap2::MmapMut::map_mut(&file) }
+                .map_err(|e| format!("mmap snapshot file: {e}"))?;
+            let raw = mmap.as_mut_ptr() as *mut MmapSnapshot;
+            // SAFETY: fresh file, single initializer; header written before
+            // any reader can observe a valid magic.
+            unsafe {
+                (*raw).magic = SNAPSHOT_MAGIC;
+                (*raw).version = SNAPSHOT_VERSION;
+                (*raw).sequence.store(0, Ordering::Release);
+            }
+            let shared = MmapSnapshot::from_raw(mmap.as_mut_ptr());
+            Ok(Self {
+                _file: file,
+                _mmap: mmap,
+                shared,
+            })
+        } else {
+            if file.metadata().map_err(|e| e.to_string())?.len()
+                < MmapSnapshot::FILE_SIZE as u64
+            {
+                return Err("snapshot file too small for a shared snapshot".to_string());
+            }
+            let mut mmap = unsafe { memmap2::MmapMut::map_mut(&file) }
+                .map_err(|e| format!("mmap snapshot file: {e}"))?;
+            let shared = MmapSnapshot::from_raw(mmap.as_mut_ptr());
+            if !shared.header_valid() {
+                return Err("snapshot file exists but is not initialized".to_string());
+            }
+            Ok(Self {
+                _file: file,
+                _mmap: mmap,
+                shared,
+            })
+        }
+    }
+
     /// Open an existing snapshot file for writing.
     pub fn open(path: &std::path::Path) -> Result<Self, String> {
         let file = std::fs::OpenOptions::new()
@@ -571,6 +630,29 @@ mod tests {
         let reader = MappedSnapshot::open(&path).unwrap();
         assert!(!reader.is_initialized());
         assert!(reader.read().is_none(), "uninitialized file must not yield data");
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn mmap_snapshot_open_or_create_is_non_destructive() {
+        let tmp = tempfile::tempdir().unwrap();
+        let path = tmp.path().join("live.bin");
+
+        // Fresh path: open_or_create initializes it.
+        let writer = MappedSnapshotWriter::open_or_create(&path).unwrap();
+        let mut data = SnapshotData::zeroed();
+        data.cycle = 1;
+        writer.write(&data).unwrap();
+        drop(writer);
+
+        // Existing path: open_or_create must NOT truncate the live mapping.
+        let writer2 = MappedSnapshotWriter::open_or_create(&path).unwrap();
+        let mut data2 = SnapshotData::zeroed();
+        data2.cycle = 2;
+        writer2.write(&data2).unwrap();
+
+        let reader = MappedSnapshot::open(&path).unwrap();
+        assert_eq!(reader.read().unwrap().cycle, 2);
     }
 
     #[cfg(not(target_arch = "wasm32"))]

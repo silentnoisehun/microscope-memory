@@ -75,8 +75,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the `#[repr(C)]` seqlock header + `SnapshotData` block via `memmap2`, so two
   processes sharing a file see the same snapshot with the same seqlock
   protocol (odd/even sequence, retry on torn reads). The heap-backed fast-path
-  fields remain in-process only. Covered by roundtrip, uninitialized-file and
-  no-torn-reads-under-concurrency tests.
+  fields remain in-process only. The `ConsciousnessStream` background cycle now
+  publishes to `<output_dir>/consciousness_snapshot.bin` every tick, so another
+  process can map the file and read the live consciousness snapshot. Covered by
+  roundtrip, uninitialized-file, no-torn-reads-under-concurrency and
+  stream-publishes-to-mmap tests.
 
 ### Changed
 - **Bounded layer retention**: `layer_retention_entries` default is now 2000

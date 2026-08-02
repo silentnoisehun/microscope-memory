@@ -22,7 +22,7 @@ static GLOBAL_STREAM: OnceLock<Arc<Mutex<StreamState>>> = OnceLock::new();
 use crate::archetype::ArchetypeState;
 use crate::attention::AttentionState;
 use crate::config::Config;
-use crate::consciousness_seqlock::SharedSnapshot;
+use crate::consciousness_seqlock::{MappedSnapshotWriter, SharedSnapshot};
 use crate::emotional_state::EmotionalStateRing;
 use crate::hebbian::HebbianState;
 use crate::mirror::MirrorState;
@@ -111,6 +111,14 @@ impl ConsciousnessStream {
         let hebbian_total_energy: f32 = hebbian.activations.iter().map(|a| a.energy).sum();
 
         let snapshot = Arc::new(SharedSnapshot::new_zeroed());
+
+        // Cross-process snapshot: publish the same data to a file-backed mmap
+        // once per tick. Failure to create the file only disables the shared
+        // layer — the in-process seqlock keeps working.
+        let snapshot_writer = MappedSnapshotWriter::open_or_create(
+            &output_dir.join(crate::consciousness_seqlock::SNAPSHOT_FILE_NAME),
+        )
+        .ok();
 
         let state = Arc::new(Mutex::new(StreamState {
             hebbian,
@@ -202,7 +210,7 @@ impl ConsciousnessStream {
                 }
 
                 // ─── Publish snapshot (minden ciklusban, lock-free olvasók számára) ───
-                publish_snapshot(&s);
+                publish_snapshot(&s, snapshot_writer.as_ref());
 
                 drop(s);
                 thread::sleep(Duration::from_millis(CYCLE_MS));
@@ -339,7 +347,7 @@ impl ConsciousnessStream {
 /// either see the old or the new version, never a torn mix.
 /// Also updates the cached format string and atomic hot fields for
 /// the ultra-fast read path.
-fn publish_snapshot(s: &StreamState) {
+fn publish_snapshot(s: &StreamState, writer: Option<&MappedSnapshotWriter>) {
     let snap: &SharedSnapshot = &s.snapshot;
 
     // Build the formatted string first (while holding Mutex for state access)
@@ -387,6 +395,14 @@ fn publish_snapshot(s: &StreamState) {
         }
     }
     snap.end_write(token);
+
+    // Cross-process mirror: publish the identical data block to the shared
+    // mmap file so other processes can read the live snapshot.
+    if let Some(writer) = writer {
+        if let Some(data) = snap.read() {
+            let _ = writer.write(&data);
+        }
+    }
 }
 
 fn now_ms() -> u64 {
@@ -394,4 +410,44 @@ fn now_ms() -> u64 {
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
         .as_millis() as u64
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::Config;
+    use crate::consciousness_seqlock::{MappedSnapshot, SNAPSHOT_FILE_NAME};
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn stream_publishes_to_mmap_snapshot() {
+        let tmp = tempfile::tempdir().unwrap();
+        let mut config = Config::default();
+        config.paths.output_dir = tmp.path().join("data").to_string_lossy().to_string();
+        config.paths.layers_dir = tmp.path().join("layers").to_string_lossy().to_string();
+        std::fs::create_dir_all(&config.paths.output_dir).unwrap();
+        std::fs::create_dir_all(&config.paths.layers_dir).unwrap();
+        config.embedding.provider = "none".to_string();
+
+        // Start the real stream: it must publish to the shared mmap file.
+        let _stream = ConsciousnessStream::start(&config);
+        let path = Path::new(&config.paths.output_dir).join(SNAPSHOT_FILE_NAME);
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        loop {
+            if let Ok(reader) = MappedSnapshot::open(&path) {
+                if let Some(data) = reader.read() {
+                    // The file is initialized by `open_or_create` before the
+                    // first tick; keep reading until a live publish arrives.
+                    if data.cycle >= 1 {
+                        break;
+                    }
+                }
+            }
+            assert!(
+                std::time::Instant::now() < deadline,
+                "stream did not publish an mmap snapshot in time"
+            );
+            std::thread::sleep(std::time::Duration::from_millis(50));
+        }
+    }
 }

@@ -19,7 +19,16 @@ use std::time::Instant;
 
 fn empty_config() -> Config {
     let mut cfg = Config::default();
-    let tmp = std::env::temp_dir().join("microscope_perf_empty");
+    // Per-test unique directory: parallel tests starting the consciousness
+    // stream must not share one output dir, or one test's file lifecycle
+    // (remove/create) can invalidate another test's mmap of the same file.
+    static PERF_DIR_COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    let counter = PERF_DIR_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let tmp = std::env::temp_dir().join(format!(
+        "microscope_perf_empty_{}_{}",
+        std::process::id(),
+        counter
+    ));
     let _ = std::fs::remove_dir_all(&tmp);
     std::fs::create_dir_all(&tmp).unwrap();
     cfg.paths.output_dir = tmp.to_string_lossy().to_string();

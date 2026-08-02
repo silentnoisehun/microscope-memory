@@ -1,0 +1,28 @@
+# Normalize every text file to LF in the repository and in the working tree,
+# so mixed CRLF/LF never reappears regardless of platform or tooling.
+* text=auto
+
+*.rs text eol=lf
+*.md text eol=lf
+*.toml text eol=lf
+*.py text eol=lf
+*.txt text eol=lf
+*.json text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.ts text eol=lf
+*.js text eol=lf
+*.html text eol=lf
+
+# Binary artifacts must never be renormalized.
+*.bin binary
+*.idx binary
+*.pyc binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.mscope binary
+*.zst binary
+*.cryo binary

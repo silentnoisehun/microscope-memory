@@ -276,9 +276,7 @@ impl ArchitectureGenerator {
         proposals.sort_by(|a, b| b.generation_score.total_cmp(&a.generation_score));
 
         // Tárolás a történetben
-        self.generation_history
-            .write()
-            .unwrap()
+        crate::sync_guard::write_lock(&self.generation_history)
             .extend(proposals.clone());
 
         proposals
@@ -383,9 +381,7 @@ impl ArchitectureGenerator {
         }
 
         proposals.sort_by(|a, b| b.generation_score.total_cmp(&a.generation_score));
-        self.generation_history
-            .write()
-            .unwrap()
+        crate::sync_guard::write_lock(&self.generation_history)
             .extend(proposals.clone());
         proposals
     }
@@ -486,9 +482,7 @@ impl ArchitectureGenerator {
         }
 
         proposals.sort_by(|a, b| b.generation_score.total_cmp(&a.generation_score));
-        self.generation_history
-            .write()
-            .unwrap()
+        crate::sync_guard::write_lock(&self.generation_history)
             .extend(proposals.clone());
         proposals
     }
@@ -644,9 +638,7 @@ impl ArchitectureGenerator {
         }
 
         proposals.sort_by(|a, b| b.generation_score.total_cmp(&a.generation_score));
-        self.generation_history
-            .write()
-            .unwrap()
+        crate::sync_guard::write_lock(&self.generation_history)
             .extend(proposals.clone());
         proposals
     }

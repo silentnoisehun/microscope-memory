@@ -87,7 +87,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Deterministic morphogenesis**: the growth functions derive their RNG from
   `Seed::rng()` (FNV hash of the seed id + position), so the same seed always
   produces the same organism — the previously flaky, RNG-driven tests are now
-  fully deterministic.
+  fully deterministic. The evolution loop's mutation RNG is now seeded from
+  the generation number too, so a whole `evolve_population` run is
+  reproducible for the same initial seeds (verified byte-identical).
+- **Poison-safe locks completed**: the earlier sweep missed 34 multi-line
+  `RwLock`/`Mutex` `.read()/.write()/.lock().unwrap()` sites (receiver and
+  call on separate lines); all now go through `sync_guard` as well.
 - **Debug CLI stack overflow fixed**: `main` now runs the async runtime on a
   16 MiB thread, so debug builds no longer overflow the 1 MiB OS main-thread
   stack at startup (`cargo run` works again).

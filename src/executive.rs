@@ -143,17 +143,13 @@ impl Executive {
     }
 
     pub fn module_state(&self, id: &str) -> Option<ModuleState> {
-        self.modules
-            .read()
-            .unwrap()
+        crate::sync_guard::read_lock(&self.modules)
             .get(id)
             .map(|m| m.state.clone())
     }
 
     pub fn set_module_state(&self, id: &str, state: ModuleState) -> bool {
-        self.modules
-            .write()
-            .unwrap()
+        crate::sync_guard::write_lock(&self.modules)
             .get_mut(id)
             .map(|m| {
                 m.state = state;
@@ -167,9 +163,7 @@ impl Executive {
     }
 
     pub fn set_priority(&self, id: &str, priority: u8) -> bool {
-        self.modules
-            .write()
-            .unwrap()
+        crate::sync_guard::write_lock(&self.modules)
             .get_mut(id)
             .map(|m| {
                 m.priority = priority;
@@ -297,9 +291,7 @@ impl Executive {
     }
 
     pub fn recent_log(&self, k: usize) -> Vec<ExecutionLogEntry> {
-        self.log
-            .read()
-            .unwrap()
+        crate::sync_guard::read_lock(&self.log)
             .iter()
             .rev()
             .take(k)

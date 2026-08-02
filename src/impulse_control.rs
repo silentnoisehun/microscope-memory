@@ -56,9 +56,7 @@ impl ImpulseControl {
 
     /// Add a suppression pattern (keywords to automatically suppress)
     pub fn add_suppression_pattern(&mut self, pattern: &str) {
-        self.suppression_patterns
-            .write()
-            .unwrap()
+        crate::sync_guard::write_lock(&self.suppression_patterns)
             .insert(pattern.to_lowercase());
     }
 

@@ -2092,10 +2092,7 @@ impl MorphogenesisEngine {
             // Legjobb fitness mentése
 
             if let Some(best) = population.first() {
-                self.evolution_history
-                    .write()
-                    .unwrap()
-                    .push(best.fitness_score);
+                crate::sync_guard::write_lock(&self.evolution_history).push(best.fitness_score);
             }
 
             // 2. Szelekció: top 30% marad
@@ -2108,6 +2105,15 @@ impl MorphogenesisEngine {
 
             let mut new_population = survivors.clone();
 
+            // Deterministic per-generation RNG, so the whole evolution run is
+            // reproducible for the same initial seeds.
+            let mut rng = {
+                use rand::SeedableRng;
+                rand::rngs::StdRng::seed_from_u64(
+                    0x9E37_79B9_7F4A_7C15 ^ (gen as u64).wrapping_mul(0x100000001b3),
+                )
+            };
+
             let mut rng_idx = 0;
 
             while new_population.len() < population_size {
@@ -2117,22 +2123,22 @@ impl MorphogenesisEngine {
 
                 // Mutált seed
 
-                let mutation_factor = 0.8 + rand::random::<f64>() * 0.4;
+                let mutation_factor = 0.8 + rng.gen::<f64>() * 0.4;
 
                 let mutated_seed = Seed {
                     id: format!("evo_{}_{}", gen, new_population.len()),
 
                     position: (
-                        parent.seed.position.0 + (rand::random::<f64>() - 0.5) * 5.0,
-                        parent.seed.position.1 + (rand::random::<f64>() - 0.5) * 5.0,
-                        parent.seed.position.2 + (rand::random::<f64>() - 0.5) * 5.0,
+                        parent.seed.position.0 + (rng.gen::<f64>() - 0.5) * 5.0,
+                        parent.seed.position.1 + (rng.gen::<f64>() - 0.5) * 5.0,
+                        parent.seed.position.2 + (rng.gen::<f64>() - 0.5) * 5.0,
                     ),
 
                     energy: parent.seed.energy * mutation_factor,
 
                     type_tag: parent.seed.type_tag.clone(),
 
-                    preferred_pattern: Some(patterns[rand::random::<usize>() % patterns.len()]),
+                    preferred_pattern: Some(patterns[rng.gen::<usize>() % patterns.len()]),
                 };
 
                 let field = crate::sync_guard::read_lock(&self.field).clone();
@@ -2872,6 +2878,30 @@ mod tests {
 
         if results.len() > 1 {
             assert!(results[0].fitness_score >= results[1].fitness_score);
+        }
+    }
+
+    #[test]
+    fn evolution_is_deterministic_for_the_same_seeds() {
+        let seeds = vec![
+            test_seed(),
+            Seed::new("b", 1.0, 2.0, 3.0, "service"),
+            Seed::new("c", -1.0, 0.5, 2.0, "cache"),
+        ];
+
+        let first = MorphogenesisEngine::new()
+            .evolve_population(&seeds, 3, &FitnessObjective::Balanced, 12);
+        let second = MorphogenesisEngine::new()
+            .evolve_population(&seeds, 3, &FitnessObjective::Balanced, 12);
+
+        assert_eq!(first.len(), second.len());
+        for (a, b) in first.iter().zip(second.iter()) {
+            assert_eq!(a.seed.id, b.seed.id, "mutated seed identity must match");
+            assert_eq!(
+                export_fingerprint(a),
+                export_fingerprint(b),
+                "organisms must be byte-identical across runs"
+            );
         }
     }
 

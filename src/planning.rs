@@ -209,9 +209,7 @@ impl Planner {
     }
 
     pub fn list_goals(&self, status: Option<GoalStatus>) -> Vec<Goal> {
-        self.goals
-            .read()
-            .unwrap()
+        crate::sync_guard::read_lock(&self.goals)
             .values()
             .filter(|g| status.as_ref().is_none_or(|s| g.status == *s))
             .cloned()
@@ -468,9 +466,7 @@ impl Planner {
     }
 
     pub fn plans_for_goal(&self, goal_id: u64) -> Vec<Plan> {
-        self.plans
-            .read()
-            .unwrap()
+        crate::sync_guard::read_lock(&self.plans)
             .values()
             .filter(|p| p.goal_id == goal_id)
             .cloned()

@@ -229,9 +229,7 @@ impl PatternRecognizer {
         };
 
         crate::sync_guard::write_lock(&self.patterns).push(pattern);
-        self.domain_index
-            .write()
-            .unwrap()
+        crate::sync_guard::write_lock(&self.domain_index)
             .entry(domain.to_string())
             .or_default()
             .push(id);
@@ -259,9 +257,7 @@ impl PatternRecognizer {
         ptype: Option<PatternType>,
         domain: Option<&str>,
     ) -> Vec<RecognizedPattern> {
-        self.patterns
-            .read()
-            .unwrap()
+        crate::sync_guard::read_lock(&self.patterns)
             .iter()
             .filter(|p| {
                 let type_match = ptype.as_ref().is_none_or(|t| p.pattern_type == *t);
@@ -274,9 +270,7 @@ impl PatternRecognizer {
 
     /// Minta keresés név alapján
     pub fn find_pattern(&self, name: &str) -> Option<RecognizedPattern> {
-        self.patterns
-            .read()
-            .unwrap()
+        crate::sync_guard::read_lock(&self.patterns)
             .iter()
             .find(|p| p.name == name)
             .cloned()
@@ -284,9 +278,7 @@ impl PatternRecognizer {
 
     /// Minta lekérése ID alapján
     pub fn get_pattern(&self, id: u64) -> Option<RecognizedPattern> {
-        self.patterns
-            .read()
-            .unwrap()
+        crate::sync_guard::read_lock(&self.patterns)
             .iter()
             .find(|p| p.id == id)
             .cloned()
@@ -358,9 +350,7 @@ impl PatternRecognizer {
                 if !exists {
                     let id = pattern.id;
                     crate::sync_guard::write_lock(&self.patterns).push(pattern.clone());
-                    self.domain_index
-                        .write()
-                        .unwrap()
+                    crate::sync_guard::write_lock(&self.domain_index)
                         .entry(domain.to_string())
                         .or_default()
                         .push(id);
@@ -414,10 +404,7 @@ impl PatternRecognizer {
                         });
 
                         // Frissítés: frequency növelés
-                        if let Some(p) = self
-                            .patterns
-                            .write()
-                            .unwrap()
+                        if let Some(p) = crate::sync_guard::write_lock(&self.patterns)
                             .iter_mut()
                             .find(|p| p.id == pattern.id)
                         {
@@ -533,9 +520,7 @@ impl PatternRecognizer {
 
             let id = pattern.id;
             crate::sync_guard::write_lock(&self.patterns).push(pattern.clone());
-            self.domain_index
-                .write()
-                .unwrap()
+            crate::sync_guard::write_lock(&self.domain_index)
                 .entry(domain.to_string())
                 .or_default()
                 .push(id);
@@ -596,9 +581,7 @@ impl PatternRecognizer {
 
                     let id = pattern.id;
                     crate::sync_guard::write_lock(&self.patterns).push(pattern.clone());
-                    self.domain_index
-                        .write()
-                        .unwrap()
+                    crate::sync_guard::write_lock(&self.domain_index)
                         .entry(domain.to_string())
                         .or_default()
                         .push(id);
@@ -665,9 +648,7 @@ impl PatternRecognizer {
 
                 let id = pattern.id;
                 crate::sync_guard::write_lock(&self.patterns).push(pattern.clone());
-                self.domain_index
-                    .write()
-                    .unwrap()
+                crate::sync_guard::write_lock(&self.domain_index)
                     .entry(domain.to_string())
                     .or_default()
                     .push(id);
@@ -707,9 +688,7 @@ impl PatternRecognizer {
 
                 let id = pattern.id;
                 crate::sync_guard::write_lock(&self.patterns).push(pattern.clone());
-                self.domain_index
-                    .write()
-                    .unwrap()
+                crate::sync_guard::write_lock(&self.domain_index)
                     .entry(domain.to_string())
                     .or_default()
                     .push(id);
@@ -755,9 +734,7 @@ impl PatternRecognizer {
 
                 let id = pattern.id;
                 crate::sync_guard::write_lock(&self.patterns).push(pattern.clone());
-                self.domain_index
-                    .write()
-                    .unwrap()
+                crate::sync_guard::write_lock(&self.domain_index)
                     .entry(domain.to_string())
                     .or_default()
                     .push(id);
@@ -908,9 +885,7 @@ impl PatternRecognizer {
 
             let id = pattern.id;
             crate::sync_guard::write_lock(&self.patterns).push(pattern.clone());
-            self.domain_index
-                .write()
-                .unwrap()
+            crate::sync_guard::write_lock(&self.domain_index)
                 .entry(domain.to_string())
                 .or_default()
                 .push(id);
@@ -1002,9 +977,7 @@ impl PatternRecognizer {
         for cp in &composite_patterns {
             let id = cp.id;
             crate::sync_guard::write_lock(&self.patterns).push(cp.clone());
-            self.domain_index
-                .write()
-                .unwrap()
+            crate::sync_guard::write_lock(&self.domain_index)
                 .entry(cp.domain.clone())
                 .or_default()
                 .push(id);
@@ -1103,9 +1076,7 @@ impl PatternRecognizer {
 
     /// Friss egyezések lekérése
     pub fn recent_matches(&self, k: usize) -> Vec<PatternMatch> {
-        self.match_history
-            .read()
-            .unwrap()
+        crate::sync_guard::read_lock(&self.match_history)
             .iter()
             .rev()
             .take(k)
@@ -1130,9 +1101,7 @@ impl PatternRecognizer {
 
     /// Domain szerinti minta szám
     pub fn domain_pattern_count(&self, domain: &str) -> usize {
-        self.domain_index
-            .read()
-            .unwrap()
+        crate::sync_guard::read_lock(&self.domain_index)
             .get(domain)
             .map(|ids| ids.len())
             .unwrap_or(0)

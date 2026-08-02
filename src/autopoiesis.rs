@@ -262,10 +262,7 @@ impl AutopoiesisEngine {
 
         // Függőben lévő mutáció visszaállítása
         drop(mutations);
-        if let Some(m) = self
-            .mutations
-            .write()
-            .unwrap()
+        if let Some(m) = crate::sync_guard::write_lock(&self.mutations)
             .iter_mut()
             .find(|m| m.id == mutation_id)
         {
@@ -277,18 +274,14 @@ impl AutopoiesisEngine {
 
     /// Mutáció státuszának ellenőrzése
     pub fn mutation_status(&self, id: u64) -> Option<MutationStatus> {
-        self.mutations
-            .read()
-            .unwrap()
+        crate::sync_guard::read_lock(&self.mutations)
             .iter()
             .find(|m| m.id == id)
             .map(|m| m.status.clone())
     }
 
     pub fn list_mutations(&self, status: Option<&MutationStatus>) -> Vec<Mutation> {
-        self.mutations
-            .read()
-            .unwrap()
+        crate::sync_guard::read_lock(&self.mutations)
             .iter()
             .filter(|m| status.is_none_or(|s| m.status == *s))
             .cloned()
@@ -296,9 +289,7 @@ impl AutopoiesisEngine {
     }
 
     fn current_version(&self, module: &str) -> u32 {
-        self.mutations
-            .read()
-            .unwrap()
+        crate::sync_guard::read_lock(&self.mutations)
             .iter()
             .filter(|m| m.target_module == module)
             .map(|m| m.version)

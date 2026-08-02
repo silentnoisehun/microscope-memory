@@ -131,16 +131,12 @@ impl CodeMemory {
         crate::sync_guard::write_lock(&self.entries).push(entry);
 
         // Indexek
-        self.project_index
-            .write()
-            .unwrap()
+        crate::sync_guard::write_lock(&self.project_index)
             .entry(project.to_string())
             .or_default()
             .push(id);
         for sym in &symbols {
-            self.symbol_index
-                .write()
-                .unwrap()
+            crate::sync_guard::write_lock(&self.symbol_index)
                 .entry(sym.to_lowercase())
                 .or_default()
                 .push(id);
@@ -173,9 +169,7 @@ impl CodeMemory {
             access_count: 0,
         };
         crate::sync_guard::write_lock(&self.entries).push(entry);
-        self.project_index
-            .write()
-            .unwrap()
+        crate::sync_guard::write_lock(&self.project_index)
             .entry(project.to_string())
             .or_default()
             .push(id);
@@ -281,9 +275,7 @@ impl CodeMemory {
     }
 
     pub fn get(&self, id: u64) -> Option<CodeEntry> {
-        self.entries
-            .read()
-            .unwrap()
+        crate::sync_guard::read_lock(&self.entries)
             .iter()
             .find(|e| e.id == id)
             .cloned()

@@ -157,7 +157,7 @@ impl MirrorState {
         let strongest = self
             .block_resonance
             .iter()
-            .max_by(|a, b| a.1.strength.partial_cmp(&b.1.strength).unwrap())
+            .max_by(|a, b| a.1.strength.total_cmp(&b.1.strength))
             .map(|(&idx, res)| (idx, res.strength));
 
         MirrorStats {
@@ -172,7 +172,7 @@ impl MirrorState {
     pub fn most_resonant(&self, n: usize) -> Vec<(u32, &BlockResonance)> {
         let mut blocks: Vec<(u32, &BlockResonance)> =
             self.block_resonance.iter().map(|(&k, v)| (k, v)).collect();
-        blocks.sort_by(|a, b| b.1.strength.partial_cmp(&a.1.strength).unwrap());
+        blocks.sort_by(|a, b| b.1.strength.total_cmp(&a.1.strength));
         blocks.truncate(n);
         blocks
     }
@@ -338,7 +338,7 @@ pub fn mirror_boost(
 
     // Return sorted by boost strength
     let mut result: Vec<(u32, f32)> = boosts.into_iter().collect();
-    result.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+    result.sort_by(|a, b| b.1.total_cmp(&a.1));
     result
 }
 

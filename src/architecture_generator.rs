@@ -273,7 +273,7 @@ impl ArchitectureGenerator {
         }
 
         // Rendezés pontszám szerint
-        proposals.sort_by(|a, b| b.generation_score.partial_cmp(&a.generation_score).unwrap());
+        proposals.sort_by(|a, b| b.generation_score.total_cmp(&a.generation_score));
 
         // Tárolás a történetben
         self.generation_history
@@ -382,7 +382,7 @@ impl ArchitectureGenerator {
             });
         }
 
-        proposals.sort_by(|a, b| b.generation_score.partial_cmp(&a.generation_score).unwrap());
+        proposals.sort_by(|a, b| b.generation_score.total_cmp(&a.generation_score));
         self.generation_history
             .write()
             .unwrap()
@@ -485,7 +485,7 @@ impl ArchitectureGenerator {
             });
         }
 
-        proposals.sort_by(|a, b| b.generation_score.partial_cmp(&a.generation_score).unwrap());
+        proposals.sort_by(|a, b| b.generation_score.total_cmp(&a.generation_score));
         self.generation_history
             .write()
             .unwrap()
@@ -643,7 +643,7 @@ impl ArchitectureGenerator {
             });
         }
 
-        proposals.sort_by(|a, b| b.generation_score.partial_cmp(&a.generation_score).unwrap());
+        proposals.sort_by(|a, b| b.generation_score.total_cmp(&a.generation_score));
         self.generation_history
             .write()
             .unwrap()

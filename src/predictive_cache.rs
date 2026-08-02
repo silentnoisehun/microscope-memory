@@ -254,7 +254,7 @@ impl PredictiveCache {
         // Cap predictions
         if self.predictions.len() > MAX_PREDICTIONS {
             self.predictions
-                .sort_by(|a, b| b.confidence.partial_cmp(&a.confidence).unwrap());
+                .sort_by(|a, b| b.confidence.total_cmp(&a.confidence));
             self.predictions.truncate(MAX_PREDICTIONS);
         }
 

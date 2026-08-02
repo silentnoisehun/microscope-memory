@@ -292,9 +292,9 @@ impl GpuAccelerator {
         if k == 0 {
             return vec![];
         }
-        results.select_nth_unstable_by(k - 1, |a, b| a.0.partial_cmp(&b.0).unwrap());
+        results.select_nth_unstable_by(k - 1, |a, b| a.0.total_cmp(&b.0));
         results.truncate(k);
-        results.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+        results.sort_by(|a, b| a.0.total_cmp(&b.0));
         results
     }
 }
@@ -316,7 +316,7 @@ mod tests {
                 })
                 .collect();
 
-            results.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
+            results.sort_by(|a, b| a.1.total_cmp(&b.1));
             results.truncate(k);
             results
         }

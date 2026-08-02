@@ -153,7 +153,7 @@ impl SynapticPlasticity {
     /// Get strongest synapses
     pub fn strongest_synapses(&self, k: usize) -> Vec<(&(u32, u32), &Synapse)> {
         let mut synapses: Vec<_> = self.synapses.iter().collect();
-        synapses.sort_by(|a, b| b.1.weight.partial_cmp(&a.1.weight).unwrap());
+        synapses.sort_by(|a, b| b.1.weight.total_cmp(&a.1.weight));
         synapses.into_iter().take(k).collect()
     }
 

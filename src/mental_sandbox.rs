@@ -109,7 +109,7 @@ impl MentalSandbox {
             .max_by(|a, b| {
                 let a_score = a.reward_potential / (a.risk_score + 0.01);
                 let b_score = b.reward_potential / (b.risk_score + 0.01);
-                a_score.partial_cmp(&b_score).unwrap()
+                a_score.total_cmp(&b_score)
             })
             .cloned()
     }

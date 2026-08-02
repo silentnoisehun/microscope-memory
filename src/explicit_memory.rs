@@ -144,7 +144,7 @@ impl ExplicitMemory {
             .values()
             .filter(|f| f.confidence >= min_confidence)
             .collect();
-        facts.sort_by(|a, b| b.confidence.partial_cmp(&a.confidence).unwrap());
+        facts.sort_by(|a, b| b.confidence.total_cmp(&a.confidence));
         facts
     }
 

@@ -181,7 +181,7 @@ impl Neuroplasticity {
     /// Get strongest pathways
     pub fn strongest_pathways(&self, k: usize) -> Vec<&NeuralPathway> {
         let mut sorted: Vec<_> = self.pathways.values().collect();
-        sorted.sort_by(|a, b| b.strength.partial_cmp(&a.strength).unwrap());
+        sorted.sort_by(|a, b| b.strength.total_cmp(&a.strength));
         sorted.into_iter().take(k).collect()
     }
 

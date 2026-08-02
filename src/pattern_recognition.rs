@@ -494,7 +494,7 @@ impl PatternRecognizer {
             .filter(|(_, _, avg)| *avg > 0.5)
             .collect();
 
-        peak_hours.sort_by(|a, b| b.2.partial_cmp(&a.2).unwrap());
+        peak_hours.sort_by(|a, b| b.2.total_cmp(&a.2));
 
         if !peak_hours.is_empty() {
             let slices: Vec<TemporalSlice> = peak_hours

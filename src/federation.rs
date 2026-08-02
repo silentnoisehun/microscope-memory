@@ -209,7 +209,7 @@ fn recall_single(
         }
     }
 
-    results.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+    results.sort_by(|a, b| a.0.total_cmp(&b.0));
     results.truncate(k);
     results.into_iter().map(|(_, r)| r).collect()
 }
@@ -321,7 +321,7 @@ fn mql_single(
 /// Merge results from multiple indices, sort by score, truncate to k.
 fn merge_results(all: Vec<Vec<FederatedResult>>, k: usize) -> Vec<FederatedResult> {
     let mut merged: Vec<FederatedResult> = all.into_iter().flatten().collect();
-    merged.sort_by(|a, b| a.score.partial_cmp(&b.score).unwrap());
+    merged.sort_by(|a, b| a.score.total_cmp(&b.score));
     merged.truncate(k);
     merged
 }

@@ -237,7 +237,7 @@ impl ThoughtGraphState {
             self.patterns.sort_by(|a, b| {
                 let sa = a.strength * a.frequency as f32;
                 let sb = b.strength * b.frequency as f32;
-                sb.partial_cmp(&sa).unwrap()
+                sb.total_cmp(&sa)
             });
             self.patterns.truncate(MAX_PATTERNS);
         }
@@ -353,7 +353,7 @@ impl ThoughtGraphState {
         sorted.sort_by(|a, b| {
             let sa = a.strength * a.frequency as f32;
             let sb = b.strength * b.frequency as f32;
-            sb.partial_cmp(&sa).unwrap()
+            sb.total_cmp(&sa)
         });
         sorted.truncate(n);
         sorted
@@ -426,7 +426,7 @@ impl ThoughtGraphState {
             self.patterns.sort_by(|a, b| {
                 let sa = a.strength * a.frequency as f32;
                 let sb = b.strength * b.frequency as f32;
-                sb.partial_cmp(&sa).unwrap()
+                sb.total_cmp(&sa)
             });
             self.patterns.truncate(MAX_PATTERNS);
         }

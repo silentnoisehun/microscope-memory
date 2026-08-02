@@ -761,12 +761,12 @@ fn bump_entry_by_text_hash(content: &str, block_text: &str, new_imp: u8) -> Opti
         .collect();
     for entry in &mut entries {
         let (stripped, _imp) = crate::reader::parse_imp_marker(entry);
-        if crate::fingerprint::fnv1a_hash(stripped.trim().as_bytes()) == needle_hash {
-            if entry.starts_with("(imp=") {
-                if let Some(end) = entry.find(')') {
-                    *entry = format!("(imp={}){}", new_imp, &entry[end + 1..]);
-                    return Some(entries.join("\n\n"));
-                }
+        if crate::fingerprint::fnv1a_hash(stripped.trim().as_bytes()) == needle_hash
+            && entry.starts_with("(imp=")
+        {
+            if let Some(end) = entry.find(')') {
+                *entry = format!("(imp={}){}", new_imp, &entry[end + 1..]);
+                return Some(entries.join("\n\n"));
             }
         }
     }
@@ -833,7 +833,7 @@ mod tests {
 
     #[test]
     fn eviction_respects_importance_protection() {
-        use crate::{BLOCK_DATA_SIZE, DEPTH_ENTRY_SIZE, HEADER_SIZE, META_HEADER_SIZE};
+        use crate::{BLOCK_DATA_SIZE, HEADER_SIZE};
         use std::fs;
 
         let tmp = tempfile::tempdir().expect("tempdir");
@@ -954,9 +954,9 @@ mod tests {
         assert_eq!(promoted, 1);
 
         let new_headers = fs::read(dir.join("microscope.bin")).unwrap();
-        assert_eq!(new_headers[1 * HEADER_SIZE + 13], 6);
+        assert_eq!(new_headers[HEADER_SIZE + 13], 6);
         assert_eq!(new_headers[2 * HEADER_SIZE + 13], 5, "no activation -> no promotion");
-        assert_eq!(new_headers[0 * HEADER_SIZE + 13], 5);
+        assert_eq!(new_headers[13], 5);
 
         let layer = fs::read_to_string(layer_dir.join("long_term.txt")).unwrap();
         assert!(

@@ -1160,7 +1160,7 @@ fn tool_recall(config: &Config, args: &Value) -> Result<String, String> {
     // Spreading activation: fingerprint-linked blocks get boosted across 2-hop
     let link_table = crate::fingerprint::LinkTable::load(output_dir);
     if let Some(ref lt) = link_table {
-        all_results.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+        all_results.sort_by(|a, b| a.0.total_cmp(&b.0));
         let top_n = all_results.len().min(3);
         for i in 0..top_n {
             let (_, idx, is_main) = all_results[i];
@@ -1193,7 +1193,7 @@ fn tool_recall(config: &Config, args: &Value) -> Result<String, String> {
         }
     }
 
-    all_results.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+    all_results.sort_by(|a, b| a.0.total_cmp(&b.0));
     let novel = all_results.first().is_none_or(|(d, _, _)| *d > 0.3);
 
     let qh_tg = crate::hebbian::query_hash(query);
@@ -1234,7 +1234,7 @@ fn tool_recall(config: &Config, args: &Value) -> Result<String, String> {
         }
     }
 
-    all_results.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+    all_results.sort_by(|a, b| a.0.total_cmp(&b.0));
 
     let mut output = format!("Recall '{}' (zoom D{}..D{})", query, zoom_lo, zoom_hi);
     if novel {
@@ -2611,7 +2611,7 @@ fn tool_embed(config: &Config, args: &Value) -> Result<String, String> {
                 }
             }
         }
-        results.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
+        results.sort_by(|a, b| b.0.total_cmp(&a.0));
         results.truncate(k);
 
         if results.is_empty() {

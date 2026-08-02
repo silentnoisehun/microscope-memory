@@ -236,7 +236,7 @@ impl ArchetypeState {
         let strongest = self
             .archetypes
             .iter()
-            .max_by(|a, b| a.strength.partial_cmp(&b.strength).unwrap());
+            .max_by(|a, b| a.strength.total_cmp(&b.strength));
 
         ArchetypeStats {
             archetype_count: self.archetypes.len(),

@@ -188,7 +188,7 @@ impl KnowledgeBase {
             .collect();
 
         // Rendezés pontszám szerint
-        scored.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
+        scored.sort_by(|a, b| b.0.total_cmp(&a.0));
 
         scored
             .into_iter()
@@ -235,7 +235,7 @@ impl KnowledgeBase {
                 .filter_map(|(rel_id, weight)| entries.get(rel_id).map(|entry| (*weight, entry)))
                 .collect();
 
-            scored.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
+            scored.sort_by(|a, b| b.0.total_cmp(&a.0));
 
             scored
                 .into_iter()

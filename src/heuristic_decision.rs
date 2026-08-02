@@ -165,7 +165,7 @@ impl HeuristicDecisionMaker {
             .collect();
 
         // Rendezés pontszám szerint csökkenő sorrendben
-        scored_options.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
+        scored_options.sort_by(|a, b| b.0.total_cmp(&a.0));
 
         scored_options.into_iter().map(|(_, opt)| opt).collect()
     }
@@ -514,7 +514,7 @@ impl HeuristicDecisionMaker {
 
         let best = scored
             .into_iter()
-            .max_by(|a, b| a.0.partial_cmp(&b.0).unwrap())?;
+            .max_by(|a, b| a.0.total_cmp(&b.0))?;
 
         Some(Decision {
             id: format!("quick_decision_{}", rand::random::<u32>()),

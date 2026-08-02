@@ -361,7 +361,7 @@ fn recall(config: &Config, query: &str, k: usize) {
     }
 
     let mut seen = std::collections::HashSet::new();
-    all_results.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+    all_results.sort_by(|a, b| a.0.total_cmp(&b.0));
     let mut shown = 0;
 
     for (dist, idx, is_main) in &all_results {
@@ -689,7 +689,7 @@ fn semantic_search(config: &Config, query: &str, k: usize, metric: &str) {
         }
     }
 
-    results.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
+    results.sort_by(|a, b| b.0.total_cmp(&a.0));
     results.truncate(k);
 
     println!("\n  {} {} results:", "Found".green(), results.len());

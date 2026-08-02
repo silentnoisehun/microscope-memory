@@ -2066,7 +2066,7 @@ impl MorphogenesisEngine {
 
             // 1. Fitness alapú rendezés
 
-            population.sort_by(|a, b| b.fitness_score.partial_cmp(&a.fitness_score).unwrap());
+            population.sort_by(|a, b| b.fitness_score.total_cmp(&a.fitness_score));
 
             // Legjobb fitness mentése
 
@@ -2146,7 +2146,7 @@ impl MorphogenesisEngine {
 
         // Final rendezés és tárolás
 
-        population.sort_by(|a, b| b.fitness_score.partial_cmp(&a.fitness_score).unwrap());
+        population.sort_by(|a, b| b.fitness_score.total_cmp(&a.fitness_score));
 
         let top: Vec<Organism> = population.into_iter().take(population_size / 2).collect();
 
@@ -2252,7 +2252,7 @@ impl MorphogenesisEngine {
 
         organisms
             .iter()
-            .max_by(|a, b| a.fitness_score.partial_cmp(&b.fitness_score).unwrap())
+            .max_by(|a, b| a.fitness_score.total_cmp(&b.fitness_score))
             .cloned()
     }
 

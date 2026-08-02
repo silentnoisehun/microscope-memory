@@ -44,6 +44,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   above 16 MiB before allocating the body buffer (previously an unbounded
   `vec![0u8; len]`), and caps header lines at 64 KiB so a client that never
   terminates its headers cannot grow memory without bound.
+- **Dependency audit**: cleared all seven `cargo audit` vulnerabilities —
+  pyo3 0.20 → 0.29 (also adds Python 3.14 support and fixes the Cargo.toml
+  target-section bug that made the optional native deps unresolvable on native
+  builds), crossbeam-epoch 0.9.20, quinn-proto 0.11.16, rustls-webpki 0.103.13;
+  anyhow/memmap2/rand updated to clear the unsound advisories.
+- **NaN-safe ranking**: 64 `partial_cmp(&...).unwrap()` f32 comparators across
+  the recall/rank/sort paths replaced with `total_cmp`, so a NaN score can
+  never panic a hot path.
 
 ### Changed
 - **Bounded layer retention**: `layer_retention_entries` default is now 2000

@@ -116,7 +116,7 @@ impl ImplicitMemory {
     /// Get strongest patterns
     pub fn strongest_patterns(&self, k: usize) -> Vec<(u64, ImplicitPattern)> {
         let mut sorted: Vec<_> = self.patterns.iter().map(|(h, p)| (*h, p.clone())).collect();
-        sorted.sort_by(|a, b| b.1.strength.partial_cmp(&a.1.strength).unwrap());
+        sorted.sort_by(|a, b| b.1.strength.total_cmp(&a.1.strength));
         sorted.into_iter().take(k).collect()
     }
 
@@ -127,7 +127,7 @@ impl ImplicitMemory {
             .iter()
             .map(|(n, s)| (n.clone(), s.clone()))
             .collect();
-        sorted.sort_by(|a, b| b.1.mastery_level.partial_cmp(&a.1.mastery_level).unwrap());
+        sorted.sort_by(|a, b| b.1.mastery_level.total_cmp(&a.1.mastery_level));
         sorted
     }
 

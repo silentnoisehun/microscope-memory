@@ -67,7 +67,7 @@ impl EmbeddingIndex {
         let ptr = self.data[offset..end].as_ptr() as *const f32;
         let emb = unsafe { std::slice::from_raw_parts(ptr, self.dim as usize) };
         // NaN sentinel marks blocks outside max_depth or with trivial text
-        if emb.first().map_or(false, |&v| v.is_nan()) {
+        if emb.first().is_some_and(|&v| v.is_nan()) {
             return None;
         }
         Some(emb)
@@ -114,7 +114,7 @@ impl EmbeddingIndex {
             })
             .collect();
 
-        results.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
+        results.sort_by(|a, b| b.0.total_cmp(&a.0));
         results.truncate(k);
         results
     }

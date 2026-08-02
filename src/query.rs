@@ -225,7 +225,7 @@ pub fn execute(q: &Query, reader: &MicroscopeReader, appended: &[AppendEntry]) -
     }
 
     // Sort by score descending
-    results.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap());
+    results.sort_by(|a, b| b.score.total_cmp(&a.score));
     results.truncate(q.limit);
     results
 }

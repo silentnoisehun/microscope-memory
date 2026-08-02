@@ -40,9 +40,7 @@ pub fn rebuild_pending(config: &Config, force_when_empty: bool) -> Result<Rebuil
 
     let previous_blocks = read_meta_block_count(output_dir);
 
-    if let Err(build_error) = build(config, true) {
-        return Err(build_error);
-    }
+    build(config, true)?;
 
     let rebuilt_blocks = read_meta_block_count(output_dir);
     if pending_entries > 0 && previous_blocks > 0 && rebuilt_blocks < previous_blocks {
@@ -894,6 +892,5 @@ fn apply_hebbian_deltas(
         .save(output_dir)
         .map_err(|e| format!("save cleared Hebbian: {}", e))
 }
-
 
 

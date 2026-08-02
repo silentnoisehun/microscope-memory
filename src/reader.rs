@@ -339,9 +339,9 @@ impl MicroscopeReader {
         if k == 0 {
             return vec![];
         }
-        results.select_nth_unstable_by(k - 1, |a, b| a.0.partial_cmp(&b.0).unwrap());
+        results.select_nth_unstable_by(k - 1, |a, b| a.0.total_cmp(&b.0));
         results.truncate(k);
-        results.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+        results.sort_by(|a, b| a.0.total_cmp(&b.0));
         results
     }
 
@@ -381,9 +381,9 @@ impl MicroscopeReader {
         if k == 0 {
             return vec![];
         }
-        results.select_nth_unstable_by(k - 1, |a, b| a.0.partial_cmp(&b.0).unwrap());
+        results.select_nth_unstable_by(k - 1, |a, b| a.0.total_cmp(&b.0));
         results.truncate(k);
-        results.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+        results.sort_by(|a, b| a.0.total_cmp(&b.0));
         results
     }
 
@@ -439,7 +439,7 @@ impl MicroscopeReader {
             }
         }
 
-        candidates.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+        candidates.sort_by(|a, b| a.0.total_cmp(&b.0));
 
         // Build ResultSet
         let primary = candidates
@@ -603,9 +603,9 @@ impl MicroscopeReader {
         if k == 0 {
             return vec![];
         }
-        results.select_nth_unstable_by(k - 1, |a, b| a.0.partial_cmp(&b.0).unwrap());
+        results.select_nth_unstable_by(k - 1, |a, b| a.0.total_cmp(&b.0));
         results.truncate(k);
-        results.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+        results.sort_by(|a, b| a.0.total_cmp(&b.0));
         results
     }
 
@@ -657,9 +657,9 @@ impl MicroscopeReader {
         if k == 0 {
             return vec![];
         }
-        results.select_nth_unstable_by(k - 1, |a, b| a.0.partial_cmp(&b.0).unwrap());
+        results.select_nth_unstable_by(k - 1, |a, b| a.0.total_cmp(&b.0));
         results.truncate(k);
-        results.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+        results.sort_by(|a, b| a.0.total_cmp(&b.0));
         results
     }
 
@@ -724,7 +724,7 @@ impl MicroscopeReader {
             }
         }
 
-        candidates.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+        candidates.sort_by(|a, b| a.0.total_cmp(&b.0));
 
         let primary = candidates
             .first()

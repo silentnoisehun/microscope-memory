@@ -652,6 +652,119 @@ fn trim_embeddings(output_dir: &Path, keep_indices: &[usize]) -> Result<(), Stri
     Ok(())
 }
 
+/// Automatic importance promotion for frequently recalled blocks.
+///
+/// Blocks whose Hebbian recall energy is at least `promote_energy` and which
+/// have been activated at least once get their importance bumped by one,
+/// capped at `protect_min_importance` (the eviction protection floor). The
+/// bump is written into the binary headers and mirrored back into the layer
+/// source entries (via the `(imp=N)` marker) so it survives rebuilds.
+pub fn promote_recalled_blocks(
+    output_dir: &Path,
+    layers_dir: &Path,
+    block_count: usize,
+    promote_energy: f32,
+    protect_min_importance: u8,
+) -> Result<u32, String> {
+    use crate::{BLOCK_DATA_SIZE, HEADER_SIZE};
+
+    let hdr_path = output_dir.join("microscope.bin");
+    if !hdr_path.exists() {
+        return Ok(0);
+    }
+    let headers = fs::read(&hdr_path).map_err(|e| format!("read microscope.bin: {e}"))?;
+    let actual = headers.len() / HEADER_SIZE;
+    if actual == 0 || actual != block_count {
+        return Ok(0);
+    }
+    let hebb = crate::hebbian::HebbianState::load_or_init(output_dir, actual);
+
+    let mut bumps: Vec<(usize, u8)> = Vec::new(); // (block index, new importance)
+    for i in 0..actual {
+        let imp = headers[i * HEADER_SIZE + 13];
+        if imp >= protect_min_importance {
+            continue; // already at or above the protection floor
+        }
+        let rec = match hebb.activations.get(i) {
+            Some(r) => r,
+            None => continue,
+        };
+        if rec.energy >= promote_energy && rec.activation_count > 0 {
+            bumps.push((i, imp.saturating_add(1).min(protect_min_importance)));
+        }
+    }
+    if bumps.is_empty() {
+        return Ok(0);
+    }
+
+    // Rewrite headers with the bumped importance values (atomic tmp+rename).
+    let mut new_headers = headers.clone();
+    for &(idx, new_imp) in &bumps {
+        new_headers[idx * HEADER_SIZE + 13] = new_imp;
+    }
+    let hdr_tmp = output_dir.join("microscope.bin.tmp");
+    fs::write(&hdr_tmp, &new_headers).map_err(|e| format!("write microscope.bin: {e}"))?;
+    fs::rename(&hdr_tmp, &hdr_path).map_err(|e| format!("rename microscope.bin: {e}"))?;
+
+    // Mirror the bumps into the layer source entries so rebuilds keep them.
+    let dat_path = output_dir.join("data.bin");
+    let data = fs::read(&dat_path).map_err(|e| format!("read data.bin: {e}"))?;
+    let mut updated_files: std::collections::HashMap<std::path::PathBuf, String> =
+        std::collections::HashMap::new();
+    for &(idx, new_imp) in &bumps {
+        let start = idx * BLOCK_DATA_SIZE;
+        if start >= data.len() {
+            continue;
+        }
+        let block = &data[start..(start + BLOCK_DATA_SIZE).min(data.len())];
+        let end = block.iter().position(|&b| b == 0).unwrap_or(block.len());
+        let block_text = String::from_utf8_lossy(&block[..end]).trim().to_string();
+        if block_text.len() < 8 {
+            continue;
+        }
+        if let Ok(entries) = fs::read_dir(layers_dir) {
+            for file in entries.filter_map(|e| e.ok()) {
+                let path = file.path();
+                if path.extension().and_then(|e| e.to_str()) != Some("txt") {
+                    continue;
+                }
+                let content = updated_files
+                    .entry(path.clone())
+                    .or_insert_with(|| fs::read_to_string(&path).unwrap_or_default());
+                if let Some(next) = bump_entry_marker(content, &block_text, new_imp) {
+                    *content = next;
+                    break;
+                }
+            }
+        }
+    }
+    for (path, content) in &updated_files {
+        let tmp = path.with_extension("txt.tmp");
+        fs::write(&tmp, content).map_err(|e| format!("write layer file: {e}"))?;
+        fs::rename(&tmp, path).map_err(|e| format!("rename layer file: {e}"))?;
+    }
+
+    Ok(bumps.len() as u32)
+}
+
+/// Replace the `(imp=N)` marker of the first entry containing `needle`.
+fn bump_entry_marker(content: &str, needle: &str, new_imp: u8) -> Option<String> {
+    let mut entries: Vec<String> = content
+        .split("\n\n")
+        .map(|s| s.to_string())
+        .collect();
+    let mut changed = false;
+    for entry in &mut entries {
+        if entry.contains(needle) && entry.starts_with("(imp=") {
+            if let Some(end) = entry.find(')') {
+                *entry = format!("(imp={}){}", new_imp, &entry[end + 1..]);
+                changed = true;
+            }
+        }
+    }
+    changed.then(|| entries.join("\n\n"))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -783,6 +896,66 @@ mod tests {
         assert_eq!(evict_over_capacity(dir, 2, 8).unwrap(), 0);
         let after = fs::read(dir.join("microscope.bin")).unwrap();
         assert_eq!(after.len() / HEADER_SIZE, n);
+    }
+
+    #[test]
+    fn promotion_bumps_recalled_blocks_and_mirrors_layer_source() {
+        use crate::hebbian::{ActivationRecord, HebbianState};
+        use crate::{BLOCK_DATA_SIZE, HEADER_SIZE};
+        use std::fs;
+
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let dir = tmp.path();
+        let layer_dir = dir.join("layers");
+        fs::create_dir_all(&layer_dir).unwrap();
+        let n = 4usize;
+
+        let mut headers = Vec::new();
+        let mut data = Vec::new();
+        for i in 0..n {
+            let mut h = vec![0u8; HEADER_SIZE];
+            h[12] = 0; // layer_id
+            h[13] = 5; // importance
+            headers.extend_from_slice(&h);
+            let text = format!("emlék szöveg blokk {}", i);
+            let mut block = text.as_bytes().to_vec();
+            block.resize(BLOCK_DATA_SIZE, 0);
+            data.extend_from_slice(&block);
+        }
+        fs::write(dir.join("microscope.bin"), &headers).unwrap();
+        fs::write(dir.join("data.bin"), &data).unwrap();
+        fs::write(dir.join("meta.bin"), b"MSC4\x04\0\0\0").unwrap();
+        fs::write(
+            layer_dir.join("long_term.txt"),
+            "(imp=5) emlék szöveg blokk 0\n\n(imp=5) emlék szöveg blokk 1\n\n\
+             (imp=5) emlék szöveg blokk 2\n\n(imp=5) emlék szöveg blokk 3",
+        )
+        .unwrap();
+
+        let mut hebb = HebbianState {
+            activations: vec![ActivationRecord::default(); n],
+            coactivations: HashMap::new(),
+            fingerprints: Vec::new(),
+        };
+        hebb.activations[1].energy = 0.8;
+        hebb.activations[1].activation_count = 3;
+        hebb.activations[2].energy = 0.9; // high energy but never activated
+        hebb.save(dir).unwrap();
+
+        let promoted = promote_recalled_blocks(dir, &layer_dir, n, 0.35, 8).unwrap();
+        assert_eq!(promoted, 1);
+
+        let new_headers = fs::read(dir.join("microscope.bin")).unwrap();
+        assert_eq!(new_headers[1 * HEADER_SIZE + 13], 6);
+        assert_eq!(new_headers[2 * HEADER_SIZE + 13], 5, "no activation -> no promotion");
+        assert_eq!(new_headers[0 * HEADER_SIZE + 13], 5);
+
+        let layer = fs::read_to_string(layer_dir.join("long_term.txt")).unwrap();
+        assert!(
+            layer.contains("(imp=6) emlék szöveg blokk 1"),
+            "layer source must mirror the promotion"
+        );
+        assert!(layer.contains("(imp=5) emlék szöveg blokk 2"));
     }
 
     #[test]

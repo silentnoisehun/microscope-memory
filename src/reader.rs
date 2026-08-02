@@ -1105,7 +1105,29 @@ impl Drop for FileLock {
     }
 }
 
-fn persist_to_layer_file(config: &Config, text: &str, layer: &str) -> Result<(), String> {
+/// Parse a leading `(imp=N)` marker from a layer entry.
+///
+/// Layer entries carry their importance as a leading `(imp=N)` marker. Legacy
+/// entries without the marker default to importance 5. Returns the entry text
+/// without the marker and the parsed importance.
+pub fn parse_imp_marker(entry: &str) -> (&str, u8) {
+    let text = entry.trim_start();
+    if let Some(rest) = text.strip_prefix("(imp=") {
+        if let Some(end) = rest.find(')') {
+            if let Ok(imp) = rest[..end].parse::<u8>() {
+                return (rest[end + 1..].trim_start(), imp);
+            }
+        }
+    }
+    (entry, 5)
+}
+
+fn persist_to_layer_file(
+    config: &Config,
+    text: &str,
+    layer: &str,
+    importance: u8,
+) -> Result<(), String> {
     let layers_dir = Path::new(&config.paths.layers_dir);
     let file_path = layers_dir.join(format!("{}.txt", layer));
     let mut content = String::new();
@@ -1119,10 +1141,11 @@ fn persist_to_layer_file(config: &Config, text: &str, layer: &str) -> Result<(),
             .unwrap_or_default()
             .as_secs();
         let datetime = chrono_stamp(ts);
-        stamped = format!("[{}] {}", datetime, text);
+        stamped = format!("(imp={}) [{}] {}", importance, datetime, text);
         &stamped
     } else {
-        text
+        stamped = format!("(imp={}) {}", importance, text);
+        &stamped
     };
     let mut entries: Vec<&str> = content
         .split("\n\n")
@@ -1394,7 +1417,7 @@ pub fn store_memory_with_status(
     file.flush()
         .map_err(|e| format!("flush append log: {}", e))?;
 
-    if let Err(e) = persist_to_layer_file(config, text, layer) {
+    if let Err(e) = persist_to_layer_file(config, text, layer, importance) {
         eprintln!("  {} persist to layer file: {}", "WARN".yellow(), e);
     }
 
@@ -1736,5 +1759,25 @@ mod tests {
         fs::write(&path, "4294967295:0").unwrap();
         let lock = FileLock::acquire_inner(&path, Duration::from_secs(2)).unwrap();
         assert_eq!(fs::read_to_string(&path).unwrap(), lock.token);
+    }
+
+    #[test]
+    fn parse_imp_marker_extracts_importance_and_strips_marker() {
+        assert_eq!(
+            parse_imp_marker("(imp=7) döntés rögzítve"),
+            ("döntés rögzítve", 7)
+        );
+        assert_eq!(
+            parse_imp_marker("(imp=8) [2026-08-02 10:00] identitás"),
+            ("[2026-08-02 10:00] identitás", 8)
+        );
+        assert_eq!(
+            parse_imp_marker("régi bejegyzés marker nélkül"),
+            ("régi bejegyzés marker nélkül", 5)
+        );
+        assert_eq!(
+            parse_imp_marker("(imp=12) túl magas érték"),
+            ("túl magas érték", 12)
+        );
     }
 }

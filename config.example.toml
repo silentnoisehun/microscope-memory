@@ -31,6 +31,7 @@ auto_rebuild_entries = 250
 layer_retention_entries = 2000  # bound each layer file; oldest entries are trimmed past this
 max_blocks = 0                   # 0 = unbounded; >0 evicts lowest-score blocks when the index exceeds this
 protect_min_importance = 8       # never evict blocks with importance >= this
+promote_energy_threshold = 0.35  # dream auto-promotes blocks whose recall energy reaches this
 
 [search]
 # Default number of results

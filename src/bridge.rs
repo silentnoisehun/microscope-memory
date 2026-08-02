@@ -1173,7 +1173,7 @@ async fn session_log(
     let start = total.saturating_sub(n);
     let recent: Vec<String> = entries[start..]
         .iter()
-        .map(|e| crate::safe_truncate(e, 300))
+        .map(|e| crate::safe_truncate(crate::reader::parse_imp_marker(e).0, 300))
         .collect();
     Ok(Json(recent))
 }
@@ -1196,7 +1196,8 @@ async fn consolidate_sessions(
     }
     let mut groups: std::collections::HashMap<String, Vec<String>> =
         std::collections::HashMap::new();
-    for entry in &entries {
+    for raw_entry in &entries {
+        let (entry, _imp) = crate::reader::parse_imp_marker(raw_entry);
         let sid = if entry.contains("[sid-") {
             entry
                 .split("[sid-")

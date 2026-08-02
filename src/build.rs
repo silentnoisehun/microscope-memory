@@ -106,14 +106,15 @@ struct RawBlock {
     layer_id: u8,
     parent_idx: u32,
     child_count: u16,
+    importance: u8,
 }
 
 // ─── Extract text values from RAW files ───────────────────
 // Zero JSON dependency. Standard UTF-8 text files.
 // Files are read and split into blocks by default.
 
-fn extract_texts_from_file(path: &Path) -> Vec<String> {
-    let mut texts = Vec::new();
+fn extract_texts_from_file(path: &Path) -> Vec<(String, u8)> {
+    let mut texts: Vec<(String, u8)> = Vec::new();
     let raw = match fs::read_to_string(path) {
         Ok(s) => s,
         Err(_) => return texts,
@@ -123,7 +124,8 @@ fn extract_texts_from_file(path: &Path) -> Vec<String> {
     for chunk in raw.split("\n\n") {
         let trimmed = chunk.trim();
         if trimmed.len() > 3 {
-            texts.push(trimmed.to_string());
+            let (text, importance) = crate::reader::parse_imp_marker(trimmed);
+            texts.push((text.to_string(), importance));
         }
     }
 
@@ -134,7 +136,8 @@ fn extract_texts_from_file(path: &Path) -> Vec<String> {
         for chunk in chars.chunks(BLOCK_DATA_SIZE) {
             let s: String = chunk.iter().collect();
             if s.trim().len() > 5 {
-                texts.push(s);
+                let (text, importance) = crate::reader::parse_imp_marker(&s);
+                texts.push((text.to_string(), importance));
             }
         }
     }
@@ -214,7 +217,7 @@ pub fn build(config: &Config, force: bool) -> Result<(), String> {
     let layer_files = &config.memory_layers.layers;
 
     // Collect all raw texts per layer
-    let mut layer_texts: Vec<(String, Vec<String>)> = Vec::new();
+    let mut layer_texts: Vec<(String, Vec<(String, u8)>)> = Vec::new();
     for name in layer_files {
         let path = layers_dir.join(format!("{}.txt", name));
         let texts = extract_texts_from_file(&path);
@@ -235,13 +238,18 @@ pub fn build(config: &Config, force: bool) -> Result<(), String> {
         layer_id: 0,
         parent_idx: u32::MAX,
         child_count: layer_files.len() as u16,
+        importance: 8,
     });
 
     // ═══ DEPTH 1: Layer summaries ═══
     let sw = config.search.semantic_weight;
     let depth1_start = blocks.len();
     for (name, texts) in &layer_texts {
-        let preview: Vec<String> = texts.iter().take(3).map(|s| safe_truncate(s, 40)).collect();
+        let preview: Vec<String> = texts
+            .iter()
+            .take(3)
+            .map(|(t, _)| safe_truncate(t, 40))
+            .collect();
         let summary = format!("[{}] {} elem. {}", name, texts.len(), preview.join(" | "));
         let (x, y, z) = content_coords_blended(name, name, sw);
         blocks.push(RawBlock {
@@ -253,6 +261,7 @@ pub fn build(config: &Config, force: bool) -> Result<(), String> {
             layer_id: layer_to_id(name),
             parent_idx: 0,
             child_count: texts.len().div_ceil(5) as u16, // cluster count
+            importance: 5,
         });
     }
 
@@ -264,7 +273,7 @@ pub fn build(config: &Config, force: bool) -> Result<(), String> {
         for ci in (0..texts.len()).step_by(5) {
             let chunk: Vec<String> = texts[ci..texts.len().min(ci + 5)]
                 .iter()
-                .map(|s| safe_truncate(s, 40))
+                .map(|(t, _)| safe_truncate(t, 40))
                 .collect();
             let summary = format!("[{} #{}] {}", name, ci / 5, chunk.join(" | "));
             let (x, y, z) = content_coords_blended(&summary, name, sw);
@@ -277,6 +286,7 @@ pub fn build(config: &Config, force: bool) -> Result<(), String> {
                 layer_id: layer_to_id(name),
                 parent_idx: (depth1_start + li) as u32,
                 child_count: chunk.len() as u16,
+                importance: 5,
             });
         }
         depth2_layer_offsets.push((cluster_start, blocks.len() - cluster_start));
@@ -286,7 +296,7 @@ pub fn build(config: &Config, force: bool) -> Result<(), String> {
     let depth3_start = blocks.len();
     let mut depth3_positions: Vec<(f32, f32, f32)> = Vec::new();
     for (li, (name, texts)) in layer_texts.iter().enumerate() {
-        for (ti, text) in texts.iter().enumerate() {
+        for (ti, (text, item_importance)) in texts.iter().enumerate() {
             let (x, y, z) = content_coords_blended(text, name, sw);
             let cluster_idx = ti / 5;
             let (d2_start, d2_count) = depth2_layer_offsets[li];
@@ -305,6 +315,7 @@ pub fn build(config: &Config, force: bool) -> Result<(), String> {
                 layer_id: layer_to_id(name),
                 parent_idx: parent,
                 child_count: 0, // will update
+                importance: *item_importance,
             });
             depth3_positions.push((x, y, z));
         }
@@ -342,6 +353,7 @@ pub fn build(config: &Config, force: bool) -> Result<(), String> {
                     layer_id: blocks[d3i].layer_id,
                     parent_idx: d3i as u32,
                     child_count: 0,
+                    importance: 5,
                 });
             }
             local_blocks
@@ -396,6 +408,7 @@ pub fn build(config: &Config, force: bool) -> Result<(), String> {
                     layer_id: lid,
                     parent_idx: d4i as u32,
                     child_count: 0,
+                    importance: 5,
                 });
             }
             local_blocks
@@ -451,6 +464,7 @@ pub fn build(config: &Config, force: bool) -> Result<(), String> {
                     layer_id: lid,
                     parent_idx: d5i as u32,
                     child_count: 0,
+                    importance: 5,
                 });
             }
             local_blocks
@@ -498,6 +512,7 @@ pub fn build(config: &Config, force: bool) -> Result<(), String> {
                     layer_id: lid,
                     parent_idx: d6i as u32,
                     child_count: 0,
+                    importance: 5,
                 });
             }
             local_blocks
@@ -542,6 +557,7 @@ pub fn build(config: &Config, force: bool) -> Result<(), String> {
                     layer_id: lid,
                     parent_idx: d7i as u32,
                     child_count: 0, // LEAF. Below = corruption.
+                    importance: 5,
                 });
             }
             local_blocks
@@ -617,7 +633,7 @@ pub fn build(config: &Config, force: bool) -> Result<(), String> {
             child_count: b.child_count,
             crc16: crc.to_le_bytes(),
             project_id: config.project_id,
-            importance: 5,
+            importance: b.importance,
             flags: 0,
         };
 

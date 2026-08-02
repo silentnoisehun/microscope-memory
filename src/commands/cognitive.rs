@@ -388,21 +388,34 @@ pub fn dream(config: &Config) {
     let output_dir = Path::new(&config.paths.output_dir);
     println!("{} consolidating...", "DREAM".magenta().bold());
 
-    match dream::dream_consolidate(
+    let cycle_result = dream::dream_consolidate(
         output_dir,
         reader.block_count,
         config.index.max_blocks,
         config.index.protect_min_importance,
-    ) {
-        Ok(cycle) => {
-            println!(
-                "  {} fingerprints replayed, {} strengthened, {} pairs pruned, {} activations pruned ({} ms)",
-                cycle.replayed_fingerprints, cycle.strengthened_pairs,
-                cycle.pruned_pairs, cycle.pruned_activations, cycle.duration_ms
-            );
-        }
-        Err(e) => {
-            eprintln!("  {} dream consolidation failed: {}", "ERR".red(), e);
+    );
+    match &cycle_result {
+        Ok(cycle) => println!(
+            "  {} fingerprints replayed, {} strengthened, {} pairs pruned, {} activations pruned ({} ms)",
+            cycle.replayed_fingerprints, cycle.strengthened_pairs,
+            cycle.pruned_pairs, cycle.pruned_activations, cycle.duration_ms
+        ),
+        Err(e) => eprintln!("  {} dream consolidation failed: {}", "ERR".red(), e),
+    }
+    if cycle_result.is_ok() {
+        match dream::promote_recalled_blocks(
+            output_dir,
+            Path::new(&config.paths.layers_dir),
+            reader.block_count,
+            config.index.promote_energy_threshold,
+            config.index.protect_min_importance,
+        ) {
+            Ok(n) if n > 0 => println!(
+                "  {} {} emlék fontossága automatikusan emelve",
+                "PROMOTE".magenta().bold(),
+                n
+            ),
+            _ => {}
         }
     }
 }

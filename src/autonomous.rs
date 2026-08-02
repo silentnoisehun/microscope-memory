@@ -369,7 +369,7 @@ impl AutonomousEngine {
             Ok(r) => r.block_count,
             Err(_) => 100,
         };
-        match dream::dream_consolidate(
+        let dream_msg = match dream::dream_consolidate(
             output_dir,
             block_count,
             config.index.max_blocks,
@@ -393,7 +393,21 @@ impl AutonomousEngine {
                 eprintln!("  {} {}", "ERROR:".red(), err);
                 err
             }
+        };
+        if let Ok(n) = dream::promote_recalled_blocks(
+            output_dir,
+            Path::new(&config.paths.layers_dir),
+            block_count,
+            config.index.promote_energy_threshold,
+            config.index.protect_min_importance,
+        ) {
+            if n > 0 {
+                let m = format!("{} emlék fontossága automatikusan emelve", n);
+                println!("  {}", m.cyan());
+                self.speak(&m);
+            }
         }
+        dream_msg
     }
 
     /// Append log rebuild — a dream consolidation után automatikusan

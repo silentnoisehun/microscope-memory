@@ -3169,6 +3169,7 @@ mod tests {
                 layer_retention_entries: 2000,
                 max_blocks: 0,
                 protect_min_importance: 8,
+                promote_energy_threshold: 0.35,
             },
             search: crate::config::Search {
                 default_k: 10,

@@ -63,6 +63,9 @@ pub struct Index {
     /// Blocks with importance >= this value are never evicted.
     #[serde(default = "default_protect_min_importance")]
     pub protect_min_importance: u8,
+    /// Minimum Hebbian recall energy for automatic importance promotion.
+    #[serde(default = "default_promote_energy_threshold")]
+    pub promote_energy_threshold: f32,
 }
 
 fn default_auto_rebuild() -> bool {
@@ -79,6 +82,10 @@ fn default_max_blocks() -> usize {
 
 fn default_protect_min_importance() -> u8 {
     8
+}
+
+fn default_promote_energy_threshold() -> f32 {
+    0.35
 }
 
 fn default_auto_rebuild_entries() -> usize {
@@ -255,6 +262,7 @@ impl Default for Config {
                 layer_retention_entries: default_layer_retention_entries(),
                 max_blocks: default_max_blocks(),
                 protect_min_importance: default_protect_min_importance(),
+                promote_energy_threshold: default_promote_energy_threshold(),
             },
             search: Search {
                 default_k: 10,

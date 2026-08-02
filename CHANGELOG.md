@@ -23,6 +23,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the cap, the dream cycle evicts the lowest-scoring blocks — score =
   importance × 10 + recall energy − age penalty — and rewrites `embeddings.bin`
   in sync. Blocks with importance >= `protect_min_importance` are never evicted.
+- **Durable importance**: layer entries now carry a leading `(imp=N)` marker and
+  the build reads it instead of flattening every layer block to importance 5, so
+  rebuilds no longer erase stored importance. The dream cycle automatically
+  promotes frequently recalled blocks (`promote_energy_threshold`, default
+  0.35): energy >= threshold bumps importance by one, capped at the protection
+  floor, mirrored back into the layer source.
 
 ### Changed
 - **Bounded layer retention**: `layer_retention_entries` default is now 2000

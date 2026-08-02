@@ -88,7 +88,7 @@ impl CodeMemory {
     }
 
     fn nid(&self) -> u64 {
-        let mut id = self.next_id.write().unwrap();
+        let mut id = crate::sync_guard::write_lock(&self.next_id);
         let n = *id;
         *id += 1;
         n
@@ -128,7 +128,7 @@ impl CodeMemory {
             access_count: 0,
         };
 
-        self.entries.write().unwrap().push(entry);
+        crate::sync_guard::write_lock(&self.entries).push(entry);
 
         // Indexek
         self.project_index
@@ -172,7 +172,7 @@ impl CodeMemory {
             created_ms: self.now(),
             access_count: 0,
         };
-        self.entries.write().unwrap().push(entry);
+        crate::sync_guard::write_lock(&self.entries).push(entry);
         self.project_index
             .write()
             .unwrap()
@@ -183,7 +183,7 @@ impl CodeMemory {
     }
 
     pub fn recall(&self, query: &CodeQuery) -> Vec<CodeEntry> {
-        let entries = self.entries.read().unwrap();
+        let entries = crate::sync_guard::read_lock(&self.entries);
         let q = query.query.to_lowercase();
         let mut scored: Vec<(f64, &CodeEntry)> = Vec::new();
 
@@ -249,11 +249,11 @@ impl CodeMemory {
     }
 
     pub fn recall_by_symbol(&self, symbol: &str) -> Vec<CodeEntry> {
-        let sym_idx = self.symbol_index.read().unwrap();
+        let sym_idx = crate::sync_guard::read_lock(&self.symbol_index);
         let sym = symbol.to_lowercase();
         let ids: Vec<u64> = sym_idx.get(&sym).cloned().unwrap_or_default();
 
-        let entries = self.entries.read().unwrap();
+        let entries = crate::sync_guard::read_lock(&self.entries);
         ids.iter()
             .filter_map(|id| entries.iter().find(|e| e.id == *id))
             .cloned()
@@ -261,10 +261,10 @@ impl CodeMemory {
     }
 
     pub fn recall_by_project(&self, project: &str) -> Vec<CodeEntry> {
-        let proj_idx = self.project_index.read().unwrap();
+        let proj_idx = crate::sync_guard::read_lock(&self.project_index);
         let ids: Vec<u64> = proj_idx.get(project).cloned().unwrap_or_default();
 
-        let entries = self.entries.read().unwrap();
+        let entries = crate::sync_guard::read_lock(&self.entries);
         ids.iter()
             .filter_map(|id| entries.iter().find(|e| e.id == *id))
             .cloned()
@@ -272,7 +272,7 @@ impl CodeMemory {
     }
 
     pub fn list_by_type(&self, etype: CodeEntryType) -> Vec<CodeEntry> {
-        let entries = self.entries.read().unwrap();
+        let entries = crate::sync_guard::read_lock(&self.entries);
         entries
             .iter()
             .filter(|e| e.entry_type == etype)
@@ -290,7 +290,7 @@ impl CodeMemory {
     }
 
     pub fn stats(&self) -> (usize, usize, Vec<(String, usize)>) {
-        let entries = self.entries.read().unwrap();
+        let entries = crate::sync_guard::read_lock(&self.entries);
         let total = entries.len();
         let errors = entries
             .iter()

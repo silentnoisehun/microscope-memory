@@ -63,7 +63,7 @@ impl MentalSandbox {
             reward_potential: goal_alignment * (1.0 - complexity_factor.min(1.0)),
         };
 
-        let mut scenarios = self.scenarios.write().unwrap();
+        let mut scenarios = crate::sync_guard::write_lock(&self.scenarios);
         scenarios.insert(id.clone(), scenario.clone());
 
         // Automatic purge: if over MAX_SCENARIOS, remove oldest entries
@@ -75,7 +75,7 @@ impl MentalSandbox {
             }
         }
 
-        let mut current = self.current_simulation.write().unwrap();
+        let mut current = crate::sync_guard::write_lock(&self.current_simulation);
         *current = Some(id);
 
         scenario
@@ -102,7 +102,7 @@ impl MentalSandbox {
 
     /// Get the best scenario based on risk/reward ratio
     pub fn get_best_scenario(&self) -> Option<Scenario> {
-        let scenarios = self.scenarios.read().unwrap();
+        let scenarios = crate::sync_guard::read_lock(&self.scenarios);
 
         scenarios
             .values()
@@ -116,8 +116,8 @@ impl MentalSandbox {
 
     /// Clear all simulated scenarios
     pub fn clear(&mut self) {
-        self.scenarios.write().unwrap().clear();
-        *self.current_simulation.write().unwrap() = None;
+        crate::sync_guard::write_lock(&self.scenarios).clear();
+        *crate::sync_guard::write_lock(&self.current_simulation) = None;
     }
 }
 

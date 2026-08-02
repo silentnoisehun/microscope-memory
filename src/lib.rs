@@ -23,6 +23,7 @@ pub mod federation;
 pub mod fingerprint;
 pub mod hebbian;
 pub mod types;
+pub mod sync_guard;
 
 #[cfg(not(target_arch = "wasm32"))]
 pub mod ai_adapter;

@@ -1945,21 +1945,21 @@ impl MorphogenesisEngine {
 
     /// Konfiguráció beállítása
     pub fn set_config(&self, config: GrowthConfig) {
-        *self.config.write().unwrap() = config;
+        *crate::sync_guard::write_lock(&self.config) = config;
     }
 
     /// Morfogén mező beállítása
     pub fn set_field(&self, field: MorphogenField) {
-        *self.field.write().unwrap() = field;
+        *crate::sync_guard::write_lock(&self.field) = field;
     }
 
     /// Organizmus növesztése egy seed-ből
     pub fn grow_from_seed(&self, seed: &Seed, pattern: Option<GrowthPattern>) -> Organism {
-        let config = self.config.read().unwrap().clone();
+        let config = crate::sync_guard::read_lock(&self.config).clone();
 
         let pattern = pattern.or(seed.preferred_pattern).unwrap_or(config.pattern);
 
-        let field = self.field.read().unwrap().clone();
+        let field = crate::sync_guard::read_lock(&self.field).clone();
 
         let organism = match pattern {
             GrowthPattern::Mycelium => mycelium_growth(seed, &field, &config),
@@ -1989,7 +1989,7 @@ impl MorphogenesisEngine {
 
         org.fitness_score = fitness.score;
 
-        self.organisms.write().unwrap().push(org.clone());
+        crate::sync_guard::write_lock(&self.organisms).push(org.clone());
 
         org
     }
@@ -2016,7 +2016,7 @@ impl MorphogenesisEngine {
             return Vec::new();
         }
 
-        let _config = self.config.read().unwrap().clone();
+        let _config = crate::sync_guard::read_lock(&self.config).clone();
 
         let patterns = [
             GrowthPattern::Mycelium,
@@ -2033,9 +2033,9 @@ impl MorphogenesisEngine {
                 patterns
                     .iter()
                     .map(|pattern| {
-                        let field = self.field.read().unwrap().clone();
+                        let field = crate::sync_guard::read_lock(&self.field).clone();
 
-                        let config = self.config.read().unwrap().clone();
+                        let config = crate::sync_guard::read_lock(&self.config).clone();
 
                         let mut org = match pattern {
                             GrowthPattern::Mycelium => mycelium_growth(seed, &field, &config),
@@ -2062,7 +2062,7 @@ impl MorphogenesisEngine {
         // Evolúciós ciklusok
 
         for gen in 0..generations {
-            *self.generation.write().unwrap() = gen + 1;
+            *crate::sync_guard::write_lock(&self.generation) = gen + 1;
 
             // 1. Fitness alapú rendezés
 
@@ -2114,9 +2114,9 @@ impl MorphogenesisEngine {
                     preferred_pattern: Some(patterns[rand::random::<usize>() % patterns.len()]),
                 };
 
-                let field = self.field.read().unwrap().clone();
+                let field = crate::sync_guard::read_lock(&self.field).clone();
 
-                let config = self.config.read().unwrap().clone();
+                let config = crate::sync_guard::read_lock(&self.config).clone();
 
                 let pattern = mutated_seed.preferred_pattern.unwrap_or(config.pattern);
 
@@ -2150,7 +2150,7 @@ impl MorphogenesisEngine {
 
         let top: Vec<Organism> = population.into_iter().take(population_size / 2).collect();
 
-        *self.organisms.write().unwrap() = top.clone();
+        *crate::sync_guard::write_lock(&self.organisms) = top.clone();
 
         top
     }
@@ -2248,7 +2248,7 @@ impl MorphogenesisEngine {
 
     /// Legjobb organizmus lekérése
     pub fn get_best_organism(&self) -> Option<Organism> {
-        let organisms = self.organisms.read().unwrap();
+        let organisms = crate::sync_guard::read_lock(&self.organisms);
 
         organisms
             .iter()
@@ -2258,7 +2258,7 @@ impl MorphogenesisEngine {
 
     /// Evolúciós történet lekérése
     pub fn evolution_summary(&self) -> Vec<(u32, f64)> {
-        let history = self.evolution_history.read().unwrap();
+        let history = crate::sync_guard::read_lock(&self.evolution_history);
 
         history
             .iter()

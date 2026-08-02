@@ -75,7 +75,7 @@ impl ImpulseControl {
 
         // Check against suppression patterns
         let content_lower = content.to_lowercase();
-        let patterns = self.suppression_patterns.read().unwrap();
+        let patterns = crate::sync_guard::read_lock(&self.suppression_patterns);
         for pattern in patterns.iter() {
             if content_lower.contains(pattern) {
                 suppressed = true;
@@ -146,13 +146,13 @@ impl ImpulseControl {
 
     /// Get statistics about filtering
     pub fn get_stats(&self) -> (f32, usize) {
-        let patterns = self.suppression_patterns.read().unwrap();
+        let patterns = crate::sync_guard::read_lock(&self.suppression_patterns);
         (self.attention_budget, patterns.len())
     }
 
     /// Clear all suppression patterns
     pub fn clear_patterns(&mut self) {
-        self.suppression_patterns.write().unwrap().clear();
+        crate::sync_guard::write_lock(&self.suppression_patterns).clear();
     }
 }
 

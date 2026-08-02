@@ -125,7 +125,7 @@ impl AutopoiesisEngine {
     }
 
     fn nid(&self) -> u64 {
-        let mut id = self.next_id.write().unwrap();
+        let mut id = crate::sync_guard::write_lock(&self.next_id);
         let n = *id;
         *id += 1;
         n
@@ -147,7 +147,7 @@ impl AutopoiesisEngine {
         variables: Vec<String>,
         desc: &str,
     ) {
-        self.templates.write().unwrap().push(SourceTemplate {
+        crate::sync_guard::write_lock(&self.templates).push(SourceTemplate {
             name: name.to_string(),
             target_module: target_module.to_string(),
             template: template.to_string(),
@@ -157,7 +157,7 @@ impl AutopoiesisEngine {
     }
 
     pub fn list_templates(&self) -> Vec<SourceTemplate> {
-        self.templates.read().unwrap().clone()
+        crate::sync_guard::read_lock(&self.templates).clone()
     }
 
     /// Template alapján kód generálás
@@ -166,7 +166,7 @@ impl AutopoiesisEngine {
         template_name: &str,
         var_values: &HashMap<String, String>,
     ) -> Option<String> {
-        let templates = self.templates.read().unwrap();
+        let templates = crate::sync_guard::read_lock(&self.templates);
         let tmpl = templates.iter().find(|t| t.name == template_name)?;
         let mut code = tmpl.template.clone();
         for (key, value) in var_values {
@@ -203,14 +203,14 @@ impl AutopoiesisEngine {
             signature: vec![],
             author: author.to_string(),
         };
-        self.mutations.write().unwrap().push(mutation);
+        crate::sync_guard::write_lock(&self.mutations).push(mutation);
         id
     }
 
     /// Mutáció alkalmazása (verziózás + snapshot)
     pub fn apply_mutation(&self, id: u64) -> bool {
-        let config = self.config.read().unwrap().clone();
-        let mut mutations = self.mutations.write().unwrap();
+        let config = crate::sync_guard::read_lock(&self.config).clone();
+        let mut mutations = crate::sync_guard::write_lock(&self.mutations);
         let mutation = match mutations
             .iter_mut()
             .find(|m| m.id == id && m.status == MutationStatus::Proposed)
@@ -228,7 +228,7 @@ impl AutopoiesisEngine {
             snapshot: mutation.source_code.as_bytes().to_vec(),
             reason: format!("Before applying: {}", mutation.name),
         };
-        self.rollback_points.write().unwrap().push(rp);
+        crate::sync_guard::write_lock(&self.rollback_points).push(rp);
 
         mutation.status = MutationStatus::InProgress;
         mutation.version += 1;
@@ -246,12 +246,12 @@ impl AutopoiesisEngine {
 
     /// Rollback: visszaállítás egy korábbi verzióra
     pub fn rollback(&self, mutation_id: u64) -> bool {
-        let mutations = self.mutations.read().unwrap();
+        let mutations = crate::sync_guard::read_lock(&self.mutations);
         let mutation = match mutations.iter().find(|m| m.id == mutation_id) {
             Some(m) => m,
             None => return false,
         };
-        let rollbacks = self.rollback_points.read().unwrap();
+        let rollbacks = crate::sync_guard::read_lock(&self.rollback_points);
         let _rp = match rollbacks
             .iter()
             .rfind(|r| r.module == mutation.target_module)
@@ -327,7 +327,7 @@ impl AutopoiesisEngine {
     // ─── Stats ───────────────────────────────────────────────────────────
 
     pub fn stats(&self) -> (usize, usize, usize, usize) {
-        let m = self.mutations.read().unwrap();
+        let m = crate::sync_guard::read_lock(&self.mutations);
         (
             m.len(),
             m.iter()
@@ -336,7 +336,7 @@ impl AutopoiesisEngine {
             m.iter()
                 .filter(|m| m.status == MutationStatus::RolledBack)
                 .count(),
-            self.rollback_points.read().unwrap().len(),
+            crate::sync_guard::read_lock(&self.rollback_points).len(),
         )
     }
 }

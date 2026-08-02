@@ -145,11 +145,11 @@ impl ConsciousnessStream {
             let mut decay_counter = 0u64;
 
             loop {
-                if !*running_clone.lock().unwrap() {
+                if !*crate::sync_guard::mutex_lock(&running_clone) {
                     break;
                 }
 
-                let mut s = state_clone.lock().unwrap();
+                let mut s = crate::sync_guard::mutex_lock(&state_clone);
                 s.cycle += 1;
                 curiosity_counter += 1;
                 predict_counter += 1;
@@ -214,7 +214,7 @@ impl ConsciousnessStream {
 
     /// Feed a query into the stream — triggers surprise if prediction was wrong.
     pub fn feed_query(state: &Arc<Mutex<StreamState>>, query_hash: u64) {
-        let mut s = state.lock().unwrap();
+        let mut s = crate::sync_guard::mutex_lock(&state);
         let now = now_ms();
 
         // Compute surprise: prediction vs reality
@@ -278,7 +278,7 @@ impl ConsciousnessStream {
 
     /// Get the current stream state as a formatted string.
     pub fn format(state: &Arc<Mutex<StreamState>>) -> String {
-        let s = state.lock().unwrap();
+        let s = crate::sync_guard::mutex_lock(&state);
         Self::format_internal(&s)
     }
 

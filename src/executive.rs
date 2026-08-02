@@ -126,7 +126,7 @@ impl Executive {
         energy_cost: f64,
         tags: Vec<String>,
     ) {
-        self.modules.write().unwrap().insert(
+        crate::sync_guard::write_lock(&self.modules).insert(
             id.to_string(),
             CognitiveModule {
                 id: id.to_string(),
@@ -163,7 +163,7 @@ impl Executive {
     }
 
     pub fn list_modules(&self) -> Vec<CognitiveModule> {
-        self.modules.read().unwrap().values().cloned().collect()
+        crate::sync_guard::read_lock(&self.modules).values().cloned().collect()
     }
 
     pub fn set_priority(&self, id: &str, priority: u8) -> bool {
@@ -179,15 +179,15 @@ impl Executive {
     }
 
     pub fn resources(&self) -> CognitiveResources {
-        self.resources.read().unwrap().clone()
+        crate::sync_guard::read_lock(&self.resources).clone()
     }
 
     pub fn update_resources(&self, f: impl Fn(&mut CognitiveResources)) {
-        f(&mut self.resources.write().unwrap());
+        f(&mut crate::sync_guard::write_lock(&self.resources));
     }
 
     pub fn schedule(&self) -> ExecutionPlan {
-        let modules = self.modules.read().unwrap();
+        let modules = crate::sync_guard::read_lock(&self.modules);
         let mut sorted: Vec<&CognitiveModule> = modules
             .values()
             .filter(|m| m.state == ModuleState::Idle || m.state == ModuleState::Running)
@@ -202,26 +202,26 @@ impl Executive {
             priority: sorted.first().map(|m| m.priority).unwrap_or(0),
             reason: format!("{} modules, {:.2} energy", sorted.len(), energy),
         };
-        let mut queue = self.module_queue.write().unwrap();
+        let mut queue = crate::sync_guard::write_lock(&self.module_queue);
         queue.clear();
         for id in &order {
             queue.push_back(id.clone());
         }
-        *self.current_plan.write().unwrap() = Some(plan.clone());
+        *crate::sync_guard::write_lock(&self.current_plan) = Some(plan.clone());
         plan
     }
 
     pub fn execute_next(&self) -> Option<String> {
-        let next = self.module_queue.write().unwrap().pop_front()?;
+        let next = crate::sync_guard::write_lock(&self.module_queue).pop_front()?;
         {
-            let mut res = self.resources.write().unwrap();
-            if let Some(m) = self.modules.read().unwrap().get(&next) {
+            let mut res = crate::sync_guard::write_lock(&self.resources);
+            if let Some(m) = crate::sync_guard::read_lock(&self.modules).get(&next) {
                 res.energy_level = (res.energy_level - m.energy_cost * 0.01).max(0.0);
                 res.context_switches += 1;
             }
         }
         let now = self.now_ms();
-        self.log.write().unwrap().push_back(ExecutionLogEntry {
+        crate::sync_guard::write_lock(&self.log).push_back(ExecutionLogEntry {
             timestamp_ms: now,
             module_id: next.clone(),
             action: "execute".to_string(),
@@ -230,7 +230,7 @@ impl Executive {
             success: true,
             detail: "Scheduled by executive".to_string(),
         });
-        if let Some(m) = self.modules.write().unwrap().get_mut(&next) {
+        if let Some(m) = crate::sync_guard::write_lock(&self.modules).get_mut(&next) {
             m.last_run_ms = now;
             m.run_count += 1;
             m.state = ModuleState::Running;
@@ -240,10 +240,10 @@ impl Executive {
 }
 impl Executive {
     pub fn cycle(&self) -> Vec<String> {
-        let config = self.config.read().unwrap().clone();
+        let config = crate::sync_guard::read_lock(&self.config).clone();
         let mut executed = Vec::new();
         self.schedule();
-        if self.resources.read().unwrap().energy_level < config.min_energy_for_execution {
+        if crate::sync_guard::read_lock(&self.resources).energy_level < config.min_energy_for_execution {
             return vec!["__low_energy__".to_string()];
         }
         for _ in 0..config.max_modules_per_cycle {
@@ -264,10 +264,10 @@ impl Executive {
 
     pub fn homeostasis(&self) -> Vec<String> {
         let mut actions = Vec::new();
-        let res = self.resources.read().unwrap().clone();
-        let config = self.config.read().unwrap().clone();
+        let res = crate::sync_guard::read_lock(&self.resources).clone();
+        let config = crate::sync_guard::read_lock(&self.config).clone();
         if res.energy_level < config.critical_energy_threshold {
-            let mut modules = self.modules.write().unwrap();
+            let mut modules = crate::sync_guard::write_lock(&self.modules);
             for m in modules.values_mut() {
                 if m.priority < 100 && m.state == ModuleState::Running {
                     m.state = ModuleState::Exhausted;
@@ -284,8 +284,8 @@ impl Executive {
     }
 
     pub fn stats(&self) -> (usize, usize, f64, f64) {
-        let m = self.modules.read().unwrap();
-        let r = self.resources.read().unwrap();
+        let m = crate::sync_guard::read_lock(&self.modules);
+        let r = crate::sync_guard::read_lock(&self.resources);
         (
             m.len(),
             m.values()
@@ -308,8 +308,8 @@ impl Executive {
     }
 
     pub fn recommend_module(&self, vagus_tone: Option<f64>) -> Option<String> {
-        let modules = self.modules.read().unwrap();
-        let res = self.resources.read().unwrap();
+        let modules = crate::sync_guard::read_lock(&self.modules);
+        let res = crate::sync_guard::read_lock(&self.resources);
         let mut candidates: Vec<&CognitiveModule> = modules
             .values()
             .filter(|m| m.state == ModuleState::Idle && m.energy_cost <= res.energy_level)

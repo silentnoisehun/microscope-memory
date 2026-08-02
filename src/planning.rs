@@ -162,7 +162,7 @@ impl Planner {
     }
 
     fn nid(&self) -> u64 {
-        let mut id = self.next_id.write().unwrap();
+        let mut id = crate::sync_guard::write_lock(&self.next_id);
         let n = *id;
         *id += 1;
         n
@@ -194,18 +194,18 @@ impl Planner {
         };
 
         if let Some(pid) = parent {
-            if let Some(p) = self.goals.write().unwrap().get_mut(&pid) {
+            if let Some(p) = crate::sync_guard::write_lock(&self.goals).get_mut(&pid) {
                 p.subgoals.push(id);
             }
         }
 
-        self.goals.write().unwrap().insert(id, goal);
+        crate::sync_guard::write_lock(&self.goals).insert(id, goal);
 
         id
     }
 
     pub fn get_goal(&self, id: u64) -> Option<Goal> {
-        self.goals.read().unwrap().get(&id).cloned()
+        crate::sync_guard::read_lock(&self.goals).get(&id).cloned()
     }
 
     pub fn list_goals(&self, status: Option<GoalStatus>) -> Vec<Goal> {
@@ -220,12 +220,12 @@ impl Planner {
 
     /// Cél lebontása részcélokra (HTN dekompozíció)
     pub fn decompose_goal(&self, goal_id: u64) -> Vec<u64> {
-        let goal = match self.goals.read().unwrap().get(&goal_id) {
+        let goal = match crate::sync_guard::read_lock(&self.goals).get(&goal_id) {
             Some(g) => g.clone(),
             None => return vec![],
         };
 
-        let _config = self.config.read().unwrap().clone();
+        let _config = crate::sync_guard::read_lock(&self.config).clone();
 
         let mut sub_ids = Vec::new();
 
@@ -340,12 +340,12 @@ impl Planner {
 
     /// Terv készítése egy célhoz
     pub fn create_plan(&self, goal_id: u64) -> Plan {
-        let goal = match self.goals.read().unwrap().get(&goal_id) {
+        let goal = match crate::sync_guard::read_lock(&self.goals).get(&goal_id) {
             Some(g) => g.clone(),
             None => return self.empty_plan(),
         };
 
-        let _config = self.config.read().unwrap().clone();
+        let _config = crate::sync_guard::read_lock(&self.config).clone();
 
         let now = self.now();
 
@@ -384,25 +384,25 @@ impl Planner {
             executed_step: 0,
         };
 
-        if let Some(g) = self.goals.write().unwrap().get_mut(&goal_id) {
+        if let Some(g) = crate::sync_guard::write_lock(&self.goals).get_mut(&goal_id) {
             g.status = GoalStatus::InProgress;
         }
 
-        self.plans.write().unwrap().insert(plan_id, plan.clone());
+        crate::sync_guard::write_lock(&self.plans).insert(plan_id, plan.clone());
 
         plan
     }
 
     /// Terv végrehajtásának előre léptetése
     pub fn execute_step(&self, plan_id: u64) -> Option<Action> {
-        let mut plans = self.plans.write().unwrap();
+        let mut plans = crate::sync_guard::write_lock(&self.plans);
 
         let plan = plans.get_mut(&plan_id)?;
 
         if plan.executed_step >= plan.actions.len() {
             plan.status = PlanStatus::Completed;
 
-            if let Some(g) = self.goals.write().unwrap().get_mut(&plan.goal_id) {
+            if let Some(g) = crate::sync_guard::write_lock(&self.goals).get_mut(&plan.goal_id) {
                 g.status = GoalStatus::Completed;
                 g.progress = 1.0;
             }
@@ -421,7 +421,7 @@ impl Planner {
 
     /// Rollback: visszalépés az utolsó végrehajtott lépésről, ha az sikertelen volt.
     pub fn fail_step(&self, plan_id: u64, reason: &str) -> bool {
-        let mut plans = self.plans.write().unwrap();
+        let mut plans = crate::sync_guard::write_lock(&self.plans);
 
         let plan = match plans.get_mut(&plan_id) {
             Some(p) => p,
@@ -442,17 +442,17 @@ impl Planner {
 
     /// Replanning: terv újragenerálás változott körülmények esetén
     pub fn replan(&self, plan_id: u64, reason: &str) -> Option<Plan> {
-        let plans = self.plans.write().unwrap();
+        let plans = crate::sync_guard::write_lock(&self.plans);
 
         let old = plans.get(&plan_id)?.clone();
 
-        let _goal = self.goals.read().unwrap().get(&old.goal_id)?.clone();
+        let _goal = crate::sync_guard::read_lock(&self.goals).get(&old.goal_id)?.clone();
 
         drop(plans);
 
         // Goal visszaállítása
 
-        if let Some(g) = self.goals.write().unwrap().get_mut(&old.goal_id) {
+        if let Some(g) = crate::sync_guard::write_lock(&self.goals).get_mut(&old.goal_id) {
             g.status = GoalStatus::Active;
         }
 
@@ -478,13 +478,13 @@ impl Planner {
     }
 
     pub fn get_plan(&self, id: u64) -> Option<Plan> {
-        self.plans.read().unwrap().get(&id).cloned()
+        crate::sync_guard::read_lock(&self.plans).get(&id).cloned()
     }
 
     pub fn stats(&self) -> (usize, usize, usize) {
-        let g = self.goals.read().unwrap();
+        let g = crate::sync_guard::read_lock(&self.goals);
 
-        let p = self.plans.read().unwrap();
+        let p = crate::sync_guard::read_lock(&self.plans);
 
         (
             g.len(),

@@ -62,6 +62,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   The middleware binds the memory scope to the verified `user_id`, so users
   are separated from each other, not just from outsiders; the shared
   `X-API-Key` mode remains as the trusted-team fallback.
+- **Poison-safe locks**: 200 `RwLock`/`Mutex` `.read()/.write()/.lock().unwrap()`
+  sites across the codebase now go through `sync_guard::{read_lock, write_lock,
+  mutex_lock}`, which recover from a poisoned lock instead of panicking forever.
+  One stray panic while holding a lock can no longer permanently break a
+  subsystem for the rest of the process lifetime.
+- **Self-defensive multimodal decoding**: `decode_image_meta` and
+  `decode_audio_meta` now return `Option` and reject short input up front
+  instead of relying on every caller to bounds-check first.
 
 ### Changed
 - **Bounded layer retention**: `layer_retention_entries` default is now 2000

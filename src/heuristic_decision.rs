@@ -194,7 +194,7 @@ impl HeuristicDecisionMaker {
         // 5. Salience pontszám (a kiemelési hálózatból)
         // Valós idejű salience számítás a leírás alapján
         let salience_score = {
-            let salience = self.salience.read().unwrap();
+            let salience = crate::sync_guard::read_lock(&self.salience);
             let hash = SalienceState::topic_hash(&option.description);
             let computed = salience.compute_salience(0.5f32, 0.5f32, 0.5f32, hash);
             computed as f64
@@ -204,7 +204,7 @@ impl HeuristicDecisionMaker {
         // 6. Eureka pontszám (váratlan összefüggések)
         // Az események insight_score-jának átlaga
         let eureka_score = {
-            let eureka = self.eureka.read().unwrap();
+            let eureka = crate::sync_guard::read_lock(&self.eureka);
             let events = &eureka.events;
             if events.is_empty() {
                 0.0
@@ -217,7 +217,7 @@ impl HeuristicDecisionMaker {
 
         // 7. Meta-felügyeleti pontszám
         let meta_score = {
-            let meta = self.meta_supervisor.read().unwrap();
+            let meta = crate::sync_guard::read_lock(&self.meta_supervisor);
             let (current, _trend, _volatility) = meta.get_summary();
             current as f64
         };
@@ -250,7 +250,7 @@ impl HeuristicDecisionMaker {
 
     /// Tanult minták alkalmazása egy opcióra
     fn apply_learned_patterns(&self, option: &DecisionOption) -> f64 {
-        let patterns = self.patterns.read().unwrap();
+        let patterns = crate::sync_guard::read_lock(&self.patterns);
         let mut correction = 0.0;
 
         for pattern in patterns.values() {
@@ -356,7 +356,7 @@ impl HeuristicDecisionMaker {
 
     /// Döntés naplózása
     fn log_decision(&self, decision: &Decision) {
-        let mut log = self.decision_log.write().unwrap();
+        let mut log = crate::sync_guard::write_lock(&self.decision_log);
         log.push(DecisionLogEntry {
             timestamp: decision.timestamp,
             decision_id: decision.id.clone(),
@@ -374,7 +374,7 @@ impl HeuristicDecisionMaker {
         outcome_score: f64,
         reflection: &str,
     ) {
-        let mut log = self.decision_log.write().unwrap();
+        let mut log = crate::sync_guard::write_lock(&self.decision_log);
 
         if let Some(entry) = log.iter_mut().find(|e| e.decision_id == decision_id) {
             entry.outcome_score = outcome_score;
@@ -387,7 +387,7 @@ impl HeuristicDecisionMaker {
 
     /// Tanulás a döntés kimeneteléből
     fn learn_from_outcome(&self, entry: &DecisionLogEntry, outcome_score: f64) {
-        let mut patterns = self.patterns.write().unwrap();
+        let mut patterns = crate::sync_guard::write_lock(&self.patterns);
         let pattern_id = format!("pattern_{}", entry.decision_type);
 
         let pattern = patterns.entry(pattern_id).or_insert(HeuristicPattern {
@@ -442,7 +442,7 @@ impl HeuristicDecisionMaker {
 
                 // Salience pontszám (valós salience számítás)
                 let salience_score = {
-                    let salience = self.salience.read().unwrap();
+                    let salience = crate::sync_guard::read_lock(&self.salience);
                     let hash =
                         SalienceState::topic_hash(&format!("{} {}", arch.name, requirements));
                     salience.compute_salience(0.5f32, 0.5f32, 0.5f32, hash) as f64
@@ -450,7 +450,7 @@ impl HeuristicDecisionMaker {
 
                 // Eureka pontszám (insight score alapján)
                 let eureka_score = {
-                    let eureka = self.eureka.read().unwrap();
+                    let eureka = crate::sync_guard::read_lock(&self.eureka);
                     let events = &eureka.events;
                     if events.is_empty() {
                         0.0
@@ -462,7 +462,7 @@ impl HeuristicDecisionMaker {
 
                 // Meta-felügyeleti pontszám
                 let meta_score = {
-                    let meta = self.meta_supervisor.read().unwrap();
+                    let meta = crate::sync_guard::read_lock(&self.meta_supervisor);
                     let (current, _trend, _volatility) = meta.get_summary();
                     current as f64
                 };
@@ -532,7 +532,7 @@ impl HeuristicDecisionMaker {
 
     /// Mintázat felismerés a döntési naplóban
     pub fn recognize_patterns(&self) -> Vec<HeuristicPattern> {
-        let log = self.decision_log.read().unwrap();
+        let log = crate::sync_guard::read_lock(&self.decision_log);
         let mut pattern_map: HashMap<String, Vec<f64>> = HashMap::new();
 
         for entry in log.iter() {
@@ -566,8 +566,8 @@ impl HeuristicDecisionMaker {
 
     /// Döntési statisztikák lekérdezése
     pub fn get_statistics(&self) -> DecisionStatistics {
-        let log = self.decision_log.read().unwrap();
-        let patterns = self.patterns.read().unwrap();
+        let log = crate::sync_guard::read_lock(&self.decision_log);
+        let patterns = crate::sync_guard::read_lock(&self.patterns);
 
         let total_decisions = log.len() as u64;
         let successful = log.iter().filter(|e| e.outcome_score > 0.7).count() as u64;
@@ -590,13 +590,13 @@ impl HeuristicDecisionMaker {
 
     /// Döntési napló exportálása
     pub fn export_decision_log(&self) -> Vec<DecisionLogEntry> {
-        let log = self.decision_log.read().unwrap();
+        let log = crate::sync_guard::read_lock(&self.decision_log);
         log.clone()
     }
 
     /// Tanult minták exportálása
     pub fn export_patterns(&self) -> Vec<HeuristicPattern> {
-        let patterns = self.patterns.read().unwrap();
+        let patterns = crate::sync_guard::read_lock(&self.patterns);
         patterns.values().cloned().collect()
     }
 }

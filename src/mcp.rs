@@ -1040,7 +1040,7 @@ fn tool_recall(config: &Config, args: &Value) -> Result<String, String> {
 
     let (mut attention, hebb_pre, tg_pre, pc_pre) =
         if let Some(stream) = crate::consciousness_stream::global_stream() {
-            let s = stream.lock().unwrap();
+            let s = crate::sync_guard::mutex_lock(&stream);
             (
                 s.attention.clone(),
                 s.hebbian.clone(),
@@ -1203,7 +1203,7 @@ fn tool_recall(config: &Config, args: &Value) -> Result<String, String> {
 
     let (mut thought_graph, mut pred_cache) =
         if let Some(stream) = crate::consciousness_stream::global_stream() {
-            let s = stream.lock().unwrap();
+            let s = crate::sync_guard::mutex_lock(&stream);
             (s.thought_graph.clone(), s.predictive_cache.clone())
         } else {
             let tg = crate::thought_graph::ThoughtGraphState::load_or_init(output_dir);
@@ -1348,7 +1348,7 @@ fn tool_recall(config: &Config, args: &Value) -> Result<String, String> {
         let _ = attention.save(output_dir);
 
         if let Some(stream) = crate::consciousness_stream::global_stream() {
-            let mut s = stream.lock().unwrap();
+            let mut s = crate::sync_guard::mutex_lock(&stream);
             s.hebbian = hebb;
             s.mirror = mirror;
             s.resonance = resonance;
@@ -1804,7 +1804,7 @@ fn tool_consciousness(config: &Config, _args: &Value) -> Result<String, String> 
     // and readers just clone the Arc — no format!(), no seqlock, no Mutex.
     // Cost: ~50-100ns per call.
     let snapshot = {
-        let s = state.lock().unwrap();
+        let s = crate::sync_guard::mutex_lock(&state);
         s.snapshot.clone()
     };
     Ok(snapshot.read_cached_format())

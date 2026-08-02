@@ -177,19 +177,19 @@ impl ArchitectureSimulator {
 
     /// Regisztrál egy architektúrát a szimulátorban
     pub fn register_architecture(&self, arch: Architecture) {
-        let mut architectures = self.architectures.write().unwrap();
+        let mut architectures = crate::sync_guard::write_lock(&self.architectures);
         architectures.insert(arch.id.clone(), arch);
     }
 
     /// Lekér egy architektúrát ID alapján
     pub fn get_architecture(&self, id: &str) -> Option<Architecture> {
-        let architectures = self.architectures.read().unwrap();
+        let architectures = crate::sync_guard::read_lock(&self.architectures);
         architectures.get(id).cloned()
     }
 
     /// Listázza az összes regisztrált architektúrát
     pub fn list_architectures(&self) -> Vec<Architecture> {
-        let architectures = self.architectures.read().unwrap();
+        let architectures = crate::sync_guard::read_lock(&self.architectures);
         architectures.values().cloned().collect()
     }
 
@@ -200,11 +200,11 @@ impl ArchitectureSimulator {
         config: &SimulationConfig,
     ) -> Option<SimulationMetrics> {
         let arch = {
-            let architectures = self.architectures.read().unwrap();
+            let architectures = crate::sync_guard::read_lock(&self.architectures);
             architectures.get(arch_id).cloned()?
         };
 
-        let mut events = self.events.write().unwrap();
+        let mut events = crate::sync_guard::write_lock(&self.events);
         let _start_time = Instant::now();
         let mut metrics = SimulationMetrics {
             architecture_id: arch_id.to_string(),
@@ -342,7 +342,7 @@ impl ArchitectureSimulator {
         }
 
         // Eredmények tárolása
-        let mut results = self.simulation_results.write().unwrap();
+        let mut results = crate::sync_guard::write_lock(&self.simulation_results);
         results
             .entry(arch_id.to_string())
             .or_default()
@@ -357,7 +357,7 @@ impl ArchitectureSimulator {
     /// Stresszteszt: fokozatosan növeli a terhelést a töréspont megtalálásáig
     pub fn run_stress_test(&self, arch_id: &str) -> Option<StressTestResult> {
         let _arch = {
-            let architectures = self.architectures.read().unwrap();
+            let architectures = crate::sync_guard::read_lock(&self.architectures);
             architectures.get(arch_id).cloned()?
         };
 
@@ -437,7 +437,7 @@ impl ArchitectureSimulator {
         }
 
         // Eredmények tárolása
-        let mut stress_results = self.stress_test_results.write().unwrap();
+        let mut stress_results = crate::sync_guard::write_lock(&self.stress_test_results);
         stress_results
             .entry(arch_id.to_string())
             .or_default()
@@ -452,7 +452,7 @@ impl ArchitectureSimulator {
         arch_id_a: &str,
         arch_id_b: &str,
     ) -> Option<ComparisonResult> {
-        let results = self.simulation_results.read().unwrap();
+        let results = crate::sync_guard::read_lock(&self.simulation_results);
         let results_a = results.get(arch_id_a)?;
         let results_b = results.get(arch_id_b)?;
 
@@ -489,7 +489,7 @@ impl ArchitectureSimulator {
 
     /// Tanulás a szimulációs eredményekből
     fn learn_from_simulation(&self, metrics: &SimulationMetrics) {
-        let mut patterns = self.learned_patterns.write().unwrap();
+        let mut patterns = crate::sync_guard::write_lock(&self.learned_patterns);
 
         // Magas hibaarány -> negatív minta
         if metrics.error_rate > 0.1 {
@@ -541,21 +541,21 @@ impl ArchitectureSimulator {
 
     /// Lekérdezi a tanult mintákat
     pub fn get_learned_patterns(&self) -> HashMap<String, f64> {
-        let patterns = self.learned_patterns.read().unwrap();
+        let patterns = crate::sync_guard::read_lock(&self.learned_patterns);
         patterns.clone()
     }
 
     /// Lekérdezi a szimulációs eseményeket
     pub fn get_events(&self) -> Vec<SimulationEvent> {
-        let events = self.events.read().unwrap();
+        let events = crate::sync_guard::read_lock(&self.events);
         events.clone()
     }
 
     /// Törli az összes szimulációs eredményt
     pub fn clear_results(&self) {
-        self.simulation_results.write().unwrap().clear();
-        self.stress_test_results.write().unwrap().clear();
-        self.events.write().unwrap().clear();
+        crate::sync_guard::write_lock(&self.simulation_results).clear();
+        crate::sync_guard::write_lock(&self.stress_test_results).clear();
+        crate::sync_guard::write_lock(&self.events).clear();
     }
 }
 

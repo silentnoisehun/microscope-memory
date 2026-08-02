@@ -103,12 +103,12 @@ impl ArchitectureGenerator {
 
     /// Generálási paraméterek beállítása
     pub fn set_params(&self, params: GenerationParams) {
-        *self.params.write().unwrap() = params;
+        *crate::sync_guard::write_lock(&self.params) = params;
     }
 
     /// Architektúra generálása a megadott követelmények alapján
     pub fn generate(&self, requirements: &str) -> Vec<ArchitectureProposal> {
-        let params = self.params.read().unwrap().clone();
+        let params = crate::sync_guard::read_lock(&self.params).clone();
 
         match params.strategy {
             GenerationStrategy::Hybrid => self.generate_hybrid(requirements, &params),
@@ -793,12 +793,12 @@ impl ArchitectureGenerator {
 
     /// Generálási történet lekérése
     pub fn get_history(&self) -> Vec<ArchitectureProposal> {
-        self.generation_history.read().unwrap().clone()
+        crate::sync_guard::read_lock(&self.generation_history).clone()
     }
 
     /// Történet törlése
     pub fn clear_history(&self) {
-        self.generation_history.write().unwrap().clear();
+        crate::sync_guard::write_lock(&self.generation_history).clear();
     }
 }
 

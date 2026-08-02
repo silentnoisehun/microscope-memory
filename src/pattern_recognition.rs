@@ -192,7 +192,7 @@ impl PatternRecognizer {
     }
 
     fn next_id(&self) -> u64 {
-        let mut id = self.next_id.write().unwrap();
+        let mut id = crate::sync_guard::write_lock(&self.next_id);
         let n = *id;
         *id += 1;
         n
@@ -228,7 +228,7 @@ impl PatternRecognizer {
             metadata: HashMap::new(),
         };
 
-        self.patterns.write().unwrap().push(pattern);
+        crate::sync_guard::write_lock(&self.patterns).push(pattern);
         self.domain_index
             .write()
             .unwrap()
@@ -241,10 +241,10 @@ impl PatternRecognizer {
 
     /// Minta törlése
     pub fn forget_pattern(&self, id: u64) -> bool {
-        let mut patterns = self.patterns.write().unwrap();
+        let mut patterns = crate::sync_guard::write_lock(&self.patterns);
         if let Some(pos) = patterns.iter().position(|p| p.id == id) {
             let p = patterns.remove(pos);
-            if let Some(ids) = self.domain_index.write().unwrap().get_mut(&p.domain) {
+            if let Some(ids) = crate::sync_guard::write_lock(&self.domain_index).get_mut(&p.domain) {
                 ids.retain(|&i| i != id);
             }
             true
@@ -298,7 +298,7 @@ impl PatternRecognizer {
     /// Bemenet: elemek sorozata (pl. block id-k, műveletek, események)
     /// Kimenet: ismétlődő minták confidenciával
     pub fn find_sequences(&self, elements: &[String], domain: &str) -> Vec<RecognizedPattern> {
-        let config = self.config.read().unwrap().clone();
+        let config = crate::sync_guard::read_lock(&self.config).clone();
         let window = config.sequence_window;
         let min_sim = config.min_similarity;
         let mut patterns = Vec::new();
@@ -347,7 +347,7 @@ impl PatternRecognizer {
                 };
 
                 // Ellenőrizzük, hogy már létezik-e hasonló
-                let exists = self.patterns.read().unwrap().iter().any(|p| {
+                let exists = crate::sync_guard::read_lock(&self.patterns).iter().any(|p| {
                     if let PatternTemplate::Sequence(ref existing) = p.template {
                         existing == seq
                     } else {
@@ -357,7 +357,7 @@ impl PatternRecognizer {
 
                 if !exists {
                     let id = pattern.id;
-                    self.patterns.write().unwrap().push(pattern.clone());
+                    crate::sync_guard::write_lock(&self.patterns).push(pattern.clone());
                     self.domain_index
                         .write()
                         .unwrap()
@@ -381,11 +381,11 @@ impl PatternRecognizer {
 
     /// Adott szekvencia egyeztetése ismert mintákkal
     pub fn match_sequence(&self, sequence: &[String]) -> Vec<PatternMatch> {
-        let config = self.config.read().unwrap().clone();
+        let config = crate::sync_guard::read_lock(&self.config).clone();
         let mut matches = Vec::new();
         let now = self.now_ms();
 
-        for pattern in self.patterns.read().unwrap().iter() {
+        for pattern in crate::sync_guard::read_lock(&self.patterns).iter() {
             if let PatternTemplate::Sequence(ref pattern_seq) = pattern.template {
                 // Részsorozat keresés (pattern hosszabb lehet)
                 if pattern_seq.len() > sequence.len() {
@@ -432,7 +432,7 @@ impl PatternRecognizer {
             }
         }
 
-        self.match_history.write().unwrap().extend(matches.clone());
+        crate::sync_guard::write_lock(&self.match_history).extend(matches.clone());
         matches
     }
 
@@ -470,7 +470,7 @@ impl PatternRecognizer {
         if events.is_empty() {
             return Vec::new();
         }
-        let config = self.config.read().unwrap().clone();
+        let config = crate::sync_guard::read_lock(&self.config).clone();
         let mut patterns = Vec::new();
 
         // Csoportosítás óra × nap szerint
@@ -532,7 +532,7 @@ impl PatternRecognizer {
             };
 
             let id = pattern.id;
-            self.patterns.write().unwrap().push(pattern.clone());
+            crate::sync_guard::write_lock(&self.patterns).push(pattern.clone());
             self.domain_index
                 .write()
                 .unwrap()
@@ -595,7 +595,7 @@ impl PatternRecognizer {
                     };
 
                     let id = pattern.id;
-                    self.patterns.write().unwrap().push(pattern.clone());
+                    crate::sync_guard::write_lock(&self.patterns).push(pattern.clone());
                     self.domain_index
                         .write()
                         .unwrap()
@@ -620,7 +620,7 @@ impl PatternRecognizer {
         edges: &[(String, String, f64)],
         domain: &str,
     ) -> Vec<RecognizedPattern> {
-        let config = self.config.read().unwrap().clone();
+        let config = crate::sync_guard::read_lock(&self.config).clone();
         let mut patterns = Vec::new();
 
         if edges.is_empty() {
@@ -664,7 +664,7 @@ impl PatternRecognizer {
                 };
 
                 let id = pattern.id;
-                self.patterns.write().unwrap().push(pattern.clone());
+                crate::sync_guard::write_lock(&self.patterns).push(pattern.clone());
                 self.domain_index
                     .write()
                     .unwrap()
@@ -706,7 +706,7 @@ impl PatternRecognizer {
                 };
 
                 let id = pattern.id;
-                self.patterns.write().unwrap().push(pattern.clone());
+                crate::sync_guard::write_lock(&self.patterns).push(pattern.clone());
                 self.domain_index
                     .write()
                     .unwrap()
@@ -754,7 +754,7 @@ impl PatternRecognizer {
                 };
 
                 let id = pattern.id;
-                self.patterns.write().unwrap().push(pattern.clone());
+                crate::sync_guard::write_lock(&self.patterns).push(pattern.clone());
                 self.domain_index
                     .write()
                     .unwrap()
@@ -793,7 +793,7 @@ impl PatternRecognizer {
         points: &[(f64, f64, f64, String)],
         domain: &str,
     ) -> Vec<RecognizedPattern> {
-        let config = self.config.read().unwrap().clone();
+        let config = crate::sync_guard::read_lock(&self.config).clone();
         let mut patterns = Vec::new();
 
         if points.is_empty() {
@@ -907,7 +907,7 @@ impl PatternRecognizer {
             };
 
             let id = pattern.id;
-            self.patterns.write().unwrap().push(pattern.clone());
+            crate::sync_guard::write_lock(&self.patterns).push(pattern.clone());
             self.domain_index
                 .write()
                 .unwrap()
@@ -925,11 +925,11 @@ impl PatternRecognizer {
     /// Keres olyan mintákat, amelyek több domain-ben is előfordulnak
     /// (pl. ugyanaz a szekvencia megjelenik thought és recall domain-ben is)
     pub fn cross_correlate(&self) -> Vec<RecognizedPattern> {
-        let config = self.config.read().unwrap().clone();
+        let config = crate::sync_guard::read_lock(&self.config).clone();
         let mut composite_patterns = Vec::new();
 
-        let patterns = self.patterns.read().unwrap();
-        let domains: Vec<String> = self.domain_index.read().unwrap().keys().cloned().collect();
+        let patterns = crate::sync_guard::read_lock(&self.patterns);
+        let domains: Vec<String> = crate::sync_guard::read_lock(&self.domain_index).keys().cloned().collect();
 
         if domains.len() < 2 {
             return Vec::new();
@@ -1001,7 +1001,7 @@ impl PatternRecognizer {
         // Cross-domain minták regisztrálása
         for cp in &composite_patterns {
             let id = cp.id;
-            self.patterns.write().unwrap().push(cp.clone());
+            crate::sync_guard::write_lock(&self.patterns).push(cp.clone());
             self.domain_index
                 .write()
                 .unwrap()
@@ -1017,8 +1017,8 @@ impl PatternRecognizer {
 
     /// Hasonló minták összevonása, gyenge minták elfelejtése
     pub fn consolidate(&self) -> usize {
-        let config = self.config.read().unwrap().clone();
-        let mut patterns = self.patterns.write().unwrap();
+        let config = crate::sync_guard::read_lock(&self.config).clone();
+        let mut patterns = crate::sync_guard::write_lock(&self.patterns);
         let before = patterns.len();
 
         // 1. Alacsony confidence-ű minták eltávolítása
@@ -1077,7 +1077,7 @@ impl PatternRecognizer {
 
     /// Rendszer statisztikák
     pub fn stats(&self) -> (usize, usize, usize, f64) {
-        let patterns = self.patterns.read().unwrap();
+        let patterns = crate::sync_guard::read_lock(&self.patterns);
 
         let total = patterns.len();
         let seq_count = patterns
@@ -1115,17 +1115,17 @@ impl PatternRecognizer {
 
     /// Konfiguráció frissítése
     pub fn set_config(&self, config: RecognitionConfig) {
-        *self.config.write().unwrap() = config;
+        *crate::sync_guard::write_lock(&self.config) = config;
     }
 
     /// Konfiguráció olvasása
     pub fn get_config(&self) -> RecognitionConfig {
-        self.config.read().unwrap().clone()
+        crate::sync_guard::read_lock(&self.config).clone()
     }
 
     /// Domain-ek listázása
     pub fn list_domains(&self) -> Vec<String> {
-        self.domain_index.read().unwrap().keys().cloned().collect()
+        crate::sync_guard::read_lock(&self.domain_index).keys().cloned().collect()
     }
 
     /// Domain szerinti minta szám

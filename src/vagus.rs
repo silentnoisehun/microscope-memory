@@ -174,7 +174,7 @@ impl VagusNerve {
 
     /// Beállítja a heurisztikus döntéshozót
     pub fn set_decision_maker(&self, dm: HeuristicDecisionMaker) {
-        *self.decision_maker.write().unwrap() = Some(dm);
+        *crate::sync_guard::write_lock(&self.decision_maker) = Some(dm);
     }
 
     /// Rendszer pulzus mérése — a szívverés analóg
@@ -185,7 +185,7 @@ impl VagusNerve {
             .as_secs();
 
         // HRV szamitasa - a rendszer valaszkeszsege
-        let prev_pulse = self.state.read().unwrap().pulse.clone();
+        let prev_pulse = crate::sync_guard::read_lock(&self.state).pulse.clone();
         let response_delta = (metrics.request_rate - prev_pulse.request_rate).abs();
         let hrv = 1.0 - (response_delta / 100.0).min(1.0);
 
@@ -202,17 +202,17 @@ impl VagusNerve {
 
         // Állapot frissítése
         {
-            let mut state = self.state.write().unwrap();
+            let mut state = crate::sync_guard::write_lock(&self.state);
             state.pulse = pulse.clone();
         }
 
-        *self.last_pulse.write().unwrap() = Instant::now();
+        *crate::sync_guard::write_lock(&self.last_pulse) = Instant::now();
         pulse
     }
 
     /// Vagus tónus frissítése — a rendszer relaxációs állapota
     pub fn update_tone(&self) {
-        let mut state = self.state.write().unwrap();
+        let mut state = crate::sync_guard::write_lock(&self.state);
         let pulse = &state.pulse;
 
         // Átlagos terhelés
@@ -273,7 +273,7 @@ impl VagusNerve {
         let id = feeling.id.clone();
 
         {
-            let mut state = self.state.write().unwrap();
+            let mut state = crate::sync_guard::write_lock(&self.state);
             state.gut_feelings.push(feeling);
 
             // Max 1000 gut feelinget tárolunk
@@ -287,7 +287,7 @@ impl VagusNerve {
 
     /// Gyulladás detektálása
     pub fn detect_inflammation(&self) -> Vec<CognitiveInflammation> {
-        let state = self.state.read().unwrap();
+        let state = crate::sync_guard::read_lock(&self.state);
         let pulse = &state.pulse;
         let tone = &state.tone;
 
@@ -331,7 +331,7 @@ impl VagusNerve {
 
         // Frissítjük az állapotot
         drop(state);
-        let mut state = self.state.write().unwrap();
+        let mut state = crate::sync_guard::write_lock(&self.state);
         state.active_inflammations = inflammations.clone();
 
         inflammations
@@ -423,7 +423,7 @@ impl VagusNerve {
 
         // Tároljuk a választ
         {
-            let mut state = self.state.write().unwrap();
+            let mut state = crate::sync_guard::write_lock(&self.state);
             state.response_history.push(response.clone());
 
             // Max 100 választ tárolunk
@@ -451,7 +451,7 @@ impl VagusNerve {
 
     /// Paraszimpatikus mód aktiválása — kényszerített lassítás
     pub fn activate_parasympathetic(&self) -> bool {
-        let mut state = self.state.write().unwrap();
+        let mut state = crate::sync_guard::write_lock(&self.state);
 
         let tone = state.tone.current;
         let pulse = &state.pulse;
@@ -485,7 +485,7 @@ impl VagusNerve {
 
     /// Paraszimpatikus mód deaktiválása — visszatérés normál működéshez
     pub fn deactivate_parasympathetic(&self) -> bool {
-        let state = self.state.read().unwrap();
+        let state = crate::sync_guard::read_lock(&self.state);
 
         let tone = state.tone.current;
         let pulse = &state.pulse;
@@ -499,7 +499,7 @@ impl VagusNerve {
 
         // Ha alacsony a nyomás és magas a tónus -> deaktiválás
         if avg_pressure < 0.4 && tone > 0.6 {
-            let mut state = self.state.write().unwrap();
+            let mut state = crate::sync_guard::write_lock(&self.state);
             if state.parasympathetic_mode {
                 state.parasympathetic_mode = false;
                 state.freeze_initiated = false;
@@ -523,7 +523,7 @@ impl VagusNerve {
 
     /// Alert szint meghatározása
     pub fn get_alert_level(&self) -> AlertLevel {
-        let state = self.state.read().unwrap();
+        let state = crate::sync_guard::read_lock(&self.state);
 
         let pulse = &state.pulse;
         let tone = state.tone.current;
@@ -559,17 +559,17 @@ impl VagusNerve {
 
     /// Rendszer állapot lekérése
     pub fn get_state(&self) -> VagusState {
-        self.state.read().unwrap().clone()
+        crate::sync_guard::read_lock(&self.state).clone()
     }
 
     /// Vagus tónus lekérése
     pub fn get_tone(&self) -> VagusTone {
-        self.state.read().unwrap().tone.clone()
+        crate::sync_guard::read_lock(&self.state).tone.clone()
     }
 
     /// Feldolgozatlan "zsigeri" jelek lekérése
     pub fn get_unprocessed_gut_feelings(&self) -> Vec<GutFeeling> {
-        let state = self.state.read().unwrap();
+        let state = crate::sync_guard::read_lock(&self.state);
         state
             .gut_feelings
             .iter()
@@ -580,7 +580,7 @@ impl VagusNerve {
 
     /// Jel feldolgozottként megjelölése
     pub fn mark_gut_feeling_processed(&self, id: &str) {
-        let mut state = self.state.write().unwrap();
+        let mut state = crate::sync_guard::write_lock(&self.state);
         if let Some(feeling) = state.gut_feelings.iter_mut().find(|f| f.id == id) {
             feeling.processed = true;
         }
@@ -598,7 +598,7 @@ impl VagusNerve {
         };
 
         // 1. Pulzus mérése (ha kell)
-        if self.last_pulse.read().unwrap().elapsed()
+        if crate::sync_guard::read_lock(&self.last_pulse).elapsed()
             > Duration::from_millis(self.heartbeat_interval_ms)
         {
             // Itt a hívónak kell megadnia a metrikákat
@@ -635,7 +635,7 @@ impl VagusNerve {
 
     /// Statisztikák lekérése
     pub fn get_statistics(&self) -> VagusStatistics {
-        let state = self.state.read().unwrap();
+        let state = crate::sync_guard::read_lock(&self.state);
 
         VagusStatistics {
             current_tone: state.tone.current,

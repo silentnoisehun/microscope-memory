@@ -130,12 +130,20 @@ impl ModalityIndex {
                     let modality = match modality_tag {
                         0 => Modality::Text,
                         1 if payload_len >= IMAGE_PAYLOAD_BYTES => {
-                            let m = decode_image_meta(&data[pos..pos + payload_len]);
-                            Modality::Image(m)
+                            if let Some(m) = decode_image_meta(&data[pos..pos + payload_len]) {
+                                Modality::Image(m)
+                            } else {
+                                pos += payload_len;
+                                continue;
+                            }
                         }
                         2 if payload_len >= AUDIO_PAYLOAD_BYTES => {
-                            let m = decode_audio_meta(&data[pos..pos + payload_len]);
-                            Modality::Audio(m)
+                            if let Some(m) = decode_audio_meta(&data[pos..pos + payload_len]) {
+                                Modality::Audio(m)
+                            } else {
+                                pos += payload_len;
+                                continue;
+                            }
                         }
                         3 => {
                             if let Some(m) = decode_structured_meta(&data[pos..pos + payload_len]) {
@@ -426,7 +434,11 @@ fn encode_image_meta(m: &ImageMeta, buf: &mut Vec<u8>) {
     }
 }
 
-fn decode_image_meta(data: &[u8]) -> ImageMeta {
+fn decode_image_meta(data: &[u8]) -> Option<ImageMeta> {
+    // Self-defensive: 28 bytes (width 2 + height 2 + phash 8 + histogram 12 + hash 4).
+    if data.len() < 28 {
+        return None;
+    }
     let width = u16::from_le_bytes(data[0..2].try_into().unwrap());
     let height = u16::from_le_bytes(data[2..4].try_into().unwrap());
     let mut phash = [0u8; 8];
@@ -434,13 +446,13 @@ fn decode_image_meta(data: &[u8]) -> ImageMeta {
     let mut color_histogram = [0u8; 12];
     color_histogram.copy_from_slice(&data[12..24]);
     let content_hash = u32::from_le_bytes(data[24..28].try_into().unwrap());
-    ImageMeta {
+    Some(ImageMeta {
         width,
         height,
         phash,
         color_histogram,
         content_hash,
-    }
+    })
 }
 
 fn encode_audio_meta(m: &AudioMeta, buf: &mut Vec<u8>) {
@@ -456,20 +468,24 @@ fn encode_audio_meta(m: &AudioMeta, buf: &mut Vec<u8>) {
     }
 }
 
-fn decode_audio_meta(data: &[u8]) -> AudioMeta {
+fn decode_audio_meta(data: &[u8]) -> Option<AudioMeta> {
+    // Self-defensive: 30 bytes (duration 4 + sample_rate 2 + fingerprint 16 + 2 floats).
+    if data.len() < 30 {
+        return None;
+    }
     let duration_ms = u32::from_le_bytes(data[0..4].try_into().unwrap());
     let sample_rate = u16::from_le_bytes(data[4..6].try_into().unwrap());
     let mut spectral_fingerprint = [0u8; 16];
     spectral_fingerprint.copy_from_slice(&data[6..22]);
     let peak_freq = f32::from_le_bytes(data[22..26].try_into().unwrap());
     let bpm_estimate = f32::from_le_bytes(data[26..30].try_into().unwrap());
-    AudioMeta {
+    Some(AudioMeta {
         duration_ms,
         sample_rate,
         spectral_fingerprint,
         peak_freq,
         bpm_estimate,
-    }
+    })
 }
 
 fn encode_structured_meta(m: &StructuredMeta) -> Vec<u8> {
@@ -651,7 +667,7 @@ mod tests {
         };
         let mut buf = Vec::new();
         encode_image_meta(&meta, &mut buf);
-        let decoded = decode_image_meta(&buf);
+        let decoded = decode_image_meta(&buf).unwrap();
         assert_eq!(meta, decoded);
     }
 
@@ -666,7 +682,7 @@ mod tests {
         };
         let mut buf = Vec::new();
         encode_audio_meta(&meta, &mut buf);
-        let decoded = decode_audio_meta(&buf);
+        let decoded = decode_audio_meta(&buf).unwrap();
         assert_eq!(meta, decoded);
     }
 

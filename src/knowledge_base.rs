@@ -114,9 +114,9 @@ impl KnowledgeBase {
 
     /// Hozzáad egy új tudásbázis bejegyzést
     pub fn add_entry(&self, entry: KnowledgeEntry) -> String {
-        let mut entries = self.entries.write().unwrap();
-        let mut tag_index = self.tag_index.write().unwrap();
-        let mut type_index = self.type_index.write().unwrap();
+        let mut entries = crate::sync_guard::write_lock(&self.entries);
+        let mut tag_index = crate::sync_guard::write_lock(&self.tag_index);
+        let mut type_index = crate::sync_guard::write_lock(&self.type_index);
 
         let id = entry.id.clone();
         entries.insert(id.clone(), entry.clone());
@@ -137,13 +137,13 @@ impl KnowledgeBase {
 
     /// Lekér egy bejegyzést ID alapján
     pub fn get_entry(&self, id: &str) -> Option<KnowledgeEntry> {
-        let entries = self.entries.read().unwrap();
+        let entries = crate::sync_guard::read_lock(&self.entries);
         entries.get(id).cloned()
     }
 
     /// Keresés a tudásbázisban
     pub fn search(&self, query: &str, max_results: usize) -> Vec<SearchResult> {
-        let entries = self.entries.read().unwrap();
+        let entries = crate::sync_guard::read_lock(&self.entries);
         let query_lower = query.to_lowercase();
         let query_words: Vec<&str> = query_lower.split_whitespace().collect();
 
@@ -203,7 +203,7 @@ impl KnowledgeBase {
 
     /// Bejegyzés hasznosságának növelése
     pub fn mark_useful(&self, id: &str) {
-        let mut entries = self.entries.write().unwrap();
+        let mut entries = crate::sync_guard::write_lock(&self.entries);
         if let Some(entry) = entries.get_mut(id) {
             entry.usefulness += 1;
             entry.updated_at = SystemTime::now()
@@ -215,7 +215,7 @@ impl KnowledgeBase {
 
     /// Asszociáció tanulása két bejegyzés között
     pub fn learn_association(&self, from_id: &str, to_id: &str, weight: f64) {
-        let mut associations = self.associations.write().unwrap();
+        let mut associations = crate::sync_guard::write_lock(&self.associations);
         associations
             .entry(from_id.to_string())
             .or_default()
@@ -226,8 +226,8 @@ impl KnowledgeBase {
 
     /// Kapcsolódó bejegyzések lekérése
     pub fn get_related(&self, id: &str, max_results: usize) -> Vec<KnowledgeEntry> {
-        let associations = self.associations.read().unwrap();
-        let entries = self.entries.read().unwrap();
+        let associations = crate::sync_guard::read_lock(&self.associations);
+        let entries = crate::sync_guard::read_lock(&self.entries);
 
         if let Some(related) = associations.get(id) {
             let mut scored: Vec<(f64, &KnowledgeEntry)> = related
@@ -488,8 +488,8 @@ impl KnowledgeBase {
 
     /// Típus szerinti lekérdezés
     pub fn get_by_type(&self, entry_type: &KnowledgeEntryType) -> Vec<KnowledgeEntry> {
-        let type_index = self.type_index.read().unwrap();
-        let entries = self.entries.read().unwrap();
+        let type_index = crate::sync_guard::read_lock(&self.type_index);
+        let entries = crate::sync_guard::read_lock(&self.entries);
 
         type_index
             .get(entry_type)
@@ -504,8 +504,8 @@ impl KnowledgeBase {
 
     /// Tag szerinti lekérdezés
     pub fn get_by_tag(&self, tag: &str) -> Vec<KnowledgeEntry> {
-        let tag_index = self.tag_index.read().unwrap();
-        let entries = self.entries.read().unwrap();
+        let tag_index = crate::sync_guard::read_lock(&self.tag_index);
+        let entries = crate::sync_guard::read_lock(&self.entries);
 
         tag_index
             .get(tag)
@@ -520,8 +520,8 @@ impl KnowledgeBase {
 
     /// Statisztikák lekérése
     pub fn get_stats(&self) -> KnowledgeBaseStats {
-        let entries = self.entries.read().unwrap();
-        let type_index = self.type_index.read().unwrap();
+        let entries = crate::sync_guard::read_lock(&self.entries);
+        let type_index = crate::sync_guard::read_lock(&self.type_index);
 
         let total = entries.len() as u64;
         let arch_count = type_index
@@ -577,16 +577,16 @@ impl KnowledgeBase {
 
     /// Tudásbázis exportálása (minden bejegyzés)
     pub fn export_all(&self) -> Vec<KnowledgeEntry> {
-        let entries = self.entries.read().unwrap();
+        let entries = crate::sync_guard::read_lock(&self.entries);
         entries.values().cloned().collect()
     }
 
     /// Tudásbázis törlése
     pub fn clear(&self) {
-        self.entries.write().unwrap().clear();
-        self.tag_index.write().unwrap().clear();
-        self.type_index.write().unwrap().clear();
-        self.associations.write().unwrap().clear();
+        crate::sync_guard::write_lock(&self.entries).clear();
+        crate::sync_guard::write_lock(&self.tag_index).clear();
+        crate::sync_guard::write_lock(&self.type_index).clear();
+        crate::sync_guard::write_lock(&self.associations).clear();
     }
 }
 

@@ -82,7 +82,7 @@ impl MetaSupervisor {
         };
 
         // Add to history
-        let mut history = self.metrics_history.write().unwrap();
+        let mut history = crate::sync_guard::write_lock(&self.metrics_history);
         if history.len() >= 100 {
             history.pop_front(); // Keep only last 100 entries
         }
@@ -93,7 +93,7 @@ impl MetaSupervisor {
 
     /// Evaluate system performance and suggest corrections
     pub fn evaluate_and_correct(&mut self) -> Option<String> {
-        let history = self.metrics_history.read().unwrap();
+        let history = crate::sync_guard::read_lock(&self.metrics_history);
 
         if history.is_empty() {
             return None;
@@ -154,7 +154,7 @@ impl MetaSupervisor {
 
     /// Analyze trends in performance metrics
     pub fn analyze_trends(&self) -> (f32, f32) {
-        let history = self.metrics_history.read().unwrap();
+        let history = crate::sync_guard::read_lock(&self.metrics_history);
 
         if history.len() < 2 {
             return (0.0, 0.0);
@@ -199,7 +199,7 @@ impl MetaSupervisor {
 
     /// Get performance summary
     pub fn get_summary(&self) -> (f32, f32, f32) {
-        let history = self.metrics_history.read().unwrap();
+        let history = crate::sync_guard::read_lock(&self.metrics_history);
 
         if history.is_empty() {
             return (0.0, 0.0, 0.0);

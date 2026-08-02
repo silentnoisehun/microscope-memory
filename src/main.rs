@@ -1129,6 +1129,15 @@ async fn main() {
         Cmd::Serve { port } => {
             serve_viewer(port);
         }
+        Cmd::Token { user_id } => {
+            match microscope_memory::bridge::user_token(
+                config.server.api_key.as_deref().unwrap_or(""),
+                &user_id,
+            ) {
+                Ok(token) => println!("{}", token),
+                Err(e) => eprintln!("  {} {}", "ERROR:".red(), e),
+            }
+        }
         Cmd::InitDemo { force } => {
             if let Err(e) = init_demo(&config, force) {
                 eprintln!("  {} {}", "ERROR:".red(), e);

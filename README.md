@@ -338,6 +338,14 @@ Before exposing the bridge on any non-loopback address, set `api_key` under
 `X-API-Key: <key>` header. The bridge **refuses to start** on a non-loopback
 host without a configured key, so the open mode cannot be accidentally exposed.
 
+For per-user separation, the same `api_key` acts as an HMAC master: generate a
+token per user with `microscope-mem token <user_id>`, and have that client send
+`Authorization: Bearer <user_id>.<hmac>` instead of `X-API-Key`. The middleware
+verifies the signature (constant-time) and binds the memory scope to the
+**verified** `user_id` — a user holding only their own token cannot read or
+write another user's scoped memories. The shared `X-API-Key` mode remains for
+single-user / trusted-team setups.
+
 ---
 
 ## 🖥 Electron Tray App
@@ -861,4 +869,3 @@ Download the [HOPE-Architect style whitepaper](docs/microscope-memory-public-dem
 
 - microscope-memory root crate: 322 tests
 - **Total verified by `cargo test`: 322 passing, 0 failed**
-

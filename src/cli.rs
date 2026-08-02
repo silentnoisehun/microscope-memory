@@ -99,6 +99,11 @@ pub enum Cmd {
     Bench,
     /// Stats
     Stats,
+    /// Generate a per-user bridge auth token (HMAC-signed against [server] api_key)
+    Token {
+        /// User id to sign
+        user_id: String,
+    },
     /// Text search
     Find {
         query: String,

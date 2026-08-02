@@ -57,6 +57,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   CORS so preflight keeps working). The bridge refuses to start on a
   non-loopback host without a key, and the single-user localhost default is
   documented in the README.
+- **Per-user bridge tokens**: `microscope-mem token <user_id>` generates an
+  HMAC-SHA256-signed bearer token (`user_id.<hmac>`, constant-time verified).
+  The middleware binds the memory scope to the verified `user_id`, so users
+  are separated from each other, not just from outsiders; the shared
+  `X-API-Key` mode remains as the trusted-team fallback.
 
 ### Changed
 - **Bounded layer retention**: `layer_retention_entries` default is now 2000

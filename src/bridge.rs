@@ -3,7 +3,7 @@ use crate::config::Config;
 use crate::types::{BlockHeader, MemoryQueryOptions, ProjectId};
 use crate::{MicroscopeReader, LAYER_NAMES};
 use axum::{
-    extract::{Json, Query, State},
+    extract::{Extension, Json, Query, State},
     http::StatusCode,
     middleware,
     response::IntoResponse,
@@ -13,6 +13,8 @@ use axum::{
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue, AUTHORIZATION};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use sha2::Sha256;
+use hmac::Mac;
 use std::fs;
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
@@ -23,37 +25,133 @@ use tower_http::trace::TraceLayer;
 
 const API_KEY_HEADER: &str = "x-api-key";
 
+/// Verified caller identity inserted by the auth middleware.
+///
+/// `Some(user_id)` when the request carried a valid per-user bearer token;
+/// `None` in the shared `X-API-Key` mode, where handlers fall back to the
+/// client-supplied `user_id` (single-user/trusted-team model).
+#[derive(Clone)]
+pub struct AuthenticatedUser(pub Option<String>);
+
 fn is_loopback(host: &str) -> bool {
     matches!(host, "127.0.0.1" | "localhost" | "::1")
 }
 
+/// Constant-time byte comparison for MAC verification.
+fn ct_eq(a: &[u8], b: &[u8]) -> bool {
+    if a.len() != b.len() {
+        return false;
+    }
+    let mut diff = 0u8;
+    for (x, y) in a.iter().zip(b.iter()) {
+        diff |= x ^ y;
+    }
+    diff == 0
+}
+
+/// Build a per-user bearer token: `user_id.<hex(hmac_sha256(master, user_id))>`.
+pub fn user_token(master: &str, user_id: &str) -> Result<String, String> {
+    if master.is_empty() {
+        return Err("set [server] api_key in config.toml first".to_string());
+    }
+    if user_id.is_empty()
+        || !user_id
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+    {
+        return Err(format!(
+            "invalid user_id '{user_id}': only alphanumeric, '-' and '_' allowed"
+        ));
+    }
+    let mut mac = hmac::Hmac::<Sha256>::new_from_slice(master.as_bytes())
+        .map_err(|e| format!("hmac init: {e}"))?;
+    mac.update(user_id.as_bytes());
+    Ok(format!("{user_id}.{}", hex::encode(mac.finalize().into_bytes())))
+}
+
+/// Verify a per-user bearer token; returns the signed `user_id` on success.
+fn verify_user_token(master: &str, token: &str) -> Option<String> {
+    let (uid, mac_hex) = token.rsplit_once('.')?;
+    if uid.is_empty()
+        || !uid
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+    {
+        return None;
+    }
+    let mut mac = hmac::Hmac::<Sha256>::new_from_slice(master.as_bytes()).ok()?;
+    mac.update(uid.as_bytes());
+    let expected = mac.finalize().into_bytes();
+    let provided = hex::decode(mac_hex).ok()?;
+    if provided.len() != expected.len() || !ct_eq(&provided, &expected) {
+        return None;
+    }
+    Some(uid.to_string())
+}
+
 /// Optional shared API key check for inbound bridge requests.
 ///
-/// When `[server] api_key` is configured, every request must carry
-/// `X-API-Key: <key>`. Without a configured key the bridge runs open
-/// (single-user localhost default); `run()` refuses to start on a non-loopback
-/// host without a key, so the open mode can never be accidentally exposed.
+/// Two modes, using the same `[server] api_key` as master secret:
+/// `Authorization: Bearer <user_id>.<hmac>` binds per-user identity (the
+/// verified `user_id` is attached as `AuthenticatedUser` for the handlers),
+/// and `X-API-Key: <key>` is the shared-secret fallback.
+///
+/// Without a configured key the bridge runs open (single-user localhost
+/// default); `run()` refuses to start on a non-loopback host without a key,
+/// so the open mode can never be accidentally exposed.
 async fn api_key_auth(
     State(state): State<Arc<AppState>>,
-    req: axum::extract::Request,
+    mut req: axum::extract::Request,
     next: middleware::Next,
 ) -> Result<axum::response::Response, axum::response::Response> {
-    if let Some(expected) = state.config.server.api_key.as_deref() {
-        if !expected.is_empty() {
-            let provided = req
-                .headers()
-                .get(API_KEY_HEADER)
-                .and_then(|v| v.to_str().ok())
-                .unwrap_or("");
-            if provided != expected {
+    let master = state.config.server.api_key.as_deref().unwrap_or("");
+    let mut authed_user: Option<String> = None;
+
+    if let Some(authz) = req
+        .headers()
+        .get(axum::http::header::AUTHORIZATION)
+        .and_then(|v| v.to_str().ok())
+    {
+        let Some(token) = authz.strip_prefix("Bearer ") else {
+            return Err((
+                StatusCode::UNAUTHORIZED,
+                "unsupported Authorization scheme",
+            )
+                .into_response());
+        };
+        if master.is_empty() {
+            return Err((
+                StatusCode::UNAUTHORIZED,
+                "api_key not configured; cannot verify user tokens",
+            )
+                .into_response());
+        }
+        match verify_user_token(master, token) {
+            Some(uid) => authed_user = Some(uid),
+            None => {
                 return Err((
                     StatusCode::UNAUTHORIZED,
-                    "missing or invalid X-API-Key header",
+                    "invalid or forged user token",
                 )
-                    .into_response());
+                    .into_response())
             }
         }
+    } else if !master.is_empty() {
+        let provided = req
+            .headers()
+            .get(API_KEY_HEADER)
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("");
+        if provided != master {
+            return Err((
+                StatusCode::UNAUTHORIZED,
+                "missing or invalid X-API-Key header",
+            )
+                .into_response());
+        }
     }
+
+    req.extensions_mut().insert(AuthenticatedUser(authed_user));
     Ok(next.run(req).await)
 }
 
@@ -614,24 +712,28 @@ async fn get_session(
 
 async fn mobile_recall(
     State(state): State<Arc<AppState>>,
+    Extension(auth): Extension<AuthenticatedUser>,
     Json(payload): Json<MobileRecallRequest>,
 ) -> Result<Json<Vec<MemoryResponse>>, (StatusCode, String)> {
     let k = payload.k.unwrap_or(10);
+    let uid = auth.0.as_deref().unwrap_or(&payload.user_id);
     Ok(Json(recall_internal(
         &state,
         &payload.query,
         k,
-        Some(&payload.user_id),
+        Some(uid),
     )?))
 }
 
 async fn mobile_remember(
     State(state): State<Arc<AppState>>,
+    Extension(auth): Extension<AuthenticatedUser>,
     Json(payload): Json<MobileRememberRequest>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
     let layer = payload.layer.unwrap_or_else(|| "long_term".to_string());
     let importance = payload.importance.unwrap_or(7);
-    let scoped_text = scope_user_text(&payload.user_id, &payload.text);
+    let uid = auth.0.as_deref().unwrap_or(&payload.user_id);
+    let scoped_text = scope_user_text(uid, &payload.text);
 
     let cfg = project_aware_config(&state);
     crate::store_memory(&cfg, &scoped_text, &layer, importance)
@@ -888,10 +990,12 @@ async fn call_provider(
 
 async fn mobile_chat(
     State(state): State<Arc<AppState>>,
+    Extension(auth): Extension<AuthenticatedUser>,
     Json(payload): Json<MobileChatRequest>,
 ) -> Result<Json<MobileChatResponse>, (StatusCode, String)> {
     let k = payload.recall_k.unwrap_or(8);
-    let recalled = recall_internal(&state, &payload.message, k, Some(&payload.user_id))?;
+    let uid = auth.0.as_deref().unwrap_or(&payload.user_id);
+    let recalled = recall_internal(&state, &payload.message, k, Some(uid))?;
 
     let memory_context = if recalled.is_empty() {
         "(no prior memory)".to_string()
@@ -1400,6 +1504,80 @@ mod tests {
             config,
             active_project: Arc::new(Mutex::new(None)),
         })
+    }
+
+    async fn whoami(Extension(auth): Extension<AuthenticatedUser>) -> String {
+        auth.0.unwrap_or_else(|| "shared".to_string())
+    }
+
+    #[test]
+    fn user_token_roundtrip_and_forgery() {
+        let master = "master";
+        let token = user_token(master, "alice-1").unwrap();
+        assert!(token.starts_with("alice-1."));
+        assert_eq!(verify_user_token(master, &token).as_deref(), Some("alice-1"));
+
+        assert!(
+            verify_user_token("other-master", &token).is_none(),
+            "wrong master key must fail"
+        );
+
+        let last = token.chars().last().unwrap();
+        let replaced = if last == '0' { '1' } else { '0' };
+        let tampered = format!("{}{}", &token[..token.len() - 1], replaced);
+        assert!(
+            verify_user_token(master, &tampered).is_none(),
+            "tampered MAC must fail"
+        );
+
+        assert!(user_token(master, "bad user!").is_err());
+        assert!(user_token("", "alice").is_err());
+    }
+
+    #[tokio::test]
+    async fn bearer_token_binds_identity() {
+        let master = "test-master-secret";
+        let token = user_token(master, "alice").unwrap();
+        let state = state_with_key(Some(master));
+        let app = Router::new()
+            .route("/whoami", get(whoami))
+            .layer(middleware::from_fn_with_state(state.clone(), api_key_auth))
+            .with_state(state);
+
+        let resp = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/whoami")
+                    .header(axum::http::header::AUTHORIZATION, format!("Bearer {token}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        let body = axum::body::to_bytes(resp.into_body(), 64).await.unwrap();
+        assert_eq!(&body[..], b"alice");
+
+        let forged = user_token("different-master", "alice").unwrap();
+        let resp = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/whoami")
+                    .header(axum::http::header::AUTHORIZATION, format!("Bearer {forged}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+
+        let resp = app
+            .oneshot(Request::builder().uri("/whoami").body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
     }
 
     #[tokio::test]

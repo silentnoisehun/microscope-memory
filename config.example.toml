@@ -100,8 +100,13 @@ max_depth = 4
 [server]
 # HTTP server port
 port = 6060
-# Shared API key for inbound HTTP requests (X-API-Key header). Empty = no auth
-# (single-user localhost default). Required when binding on a non-loopback host.
+# Shared master secret for inbound HTTP auth. Empty = no auth (single-user
+# localhost default). Required when binding on a non-loopback host.
+# Two modes use the same secret:
+#   X-API-Key: <secret>                     — shared-key mode (trusted team)
+#   Authorization: Bearer <user_id>.<hmac>  — per-user identity; generate with
+#     `microscope-mem token <user_id>` — the verified user_id is bound to the
+#     caller, so a user can never read another user's scoped memories.
 api_key = ""
 
 # CORS origin

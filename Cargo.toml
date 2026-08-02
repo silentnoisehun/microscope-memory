@@ -63,14 +63,9 @@ axum = "0.7"
 tokio = { version = "1.36", features = ["full"] }
 tower-http = { version = "0.5", features = ["cors", "trace"] }
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "blocking"] }
-
-[target.'cfg(target_arch = "wasm32")'.dependencies]
-wasm-bindgen = "0.2"
-web-sys = { version = "0.3", features = ["console"] }
-getrandom = { version = "0.2", features = ["js"] }
-
-# Optional features
-pyo3 = { version = "0.20", features = ["extension-module"], optional = true }
+# Optional features (native only — must not live under the wasm32 target
+# section, otherwise the feature-gated crates are unresolvable on native builds)
+pyo3 = { version = "0.29", features = ["extension-module"], optional = true }
 wgpu = { version = "0.19", optional = true }
 bytemuck = { version = "1.13", features = ["derive"], optional = true }
 pollster = { version = "0.3", optional = true }
@@ -79,11 +74,16 @@ candle-nn = { version = "0.3", optional = true }
 hf-hub = { version = "0.3", optional = true }
 tokenizers = { version = "0.15", optional = true }
 
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen = "0.2"
+web-sys = { version = "0.3", features = ["console"] }
+getrandom = { version = "0.2", features = ["js"] }
+
 [features]
 default = ["native"]
 native = []
 wasm = []
-python = ["pyo3"]
+python = ["dep:pyo3"]
 compression = ["zstd"]
 gpu = ["wgpu", "bytemuck", "pollster"]
 embeddings = ["candle-core", "candle-nn", "hf-hub", "tokenizers"]
@@ -104,6 +104,3 @@ lto = "fat"
 codegen-units = 1
 panic = "abort"
 strip = true
-
-
-wasm-opt = false

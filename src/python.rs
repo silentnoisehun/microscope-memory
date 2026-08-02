@@ -18,7 +18,7 @@ pub struct PyMicroscope {
 }
 
 #[cfg(feature = "python")]
-#[pyclass]
+#[pyclass(skip_from_py_object)]
 #[derive(Clone)]
 pub struct PyBlock {
     #[pyo3(get, set)]
@@ -123,7 +123,7 @@ impl PyMicroscope {
             }
         }
 
-        results.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
+        results.sort_by(|a, b| b.0.total_cmp(&a.0));
         results.truncate(k);
 
         Ok(results.into_iter().map(|(_, b)| b).collect())
@@ -161,7 +161,7 @@ impl PyMicroscope {
         }
 
         // Sort by distance (stored in similarity field)
-        results.sort_by(|a, b| b.similarity.partial_cmp(&a.similarity).unwrap());
+        results.sort_by(|a, b| b.similarity.total_cmp(&a.similarity));
 
         Ok(results)
     }
@@ -207,7 +207,7 @@ impl PyMicroscope {
             }
         }
 
-        results.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
+        results.sort_by(|a, b| b.0.total_cmp(&a.0));
         results.truncate(k);
 
         Ok(results.into_iter().map(|(_, b)| b).collect())
@@ -225,7 +225,7 @@ impl PyMicroscope {
     }
 
     /// Load blocks from list
-    pub fn load_blocks(&mut self, blocks: &PyList) -> PyResult<()> {
+    pub fn load_blocks(&mut self, blocks: &Bound<'_, PyList>) -> PyResult<()> {
         self.clear();
 
         for item in blocks.iter() {
@@ -258,7 +258,7 @@ impl PyMicroscope {
 /// Python module definition
 #[cfg(feature = "python")]
 #[pymodule]
-fn microscope_memory(_py: Python, m: &PyModule) -> PyResult<()> {
+fn microscope_memory(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyMicroscope>()?;
     m.add_class::<PyBlock>()?;
     m.add("__version__", "0.1.0")?;

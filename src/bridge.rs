@@ -37,6 +37,22 @@ fn is_loopback(host: &str) -> bool {
     matches!(host, "127.0.0.1" | "localhost" | "::1")
 }
 
+/// Build the CORS layer honoring the configured `[server] cors_origin`
+/// (`"*"`/unset keeps the fully-open default).
+fn cors_layer(configured: &Option<String>) -> CorsLayer {
+    let allow_origin = match configured.as_deref() {
+        None | Some("*") => tower_http::cors::AllowOrigin::any(),
+        Some(origin) => match origin.parse::<HeaderValue>() {
+            Ok(v) => tower_http::cors::AllowOrigin::exact(v),
+            Err(_) => tower_http::cors::AllowOrigin::any(),
+        },
+    };
+    CorsLayer::new()
+        .allow_origin(allow_origin)
+        .allow_methods(Any)
+        .allow_headers(Any)
+}
+
 /// Constant-time byte comparison for MAC verification.
 fn ct_eq(a: &[u8], b: &[u8]) -> bool {
     if a.len() != b.len() {
@@ -1434,10 +1450,7 @@ pub async fn run(
         active_project: Arc::new(Mutex::new(None)),
     });
 
-    let cors = CorsLayer::new()
-        .allow_origin(Any)
-        .allow_methods(Any)
-        .allow_headers(Any);
+    let cors = cors_layer(&state.config.server.cors_origin);
 
     let v1_routes = Router::new()
         .route("/status", get(get_status))
@@ -1715,5 +1728,52 @@ mod tests {
         assert!(is_loopback("::1"));
         assert!(!is_loopback("0.0.0.0"));
         assert!(!is_loopback("192.168.1.10"));
+    }
+
+    #[tokio::test]
+    async fn cors_honors_configured_origin() {
+        let origin = "https://app.example".to_string();
+        let app = Router::new()
+            .route("/ping", get(|| async { "pong" }))
+            .layer(cors_layer(&Some(origin)));
+
+        // Matching origin → allowed.
+        let resp = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/ping")
+                    .header("origin", "https://app.example")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            resp.headers()
+                .get("access-control-allow-origin")
+                .and_then(|v| v.to_str().ok()),
+            Some("https://app.example")
+        );
+
+        // Non-matching origin → the response carries the configured origin,
+        // never the requester's; a browser therefore blocks the read.
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .uri("/ping")
+                    .header("origin", "https://evil.example")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert!(
+            resp.headers()
+                .get("access-control-allow-origin")
+                .and_then(|v| v.to_str().ok())
+                != Some("https://evil.example"),
+            "the requester's origin must never be reflected"
+        );
     }
 }

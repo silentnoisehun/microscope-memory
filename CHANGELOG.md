@@ -80,6 +80,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   process can map the file and read the live consciousness snapshot. Covered by
   roundtrip, uninitialized-file, no-torn-reads-under-concurrency and
   stream-publishes-to-mmap tests.
+- **Honored `[server] cors_origin`**: the bridge previously hardcoded
+  `allow_origin(Any)` and silently ignored the config value. It now uses the
+  configured origin (exact match; the requester's origin is never reflected),
+  with `"*"`/unset keeping the open default. Covered by a CORS test.
+- **Deterministic morphogenesis**: the growth functions derive their RNG from
+  `Seed::rng()` (FNV hash of the seed id + position), so the same seed always
+  produces the same organism — the previously flaky, RNG-driven tests are now
+  fully deterministic.
+- **Debug CLI stack overflow fixed**: `main` now runs the async runtime on a
+  16 MiB thread, so debug builds no longer overflow the 1 MiB OS main-thread
+  stack at startup (`cargo run` works again).
 
 ### Changed
 - **Bounded layer retention**: `layer_retention_entries` default is now 2000

@@ -1102,8 +1102,22 @@ fn init_demo(config: &Config, force: bool) -> Result<(), String> {
     Ok(())
 }
 
-#[tokio::main]
-async fn main() {
+fn main() {
+    // Debug builds carry a large async future frame; give the thread that
+    // runs `block_on` a generous stack so `cargo run` does not overflow on
+    // startup (the OS main-thread default is 1 MiB on Windows).
+    std::thread::Builder::new()
+        .stack_size(16 * 1024 * 1024)
+        .spawn(|| {
+            let runtime = tokio::runtime::Runtime::new().expect("build tokio runtime");
+            runtime.block_on(async_main());
+        })
+        .expect("spawn main thread")
+        .join()
+        .expect("main thread panicked");
+}
+
+async fn async_main() {
     let config_path =
         std::env::var("MICROSCOPE_CONFIG").unwrap_or_else(|_| DEFAULT_CONFIG_PATH.to_string());
     let config = Config::load(&config_path).unwrap_or_else(|_| {

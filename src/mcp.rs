@@ -1473,7 +1473,7 @@ fn tool_evidence_link(config: &Config, args: &Value) -> Result<String, String> {
         u64::from_str_radix(support_text, 16).map_err(|e| format!("invalid hex: {e}"))?
     } else { crate::epistemic::content_hash(support_text) };
     crate::epistemic::link_evidence(&mut ledger, &mut audit, claim_ch, support_ch, class, source, now,
-        Some(support_text), Some(claim_text))
+        Some(support_text), Some(claim_text), None)
         .map_err(|e| e)?;
     ledger.save(output_dir).map_err(|e| e)?;
     audit.save(output_dir).map_err(|e| e)?;

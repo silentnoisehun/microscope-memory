@@ -435,7 +435,9 @@ pub fn content_hash(text: &str) -> u64 {
 /// - The support is an echo — does not increment `distinct_sources`.
 ///
 /// When `support_text` and `claim_text` are provided, uses cosine similarity
-/// for echo detection (C2). Otherwise falls back to source_id-only check.
+/// for echo detection (C2). When `provider` is `Some`, uses cosine similarity;
+/// when `None`, falls back to source_id-only check.
+#[allow(clippy::too_many_arguments)]
 pub fn link_evidence(
     ledger: &mut EvidenceLedger,
     audit: &mut AuditChain,
@@ -446,6 +448,7 @@ pub fn link_evidence(
     now_ms: u64,
     support_text: Option<&str>,
     claim_text: Option<&str>,
+    provider: Option<&dyn crate::embeddings::EmbeddingProvider>,
 ) -> Result<(), String> {
     // C3: only Observation/Evidence can support
     if !support_class.can_support() {
@@ -467,7 +470,7 @@ pub fn link_evidence(
     // Check 2: cosine similarity with claim text above threshold → self-echo.
     let is_new_source = compute_is_new_source(
         ledger, support_hash, support_source, support_class, now_ms,
-        support_text, claim_text,
+        support_text, claim_text, provider,
     );
 
     // Get or create the claim record
@@ -500,6 +503,7 @@ pub fn link_evidence(
 /// Uses two checks:
 /// 1. source_id match against existing records (fast, always available)
 /// 2. cosine similarity between support_text and claim_text (when texts provided)
+#[allow(clippy::too_many_arguments)]
 fn compute_is_new_source(
     ledger: &mut EvidenceLedger,
     support_hash: u64,
@@ -508,6 +512,7 @@ fn compute_is_new_source(
     now_ms: u64,
     support_text: Option<&str>,
     claim_text: Option<&str>,
+    provider: Option<&dyn crate::embeddings::EmbeddingProvider>,
 ) -> bool {
     // Check 1: same source_id as an existing record → echo
     let same_source = ledger.records.get(&support_hash)
@@ -515,40 +520,41 @@ fn compute_is_new_source(
         .unwrap_or(false);
 
     // Check 2: cosine similarity with claim text → self-echo
-    let cosine_echo = match (support_text, claim_text) {
-        (Some(s), Some(c)) => is_echo_cosine(s, c),
+    let cosine_echo = match (support_text, claim_text, provider) {
+        (Some(s), Some(c), Some(p)) => is_echo_cosine(p, s, c, DEFAULT_SIM_THRESHOLD),
         _ => false,
     };
 
     let is_echo = same_source || cosine_echo;
 
     // Ensure the support block exists in the ledger
-    if !ledger.records.contains_key(&support_hash) {
-        ledger.records.insert(support_hash, EvidenceRecord {
-            content_hash: support_hash,
-            class: support_class,
-            source_id: support_source,
-            support_count: 0,
-            refute_count: 0,
-            distinct_sources: 0,
-            first_seen_ms: now_ms,
-            last_support_ms: 0,
-            last_refute_ms: 0,
-            confidence: 0,
-            flags: 0,
-        });
-    }
+    ledger.records.entry(support_hash).or_insert_with(|| EvidenceRecord {
+        content_hash: support_hash,
+        class: support_class,
+        source_id: support_source,
+        support_count: 0,
+        refute_count: 0,
+        distinct_sources: 0,
+        first_seen_ms: now_ms,
+        last_support_ms: 0,
+        last_refute_ms: 0,
+        confidence: 0,
+        flags: 0,
+    });
 
     !is_echo
 }
 
 /// Check if two texts are echoes using cosine similarity of their embeddings.
 ///
-/// Returns true if the texts are semantically similar above `sim_threshold`
-/// AND would be considered the same claim (not independent evidence).
-fn is_echo_cosine(support_text: &str, claim_text: &str) -> bool {
-    use crate::embeddings::{cosine_similarity_scalar, EmbeddingProvider, MockEmbeddingProvider};
-    let provider = MockEmbeddingProvider::new(128);
+/// Returns true if the texts are semantically similar above `threshold`.
+pub fn is_echo_cosine(
+    provider: &dyn crate::embeddings::EmbeddingProvider,
+    support_text: &str,
+    claim_text: &str,
+    threshold: f32,
+) -> bool {
+    use crate::embeddings::cosine_similarity_scalar;
     let a = match provider.embed(support_text) {
         Ok(v) => v,
         Err(_) => return false,
@@ -557,8 +563,7 @@ fn is_echo_cosine(support_text: &str, claim_text: &str) -> bool {
         Ok(v) => v,
         Err(_) => return false,
     };
-    let sim = cosine_similarity_scalar(&a, &b);
-    sim >= DEFAULT_SIM_THRESHOLD
+    cosine_similarity_scalar(&a, &b) >= threshold
 }
 
 /// Record a refutation against a claim.
@@ -647,7 +652,7 @@ mod tests {
             claim_hash,
             content_hash("test"),
             EpistemicClass::Observation,
-            0xBEEF, ms(0), None, None,
+            0xBEEF, ms(0), None, None, None,
         );
 
         let before = ledger.records[&claim_hash].confidence;
@@ -699,12 +704,12 @@ mod tests {
         let obs_hash = content_hash("observed fact");
 
         // Link from source A
-        link_evidence(&mut ledger, &mut audit, claim_hash, obs_hash, EpistemicClass::Observation, 0xAAAA, ms(0), None, None).unwrap();
+        link_evidence(&mut ledger, &mut audit, claim_hash, obs_hash, EpistemicClass::Observation, 0xAAAA, ms(0), None, None, None).unwrap();
         let ds_after_first = ledger.records[&claim_hash].distinct_sources;
         assert_eq!(ds_after_first, 1);
 
         // Link again from SAME source (same source_id = echo)
-        link_evidence(&mut ledger, &mut audit, claim_hash, obs_hash, EpistemicClass::Observation, 0xAAAA, ms(1), None, None).unwrap();
+        link_evidence(&mut ledger, &mut audit, claim_hash, obs_hash, EpistemicClass::Observation, 0xAAAA, ms(1), None, None, None).unwrap();
         let ds_after_second = ledger.records[&claim_hash].distinct_sources;
         assert_eq!(ds_after_second, 1, "C2 violated: same source should not increase distinct_sources");
         // support_count SHOULD increase (it's still a link)
@@ -720,8 +725,8 @@ mod tests {
         let claim_hash = content_hash("a claim");
         let obs_hash = content_hash("observed fact");
 
-        link_evidence(&mut ledger, &mut audit, claim_hash, obs_hash, EpistemicClass::Observation, 0xAAAA, ms(0), None, None).unwrap();
-        link_evidence(&mut ledger, &mut audit, claim_hash, obs_hash, EpistemicClass::Observation, 0xBBBB, ms(1), None, None).unwrap();
+        link_evidence(&mut ledger, &mut audit, claim_hash, obs_hash, EpistemicClass::Observation, 0xAAAA, ms(0), None, None, None).unwrap();
+        link_evidence(&mut ledger, &mut audit, claim_hash, obs_hash, EpistemicClass::Observation, 0xBBBB, ms(1), None, None, None).unwrap();
 
         assert_eq!(ledger.records[&claim_hash].distinct_sources, 2,
             "different sources should increase distinct_sources");
@@ -740,7 +745,7 @@ mod tests {
 
         let result = link_evidence(
             &mut ledger, &mut audit, claim, inf,
-            EpistemicClass::Inference, 0x1, ms(0), None, None,
+            EpistemicClass::Inference, 0x1, ms(0), None, None, None,
         );
         assert!(result.is_err(), "C3 violated: Inference should not be able to support");
         assert!(result.unwrap_err().contains("cannot serve as support"));
@@ -757,7 +762,7 @@ mod tests {
 
         let result = link_evidence(
             &mut ledger, &mut audit, claim, hyp,
-            EpistemicClass::Hypothesis, 0x1, ms(0), None, None,
+            EpistemicClass::Hypothesis, 0x1, ms(0), None, None, None,
         );
         assert!(result.is_err(), "C3 violated: Hypothesis should not be able to support");
     }
@@ -771,7 +776,7 @@ mod tests {
         let claim = content_hash("claim");
         let obs = content_hash("observation");
 
-        assert!(link_evidence(&mut ledger, &mut audit, claim, obs, EpistemicClass::Observation, 0x1, ms(0), None, None).is_ok());
+        assert!(link_evidence(&mut ledger, &mut audit, claim, obs, EpistemicClass::Observation, 0x1, ms(0), None, None, None).is_ok());
     }
 
     #[test]
@@ -783,7 +788,7 @@ mod tests {
         let claim = content_hash("claim");
         let evi = content_hash("evidence");
 
-        assert!(link_evidence(&mut ledger, &mut audit, claim, evi, EpistemicClass::Evidence, 0x1, ms(0), None, None).is_ok());
+        assert!(link_evidence(&mut ledger, &mut audit, claim, evi, EpistemicClass::Evidence, 0x1, ms(0), None, None, None).is_ok());
     }
 
     // ── C4: Promotion gate ────────────────────────────
@@ -804,7 +809,7 @@ mod tests {
 
         let claim_hash = content_hash("supported inference");
         let obs_hash = content_hash("supporting observation");
-        link_evidence(&mut ledger, &mut audit, claim_hash, obs_hash, EpistemicClass::Observation, 0xBEEF, ms(0), None, None).unwrap();
+        link_evidence(&mut ledger, &mut audit, claim_hash, obs_hash, EpistemicClass::Observation, 0xBEEF, ms(0), None, None, None).unwrap();
 
         assert!(check_promotion_gate(&ledger, EpistemicClass::Inference, claim_hash).is_ok());
     }
@@ -903,7 +908,7 @@ mod tests {
 
         // Build up confidence with 3 supports from different sources
         for src in [0x100u64, 0x200, 0x300] {
-            link_evidence(&mut ledger, &mut audit, claim, obs, EpistemicClass::Observation, src, ms(0), None, None).unwrap();
+            link_evidence(&mut ledger, &mut audit, claim, obs, EpistemicClass::Observation, src, ms(0), None, None, None).unwrap();
         }
         let before_refute = ledger.records[&claim].confidence;
         assert!(before_refute > 0);
@@ -924,7 +929,7 @@ mod tests {
         let mut audit = AuditChain::load_or_init(dir.path());
 
         let h = content_hash("self-referencing claim");
-        let result = link_evidence(&mut ledger, &mut audit, h, h, EpistemicClass::Observation, 1, ms(0), None, None);
+        let result = link_evidence(&mut ledger, &mut audit, h, h, EpistemicClass::Observation, 1, ms(0), None, None, None);
         assert!(result.is_err(), "self-reference should be blocked");
     }
 
@@ -939,7 +944,7 @@ mod tests {
 
             let claim = content_hash("persistent claim");
             link_evidence(&mut ledger, &mut audit, claim,
-                           content_hash("obs"), EpistemicClass::Observation, 0xA, ms(0), None, None).unwrap();
+                           content_hash("obs"), EpistemicClass::Observation, 0xA, ms(0), None, None, None).unwrap();
             ledger.save(dir.path()).unwrap();
             audit.save(dir.path()).unwrap();
         }
@@ -975,7 +980,7 @@ mod tests {
 
         for src in 1u64..=5 {
             link_evidence(&mut ledger, &mut audit, claim,
-                           content_hash("obs"), EpistemicClass::Observation, src, ms(0), None, None).unwrap();
+                           content_hash("obs"), EpistemicClass::Observation, src, ms(0), None, None, None).unwrap();
             let cur = ledger.records[&claim].confidence;
             assert!(cur >= prev_conf, "confidence should be non-decreasing with support");
             prev_conf = cur;
@@ -987,6 +992,8 @@ mod tests {
     /// should NOT increase distinct_sources.
     #[test]
     fn c2_cosine_echo_same_source_no_increment() {
+        use crate::embeddings::MockEmbeddingProvider;
+        let provider = MockEmbeddingProvider::new(128);
         let dir = tmp_dir();
         let mut ledger = EvidenceLedger::load_or_init(dir.path());
         let mut audit = AuditChain::load_or_init(dir.path());
@@ -1000,7 +1007,7 @@ mod tests {
             &mut ledger, &mut audit, claim,
             content_hash(support_text),
             EpistemicClass::Observation, 0xAAAA, ms(0),
-            Some(support_text), Some(claim_text),
+            Some(support_text), Some(claim_text), Some(&provider),
         ).unwrap();
         let ds = ledger.records[&claim].distinct_sources;
         // Cosine echo: same source + similar text → should NOT count as new
@@ -1011,6 +1018,8 @@ mod tests {
     /// C2c: truly independent observations should increase distinct_sources.
     #[test]
     fn c2_truly_independent_obs_increments() {
+        use crate::embeddings::MockEmbeddingProvider;
+        let provider = MockEmbeddingProvider::new(128);
         let dir = tmp_dir();
         let mut ledger = EvidenceLedger::load_or_init(dir.path());
         let mut audit = AuditChain::load_or_init(dir.path());
@@ -1023,7 +1032,7 @@ mod tests {
             &mut ledger, &mut audit, claim,
             content_hash(obs1),
             EpistemicClass::Observation, 0xAAAA, ms(0),
-            Some(obs1), Some(claim_text),
+            Some(obs1), Some(claim_text), Some(&provider),
         ).unwrap();
         let ds1 = ledger.records[&claim].distinct_sources;
         assert_eq!(ds1, 1, "first independent observation should count");

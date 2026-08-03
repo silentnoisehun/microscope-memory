@@ -726,6 +726,7 @@ async fn remember_memory(
                         &mut ledger, &mut audit, claim_hash, sup_hash,
                         crate::epistemic::EpistemicClass::Observation, 0, now,
                         Some(sup), Some(&payload.text),
+                        None,
                     );
                 }
             }

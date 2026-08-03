@@ -3086,6 +3086,7 @@ async fn async_main() {
                         &mut ledger, &mut audit, claim_ch, support_ch,
                         microscope_memory::epistemic::EpistemicClass::Observation, source, now,
                         Some(&support), Some(&claim),
+                        None,
                     ) {
                         Ok(()) => {
                             ledger.save(output_dir).ok();

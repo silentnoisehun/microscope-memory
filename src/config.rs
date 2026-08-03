@@ -143,6 +143,8 @@ pub struct Embedding {
     pub onnx_model_path: Option<String>,
     #[serde(default)]
     pub tokenizer_path: Option<String>,
+    #[serde(default)]
+    pub use_gpu: bool,
 }
 
 fn default_provider() -> String {
@@ -167,6 +169,7 @@ impl Default for Embedding {
             max_depth: default_max_depth(),
             onnx_model_path: None,
             tokenizer_path: None,
+            use_gpu: false,
         }
     }
 }

@@ -72,7 +72,7 @@ pyo3 = { version = "0.29", features = ["extension-module"], optional = true }
 wgpu = { version = "0.19", optional = true }
 bytemuck = { version = "1.13", features = ["derive"], optional = true }
 pollster = { version = "0.3", optional = true }
-candle-core = { version = "0.3", optional = true }
+candle-core = { version = "0.3", optional = true, features = [] }
 candle-nn = { version = "0.3", optional = true }
 candle-transformers = { version = "0.3", optional = true }
 hf-hub = { version = "0.3", optional = true }
@@ -91,6 +91,7 @@ python = ["dep:pyo3"]
 compression = ["zstd"]
 gpu = ["wgpu", "bytemuck", "pollster"]
 embeddings = ["candle-core", "candle-nn", "candle-transformers", "hf-hub", "tokenizers"]
+cuda = ["embeddings", "candle-core/cuda"]
 onnx = []
 console_error_panic_hook = []
 

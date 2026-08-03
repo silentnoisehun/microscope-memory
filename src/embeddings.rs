@@ -419,7 +419,9 @@ pub fn provider_from_config(
             {
                 // BAAI/bge-small-en-v1.5: 33M params, 384 dim
                 // Config is loaded from the model's config.json on first use.
-                match CandleEmbeddingProvider::with_config("BAAI/bge-small-en-v1.5", None, 384) {
+                match CandleEmbeddingProvider::with_config(
+                    "BAAI/bge-small-en-v1.5", None, 384, cfg.use_gpu,
+                ) {
                     Ok(p) => Box::new(p),
                     Err(e) => {
                         eprintln!("  WARN: bge-small init failed: {:?} — using mock", e);
@@ -476,7 +478,7 @@ pub struct CandleEmbeddingProvider {
 #[cfg(feature = "embeddings")]
 impl CandleEmbeddingProvider {
     pub fn new(model_id: &str) -> Result<Self, EmbeddingError> {
-        Self::with_config(model_id, None, 768)
+        Self::with_config(model_id, None, 768, false)
     }
 
     /// Create with explicit BERT config (for non-standard models like bge-small).
@@ -484,11 +486,26 @@ impl CandleEmbeddingProvider {
         model_id: &str,
         config_override: Option<candle_transformers::models::bert::Config>,
         dim_override: usize,
+        use_gpu: bool,
     ) -> Result<Self, EmbeddingError> {
         use candle_core::Device;
         use hf_hub::api::sync::Api;
 
-        let device = Device::Cpu;
+        // Lazy GPU activation: try CUDA only if requested and available.
+        let device = if use_gpu {
+            match Device::cuda_if_available(0) {
+                Ok(d) => {
+                    eprintln!("  [bge] GPU device: {:?}", d);
+                    d
+                }
+                Err(e) => {
+                    eprintln!("  [bge] CUDA unavailable ({}) — falling back to CPU", e);
+                    Device::Cpu
+                }
+            }
+        } else {
+            Device::Cpu
+        };
         let api = Api::new().map_err(|e| EmbeddingError::ApiError(e.to_string()))?;
         let repo = api.model(model_id.to_string());
 

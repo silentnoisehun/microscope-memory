@@ -181,6 +181,33 @@ impl MirrorState {
     pub fn save(&self, output_dir: &Path) -> Result<(), String> {
         save_mirror_state(output_dir, self)
     }
+
+    /// Remap block indexes after rebuild.
+    pub fn remap_indexes(&mut self, old_to_new: &[u32]) {
+        let mut new_resonance = HashMap::new();
+        for (old_idx, block_res) in self.block_resonance.drain() {
+            if (old_idx as usize) < old_to_new.len() {
+                let new_idx = old_to_new[old_idx as usize];
+                if new_idx != u32::MAX {
+                    new_resonance.insert(new_idx, block_res);
+                }
+            }
+        }
+        self.block_resonance = new_resonance;
+
+        // Remap echo shared_blocks
+        for echo in &mut self.echoes {
+            echo.shared_blocks = echo.shared_blocks.iter()
+                .filter_map(|&idx| {
+                    if (idx as usize) < old_to_new.len() {
+                        let new = old_to_new[idx as usize];
+                        if new != u32::MAX { Some(new) } else { None }
+                    } else { None }
+                })
+                .collect();
+        }
+        self.echoes.retain(|e| !e.shared_blocks.is_empty());
+    }
 }
 
 pub struct MirrorStats {

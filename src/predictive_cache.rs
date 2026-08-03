@@ -293,6 +293,22 @@ impl PredictiveCache {
     pub fn save(&self, output_dir: &Path) -> Result<(), String> {
         save_cache(&output_dir.join("predictive_cache.bin"), self)
     }
+
+    /// Remap block indexes after rebuild.
+    pub fn remap_indexes(&mut self, old_to_new: &[u32]) {
+        for pred in &mut self.predictions {
+            pred.blocks = pred.blocks.iter()
+                .filter_map(|&idx| {
+                    if (idx as usize) < old_to_new.len() {
+                        let new = old_to_new[idx as usize];
+                        if new != u32::MAX { Some(new) } else { None }
+                    } else { None }
+                })
+                .collect();
+        }
+        // Remove predictions with empty block lists
+        self.predictions.retain(|p| !p.blocks.is_empty());
+    }
 }
 
 // ─── Binary I/O ─────────────────────────────────────

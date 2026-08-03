@@ -848,6 +848,29 @@ pub fn build(config: &Config, force: bool) -> Result<(), String> {
         crate::reader::build_emotions_from_log(output_dir, &reader)?;
     }
 
+    // ═══ Remap cognitive state after index reorder ═══
+    // MM-001 fix: rebuild reorders blocks by depth, which invalidates all
+    // positional indexes in Hebbian, PredictiveCache, and Mirror state.
+    // We remap them using the old_to_new mapping computed during sort.
+    {
+        let mut hebb = crate::hebbian::HebbianState::load_or_init(output_dir, n);
+        hebb.remap_indexes(&old_to_new);
+        hebb.save(output_dir).map_err(|e| format!("save hebbian after remap: {e}"))?;
+        println!("  {} Hebbian state remapped (MM-001)", "REMAP".magenta());
+    }
+    {
+        let mut pc = crate::predictive_cache::PredictiveCache::load_or_init(output_dir);
+        pc.remap_indexes(&old_to_new);
+        pc.save(output_dir).map_err(|e| format!("save predictive_cache after remap: {e}"))?;
+        println!("  {} PredictiveCache remapped", "REMAP".magenta());
+    }
+    {
+        let mut mirror = crate::mirror::MirrorState::load_or_init(output_dir);
+        mirror.remap_indexes(&old_to_new);
+        mirror.save(output_dir).map_err(|e| format!("save mirror after remap: {e}"))?;
+        println!("  {} MirrorState remapped", "REMAP".magenta());
+    }
+
     println!("\n{}", "ZERO JSON. Pure binary. Done.".green().bold());
     Ok(())
 }

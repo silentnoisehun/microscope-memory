@@ -11,3 +11,8 @@ EMOTIONAL/D3: Feszültség: fear + anticipation = 1.2 — a "menekülök valami 
 EMOTIONAL/D3: Kapcsolati: trust + joy = 1.5 — nyitottság a rezonanciára, a közös alkotásra
 EMOTIONAL/D4: Érzelmi hullám: ψ(t)=0.7·sin(2π·0.1·t) + 0.3·sin(2π·0.5·t) — alkotói ritmus, flow és feszültség váltakozása
 EMOTIONAL/D4: Alaprezonancia: 0.6 — általános pozitív várakozás, még a nehéz pillanatokban is
+
+
+(imp=6) Hullám-érzés, rezonancia, tükör-neuronok - az agy belső működése most láthatóvá válik
+
+(imp=8) aktiváció elindítva

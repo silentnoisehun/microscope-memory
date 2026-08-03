@@ -12,6 +12,7 @@
 
 use crate::config::Config;
 use crate::reader::MicroscopeReader;
+use crate::{store_memory, LAYER_NAMES};
 use std::path::Path;
 use std::sync::Arc;
 #[cfg(unix)]
@@ -146,22 +147,67 @@ impl AIAdapter {
     }
 
     /// Handle write operations.
+    /// The payload format is: [1 byte length][UTF-8 text bytes].
+    /// The text is stored into the append log via store_memory, using the
+    /// layer encoded in cmd.layer and a default importance of 5.
     fn handle_write(&mut self, cmd: AICommand) -> Result<AICommand, String> {
-        // Mark block as dirty for Merkle update
+        let len = cmd.payload[0] as usize;
+        if len > 241 {
+            return Err("Invalid payload length".to_string());
+        }
+        let text = String::from_utf8(cmd.payload[1..1 + len].to_vec())
+            .map_err(|e| format!("Invalid UTF-8 payload: {}", e))?;
+
+        let layer_name = LAYER_NAMES
+            .get(cmd.layer as usize)
+            .copied()
+            .unwrap_or("long_term");
+
+        store_memory(&self.config,
+            &text,
+            layer_name,
+            5, // default importance
+        )?;
+
+        // Mark block as dirty for future Merkle update support
         self.dirty_blocks.insert(cmd.block_id);
 
-        // For now, writes go through the append log
-        // TODO: Implement direct block writing with Merkle updates
-        Err("Direct write not yet implemented".to_string())
+        Ok(AICommand {
+            op_code: 1, // Write response
+            layer: cmd.layer,
+            block_id: cmd.block_id,
+            ..AICommand::default()
+        })
     }
 
     /// Handle learning/drift operations.
+    /// Records a Hebbian activation for the given block with the supplied weight delta.
     fn handle_learn(&mut self, cmd: AICommand) -> Result<AICommand, String> {
-        // Mark block as dirty for Merkle update
+        use crate::hebbian::HebbianState;
+
+        let mut state = HebbianState::load_or_init(
+            Path::new(&self.config.paths.output_dir),
+            self.reader.block_count,
+        );
+
+        let block_idx = cmd.block_id as u32;
+        let query_hash = cmd.block_id; // use block id as query identifier
+        state.record_activation(
+            &[(block_idx, cmd.weight_delta)],
+            query_hash,
+        );
+
+        state.save(Path::new(&self.config.paths.output_dir))?;
+
+        // Mark block as dirty for future Merkle update support
         self.dirty_blocks.insert(cmd.block_id);
 
-        // TODO: Implement Hebbian learning interface with saturation
-        Err("Learning operations not yet implemented".to_string())
+        Ok(AICommand {
+            op_code: 2, // Learn response
+            layer: cmd.layer,
+            block_id: cmd.block_id,
+            ..AICommand::default()
+        })
     }
 
     /// Force immediate Merkle tree update for dirty blocks.
@@ -191,15 +237,129 @@ impl AIAdapter {
     }
 }
 
-// ─── Cross-Platform Socket Listener ─────────────────────
+
+// ─── Windows Named Pipe Implementation ──────────────────
+
+#[cfg(windows)]
+mod windows_pipe {
+    use std::ffi::CString;
+        use windows_sys::Win32::Foundation::{HANDLE, INVALID_HANDLE_VALUE, CloseHandle};
+    use windows_sys::Win32::Storage::FileSystem::{ReadFile, WriteFile, PIPE_ACCESS_DUPLEX};
+    use windows_sys::Win32::System::Pipes::{CreateNamedPipeA, ConnectNamedPipe, DisconnectNamedPipe, PIPE_TYPE_MESSAGE, PIPE_READMODE_MESSAGE, PIPE_WAIT, PIPE_REJECT_REMOTE_CLIENTS};
+
+    pub struct NamedPipeListener {
+        handle: HANDLE,
+    }
+
+    impl NamedPipeListener {
+        pub fn new(name: &str) -> Result<Self, String> {
+            // Ensure pipe name uses Windows named pipe format
+            let pipe_name = if name.starts_with("\\\\.\\pipe\\") {
+                name.to_string()
+            } else {
+                format!("\\\\.\\pipe\\{}", name)
+            };
+            let c_name = CString::new(pipe_name).map_err(|e| format!("Invalid pipe name: {}", e))?;
+
+            let handle = unsafe {
+                CreateNamedPipeA(
+                    c_name.as_ptr() as *const u8,
+                    PIPE_ACCESS_DUPLEX,
+                    PIPE_TYPE_MESSAGE | PIPE_READMODE_MESSAGE | PIPE_WAIT | PIPE_REJECT_REMOTE_CLIENTS,
+                    1, // max instances
+                    256, // out buffer
+                    256, // in buffer
+                    0, // default timeout
+                    std::ptr::null(), // no security attrs
+                )
+            };
+
+            if handle == INVALID_HANDLE_VALUE {
+                return Err("Failed to create named pipe".to_string());
+            }
+
+            Ok(Self { handle })
+        }
+
+        pub fn accept(&self) -> Result<NamedPipeConnection, String> {
+            let connected = unsafe { ConnectNamedPipe(self.handle, std::ptr::null_mut()) };
+            if connected == 0 {
+                // Client may already be connected; GetLastError would tell, but we proceed
+            }
+            Ok(NamedPipeConnection { handle: self.handle })
+        }
+    }
+
+    impl Drop for NamedPipeListener {
+        fn drop(&mut self) {
+            unsafe { CloseHandle(self.handle); }
+        }
+    }
+
+    pub struct NamedPipeConnection {
+        handle: HANDLE,
+    }
+
+    impl NamedPipeConnection {
+        pub fn read_exact(&mut self, buf: &mut [u8]) -> Result<(), String> {
+            let mut total = 0usize;
+            while total < buf.len() {
+                let mut read = 0u32;
+                let ok = unsafe {
+                    ReadFile(
+                        self.handle,
+                        buf.as_mut_ptr().add(total) as *mut u8,
+                        (buf.len() - total) as u32,
+                        &mut read,
+                        std::ptr::null_mut(),
+                    )
+                };
+                if ok == 0 {
+                    return Err("ReadFile failed".to_string());
+                }
+                if read == 0 {
+                    return Err("Pipe closed".to_string());
+                }
+                total += read as usize;
+            }
+            Ok(())
+        }
+
+        pub fn write_all(&mut self, buf: &[u8]) -> Result<(), String> {
+            let mut total = 0usize;
+            while total < buf.len() {
+                let mut written = 0u32;
+                let ok = unsafe {
+                    WriteFile(
+                        self.handle,
+                        buf.as_ptr().add(total) as *const u8,
+                        (buf.len() - total) as u32,
+                        &mut written,
+                        std::ptr::null_mut(),
+                    )
+                };
+                if ok == 0 {
+                    return Err("WriteFile failed".to_string());
+                }
+                total += written as usize;
+            }
+            Ok(())
+        }
+    }
+
+    impl Drop for NamedPipeConnection {
+        fn drop(&mut self) {
+            unsafe { DisconnectNamedPipe(self.handle); }
+        }
+    }
+}// ─── Cross-Platform Socket Listener ─────────────────────
 
 /// Platform-specific socket listener for AI communication.
 pub struct AISocketListener {
     #[cfg(unix)]
     listener: std::os::unix::net::UnixListener,
     #[cfg(windows)]
-    // TODO: Implement named pipe listener for Windows
-    _placeholder: (),
+    listener: windows_pipe::NamedPipeListener,
 }
 
 impl AISocketListener {
@@ -216,9 +376,10 @@ impl AISocketListener {
     }
 
     #[cfg(windows)]
-    pub fn new(_path: &str) -> Result<Self, String> {
-        // TODO: Implement Windows named pipe
-        Err("Windows named pipe support not yet implemented".to_string())
+    pub fn new(path: &str) -> Result<Self, String> {
+        let listener = windows_pipe::NamedPipeListener::new(path)
+            .map_err(|e| format!("Failed to create named pipe listener: {}", e))?;
+        Ok(Self { listener })
     }
 
     /// Accept incoming connections and handle commands.
@@ -273,8 +434,41 @@ impl AISocketListener {
 
         #[cfg(windows)]
         {
-            // TODO: Implement Windows named pipe listening
-            Err("Windows support not implemented".to_string())
+            loop {
+                let mut conn = match self.listener.accept() {
+                    Ok(c) => c,
+                    Err(e) => {
+                        eprintln!("Connection error: {}", e);
+                        continue;
+                    }
+                };
+
+                let mut buffer = [0u8; 256];
+                if let Err(e) = conn.read_exact(&mut buffer) {
+                    eprintln!("Read error: {}", e);
+                    continue;
+                }
+
+                let cmd: AICommand = unsafe { std::mem::transmute(buffer) };
+
+                match adapter.process_command(cmd) {
+                    Ok(response) => {
+                        let response_bytes: [u8; 256] = unsafe { std::mem::transmute(response) };
+                        if let Err(e) = conn.write_all(&response_bytes) {
+                            eprintln!("Write error: {}", e);
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("Command processing error: {}", e);
+                        let error_response = AICommand {
+                            op_code: 255,
+                            ..AICommand::default()
+                        };
+                        let response_bytes: [u8; 256] = unsafe { std::mem::transmute(error_response) };
+                        let _ = conn.write_all(&response_bytes);
+                    }
+                }
+            }
         }
 
         #[cfg(not(windows))]
@@ -345,3 +539,16 @@ mod tests {
         );
     }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+

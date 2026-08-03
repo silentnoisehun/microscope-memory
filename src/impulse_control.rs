@@ -56,8 +56,7 @@ impl ImpulseControl {
 
     /// Add a suppression pattern (keywords to automatically suppress)
     pub fn add_suppression_pattern(&mut self, pattern: &str) {
-        crate::sync_guard::write_lock(&self.suppression_patterns)
-            .insert(pattern.to_lowercase());
+        crate::sync_guard::write_lock(&self.suppression_patterns).insert(pattern.to_lowercase());
     }
 
     /// Filter a stimulus based on attention gates and goals

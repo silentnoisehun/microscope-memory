@@ -7,7 +7,7 @@
 
 [![Rust](https://img.shields.io/badge/language-Rust-orange.svg)](https://www.rust-lang.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/Tests-322%20passing-brightgreen.svg)](#-testing)
+[![Tests](https://img.shields.io/badge/Tests-339%20passing-brightgreen.svg)](#-testing)
 
 **Microscope Memory** is a Rust-native binary memory engine for AI agents.
 
@@ -397,13 +397,13 @@ CURIOUS: I am curious about:
 ## 📦 Optional Features
 
 ```bash
-# GPU-accelerated embedding search
+# GPU-accelerated embedding search (CUDA lazy activation, RTX 4050 ready)
 cargo build --release --features gpu
 
 # Native ONNX embedding models
 cargo build --release --features onnx
 
-# Candle-based embeddings (HF models, sentence-transformers, etc.)
+# Candle-based embeddings (HF models, sentence-transformers, bge-small-en-v1.5)
 cargo build --release --features embeddings
 
 # Compression (zstd for archived exports)
@@ -416,12 +416,19 @@ cargo build --release --features python
 cargo build --release --target wasm32-unknown-unknown --features wasm
 ```
 
+### New in recent commits
+
+- **CUDA lazy GPU activation** -- candle-core/cuda with Device::cuda_if_available(0), CPU fallback, RTX 4050 tested. Enable via embeddings + cuda features and set use_gpu = true under [embedding].
+- **bge-small-en-v1.5 embedding provider** -- candle-based HuggingFace model support with automatic config.json loading. Provider id bge-small, 384 dim.
+- **Cosine echo filter + bridge class support** -- two-stage echo detection (source_id + cosine similarity) in epistemic.rs; RememberRequest now carries class and supports for richer evidence linking.
+- **Cognitive-state index remapping on rebuild (MM-001)** -- Hebbian, mirror and predictive-cache states are remapped after a rebuild so learned associations survive index reorganization.
+
 ---
 
 ## 🧪 Testing
 
 ```bash
-cargo test                     # 322 unit + integration tests
+cargo test                     # 339 unit + integration tests
 cargo test --test integration  # integration only
 cargo test --lib               # library only
 cargo test --test relevance_benchmark -- --nocapture
@@ -430,7 +437,7 @@ cargo bench                    # criterion benchmarks
 
 The deterministic relevance gate uses a versioned 20-memory, 10-query English/Hungarian corpus. It reports Recall@3 and mean reciprocal rank (MRR), compares the legacy clamped-distance formula with the shared hybrid ranker, and fails below `Recall@3 = 0.90` or `MRR = 0.80`.
 
-Current verified quality result: legacy `Recall@3 = 0.900`, `MRR = 0.492`; hybrid `Recall@3 = 1.000`, `MRR = 1.000`. The full `cargo test` run passes 322 tests, including the existing consciousness performance checks. See [docs/RELEVANCE_BENCHMARK.md](docs/RELEVANCE_BENCHMARK.md) for the reproducible dataset and measurement contract.
+Current verified quality result: legacy `Recall@3 = 0.900`, `MRR = 0.492`; hybrid `Recall@3 = 1.000`, `MRR = 1.000`. The full `cargo test` run passes 339 tests, including the existing consciousness performance checks. See [docs/RELEVANCE_BENCHMARK.md](docs/RELEVANCE_BENCHMARK.md) for the reproducible dataset and measurement contract.
 
 Coverage spans all 13 consciousness layers, relevance ranking, MQL, CRC, Merkle, snapshot, embedding index, multimodal, dream, attention, and more. See `WHITEPAPER.md` §8 for the full per-module breakdown.
 
@@ -869,3 +876,4 @@ Download the [HOPE-Architect style whitepaper](docs/microscope-memory-public-dem
 
 - microscope-memory root crate: 322 tests
 - **Total verified by `cargo test`: 322 passing, 0 failed**
+

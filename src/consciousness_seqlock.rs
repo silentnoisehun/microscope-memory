@@ -405,8 +405,8 @@ impl MappedSnapshot {
                 MmapSnapshot::FILE_SIZE
             ));
         }
-        let mmap = unsafe { memmap2::Mmap::map(&file) }
-            .map_err(|e| format!("mmap snapshot file: {e}"))?;
+        let mmap =
+            unsafe { memmap2::Mmap::map(&file) }.map_err(|e| format!("mmap snapshot file: {e}"))?;
         let shared = MmapSnapshot::from_raw(mmap.as_ptr() as *mut u8);
         Ok(Self {
             _file: file,
@@ -502,9 +502,7 @@ impl MappedSnapshotWriter {
                 shared,
             })
         } else {
-            if file.metadata().map_err(|e| e.to_string())?.len()
-                < MmapSnapshot::FILE_SIZE as u64
-            {
+            if file.metadata().map_err(|e| e.to_string())?.len() < MmapSnapshot::FILE_SIZE as u64 {
                 return Err("snapshot file too small for a shared snapshot".to_string());
             }
             let mut mmap = unsafe { memmap2::MmapMut::map_mut(&file) }
@@ -629,7 +627,10 @@ mod tests {
 
         let reader = MappedSnapshot::open(&path).unwrap();
         assert!(!reader.is_initialized());
-        assert!(reader.read().is_none(), "uninitialized file must not yield data");
+        assert!(
+            reader.read().is_none(),
+            "uninitialized file must not yield data"
+        );
     }
 
     #[cfg(not(target_arch = "wasm32"))]

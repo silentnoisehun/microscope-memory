@@ -512,9 +512,7 @@ impl HeuristicDecisionMaker {
             })
             .collect();
 
-        let best = scored
-            .into_iter()
-            .max_by(|a, b| a.0.total_cmp(&b.0))?;
+        let best = scored.into_iter().max_by(|a, b| a.0.total_cmp(&b.0))?;
 
         Some(Decision {
             id: format!("quick_decision_{}", rand::random::<u32>()),

@@ -103,6 +103,20 @@ pub fn apply_boost(distance: f32, boost: f32) -> f32 {
     distance / (1.0 + boost.max(0.0))
 }
 
+/// Apply an evidence-confidence boost to the rank distance.
+///
+/// `confidence` is 0..100 (0 = no evidence). The boost is subtracted from
+/// the divisor, so higher confidence means lower distance (better rank).
+/// A confidence of 50 reduces the distance by ~5%; 100 by ~10%.
+///
+/// The boost is gentle — it cannot dominate lexical or spatial distance,
+/// it only orders memories with the same content by how much evidence
+/// stands behind them. C1: recall frequency never affects this.
+#[inline]
+pub fn apply_confidence_boost(distance: f32, confidence: u8) -> f32 {
+    distance / (1.0 + (confidence as f32 * 0.001))
+}
+
 fn normalize(text: &str) -> String {
     let mut out = String::with_capacity(text.len());
     let mut previous_was_space = true;

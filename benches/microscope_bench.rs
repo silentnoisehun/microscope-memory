@@ -210,6 +210,47 @@ fn bench_append_log(c: &mut Criterion) {
     group.finish();
 }
 
+
+// ─── Candle embedding device selection ─────────────────
+
+#[cfg(all(not(target_arch = "wasm32"), feature = "embeddings"))]
+fn bench_embedding_device(c: &mut Criterion) {
+    use candle_core::Device;
+
+    let mut group = c.benchmark_group("embedding_device");
+
+    group.bench_function("cpu_explicit", |b| {
+        b.iter(|| {
+            let _device = black_box(Device::Cpu);
+        });
+    });
+
+    group.bench_function("cuda_if_available_false", |b| {
+        b.iter(|| {
+            let _device = black_box(Device::cuda_if_available(0).unwrap_or(Device::Cpu));
+        });
+    });
+
+    group.bench_function("cuda_lazy_with_gpu_request", |b| {
+        b.iter(|| {
+            // This mirrors the lazy GPU activation in embeddings.rs:
+            // if use_gpu is true, try CUDA(0); fall back to CPU.
+            let device = if let Ok(d) = Device::cuda_if_available(0) {
+                d
+            } else {
+                Device::Cpu
+            };
+            let _ = black_box(device);
+        });
+    });
+
+    group.finish();
+}
+
+#[cfg(not(all(not(target_arch = "wasm32"), feature = "embeddings")))]
+fn bench_embedding_device(_c: &mut Criterion) {}
+
+
 criterion_group!(
     benches,
     bench_build_pipeline,
@@ -413,6 +454,7 @@ fn bench_autopoiesis(c: &mut Criterion) {
 criterion_group!(
     cognitive_benches,
     bench_morphogenesis_growth,
+    bench_embedding_device,
     bench_morphogenesis_evaluate_fitness,
     bench_executive_schedule,
     bench_pattern_recognition,

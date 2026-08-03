@@ -227,6 +227,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "bindgen_cuda"
+version = "0.1.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "282be55fb326843bb67cccceeeaf21c961ef303f60018f9a2ab69494dad8eaf9"
+dependencies = [
+ "glob",
+ "num_cpus",
+ "rayon",
+]
+
+[[package]]
 name = "bit-set"
 version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -327,18 +338,29 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6db8659ea87ee8197d2fc627348916cce0561330ee7ae3874e771691d3cecb2f"
 dependencies = [
  "byteorder",
+ "candle-kernels",
+ "cudarc",
  "gemm",
  "half",
  "memmap2",
  "num-traits",
  "num_cpus",
  "rand 0.8.7",
- "rand_distr 0.4.3",
+ "rand_distr",
  "rayon",
  "safetensors",
  "thiserror 1.0.69",
  "yoke 0.7.5",
  "zip",
+]
+
+[[package]]
+name = "candle-kernels"
+version = "0.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d80cdd5f1cc60d30ba61353cdba5accd0fbc4d4ef2fe707fcb5179a9821adbea"
+dependencies = [
+ "bindgen_cuda",
 ]
 
 [[package]]
@@ -354,6 +376,25 @@ dependencies = [
  "safetensors",
  "serde",
  "thiserror 1.0.69",
+]
+
+[[package]]
+name = "candle-transformers"
+version = "0.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "68834a0cacb7e002d1f4abfe26a7cd1237e2ba342fddcf2e30913c4edb96409d"
+dependencies = [
+ "byteorder",
+ "candle-core",
+ "candle-nn",
+ "num-traits",
+ "rand 0.8.7",
+ "rayon",
+ "serde",
+ "serde_json",
+ "serde_plain",
+ "tracing",
+ "wav",
 ]
 
 [[package]]
@@ -699,6 +740,15 @@ checksum = "78c8292055d1c1df0cce5d180393dc8cce0abec0a7102adb6c7b1eef6016d60a"
 dependencies = [
  "generic-array",
  "typenum",
+]
+
+[[package]]
+name = "cudarc"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9395df0cab995685664e79cc35ad6302bf08fb9c5d82301875a183affe1278b1"
+dependencies = [
+ "half",
 ]
 
 [[package]]
@@ -1195,6 +1245,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "glob"
+version = "0.3.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e4eba85ea1d0a966a983acd07deee566e67395d2d96b6fb39e62b5a833f1eb0b"
+
+[[package]]
 name = "glow"
 version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1269,17 +1325,16 @@ dependencies = [
 
 [[package]]
 name = "half"
-version = "2.7.1"
+version = "2.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6ea2d84b969582b4b1864a92dc5d27cd2b77b622a8d79306834f1be5ba20d84b"
+checksum = "6dd08c532ae367adf81c312a4580bc67f1d0fe8bc9c460520283f4c0ff277888"
 dependencies = [
  "bytemuck",
  "cfg-if",
  "crunchy",
  "num-traits",
- "rand 0.9.5",
- "rand_distr 0.5.1",
- "zerocopy",
+ "rand 0.8.7",
+ "rand_distr",
 ]
 
 [[package]]
@@ -1920,10 +1975,12 @@ dependencies = [
  "bytemuck",
  "candle-core",
  "candle-nn",
+ "candle-transformers",
  "clap",
  "colored",
  "criterion",
  "getrandom 0.2.17",
+ "half",
  "hex",
  "hf-hub",
  "hmac",
@@ -2496,18 +2553,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "22f6172bdec972074665ed81ed53b71da00bfc44b65a753cfde883ec4c702a1a"
 dependencies = [
  "libc",
- "rand_chacha 0.3.1",
+ "rand_chacha",
  "rand_core 0.6.4",
-]
-
-[[package]]
-name = "rand"
-version = "0.9.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b9ef1d0d795eb7d84685bca4f72f3649f064e6641543d3a8c415898726a57b41"
-dependencies = [
- "rand_chacha 0.9.0",
- "rand_core 0.9.5",
 ]
 
 [[package]]
@@ -2532,31 +2579,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "rand_chacha"
-version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d3022b5f1df60f26e1ffddd6c66e8aa15de382ae63b3a0c1bfc0e4d3e3f325cb"
-dependencies = [
- "ppv-lite86",
- "rand_core 0.9.5",
-]
-
-[[package]]
 name = "rand_core"
 version = "0.6.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ec0be4795e2f6a28069bec0b5ff3e2ac9bafc99e6a9a7dc3547996c5c816922c"
 dependencies = [
  "getrandom 0.2.17",
-]
-
-[[package]]
-name = "rand_core"
-version = "0.9.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "76afc826de14238e6e8c374ddcc1fa19e374fd8dd986b0d2af0d02377261d83c"
-dependencies = [
- "getrandom 0.3.4",
 ]
 
 [[package]]
@@ -2573,16 +2601,6 @@ checksum = "32cb0b9bc82b0a0876c2dd994a7e7a2683d3e7390ca40e6886785ef0c7e3ee31"
 dependencies = [
  "num-traits",
  "rand 0.8.7",
-]
-
-[[package]]
-name = "rand_distr"
-version = "0.5.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6a8615d50dcf34fa31f7ab52692afec947c4dd0ab803cc87cb3b0b4570ff7463"
-dependencies = [
- "num-traits",
- "rand 0.9.5",
 ]
 
 [[package]]
@@ -2746,6 +2764,12 @@ dependencies = [
  "web-sys",
  "webpki-roots 1.0.6",
 ]
+
+[[package]]
+name = "riff"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b9b1a3d5f46d53f4a3478e2be4a5a5ce5108ea58b100dcd139830eae7f79a3a1"
 
 [[package]]
 name = "ring"
@@ -2955,6 +2979,15 @@ dependencies = [
  "itoa",
  "serde",
  "serde_core",
+]
+
+[[package]]
+name = "serde_plain"
+version = "1.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9ce1fc6db65a611022b23a0dec6975d63fb80a302cb3388835ff02c097258d50"
+dependencies = [
+ "serde",
 ]
 
 [[package]]
@@ -3722,6 +3755,15 @@ dependencies = [
  "hashbrown 0.15.5",
  "indexmap",
  "semver",
+]
+
+[[package]]
+name = "wav"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "99d97402f69875b579ec37f2aa52d1f455a1d6224251edba32e8c18a5da2698d"
+dependencies = [
+ "riff",
 ]
 
 [[package]]

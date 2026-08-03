@@ -51,11 +51,22 @@ fn test_ai_adapter_write_operations() {
     let (_tmp, config) = setup_test_memory();
     let mut adapter = AIAdapter::new(config).expect("Failed to create AI adapter");
 
-    // Test write command (currently returns error, but marks as dirty)
-    let cmd = AICommand::write(1, 0, b"Test data");
+    // Test write command: payload is stored via the append log
+    let mut payload = [0u8; 242];
+    let text = b"Test data";
+    payload[0] = text.len() as u8;
+    payload[1..1 + text.len()].copy_from_slice(text);
+    let cmd = AICommand {
+        op_code: 1,
+        layer: 1, // long_term
+        block_id: 0,
+        weight_delta: 0.0,
+        payload,
+    };
     let result = adapter.process_command(cmd);
-    assert!(result.is_err()); // Not implemented yet
-    assert!(result.unwrap_err().contains("not yet implemented"));
+    assert!(result.is_ok());
+    let response = result.unwrap();
+    assert_eq!(response.op_code, 1); // Write response
 }
 
 #[test]
@@ -63,11 +74,13 @@ fn test_ai_adapter_learning_operations() {
     let (_tmp, config) = setup_test_memory();
     let mut adapter = AIAdapter::new(config).expect("Failed to create AI adapter");
 
-    // Test learning command (currently returns error, but marks as dirty)
+    // Test learning command: records Hebbian activation for block 0
     let cmd = AICommand::learn(0, 0.1);
     let result = adapter.process_command(cmd);
-    assert!(result.is_err()); // Not implemented yet
-    assert!(result.unwrap_err().contains("not yet implemented"));
+    assert!(result.is_ok());
+    let response = result.unwrap();
+    assert_eq!(response.op_code, 2); // Learn response
+    assert_eq!(response.block_id, 0);
 }
 
 #[test]
@@ -99,3 +112,5 @@ fn test_lazy_merkle_updates() {
     let result = adapter.process_command(cmd);
     assert!(result.is_ok());
 }
+
+

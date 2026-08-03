@@ -2889,10 +2889,18 @@ mod tests {
             Seed::new("c", -1.0, 0.5, 2.0, "cache"),
         ];
 
-        let first = MorphogenesisEngine::new()
-            .evolve_population(&seeds, 3, &FitnessObjective::Balanced, 12);
-        let second = MorphogenesisEngine::new()
-            .evolve_population(&seeds, 3, &FitnessObjective::Balanced, 12);
+        let first = MorphogenesisEngine::new().evolve_population(
+            &seeds,
+            3,
+            &FitnessObjective::Balanced,
+            12,
+        );
+        let second = MorphogenesisEngine::new().evolve_population(
+            &seeds,
+            3,
+            &FitnessObjective::Balanced,
+            12,
+        );
 
         assert_eq!(first.len(), second.len());
         for (a, b) in first.iter().zip(second.iter()) {

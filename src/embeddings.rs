@@ -422,9 +422,16 @@ pub fn provider_from_config(
                 match CandleEmbeddingProvider::with_config(
                     "BAAI/bge-small-en-v1.5", None, 384, cfg.use_gpu,
                 ) {
-                    Ok(p) => Box::new(p),
+                    Ok(p) => {
+                        eprintln!("  [bge-small] Provider ready (dim=384, use_gpu={})", cfg.use_gpu);
+                        Box::new(p)
+                    }
+                    Err(EmbeddingError::NetworkError) => {
+                        eprintln!("  [bge-small] Network/model download failed. Check internet / HuggingFace cache. Falling back to mock provider.");
+                        Box::new(MockEmbeddingProvider::new(idx_dim))
+                    }
                     Err(e) => {
-                        eprintln!("  WARN: bge-small init failed: {:?} — using mock", e);
+                        eprintln!("  [bge-small] Init failed: {}. Falling back to mock provider.", e);
                         Box::new(MockEmbeddingProvider::new(idx_dim))
                     }
                 }
@@ -506,20 +513,16 @@ impl CandleEmbeddingProvider {
         } else {
             Device::Cpu
         };
-        let api = Api::new().map_err(|e| EmbeddingError::ApiError(e.to_string()))?;
+        let api = Api::new().map_err(|_| EmbeddingError::NetworkError)?;
         let repo = api.model(model_id.to_string());
 
         // Load tokenizer
-        let tokenizer_path = repo
-            .get("tokenizer.json")
-            .map_err(|e| EmbeddingError::ApiError(format!("tokenizer download: {}", e)))?;
+        let tokenizer_path = repo.get("tokenizer.json").map_err(|_| EmbeddingError::NetworkError)?;
         let tokenizer = tokenizers::Tokenizer::from_file(tokenizer_path)
             .map_err(|e| EmbeddingError::ApiError(format!("tokenizer load: {}", e)))?;
 
         // Load model weights
-        let weights_path = repo
-            .get("model.safetensors")
-            .map_err(|e| EmbeddingError::ApiError(format!("weights download: {}", e)))?;
+        let weights_path = repo.get("model.safetensors").map_err(|_| EmbeddingError::NetworkError)?;
         // Safety: safetensors file is valid and will remain mapped for the lifetime of the model
         let vb = unsafe {
             candle_nn::VarBuilder::from_mmaped_safetensors(
@@ -535,8 +538,7 @@ impl CandleEmbeddingProvider {
             cfg
         } else {
             // Try to load config.json from the model repo
-            let config_path = repo.get("config.json")
-                .map_err(|e| EmbeddingError::ApiError(format!("config download: {}", e)))?;
+            let config_path = repo.get("config.json").map_err(|_| EmbeddingError::NetworkError)?;
             let config_str = std::fs::read_to_string(&config_path)
                 .map_err(|e| EmbeddingError::ApiError(format!("config read: {}", e)))?;
             serde_json::from_str(&config_str)
@@ -658,3 +660,5 @@ mod tests {
         assert_eq!(cache.get("test"), Some(&embedding));
     }
 }
+
+

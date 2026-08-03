@@ -159,7 +159,10 @@ impl Executive {
     }
 
     pub fn list_modules(&self) -> Vec<CognitiveModule> {
-        crate::sync_guard::read_lock(&self.modules).values().cloned().collect()
+        crate::sync_guard::read_lock(&self.modules)
+            .values()
+            .cloned()
+            .collect()
     }
 
     pub fn set_priority(&self, id: &str, priority: u8) -> bool {
@@ -237,7 +240,9 @@ impl Executive {
         let config = crate::sync_guard::read_lock(&self.config).clone();
         let mut executed = Vec::new();
         self.schedule();
-        if crate::sync_guard::read_lock(&self.resources).energy_level < config.min_energy_for_execution {
+        if crate::sync_guard::read_lock(&self.resources).energy_level
+            < config.min_energy_for_execution
+        {
             return vec!["__low_energy__".to_string()];
         }
         for _ in 0..config.max_modules_per_cycle {

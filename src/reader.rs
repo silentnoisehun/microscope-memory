@@ -1003,10 +1003,7 @@ impl FileLock {
             {
                 Ok(mut file) => {
                     let token = lock_token();
-                    if let Err(e) = file
-                        .write_all(token.as_bytes())
-                        .and_then(|()| file.flush())
-                    {
+                    if let Err(e) = file.write_all(token.as_bytes()).and_then(|()| file.flush()) {
                         // Never leave a partially-owned lock behind.
                         let _ = fs::remove_file(lock_path);
                         return Err(format!("lock acquire: write owner token: {}", e));

@@ -242,7 +242,8 @@ impl PatternRecognizer {
         let mut patterns = crate::sync_guard::write_lock(&self.patterns);
         if let Some(pos) = patterns.iter().position(|p| p.id == id) {
             let p = patterns.remove(pos);
-            if let Some(ids) = crate::sync_guard::write_lock(&self.domain_index).get_mut(&p.domain) {
+            if let Some(ids) = crate::sync_guard::write_lock(&self.domain_index).get_mut(&p.domain)
+            {
                 ids.retain(|&i| i != id);
             }
             true
@@ -339,13 +340,15 @@ impl PatternRecognizer {
                 };
 
                 // Ellenőrizzük, hogy már létezik-e hasonló
-                let exists = crate::sync_guard::read_lock(&self.patterns).iter().any(|p| {
-                    if let PatternTemplate::Sequence(ref existing) = p.template {
-                        existing == seq
-                    } else {
-                        false
-                    }
-                });
+                let exists = crate::sync_guard::read_lock(&self.patterns)
+                    .iter()
+                    .any(|p| {
+                        if let PatternTemplate::Sequence(ref existing) = p.template {
+                            existing == seq
+                        } else {
+                            false
+                        }
+                    });
 
                 if !exists {
                     let id = pattern.id;
@@ -904,7 +907,10 @@ impl PatternRecognizer {
         let mut composite_patterns = Vec::new();
 
         let patterns = crate::sync_guard::read_lock(&self.patterns);
-        let domains: Vec<String> = crate::sync_guard::read_lock(&self.domain_index).keys().cloned().collect();
+        let domains: Vec<String> = crate::sync_guard::read_lock(&self.domain_index)
+            .keys()
+            .cloned()
+            .collect();
 
         if domains.len() < 2 {
             return Vec::new();
@@ -1096,7 +1102,10 @@ impl PatternRecognizer {
 
     /// Domain-ek listázása
     pub fn list_domains(&self) -> Vec<String> {
-        crate::sync_guard::read_lock(&self.domain_index).keys().cloned().collect()
+        crate::sync_guard::read_lock(&self.domain_index)
+            .keys()
+            .cloned()
+            .collect()
     }
 
     /// Domain szerinti minta szám

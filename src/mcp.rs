@@ -972,6 +972,10 @@ fn tool_status(config: &Config) -> Result<String, String> {
     let hdr_kb = (reader.block_count * crate::HEADER_SIZE) as f64 / 1024.0;
     let data_kb = reader.data.len() as f64 / 1024.0;
 
+    let embedding_provider = &config.embedding.provider;
+    let use_gpu = config.embedding.use_gpu;
+    let gpu_status = if use_gpu { "enabled (CUDA lazy)" } else { "disabled" };
+
     Ok(format!(
         "Microscope Memory Status\n\
          ========================\n\
@@ -982,13 +986,19 @@ fn tool_status(config: &Config) -> Result<String, String> {
          Append log: {} entries\n\
          \n\
          Depth breakdown:\n\
-         {}",
+         {}\n\
+         Features:\n\
+         - Embedding provider: {}\n\
+         - GPU acceleration: {}\n\
+         - Cosine echo filter: enabled (source_id + cosine similarity)",
         reader.block_count,
         hdr_kb,
         data_kb,
         hdr_kb + data_kb,
         appended.len(),
-        depth_info
+        depth_info,
+        embedding_provider,
+        gpu_status
     ))
 }
 
@@ -3825,3 +3835,4 @@ mod tests {
         assert_eq!(err.kind(), std::io::ErrorKind::InvalidData);
     }
 }
+

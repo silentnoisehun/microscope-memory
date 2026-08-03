@@ -416,10 +416,10 @@ pub fn forget_old_thoughts(output_dir: &Path, _block_count: usize) -> Result<u32
             break;
         }
 
-        // Read layer_id (byte 12 in header: after x(4), y(4), z(4))
-        let layer_id = headers[off + 12];
-        // Read importance (byte 13 in header)
-        let importance = headers[off + 13];
+        // Read layer_id (byte 17 in MSC4 header: depth(16) then layer_id(17))
+        let layer_id = headers[off + 17];
+        // Read importance (byte 48 in MSC4 header: after project_id)
+        let importance = headers[off + 48];
 
         // Check if this is an internal thought that should be forgotten
         if FORGET_INTERNAL_LAYERS.contains(&layer_id) && importance < FORGET_MIN_IMPORTANCE {
@@ -546,7 +546,7 @@ pub fn evict_over_capacity(
     let mut scored: Vec<(usize, f32)> = Vec::with_capacity(actual_blocks);
     for i in 0..actual_blocks {
         let off = i * HEADER_SIZE;
-        let importance = headers[off + 13]; // byte 13: importance
+        let importance = headers[off + 48]; // byte 48: importance (MSC4 layout)
         if importance >= protect_min_importance {
             continue; // protected core memory is never evicted
         }
@@ -562,7 +562,9 @@ pub fn evict_over_capacity(
     scored.sort_by(|a, b| a.1.total_cmp(&b.1)); // lowest score first
     let victims: std::collections::HashSet<usize> =
         scored.iter().take(target).map(|(idx, _)| *idx).collect();
-    let keep_indices: Vec<usize> = (0..actual_blocks).filter(|i| !victims.contains(i)).collect();
+    let keep_indices: Vec<usize> = (0..actual_blocks)
+        .filter(|i| !victims.contains(i))
+        .collect();
 
     // Rewrite the binary index, keeping only the surviving blocks.
     let mut new_headers = Vec::with_capacity(keep_indices.len() * HEADER_SIZE);
@@ -680,8 +682,17 @@ pub fn promote_recalled_blocks(
     let hebb = crate::hebbian::HebbianState::load_or_init(output_dir, actual);
 
     let mut bumps: Vec<(usize, u8)> = Vec::new(); // (block index, new importance)
+
+    // Load the evidence ledger for the epistemic gate (C4).
+    let epistemic_gate = output_dir.exists();
+    let ledger = if epistemic_gate {
+        crate::epistemic::EvidenceLedger::load_or_init(output_dir)
+    } else {
+        crate::epistemic::EvidenceLedger { records: std::collections::HashMap::new() }
+    };
+
     for i in 0..actual {
-        let imp = headers[i * HEADER_SIZE + 13];
+        let imp = headers[i * HEADER_SIZE + 48]; // byte 48: importance (MSC4)
         if imp >= protect_min_importance {
             continue; // already at or above the protection floor
         }
@@ -690,6 +701,25 @@ pub fn promote_recalled_blocks(
             None => continue,
         };
         if rec.energy >= promote_energy && rec.activation_count > 0 {
+            // Epistemic gate (C4): Inference/Hypothesis without evidence cannot promote.
+            let flags = headers[i * HEADER_SIZE + 49]; // byte 48+1: flags
+            let class = crate::epistemic::class_of_flags(flags);
+            let block_hash = {
+                // Read the block text from data.bin to compute its content hash.
+                let data_path = output_dir.join("data.bin");
+                if let Ok(data) = fs::read(&data_path) {
+                    let start = i * crate::BLOCK_DATA_SIZE;
+                    if start + crate::BLOCK_DATA_SIZE <= data.len() {
+                        let block = &data[start..start + crate::BLOCK_DATA_SIZE];
+                        let end = block.iter().position(|&b| b == 0).unwrap_or(block.len());
+                        crate::epistemic::content_hash(String::from_utf8_lossy(&block[..end]).trim())
+                    } else { 0 }
+                } else { 0 }
+            };
+            if let Err(_reason) = crate::epistemic::check_promotion_gate(&ledger, class, block_hash) {
+                // Gate blocked: log but do not promote.
+                continue;
+            }
             bumps.push((i, imp.saturating_add(1).min(protect_min_importance)));
         }
     }
@@ -700,7 +730,7 @@ pub fn promote_recalled_blocks(
     // Rewrite headers with the bumped importance values (atomic tmp+rename).
     let mut new_headers = headers.clone();
     for &(idx, new_imp) in &bumps {
-        new_headers[idx * HEADER_SIZE + 13] = new_imp;
+        new_headers[idx * HEADER_SIZE + 48] = new_imp; // byte 48: importance (MSC4)
     }
     let hdr_tmp = output_dir.join("microscope.bin.tmp");
     fs::write(&hdr_tmp, &new_headers).map_err(|e| format!("write microscope.bin: {e}"))?;
@@ -755,10 +785,7 @@ pub fn promote_recalled_blocks(
 /// be modified by mistake. At most one entry changes: the first exact match.
 fn bump_entry_by_text_hash(content: &str, block_text: &str, new_imp: u8) -> Option<String> {
     let needle_hash = crate::fingerprint::fnv1a_hash(block_text.trim().as_bytes());
-    let mut entries: Vec<String> = content
-        .split("\n\n")
-        .map(|s| s.to_string())
-        .collect();
+    let mut entries: Vec<String> = content.split("\n\n").map(|s| s.to_string()).collect();
     for entry in &mut entries {
         let (stripped, _imp) = crate::reader::parse_imp_marker(entry);
         if crate::fingerprint::fnv1a_hash(stripped.trim().as_bytes()) == needle_hash
@@ -843,9 +870,9 @@ mod tests {
         let mut data = Vec::new();
         for i in 0..n {
             let mut h = vec![0u8; HEADER_SIZE];
-            h[12] = 1; // layer_id
-            h[13] = if i < 2 { 8 } else { 5 }; // first two blocks are core memories
-            h[14] = (i % 9) as u8; // depth
+            h[17] = 1; // layer_id (byte 17 in MSC4)
+            h[48] = if i < 2 { 8 } else { 5 }; // importance (byte 48 in MSC4)
+            h[16] = (i % 9) as u8; // depth (byte 16 in MSC4)
             headers.extend_from_slice(&h);
             data.extend_from_slice(&[b'a'; BLOCK_DATA_SIZE]);
         }
@@ -868,7 +895,7 @@ mod tests {
         let mut protected_survivors = 0;
         let mut min_imp = u8::MAX;
         for i in 0..4 {
-            let imp = new_headers[i * HEADER_SIZE + 13];
+            let imp = new_headers[i * HEADER_SIZE + 48]; // byte 48: importance (MSC4)
             if imp >= 8 {
                 protected_survivors += 1;
             }
@@ -890,7 +917,7 @@ mod tests {
         let mut data = Vec::new();
         for _ in 0..n {
             let mut h = vec![0u8; HEADER_SIZE];
-            h[13] = 8; // everything protected
+            h[48] = 8; // everything protected (byte 48 in MSC4)
             headers.extend_from_slice(&h);
             data.extend_from_slice(&[b'a'; BLOCK_DATA_SIZE]);
         }
@@ -922,8 +949,8 @@ mod tests {
         let mut data = Vec::new();
         for i in 0..n {
             let mut h = vec![0u8; HEADER_SIZE];
-            h[12] = 0; // layer_id
-            h[13] = 5; // importance
+            h[17] = 0; // layer_id (byte 17 in MSC4)
+            h[48] = 5; // importance (byte 48 in MSC4)
             headers.extend_from_slice(&h);
             let text = format!("emlék szöveg blokk {}", i);
             let mut block = text.as_bytes().to_vec();
@@ -954,9 +981,13 @@ mod tests {
         assert_eq!(promoted, 1);
 
         let new_headers = fs::read(dir.join("microscope.bin")).unwrap();
-        assert_eq!(new_headers[HEADER_SIZE + 13], 6);
-        assert_eq!(new_headers[2 * HEADER_SIZE + 13], 5, "no activation -> no promotion");
-        assert_eq!(new_headers[13], 5);
+        assert_eq!(new_headers[HEADER_SIZE + 48], 6);
+        assert_eq!(
+            new_headers[2 * HEADER_SIZE + 48],
+            5,
+            "no activation -> no promotion"
+        );
+        assert_eq!(new_headers[48], 5);
 
         let layer = fs::read_to_string(layer_dir.join("long_term.txt")).unwrap();
         assert!(

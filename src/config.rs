@@ -36,6 +36,8 @@ pub struct Config {
     pub hooks: HooksConfig,
     #[serde(default = "default_project_id")]
     pub project_id: ProjectId,
+    #[serde(default)]
+    pub epistemic: EpistemicConfig,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -214,6 +216,56 @@ pub struct Federation {
     pub indices: Vec<FederatedIndex>,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+pub struct EpistemicConfig {
+    /// Gate importance promotion for unsupported Inference/Hypothesis.
+    #[serde(default = "default_true")]
+    pub gate_promotion: bool,
+    /// Minimum independent sources needed for non-zero confidence.
+    #[serde(default = "default_min_sources")]
+    pub min_independent_sources: u32,
+    /// Cosine similarity threshold for echo detection.
+    #[serde(default = "default_sim_threshold")]
+    pub sim_threshold: f32,
+    /// Near-duplicate scan depth for link operations.
+    #[serde(default = "default_search_k")]
+    pub search_k: usize,
+    /// Confidence formula weights.
+    #[serde(default)]
+    pub confidence_weights: ConfidenceWeights,
+    /// Bias added to eviction score from confidence (0 = disabled).
+    #[serde(default)]
+    pub eviction_evidence_bias: f32,
+}
+
+fn default_true() -> bool { true }
+fn default_min_sources() -> u32 { 1 }
+fn default_sim_threshold() -> f32 { 0.85 }
+fn default_search_k() -> usize { 8 }
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ConfidenceWeights {
+    #[serde(default = "default_obs_w")]
+    pub observation_w: i32,
+    #[serde(default = "default_src_w")]
+    pub source_w: i32,
+    #[serde(default = "default_refute_w")]
+    pub refute_w: i32,
+    #[serde(default = "default_age_pen")]
+    pub age_penalty: i32,
+}
+
+impl Default for ConfidenceWeights {
+    fn default() -> Self {
+        Self { observation_w: 30, source_w: 18, refute_w: 25, age_penalty: 5 }
+    }
+}
+
+fn default_obs_w() -> i32 { 30 }
+fn default_src_w() -> i32 { 18 }
+fn default_refute_w() -> i32 { 25 }
+fn default_age_pen() -> i32 { 5 }
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct FederatedIndex {
     pub name: String,
@@ -304,6 +356,7 @@ impl Default for Config {
             federation: Federation::default(),
             hooks: HooksConfig::default(),
             project_id: ProjectId::GLOBAL,
+            epistemic: EpistemicConfig::default(),
         }
     }
 }

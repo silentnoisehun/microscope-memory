@@ -382,3 +382,5 @@ pub mod narrative_memory;
 pub mod self_model;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod self_reflect;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod epistemic;

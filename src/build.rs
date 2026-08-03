@@ -208,6 +208,9 @@ pub fn build(config: &Config, force: bool) -> Result<(), String> {
     let layers_dir = Path::new(&config.paths.layers_dir);
     let output_dir = Path::new(&config.paths.output_dir);
 
+    // Load evidence ledger for flags stamping (epistemic class).
+    let ledger = crate::epistemic::EvidenceLedger::load_or_init(output_dir);
+
     if !output_dir.exists() {
         fs::create_dir_all(output_dir).map_err(|e| format!("create output dir: {}", e))?;
     }
@@ -632,7 +635,18 @@ pub fn build(config: &Config, force: bool) -> Result<(), String> {
             crc16: crc.to_le_bytes(),
             project_id: config.project_id,
             importance: b.importance,
-            flags: 0,
+            flags: {
+                // Stamp epistemic class from evidence ledger into flags bits 0-2.
+                let text_str = std::str::from_utf8(&b.data[..len as usize])
+                    .unwrap_or("")
+                    .trim_end_matches('\0')
+                    .trim();
+                let ch = crate::epistemic::content_hash(text_str);
+                match ledger.records.get(&ch) {
+                    Some(rec) => rec.class as u8 & 0x07,
+                    None => 0,
+                }
+            },
         };
 
         let bytes: &[u8] = unsafe {
@@ -892,5 +906,3 @@ fn apply_hebbian_deltas(
         .save(output_dir)
         .map_err(|e| format!("save cleared Hebbian: {}", e))
 }
-
-

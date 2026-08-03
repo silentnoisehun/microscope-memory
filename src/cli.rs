@@ -357,6 +357,11 @@ pub enum Cmd {
         #[command(subcommand)]
         action: EnforceAction,
     },
+    /// Evidence layer — epistemic audit, confidence tracking
+    Evidence {
+        #[command(subcommand)]
+        action: EvidenceAction,
+    },
 }
 
 #[derive(Subcommand)]
@@ -397,6 +402,37 @@ pub enum EnforceAction {
     },
     /// Show the audit chain and verify its integrity
     Audit,
+}
+
+#[derive(Subcommand)]
+pub enum EvidenceAction {
+    /// Show evidence record for a content hash
+    Show {
+        /// Content hash (hex) or text to hash
+        hash_or_text: String,
+    },
+    /// Link an independent Observation/Evidence to a claim
+    Link {
+        /// Claim content hash (hex) or text
+        claim: String,
+        /// Supporting observation/evidence hash (hex) or text
+        support: String,
+        /// Source identifier (hex)
+        #[arg(long, default_value = "0")]
+        source: u64,
+    },
+    /// Record a refutation against a claim
+    Refute {
+        /// Claim content hash (hex) or text
+        claim: String,
+        /// Refuter source identifier (hex)
+        #[arg(long, default_value = "0")]
+        source: u64,
+    },
+    /// Verify the audit chain integrity
+    Audit,
+    /// Show gate statistics (how many promotions were blocked)
+    GateStats,
 }
 
 #[derive(Subcommand)]

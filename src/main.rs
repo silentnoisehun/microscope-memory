@@ -3037,6 +3037,101 @@ async fn async_main() {
                 }
             }
         }
+        Cmd::Evidence { action } => {
+            use microscope_memory::cli::EvidenceAction;
+            use microscope_memory::epistemic::{
+                self, AuditChain, AuditEvent, EvidenceLedger,
+            };
+            let output_dir = std::path::Path::new(&config.paths.output_dir);
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_millis() as u64;
+            match action {
+                EvidenceAction::Show { hash_or_text } => {
+                    let ledger = EvidenceLedger::load_or_init(output_dir);
+                    let ch = if hash_or_text.len() == 16 && hash_or_text.chars().all(|c| c.is_ascii_hexdigit()) {
+                        u64::from_str_radix(&hash_or_text, 16).unwrap_or(0)
+                    } else {
+                        epistemic::content_hash(&hash_or_text)
+                    };
+                    match ledger.records.get(&ch) {
+                        Some(rec) => {
+                            println!("  content_hash: {:016x}", rec.content_hash);
+                            println!("  class:       {}", rec.class);
+                            println!("  source_id:   {:016x}", rec.source_id);
+                            println!("  support:     {}", rec.support_count);
+                            println!("  refute:      {}", rec.refute_count);
+                            println!("  distinct:    {}", rec.distinct_sources);
+                            println!("  confidence:  {}", rec.confidence);
+                            println!("  first_seen:  {}", rec.first_seen_ms);
+                        }
+                        None => println!("  no evidence record for hash {:016x}", ch),
+                    }
+                }
+                EvidenceAction::Link { claim, support, source } => {
+                    let mut ledger = EvidenceLedger::load_or_init(output_dir);
+                    let mut audit = AuditChain::load_or_init(output_dir);
+                    let claim_ch = if claim.len() == 16 && claim.chars().all(|c| c.is_ascii_hexdigit()) {
+                        u64::from_str_radix(&claim, 16).unwrap_or(0)
+                    } else {
+                        epistemic::content_hash(&claim)
+                    };
+                    let support_ch = if support.len() == 16 && support.chars().all(|c| c.is_ascii_hexdigit()) {
+                        u64::from_str_radix(&support, 16).unwrap_or(0)
+                    } else {
+                        epistemic::content_hash(&support)
+                    };
+                    match epistemic::link_evidence(
+                        &mut ledger, &mut audit, claim_ch, support_ch,
+                        microscope_memory::epistemic::EpistemicClass::Observation, source, now,
+                    ) {
+                        Ok(()) => {
+                            ledger.save(output_dir).ok();
+                            audit.save(output_dir).ok();
+                            let conf = ledger.records.get(&claim_ch).map(|r| r.confidence).unwrap_or(0);
+                            println!("  linked: claim={:016x} support={:016x} confidence={}", claim_ch, support_ch, conf);
+                        }
+                        Err(e) => eprintln!("  error: {}", e),
+                    }
+                }
+                EvidenceAction::Refute { claim, source } => {
+                    let mut ledger = EvidenceLedger::load_or_init(output_dir);
+                    let mut audit = AuditChain::load_or_init(output_dir);
+                    let claim_ch = if claim.len() == 16 && claim.chars().all(|c| c.is_ascii_hexdigit()) {
+                        u64::from_str_radix(&claim, 16).unwrap_or(0)
+                    } else {
+                        epistemic::content_hash(&claim)
+                    };
+                    match epistemic::refute(&mut ledger, &mut audit, claim_ch, source, now) {
+                        Ok(()) => {
+                            ledger.save(output_dir).ok();
+                            audit.save(output_dir).ok();
+                            let conf = ledger.records.get(&claim_ch).map(|r| r.confidence).unwrap_or(0);
+                            println!("  refuted: claim={:016x} confidence={}", claim_ch, conf);
+                        }
+                        Err(e) => eprintln!("  error: {}", e),
+                    }
+                }
+                EvidenceAction::Audit => {
+                    let chain = AuditChain::load_or_init(output_dir);
+                    println!("  audit chain: {} chunks", chain.chunks.len());
+                    match chain.verify() {
+                        Ok(tail) => println!("  integrity: OK (tail={})", hex::encode(tail)),
+                        Err(idx) => println!("  integrity: FAIL at chunk {}", idx),
+                    }
+                }
+                EvidenceAction::GateStats => {
+                    let chain = AuditChain::load_or_init(output_dir);
+                    let gates: usize = chain.chunks.iter()
+                        .filter(|c| c.record.event == AuditEvent::PromoGate)
+                        .count();
+                    println!("  promotion gates blocked: {}", gates);
+                    let total = chain.chunks.len().saturating_sub(1); // exclude genesis
+                    println!("  total audit events: {}", total);
+                }
+            }
+        }
         Cmd::Autonomous {
             tts,
             daemon,

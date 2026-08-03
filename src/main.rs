@@ -3085,6 +3085,7 @@ async fn async_main() {
                     match epistemic::link_evidence(
                         &mut ledger, &mut audit, claim_ch, support_ch,
                         microscope_memory::epistemic::EpistemicClass::Observation, source, now,
+                        Some(&support), Some(&claim),
                     ) {
                         Ok(()) => {
                             ledger.save(output_dir).ok();

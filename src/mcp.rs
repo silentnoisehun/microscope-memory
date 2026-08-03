@@ -1472,7 +1472,8 @@ fn tool_evidence_link(config: &Config, args: &Value) -> Result<String, String> {
     let support_ch = if support_text.len() == 16 && support_text.chars().all(|c| c.is_ascii_hexdigit()) {
         u64::from_str_radix(support_text, 16).map_err(|e| format!("invalid hex: {e}"))?
     } else { crate::epistemic::content_hash(support_text) };
-    crate::epistemic::link_evidence(&mut ledger, &mut audit, claim_ch, support_ch, class, source, now)
+    crate::epistemic::link_evidence(&mut ledger, &mut audit, claim_ch, support_ch, class, source, now,
+        Some(support_text), Some(claim_text))
         .map_err(|e| e)?;
     ledger.save(output_dir).map_err(|e| e)?;
     audit.save(output_dir).map_err(|e| e)?;

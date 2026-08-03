@@ -10,11 +10,11 @@ use axum::{
     routing::{get, post},
     Router,
 };
+use hmac::Mac;
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue, AUTHORIZATION};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::Sha256;
-use hmac::Mac;
 use std::fs;
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
@@ -82,7 +82,10 @@ pub fn user_token(master: &str, user_id: &str) -> Result<String, String> {
     let mut mac = hmac::Hmac::<Sha256>::new_from_slice(master.as_bytes())
         .map_err(|e| format!("hmac init: {e}"))?;
     mac.update(user_id.as_bytes());
-    Ok(format!("{user_id}.{}", hex::encode(mac.finalize().into_bytes())))
+    Ok(format!(
+        "{user_id}.{}",
+        hex::encode(mac.finalize().into_bytes())
+    ))
 }
 
 /// Verify a per-user bearer token; returns the signed `user_id` on success.
@@ -129,11 +132,9 @@ async fn api_key_auth(
         .and_then(|v| v.to_str().ok())
     {
         let Some(token) = authz.strip_prefix("Bearer ") else {
-            return Err((
-                StatusCode::UNAUTHORIZED,
-                "unsupported Authorization scheme",
-            )
-                .into_response());
+            return Err(
+                (StatusCode::UNAUTHORIZED, "unsupported Authorization scheme").into_response(),
+            );
         };
         if master.is_empty() {
             return Err((
@@ -145,11 +146,9 @@ async fn api_key_auth(
         match verify_user_token(master, token) {
             Some(uid) => authed_user = Some(uid),
             None => {
-                return Err((
-                    StatusCode::UNAUTHORIZED,
-                    "invalid or forged user token",
+                return Err(
+                    (StatusCode::UNAUTHORIZED, "invalid or forged user token").into_response()
                 )
-                    .into_response())
             }
         }
     } else if !master.is_empty() {
@@ -218,6 +217,10 @@ pub struct RememberRequest {
     pub user_id: Option<String>,
     pub memory_backend: Option<String>,
     pub memory_scope: Option<String>,
+    /// Epistemic class: observation, evidence, inference, hypothesis
+    pub class: Option<String>,
+    /// Supporting observation/hashes (comma-separated hex or text)
+    pub supports: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -699,6 +702,44 @@ async fn remember_memory(
         written_scopes.push("shared");
     }
 
+    // Epistemic layer: if class is provided, link supports.
+    let mut epistemic_info = serde_json::json!({});
+    if let Some(class_str) = &payload.class {
+        if let Ok(class) = class_str.parse::<crate::epistemic::EpistemicClass>() {
+            let output_dir = std::path::Path::new(&state.config.paths.output_dir);
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_millis() as u64;
+            let mut ledger = crate::epistemic::EvidenceLedger::load_or_init(output_dir);
+            let mut audit = crate::epistemic::AuditChain::load_or_init(output_dir);
+            let claim_hash = crate::epistemic::content_hash(&payload.text);
+            // Ensure the claim itself is in the ledger
+            ledger.get_or_create(claim_hash, class, 0, now);
+            // Link each support
+            if let Some(supports_str) = &payload.supports {
+                for sup in supports_str.split(',') {
+                    let sup = sup.trim();
+                    if sup.is_empty() { continue; }
+                    let sup_hash = crate::epistemic::content_hash(sup);
+                    let _ = crate::epistemic::link_evidence(
+                        &mut ledger, &mut audit, claim_hash, sup_hash,
+                        crate::epistemic::EpistemicClass::Observation, 0, now,
+                        Some(sup), Some(&payload.text),
+                    );
+                }
+            }
+            let conf = ledger.records.get(&claim_hash).map(|r| r.confidence).unwrap_or(0);
+            let _ = ledger.save(output_dir);
+            let _ = audit.save(output_dir);
+            epistemic_info = serde_json::json!({
+                "class": class_str,
+                "confidence": conf,
+                "supports": payload.supports.as_deref().unwrap_or(""),
+            });
+        }
+    }
+
     Ok(Json(serde_json::json!({
         "status": "committed",
         "message": "Memory stored in append log",
@@ -708,7 +749,8 @@ async fn remember_memory(
         "written_scopes": written_scopes,
         "namespace_dir": personal_ns.to_string_lossy(),
         "personal_namespace_dir": personal_ns.to_string_lossy(),
-        "shared_namespace_dir": shared_ns.to_string_lossy()
+        "shared_namespace_dir": shared_ns.to_string_lossy(),
+        "epistemic": epistemic_info,
     })))
 }
 
@@ -740,12 +782,7 @@ async fn mobile_recall(
 ) -> Result<Json<Vec<MemoryResponse>>, (StatusCode, String)> {
     let k = payload.k.unwrap_or(10);
     let uid = effective_user_id(&auth, &payload.user_id);
-    Ok(Json(recall_internal(
-        &state,
-        &payload.query,
-        k,
-        Some(uid),
-    )?))
+    Ok(Json(recall_internal(&state, &payload.query, k, Some(uid))?))
 }
 
 async fn mobile_remember(
@@ -1535,7 +1572,10 @@ mod tests {
         let master = "master";
         let token = user_token(master, "alice-1").unwrap();
         assert!(token.starts_with("alice-1."));
-        assert_eq!(verify_user_token(master, &token).as_deref(), Some("alice-1"));
+        assert_eq!(
+            verify_user_token(master, &token).as_deref(),
+            Some("alice-1")
+        );
 
         assert!(
             verify_user_token("other-master", &token).is_none(),
@@ -1594,7 +1634,10 @@ mod tests {
             .oneshot(
                 Request::builder()
                     .uri("/whoami")
-                    .header(axum::http::header::AUTHORIZATION, format!("Bearer {forged}"))
+                    .header(
+                        axum::http::header::AUTHORIZATION,
+                        format!("Bearer {forged}"),
+                    )
                     .body(Body::empty())
                     .unwrap(),
             )
@@ -1603,7 +1646,12 @@ mod tests {
         assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
 
         let resp = app
-            .oneshot(Request::builder().uri("/whoami").body(Body::empty()).unwrap())
+            .oneshot(
+                Request::builder()
+                    .uri("/whoami")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
             .await
             .unwrap();
         assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
@@ -1657,7 +1705,9 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(resp.status(), StatusCode::OK);
-        let bytes = axum::body::to_bytes(resp.into_body(), 64 * 1024).await.unwrap();
+        let bytes = axum::body::to_bytes(resp.into_body(), 64 * 1024)
+            .await
+            .unwrap();
         let text = String::from_utf8(bytes.to_vec()).unwrap();
         assert!(
             text.contains(stored),

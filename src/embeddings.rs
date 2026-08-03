@@ -234,9 +234,7 @@ impl PythonEmbeddingProvider {
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::null())
             .spawn()
-            .map_err(|e| {
-                EmbeddingError::ApiError(format!("spawn {} {}: {}", python, script, e))
-            })?;
+            .map_err(|e| EmbeddingError::ApiError(format!("spawn {} {}: {}", python, script, e)))?;
         let stdin = child
             .stdin
             .take()
@@ -312,10 +310,9 @@ impl PythonEmbeddingProvider {
             }
             Ok(Err(e)) => Err(EmbeddingError::ApiError(e)),
             Err(_) => {
-                let mut child = self
-                    .child
-                    .lock()
-                    .map_err(|_| EmbeddingError::ApiError("embedding child lock poisoned".into()))?;
+                let mut child = self.child.lock().map_err(|_| {
+                    EmbeddingError::ApiError("embedding child lock poisoned".into())
+                })?;
                 let _ = child.kill();
                 Err(EmbeddingError::ApiError(format!(
                     "embedding provider timed out after {} ms",
@@ -392,7 +389,10 @@ pub fn provider_from_config(
         "python" => match PythonEmbeddingProvider::new(&cfg.model) {
             Ok(p) => Box::new(p),
             Err(e) => {
-                eprintln!("  WARN: python embedding provider unavailable: {} — using mock", e);
+                eprintln!(
+                    "  WARN: python embedding provider unavailable: {} — using mock",
+                    e
+                );
                 Box::new(MockEmbeddingProvider::new(idx_dim))
             }
         },
@@ -414,8 +414,30 @@ pub fn provider_from_config(
             }
         }
         "none" | "mock" => Box::new(MockEmbeddingProvider::new(idx_dim)),
+        "bge-small" => {
+            #[cfg(feature = "embeddings")]
+            {
+                // BAAI/bge-small-en-v1.5: 33M params, 384 dim
+                // Config is loaded from the model's config.json on first use.
+                match CandleEmbeddingProvider::with_config("BAAI/bge-small-en-v1.5", None, 384) {
+                    Ok(p) => Box::new(p),
+                    Err(e) => {
+                        eprintln!("  WARN: bge-small init failed: {:?} — using mock", e);
+                        Box::new(MockEmbeddingProvider::new(idx_dim))
+                    }
+                }
+            }
+            #[cfg(not(feature = "embeddings"))]
+            {
+                eprintln!("  WARN: bge-small requires the 'embeddings' feature — using mock");
+                Box::new(MockEmbeddingProvider::new(idx_dim))
+            }
+        }
         other => {
-            eprintln!("  WARN: unknown embedding provider '{}' — using mock", other);
+            eprintln!(
+                "  WARN: unknown embedding provider '{}' — using mock",
+                other
+            );
             Box::new(MockEmbeddingProvider::new(idx_dim))
         }
     }
@@ -454,6 +476,15 @@ pub struct CandleEmbeddingProvider {
 #[cfg(feature = "embeddings")]
 impl CandleEmbeddingProvider {
     pub fn new(model_id: &str) -> Result<Self, EmbeddingError> {
+        Self::with_config(model_id, None, 768)
+    }
+
+    /// Create with explicit BERT config (for non-standard models like bge-small).
+    pub fn with_config(
+        model_id: &str,
+        config_override: Option<candle_transformers::models::bert::Config>,
+        dim_override: usize,
+    ) -> Result<Self, EmbeddingError> {
         use candle_core::Device;
         use hf_hub::api::sync::Api;
 
@@ -482,24 +513,19 @@ impl CandleEmbeddingProvider {
         }
         .map_err(|e| EmbeddingError::ApiError(format!("varbuilder: {}", e)))?;
 
-        // Load config (Zero-JSON: hardcoded BERT-base-uncased defaults)
-        let config = candle_transformers::models::bert::Config {
-            vocab_size: 30522,
-            hidden_size: 768,
-            num_hidden_layers: 12,
-            num_attention_heads: 12,
-            intermediate_size: 3072,
-            hidden_act: candle_transformers::models::bert::Activation::Gelu,
-            hidden_dropout_prob: 0.1,
-            attention_probs_dropout_prob: 0.1,
-            max_position_embeddings: 512,
-            type_vocab_size: 2,
-            initializer_range: 0.02,
-            layer_norm_eps: 1e-12,
-            pad_token_id: 0,
-            model_type: Some("bert".to_string()),
+        // Load config: either from override, or from model's config.json
+        let config = if let Some(cfg) = config_override {
+            cfg
+        } else {
+            // Try to load config.json from the model repo
+            let config_path = repo.get("config.json")
+                .map_err(|e| EmbeddingError::ApiError(format!("config download: {}", e)))?;
+            let config_str = std::fs::read_to_string(&config_path)
+                .map_err(|e| EmbeddingError::ApiError(format!("config read: {}", e)))?;
+            serde_json::from_str(&config_str)
+                .map_err(|e| EmbeddingError::ApiError(format!("config parse: {}", e)))?
         };
-        let dim = config.hidden_size;
+        let dim = dim_override;
 
         let model = candle_transformers::models::bert::BertModel::load(vb, &config)
             .map_err(|e| EmbeddingError::ApiError(format!("model load: {}", e)))?;
@@ -535,7 +561,7 @@ impl CandleEmbeddingProvider {
 
         let output = self
             .model
-            .forward(&input_ids, &token_type_ids, None)
+            .forward(&input_ids, &token_type_ids)
             .map_err(|e| EmbeddingError::ApiError(format!("forward: {}", e)))?;
 
         // Mean pooling over sequence dimension

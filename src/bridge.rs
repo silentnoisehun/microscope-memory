@@ -717,6 +717,9 @@ async fn remember_memory(
             // Ensure the claim itself is in the ledger
             ledger.get_or_create(claim_hash, class, 0, now);
             // Link each support
+            let provider = crate::embeddings::provider_from_config(
+                &state.config.embedding, state.config.embedding.dim,
+            );
             if let Some(supports_str) = &payload.supports {
                 for sup in supports_str.split(',') {
                     let sup = sup.trim();
@@ -726,7 +729,7 @@ async fn remember_memory(
                         &mut ledger, &mut audit, claim_hash, sup_hash,
                         crate::epistemic::EpistemicClass::Observation, 0, now,
                         Some(sup), Some(&payload.text),
-                        None,
+                        Some(provider.as_ref()),
                     );
                 }
             }

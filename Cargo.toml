@@ -38,6 +38,7 @@ path = "src/main.rs"
 required-features = ["native"]
 
 [dependencies]
+half = ">=2.3, <2.5"
 serde = { version = "1.0", features = ["derive"] }
 sha2 = "0.10"
 blake3 = "1.5"
@@ -73,6 +74,7 @@ bytemuck = { version = "1.13", features = ["derive"], optional = true }
 pollster = { version = "0.3", optional = true }
 candle-core = { version = "0.3", optional = true }
 candle-nn = { version = "0.3", optional = true }
+candle-transformers = { version = "0.3", optional = true }
 hf-hub = { version = "0.3", optional = true }
 tokenizers = { version = "0.15", optional = true }
 
@@ -88,7 +90,7 @@ wasm = []
 python = ["dep:pyo3"]
 compression = ["zstd"]
 gpu = ["wgpu", "bytemuck", "pollster"]
-embeddings = ["candle-core", "candle-nn", "hf-hub", "tokenizers"]
+embeddings = ["candle-core", "candle-nn", "candle-transformers", "hf-hub", "tokenizers"]
 onnx = []
 console_error_panic_hook = []
 

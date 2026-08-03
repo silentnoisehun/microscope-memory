@@ -1,0 +1,36 @@
+name: release
+
+# On any v* tag push, build the Windows release binary and attach it (plus a
+# SHA256SUMS) to the GitHub Release, so users never have to build themselves.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Build (release)
+        run: cargo build --release --locked
+
+      - name: Create checksums
+        shell: bash
+        run: |
+          cd target/release
+          sha256sum *.exe > SHA256SUMS.txt
+
+      - name: Upload to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: |
+            target/release/microscope-mem.exe
+            target/release/SHA256SUMS.txt

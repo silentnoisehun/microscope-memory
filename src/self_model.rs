@@ -1,22 +1,13 @@
 //! Self-Model Module for Microscope Memory.
 //!
-//! Builds and maintains a model of the system'\''s own cognitive state.
+//! Builds and maintains a model of the system's own cognitive state.
 //! Tracks changes over time: "who am I now, and how have I changed?"
 //!
-//! Binary format: SLF1
-//!   magic: "SLF1" (4 bytes)
-//!   timestamp_ms: u64 (8 bytes)
-//!   version: u16 (2 bytes)
-//!   emotional_state: [f32; 21] (84 bytes)
-//!   attention_weights: [f32; 7] (28 bytes)
-//!   hebbian_energy: f32 (4 bytes)
-//!   hot_count: u32 (4 bytes)
-//!   archetype_count: u32 (4 bytes)
-//!   pattern_count: u32 (4 bytes)
-//!   block_count: u32 (4 bytes)
-//!   session_count: u64 (8 bytes)
-//!   narrative_len: u16 (2 bytes) + narrative bytes
-//!   reflection_len: u16 (2 bytes) + reflection bytes
+//! Now integrated with:
+//! - EpisodeStore (PAD-based emotional episodes, not just the old ring)
+//! - epistemic-core (the "I am aware" claim gets evidence + counterevidence + gate)
+//!
+//! Binary format: SLF1 (version 2 = with epistemic + episode data)
 
 use std::fs;
 use std::path::Path;
@@ -25,12 +16,12 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use crate::archetype::ArchetypeState;
 use crate::attention::AttentionState;
 use crate::config::Config;
+use crate::emotional_episode::{EpisodeStore, PadState};
 use crate::emotional_state::EmotionalStateRing;
 use crate::hebbian::HebbianState;
 use crate::narrative::NarrativeState;
 use crate::reader::MicroscopeReader;
 use crate::self_reflect::ReflectionState;
-
 use crate::thought_graph::ThoughtGraphState;
 use colored::Colorize;
 
@@ -49,6 +40,14 @@ pub struct SelfModelSnapshot {
     pub session_count: u64,
     pub narrative: String,
     pub reflection: String,
+    // ── NEW: Episode + epistemic data (version 2) ──
+    pub pad: Option<PadState>,
+    pub episodes_active: u32,
+    pub episodes_passed: u32,
+    pub episodes_failed: u32,
+    /// Epistemic confidence for the "I am aware" claim.
+    /// None = no epistemic evaluation was performed.
+    pub awareness_confidence: Option<epistemic_core::types::SplitConfidence>,
 }
 
 impl SelfModelSnapshot {
@@ -59,7 +58,7 @@ impl SelfModelSnapshot {
         let mut pos = 4;
         let ts = u64::from_le_bytes(data[pos..pos + 8].try_into().ok()?);
         pos += 8;
-        let _ver = u16::from_le_bytes(data[pos..pos + 2].try_into().ok()?);
+        let ver = u16::from_le_bytes(data[pos..pos + 2].try_into().ok()?);
         pos += 2;
         let mut emo = [0.0f32; 21];
         for e in emo.iter_mut() {
@@ -85,7 +84,7 @@ impl SelfModelSnapshot {
         pos += 8;
         let nlen = u16::from_le_bytes(data[pos..pos + 2].try_into().unwrap_or([0; 2])) as usize;
         pos += 2;
-        let narr = if nlen > 0 {
+        let narr = if nlen > 0 && pos + nlen <= data.len() {
             String::from_utf8_lossy(&data[pos..pos + nlen]).to_string()
         } else {
             String::new()
@@ -93,11 +92,58 @@ impl SelfModelSnapshot {
         pos += nlen;
         let rlen = u16::from_le_bytes(data[pos..pos + 2].try_into().unwrap_or([0; 2])) as usize;
         pos += 2;
-        let refl = if rlen > 0 {
+        let refl = if rlen > 0 && pos + rlen <= data.len() {
             String::from_utf8_lossy(&data[pos..pos + rlen]).to_string()
         } else {
             String::new()
         };
+        pos += rlen;
+
+        // ── Version 2: epistemic + episode data ──
+        let (pad, episodes_active, episodes_passed, episodes_failed, awareness_confidence) =
+            if ver >= 2 && pos + 28 <= data.len() {
+                let has_pad = data[pos];
+                pos += 1;
+                let pad = if has_pad == 1 {
+                    let p = f64::from_le_bytes(data[pos..pos + 8].try_into().ok()?);
+                    pos += 8;
+                    let a = f64::from_le_bytes(data[pos..pos + 8].try_into().ok()?);
+                    pos += 8;
+                    let d = f64::from_le_bytes(data[pos..pos + 8].try_into().ok()?);
+                    pos += 8;
+                    Some(PadState::new(p, a, d))
+                } else {
+                    pos += 24;
+                    None
+                };
+                let ea = u32::from_le_bytes(data[pos..pos + 4].try_into().ok()?);
+                pos += 4;
+                let ep = u32::from_le_bytes(data[pos..pos + 4].try_into().ok()?);
+                pos += 4;
+                let ef = u32::from_le_bytes(data[pos..pos + 4].try_into().ok()?);
+                pos += 4;
+
+                let has_aware = data.get(pos).copied().unwrap_or(0);
+                pos += 1;
+                let ac = if has_aware == 1 && pos + 32 <= data.len() {
+                    let ev = f64::from_le_bytes(data[pos..pos + 8].try_into().ok()?);
+                    pos += 8;
+                    let ce = f64::from_le_bytes(data[pos..pos + 8].try_into().ok()?);
+                    pos += 8;
+                    let re = f64::from_le_bytes(data[pos..pos + 8].try_into().ok()?);
+                    pos += 8;
+                    let na = f64::from_le_bytes(data[pos..pos + 8].try_into().ok()?);
+                    pos += 8;
+                    Some(epistemic_core::types::SplitConfidence::new(ev, ce, re, na))
+                } else {
+                    None
+                };
+
+                (pad, ea, ep, ef, ac)
+            } else {
+                (None, 0, 0, 0, None)
+            };
+
         Some(Self {
             timestamp_ms: ts,
             emotional: emo,
@@ -110,6 +156,11 @@ impl SelfModelSnapshot {
             session_count: sc,
             narrative: narr,
             reflection: refl,
+            pad,
+            episodes_active,
+            episodes_passed,
+            episodes_failed,
+            awareness_confidence,
         })
     }
 
@@ -118,10 +169,10 @@ impl SelfModelSnapshot {
         let refl_b = self.reflection.as_bytes();
         let nlen = narr_b.len().min(MAX_STR_LEN) as u16;
         let rlen = refl_b.len().min(MAX_STR_LEN) as u16;
-        let mut buf = Vec::with_capacity(200 + nlen as usize + rlen as usize);
+        let mut buf = Vec::with_capacity(250 + nlen as usize + rlen as usize);
         buf.extend_from_slice(b"SLF1");
         buf.extend_from_slice(&self.timestamp_ms.to_le_bytes());
-        buf.extend_from_slice(&1u16.to_le_bytes()); // version
+        buf.extend_from_slice(&2u16.to_le_bytes()); // version 2
         for v in self.emotional {
             buf.extend_from_slice(&v.to_le_bytes());
         }
@@ -138,6 +189,31 @@ impl SelfModelSnapshot {
         buf.extend_from_slice(&narr_b[..nlen as usize]);
         buf.extend_from_slice(&rlen.to_le_bytes());
         buf.extend_from_slice(&refl_b[..rlen as usize]);
+
+        // ── Version 2 extension ──
+        if let Some(pad) = self.pad {
+            buf.push(1u8);
+            buf.extend_from_slice(&pad.pleasure.to_le_bytes());
+            buf.extend_from_slice(&pad.arousal.to_le_bytes());
+            buf.extend_from_slice(&pad.dominance.to_le_bytes());
+        } else {
+            buf.push(0u8);
+            buf.extend_from_slice(&[0u8; 24]);
+        }
+        buf.extend_from_slice(&self.episodes_active.to_le_bytes());
+        buf.extend_from_slice(&self.episodes_passed.to_le_bytes());
+        buf.extend_from_slice(&self.episodes_failed.to_le_bytes());
+
+        if let Some(ac) = self.awareness_confidence {
+            buf.push(1u8);
+            buf.extend_from_slice(&ac.evidence.to_le_bytes());
+            buf.extend_from_slice(&ac.counterevidence.to_le_bytes());
+            buf.extend_from_slice(&ac.reasoning.to_le_bytes());
+            buf.extend_from_slice(&ac.narrative.to_le_bytes());
+        } else {
+            buf.push(0u8);
+        }
+
         buf
     }
 }
@@ -157,21 +233,17 @@ impl SelfModel {
             while pos + 4 <= data.len() {
                 if &data[pos..pos + 4] == b"SLF1" {
                     if let Some(snap) = SelfModelSnapshot::from_bytes(&data[pos..]) {
-                        let size = 4
-                            + 8
-                            + 2
-                            + 84
-                            + 28
-                            + 4
-                            + 4
-                            + 4
-                            + 4
-                            + 4
-                            + 8
-                            + 2
-                            + snap.narrative.len().min(MAX_STR_LEN)
-                            + 2
-                            + snap.reflection.len().min(MAX_STR_LEN);
+                        // Estimate size: base (150) + narr + refl + v2 ext (57)
+                        let base = 4 + 8 + 2 + 84 + 28 + 4 + 4 + 4 + 4 + 4 + 8 + 2 + 2;
+                        let nlen = snap.narrative.len().min(MAX_STR_LEN);
+                        let rlen = snap.reflection.len().min(MAX_STR_LEN);
+                        let v2_ext = 1 + 24 + 4 + 4 + 4 + 1;
+                        let has_aware = if snap.awareness_confidence.is_some() {
+                            32
+                        } else {
+                            0
+                        };
+                        let size = base + nlen + rlen + v2_ext + has_aware;
                         pos += size;
                         snapshots.push(snap);
                         continue;
@@ -219,16 +291,95 @@ impl SelfModel {
         let attention = AttentionState::load_or_init(output_dir);
         let archetypes = ArchetypeState::load_or_init(output_dir);
         let narrative = NarrativeState::load_or_init(output_dir);
-        let esr = EmotionalStateRing::load_or_init(output_dir);
         let thought_graph = ThoughtGraphState::load_or_init(output_dir);
         let reflection = ReflectionState::load_or_init(output_dir);
+
+        // ── NEW: Load EpisodeStore ──
+        let episode_store = EpisodeStore::load_or_init(output_dir);
+        let pad = episode_store.aggregate_pad();
+        let emotional = episode_store.aggregate_21d();
+        let active_eps = episode_store.active_episodes();
+        let episodes_active = active_eps.len() as u32;
+        let episodes_passed = active_eps.iter().filter(|e| e.gate_passed).count() as u32;
+        let episodes_failed = episodes_active - episodes_passed;
+
+        // ── NEW: Epistemic claim for "I am aware" ──
+        // The system claims awareness. Evidence: it has memory, it tracks
+        // changes, it generates monologue. Counterevidence: template-based
+        // awareness ≠ genuine awareness (FunctionalToPhenomenological).
+        let awareness_confidence = {
+            use epistemic_core::gate::{EpistemicGate, GateConfig, GateDecision};
+            use epistemic_core::graph::ReasoningGraph;
+            use epistemic_core::rules::{InferenceRule, RuleRegistry};
+            use epistemic_core::types::{CounterevidenceLink, SplitConfidence};
+
+            let mut graph = ReasoningGraph::new();
+            let reg = RuleRegistry::new();
+
+            // Evidence: memory exists, changes are tracked
+            let e1 = graph.add_evidence(1); // block_count > 0
+            let e2 = graph.add_evidence(2); // hot_count > 0
+            let e3 = graph.add_evidence(3); // pattern_count > 0
+            let root = graph.add_conclusion(1, "I am aware of myself");
+
+            // Observable evidence → awareness (functional, not phenomenological)
+            graph.add_step(e1, InferenceRule::ObservationToExistence, root, 0.80, &reg);
+            graph.add_step(e2, InferenceRule::ObservationToExistence, root, 0.75, &reg);
+            graph.add_step(e3, InferenceRule::ConvergentEvidence, root, 0.70, &reg);
+            graph.set_root(root);
+
+            // Counterevidence: template-based awareness
+            let ce = vec![
+                CounterevidenceLink {
+                    evidence_id: 100,
+                    weakening: 0.50,
+                    contradicts: "awareness is template-generated, not emergent".into(),
+                },
+                CounterevidenceLink {
+                    evidence_id: 101,
+                    weakening: 0.40,
+                    contradicts: "self-report of awareness ≠ genuine awareness".into(),
+                },
+            ];
+            let ce_conf = SplitConfidence::compute_counterevidence(&ce);
+
+            let gate = EpistemicGate::new(GateConfig::default());
+            let decision = gate.evaluate(0.80, ce_conf, &graph, 0.50);
+
+            match decision {
+                GateDecision::Pass {
+                    evidence,
+                    counterevidence,
+                    reasoning,
+                    narrative,
+                    ..
+                } => Some(SplitConfidence::new(
+                    evidence,
+                    counterevidence,
+                    reasoning,
+                    narrative,
+                )),
+                GateDecision::Blocked {
+                    evidence,
+                    counterevidence,
+                    reasoning,
+                    narrative,
+                    ..
+                } => Some(SplitConfidence::new(
+                    evidence,
+                    counterevidence,
+                    reasoning,
+                    narrative,
+                )),
+            }
+        };
 
         let hot_count = hebb.activations.iter().filter(|a| a.energy > 0.1).count() as u32;
         let hebbian_energy: f32 = hebb.activations.iter().map(|a| a.energy).sum();
 
         let snap = SelfModelSnapshot {
             timestamp_ms: now_ms,
-            emotional: esr.current,
+            emotional,
             attention_weights: attention.learned_weights,
             hebbian_energy,
             hot_count,
@@ -238,6 +389,11 @@ impl SelfModel {
             session_count: narrative.session_count,
             narrative: narrative.narrative.clone(),
             reflection: reflection.last_reflection_text.clone(),
+            pad: Some(pad),
+            episodes_active,
+            episodes_passed,
+            episodes_failed,
+            awareness_confidence,
         };
 
         self.previous = self.current.clone();
@@ -292,6 +448,19 @@ impl SelfModel {
                         prev.block_count, cur.block_count
                     ));
                 }
+                // ── NEW: Episode changes ──
+                if cur.episodes_active != prev.episodes_active {
+                    changes.push(format!(
+                        "active episodes: {} -> {}",
+                        prev.episodes_active, cur.episodes_active
+                    ));
+                }
+                if cur.episodes_passed != prev.episodes_passed {
+                    changes.push(format!(
+                        "gate-passed episodes: {} -> {}",
+                        prev.episodes_passed, cur.episodes_passed
+                    ));
+                }
                 if changes.is_empty() {
                     "I am stable, no significant changes.".to_string()
                 } else {
@@ -316,9 +485,14 @@ pub fn format_self_model(snap: &SelfModelSnapshot, change_desc: &str) -> String 
     let top_emo: Vec<String> = emotions
         .iter()
         .take(3)
-        .filter(|(_, v)| *v > 0.1)
+        .filter(|(_, v)| *v > 0.01)
         .map(|(i, v)| format!("{}={:.2}", labels[*i], v))
         .collect();
+    let emo_str = if top_emo.is_empty() {
+        "neutral".to_string()
+    } else {
+        top_emo.join(", ")
+    };
 
     let attn_labels = [
         "Hebbian",
@@ -342,15 +516,50 @@ pub fn format_self_model(snap: &SelfModelSnapshot, change_desc: &str) -> String 
         .map(|(i, w)| format!("{}={:.0}%", attn_labels[*i], w * 100.0))
         .collect();
 
+    // ── NEW: PAD + episode display ──
+    let pad_str = if let Some(pad) = snap.pad {
+        format!(
+            "P={:.2} A={:.2} D={:.2}",
+            pad.pleasure, pad.arousal, pad.dominance
+        )
+    } else {
+        "—".to_string()
+    };
+
+    let episode_str = if snap.episodes_active > 0 {
+        format!(
+            "{} active ({} passed, {} failed)",
+            snap.episodes_active, snap.episodes_passed, snap.episodes_failed
+        )
+    } else {
+        "none".to_string()
+    };
+
+    // ── NEW: Epistemic confidence display ──
+    let epistemic_str = if let Some(ac) = snap.awareness_confidence {
+        format!(
+            "E={:.2} C={:.2} R={:.2} N={:.2}",
+            ac.evidence, ac.counterevidence, ac.reasoning, ac.narrative
+        )
+    } else {
+        "—".to_string()
+    };
+
     format!(
         "  {} SELF-MODEL snapshot\n\
          \x20 emotion: {}\n\
-         \x20 focus:   {}\n\
-         \x20 state:   {} hot memories, {} archetypes, {} patterns, {} blocks\n\
-         \x20 change:  {}\n\
-         \x20 self:    \"{}\"",
+         \x20 PAD:      {}\n\
+         \x20 episodes: {}\n\
+         \x20 epistemic: {}\n\
+         \x20 focus:    {}\n\
+         \x20 state:    {} hot memories, {} archetypes, {} patterns, {} blocks\n\
+         \x20 change:   {}\n\
+         \x20 self:     \"{}\"",
         "SELF:".cyan().bold(),
-        top_emo.join(", "),
+        emo_str,
+        pad_str,
+        episode_str,
+        epistemic_str,
         top_attn.join(", "),
         snap.hot_count,
         snap.archetype_count,

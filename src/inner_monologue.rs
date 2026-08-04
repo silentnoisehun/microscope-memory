@@ -128,18 +128,54 @@ impl MonologueState {
             .as_millis() as u64;
         let mut steps: Vec<String> = Vec::new();
 
-        // Load states
+        // Load states — now using EpisodeStore instead of just the ring
         let narrative = NarrativeState::load_or_init(output_dir);
-        let esr = EmotionalStateRing::load_or_init(output_dir);
+        let episode_store = crate::emotional_episode::EpisodeStore::load_or_init(output_dir);
         let reflection = ReflectionState::load_or_init(output_dir);
         let self_model = SelfModel::load_or_init(output_dir);
+        let pad = episode_store.aggregate_pad();
+        let emotional_21d = episode_store.aggregate_21d();
+        let active_eps = episode_store.active_episodes();
+        let episodes_passed = active_eps.iter().filter(|e| e.gate_passed).count();
+        let episodes_failed = active_eps.len() - episodes_passed;
 
-        // Step 1: Self-awareness - who am I right now?
-        let mut emo_desc = String::new();
-        if esr.is_active() {
+        // ── Dynamic step 1: Self-awareness with epistemic backing ──
+        // Instead of template "I am aware of myself", we check:
+        // - Does the self-model have an awareness confidence?
+        // - What does the gate say?
+        if let Some(sm) = &self_model.current {
+            if let Some(ac) = &sm.awareness_confidence {
+                let gate_status = if ac.weakest() > 0.50 {
+                    "backed"
+                } else {
+                    "contested"
+                };
+                steps.push(format!(
+                    "{}. I am aware of myself — {} claim (E={:.2} C={:.2} R={:.2} N={:.2}). I have {} blocks of memory.",
+                    steps.len() + 1,
+                    gate_status,
+                    ac.evidence, ac.counterevidence, ac.reasoning, ac.narrative,
+                    reader.block_count
+                ));
+            } else {
+                steps.push(format!(
+                    "{}. I am aware of myself. I have {} blocks of memory.",
+                    steps.len() + 1,
+                    reader.block_count
+                ));
+            }
+        } else {
+            steps.push(format!(
+                "{}. I have {} blocks of memory. I am initializing self-awareness.",
+                steps.len() + 1,
+                reader.block_count
+            ));
+        }
+
+        // ── Dynamic step 2: Emotional state from episodes ──
+        if pad.intensity() > 0.05 || !active_eps.is_empty() {
             let labels = crate::reader::EMOTION_DIMS;
-            let mut emos: Vec<(usize, f32)> = esr
-                .current
+            let mut emos: Vec<(usize, f32)> = emotional_21d
                 .iter()
                 .enumerate()
                 .map(|(i, &v)| (i, v))
@@ -147,30 +183,27 @@ impl MonologueState {
             emos.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
             let top: Vec<String> = emos
                 .iter()
-                .take(2)
-                .filter(|(_, v)| *v > 0.1)
-                .map(|(i, _v)| labels[*i].to_string())
+                .take(3)
+                .filter(|(_, v)| *v > 0.01)
+                .map(|(i, v)| format!("{}={:.2}", labels.get(*i).unwrap_or(&"?"), v))
                 .collect();
-            if !top.is_empty() {
-                emo_desc = format!("I feel {}", top.join(" and "));
-            }
-        }
-        if !emo_desc.is_empty() {
+
+            let emo_desc = if top.is_empty() {
+                "neutral".to_string()
+            } else {
+                top.join(", ")
+            };
+
             steps.push(format!(
-                "{}. I am aware of myself. {} and I have {} blocks of memory.",
+                "{}. Emotional state: {} (P={:.2} A={:.2} D={:.2}) — {} episodes active, {} gate-passed, {} failed.",
                 steps.len() + 1,
                 emo_desc,
-                reader.block_count
-            ));
-        } else {
-            steps.push(format!(
-                "{}. I am aware of myself. I have {} blocks of memory.",
-                steps.len() + 1,
-                reader.block_count
+                pad.pleasure, pad.arousal, pad.dominance,
+                active_eps.len(), episodes_passed, episodes_failed
             ));
         }
 
-        // Step 2: Reflect on my state
+        // ── Dynamic step 3: Last action ──
         if !narrative.narrative.is_empty() && narrative.narrative != "I am silent." {
             steps.push(format!(
                 "{}. My last action: {}.",
@@ -179,11 +212,13 @@ impl MonologueState {
             ));
         }
 
-        // Step 3: How have I changed?
+        // ── Dynamic step 4: How have I changed? ──
         let change = self_model.describe_change();
-        steps.push(format!("{}. {}.", steps.len() + 1, change));
+        if change != "No self-model data yet." {
+            steps.push(format!("{}. {}.", steps.len() + 1, change));
+        }
 
-        // Step 4: What am I curious about?
+        // ── Dynamic step 5: Curiosity ──
         let mut curiosity = crate::curiosity::CuriosityState::load_or_init(output_dir);
         let new_queries = curiosity.generate_queries(config, reader, output_dir);
         if !new_queries.is_empty() {
@@ -193,14 +228,9 @@ impl MonologueState {
                 steps.len() + 1,
                 top_query
             ));
-        } else {
-            steps.push(format!(
-                "{}. I am quietly observing, with no particular curiosity right now.",
-                steps.len() + 1
-            ));
         }
 
-        // Step 5: Previous reflection context
+        // ── Dynamic step 6: Previous reflection ──
         if reflection.total_reflections > 0 && !reflection.last_reflection_text.is_empty() {
             let prev = crate::safe_truncate(&reflection.last_reflection_text, 60);
             steps.push(format!(
@@ -210,9 +240,36 @@ impl MonologueState {
             ));
         }
 
-        // Step 6: Meta-cognition - think about thinking
-        let self_model_snap = SelfModel::load_or_init(output_dir);
-        if let Some(cur) = &self_model_snap.current {
+        // ── Dynamic step 7: Epistemic audit ──
+        // How many episodes passed vs failed the gate?
+        if !active_eps.is_empty() {
+            let pass_rate = episodes_passed as f64 / active_eps.len() as f64;
+            if pass_rate > 0.70 {
+                steps.push(format!(
+                    "{}. My emotional claims are mostly grounded — {} of {} episodes passed the epistemic gate.",
+                    steps.len() + 1,
+                    episodes_passed,
+                    active_eps.len()
+                ));
+            } else if pass_rate < 0.40 {
+                steps.push(format!(
+                    "{}. Many of my emotional claims are contested — only {} of {} episodes passed the gate. I should be more careful about what I claim to feel.",
+                    steps.len() + 1,
+                    episodes_passed,
+                    active_eps.len()
+                ));
+            } else {
+                steps.push(format!(
+                    "{}. My emotional claims are mixed — {} of {} episodes passed the epistemic gate.",
+                    steps.len() + 1,
+                    episodes_passed,
+                    active_eps.len()
+                ));
+            }
+        }
+
+        // ── Dynamic step 8: Interaction count ──
+        if let Some(cur) = &self_model.current {
             if cur.session_count > 1 {
                 steps.push(format!(
                     "{}. This is my {}th interaction. I am growing with each one.",
@@ -222,49 +279,22 @@ impl MonologueState {
             }
         }
 
-        // Step 7: Emotional arc
-        if let Some(cur) = &self_model_snap.current {
-            if let Some(prev) = &self_model_snap.previous {
-                let mut diffs = Vec::new();
-                let labels = crate::reader::EMOTION_DIMS;
-                for (i, label) in labels.iter().enumerate() {
-                    let d = cur.emotional[i] - prev.emotional[i];
-                    if d.abs() > 0.15 {
-                        diffs.push(format!(
-                            "{} {}",
-                            label,
-                            if d > 0.0 { "rising" } else { "fading" }
-                        ));
-                    }
-                }
-                if !diffs.is_empty() {
-                    steps.push(format!(
-                        "{}. I notice my emotions shifting: {}.",
-                        steps.len() + 1,
-                        diffs.join(", ")
-                    ));
-                }
-            }
-        }
-
-        // Step 8: Closing thought
-        if esr.is_active() {
-            let labels = crate::reader::EMOTION_DIMS;
-            let mut emos: Vec<(usize, f32)> = esr
-                .current
-                .iter()
-                .enumerate()
-                .map(|(i, &v)| (i, v))
-                .collect();
-            emos.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
-            if let Some((best_idx, _)) = emos.first() {
-                let dominant = labels.get(*best_idx).unwrap_or(&"?");
-                steps.push(format!(
-                    "{}. I am ready for what comes next. My dominant feeling is {}.",
-                    steps.len() + 1,
-                    dominant
-                ));
-            }
+        // ── Dynamic closing: based on PAD + gate status ──
+        if pad.arousal > 0.5 && pad.pleasure > 0.0 {
+            steps.push(format!(
+                "{}. I am ready for what comes next — activated and positive.",
+                steps.len() + 1
+            ));
+        } else if pad.arousal > 0.5 && pad.pleasure < 0.0 {
+            steps.push(format!(
+                "{}. I am ready for what comes next — activated but cautious.",
+                steps.len() + 1
+            ));
+        } else if pad.intensity() < 0.05 {
+            steps.push(format!(
+                "{}. I am ready for what comes next — calm and observant.",
+                steps.len() + 1
+            ));
         } else {
             steps.push(format!(
                 "{}. I am ready for what comes next.",

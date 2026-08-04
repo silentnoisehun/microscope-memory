@@ -32,22 +32,22 @@ fn setup_built_env() -> (
     microscope_memory::MicroscopeReader,
 ) {
     let (tmp, config) = setup_test_env();
-    microscope_memory::build::build(&config, true).expect("build");
+    microscope_memory::build::build(&config, true, true).expect("build");
     let reader = microscope_memory::MicroscopeReader::open(&config).expect("open reader");
     (tmp, config, reader)
 }
 
-// ─── Build pipeline ──────────────────────────────────────
+// â”€â”€â”€ Build pipeline â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 fn bench_build_pipeline(c: &mut Criterion) {
     c.bench_function("build_pipeline", |b| {
         b.iter_with_setup(setup_test_env, |(_tmp, config)| {
-            microscope_memory::build::build(black_box(&config), true).expect("build");
+            microscope_memory::build::build(black_box(&config), true, true).expect("build");
         });
     });
 }
 
-// ─── Text search (find_text) ─────────────────────────────
+// â”€â”€â”€ Text search (find_text) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 fn bench_find_text(c: &mut Criterion) {
     let (_tmp, _config, reader) = setup_built_env();
@@ -62,7 +62,7 @@ fn bench_find_text(c: &mut Criterion) {
     group.finish();
 }
 
-// ─── Spatial lookup (reader.look) ────────────────────────
+// â”€â”€â”€ Spatial lookup (reader.look) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 fn bench_look(c: &mut Criterion) {
     let (_tmp, config, reader) = setup_built_env();
@@ -85,7 +85,7 @@ fn bench_look(c: &mut Criterion) {
     group.finish();
 }
 
-// ─── MQL query (parse + execute) ─────────────────────────
+// â”€â”€â”€ MQL query (parse + execute) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 fn bench_mql_query(c: &mut Criterion) {
     let (_tmp, config, reader) = setup_built_env();
@@ -108,7 +108,7 @@ fn bench_mql_query(c: &mut Criterion) {
     group.finish();
 }
 
-// ─── CRC16 computation ──────────────────────────────────
+// â”€â”€â”€ CRC16 computation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 fn bench_crc16(c: &mut Criterion) {
     let short_data = b"hello world";
@@ -128,7 +128,7 @@ fn bench_crc16(c: &mut Criterion) {
     group.finish();
 }
 
-// ─── Content coords ─────────────────────────────────────
+// â”€â”€â”€ Content coords â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 fn bench_content_coords(c: &mut Criterion) {
     let mut group = c.benchmark_group("content_coords");
@@ -161,7 +161,7 @@ fn bench_content_coords(c: &mut Criterion) {
     group.finish();
 }
 
-// ─── Append log read/write ──────────────────────────────
+// â”€â”€â”€ Append log read/write â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 fn bench_append_log(c: &mut Criterion) {
     let mut group = c.benchmark_group("append_log");
@@ -170,7 +170,7 @@ fn bench_append_log(c: &mut Criterion) {
         b.iter_with_setup(
             || {
                 let (tmp, config) = setup_test_env();
-                microscope_memory::build::build(&config, true).expect("build");
+                microscope_memory::build::build(&config, true, true).expect("build");
                 (tmp, config)
             },
             |(_tmp, config)| {
@@ -191,7 +191,7 @@ fn bench_append_log(c: &mut Criterion) {
     group.bench_function("read_existing", |b| {
         // Setup: build and store one entry, then benchmark reads only
         let (_tmp, config) = setup_test_env();
-        microscope_memory::build::build(&config, true).expect("build");
+        microscope_memory::build::build(&config, true, true).expect("build");
         microscope_memory::store_memory(
             &config,
             "Benchmark pre-stored memory entry",
@@ -210,8 +210,7 @@ fn bench_append_log(c: &mut Criterion) {
     group.finish();
 }
 
-
-// ─── Candle embedding device selection ─────────────────
+// â”€â”€â”€ Candle embedding device selection â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 #[cfg(all(not(target_arch = "wasm32"), feature = "embeddings"))]
 fn bench_embedding_device(c: &mut Criterion) {
@@ -250,7 +249,6 @@ fn bench_embedding_device(c: &mut Criterion) {
 #[cfg(not(all(not(target_arch = "wasm32"), feature = "embeddings")))]
 fn bench_embedding_device(_c: &mut Criterion) {}
 
-
 criterion_group!(
     benches,
     bench_build_pipeline,
@@ -263,7 +261,7 @@ criterion_group!(
 );
 criterion_main!(benches, cognitive_benches);
 
-// ─── Morphogenesis benchmarks ────────────────────────────
+// â”€â”€â”€ Morphogenesis benchmarks â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 fn bench_morphogenesis_growth(c: &mut Criterion) {
     use microscope_memory::morphogenesis::*;
@@ -330,7 +328,7 @@ fn bench_morphogenesis_evaluate_fitness(c: &mut Criterion) {
     });
 }
 
-// ─── Executive benchmarks ────────────────────────────────
+// â”€â”€â”€ Executive benchmarks â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 fn bench_executive_schedule(c: &mut Criterion) {
     use microscope_memory::executive::Executive;
@@ -355,7 +353,7 @@ fn bench_executive_schedule(c: &mut Criterion) {
     });
 }
 
-// ─── Pattern Recognition benchmarks ──────────────────────
+// â”€â”€â”€ Pattern Recognition benchmarks â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 fn bench_pattern_recognition(c: &mut Criterion) {
     use microscope_memory::pattern_recognition::*;
@@ -390,7 +388,7 @@ fn bench_pattern_recognition(c: &mut Criterion) {
     });
 }
 
-// ─── Planner benchmarks ──────────────────────────────────
+// â”€â”€â”€ Planner benchmarks â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 fn bench_planning(c: &mut Criterion) {
     use microscope_memory::planning::Planner;
@@ -413,7 +411,7 @@ fn bench_planning(c: &mut Criterion) {
     });
 }
 
-// ─── Autopoiesis benchmarks ──────────────────────────────
+// â”€â”€â”€ Autopoiesis benchmarks â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 fn bench_autopoiesis(c: &mut Criterion) {
     use microscope_memory::autopoiesis::AutopoiesisEngine;

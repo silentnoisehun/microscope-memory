@@ -333,6 +333,25 @@ impl ThoughtGraphState {
         }
     }
 
+    /// Remap pattern result-block indices after a rebuild changed the block
+    /// layout. `old_to_new[old_idx] = new_idx`; blocks that no longer exist are
+    /// dropped. The pattern itself (query sequence) is kept even when it has no
+    /// surviving result blocks — the sequence still predicts future queries.
+    pub fn remap_indexes(&mut self, old_to_new: &[u32]) {
+        for p in &mut self.patterns {
+            let mut new_blocks = Vec::with_capacity(p.result_blocks.len());
+            for &b in &p.result_blocks {
+                if (b as usize) < old_to_new.len() {
+                    let new_idx = old_to_new[b as usize];
+                    if new_idx != u32::MAX && !new_blocks.contains(&new_idx) {
+                        new_blocks.push(new_idx);
+                    }
+                }
+            }
+            p.result_blocks = new_blocks;
+        }
+    }
+
     /// Save to binary files.
     pub fn save(&self, output_dir: &Path) -> Result<(), String> {
         save_graph(

@@ -418,7 +418,7 @@ impl AutonomousEngine {
             println!("  {}", msg.cyan());
             return msg;
         }
-        match build::build(config, true) {
+        match build::build(config, true, true) {
             Ok(()) => {
                 let _ = std::fs::remove_file(&append_path);
                 let msg = "🔄 Rebuild: append log beépítve és törölve".to_string();

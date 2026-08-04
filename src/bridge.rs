@@ -718,22 +718,35 @@ async fn remember_memory(
             ledger.get_or_create(claim_hash, class, 0, now);
             // Link each support
             let provider = crate::embeddings::provider_from_config(
-                &state.config.embedding, state.config.embedding.dim,
+                &state.config.embedding,
+                state.config.embedding.dim,
             );
             if let Some(supports_str) = &payload.supports {
                 for sup in supports_str.split(',') {
                     let sup = sup.trim();
-                    if sup.is_empty() { continue; }
+                    if sup.is_empty() {
+                        continue;
+                    }
                     let sup_hash = crate::epistemic::content_hash(sup);
                     let _ = crate::epistemic::link_evidence(
-                        &mut ledger, &mut audit, claim_hash, sup_hash,
-                        crate::epistemic::EpistemicClass::Observation, 0, now,
-                        Some(sup), Some(&payload.text),
+                        &mut ledger,
+                        &mut audit,
+                        claim_hash,
+                        sup_hash,
+                        crate::epistemic::EpistemicClass::Observation,
+                        0,
+                        now,
+                        Some(sup),
+                        Some(&payload.text),
                         Some(provider.as_ref()),
                     );
                 }
             }
-            let conf = ledger.records.get(&claim_hash).map(|r| r.confidence).unwrap_or(0);
+            let conf = ledger
+                .records
+                .get(&claim_hash)
+                .map(|r| r.confidence)
+                .unwrap_or(0);
             let _ = ledger.save(output_dir);
             let _ = audit.save(output_dir);
             epistemic_info = serde_json::json!({
@@ -1345,10 +1358,10 @@ async fn build_index(
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
     let force = payload.force.unwrap_or(false);
     if force {
-        crate::build::rebuild_pending(&state.config, true)
+        crate::build::rebuild_pending(&state.config, true, true)
             .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     } else {
-        crate::build::build(&state.config, false)
+        crate::build::build(&state.config, false, true)
             .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     }
     let reader = MicroscopeReader::open(&state.config)
@@ -1670,11 +1683,11 @@ mod tests {
         config.memory_layers.layers = vec!["long_term".to_string()];
         config.embedding.provider = "none".to_string();
         std::fs::create_dir_all(&config.paths.layers_dir).unwrap();
-        crate::build::build(&config, true).unwrap();
+        crate::build::build(&config, true, true).unwrap();
 
         let stored = "alice private note";
         crate::store_memory(&config, &scope_user_text("alice", stored), "long_term", 5).unwrap();
-        crate::build::build(&config, true).unwrap();
+        crate::build::build(&config, true, true).unwrap();
 
         let master = "master-key";
         let token = user_token(master, "alice").unwrap();

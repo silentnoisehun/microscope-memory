@@ -297,12 +297,20 @@ impl PredictiveCache {
     /// Remap block indexes after rebuild.
     pub fn remap_indexes(&mut self, old_to_new: &[u32]) {
         for pred in &mut self.predictions {
-            pred.blocks = pred.blocks.iter()
+            pred.blocks = pred
+                .blocks
+                .iter()
                 .filter_map(|&idx| {
                     if (idx as usize) < old_to_new.len() {
                         let new = old_to_new[idx as usize];
-                        if new != u32::MAX { Some(new) } else { None }
-                    } else { None }
+                        if new != u32::MAX {
+                            Some(new)
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
                 })
                 .collect();
         }

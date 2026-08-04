@@ -373,6 +373,8 @@ pub mod autonomous;
 pub mod curiosity;
 pub mod emotional_21d;
 #[cfg(not(target_arch = "wasm32"))]
+pub mod epistemic;
+#[cfg(not(target_arch = "wasm32"))]
 pub mod inner_monologue;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod mermaid;
@@ -382,5 +384,3 @@ pub mod narrative_memory;
 pub mod self_model;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod self_reflect;
-#[cfg(not(target_arch = "wasm32"))]
-pub mod epistemic;

@@ -974,7 +974,11 @@ fn tool_status(config: &Config) -> Result<String, String> {
 
     let embedding_provider = &config.embedding.provider;
     let use_gpu = config.embedding.use_gpu;
-    let gpu_status = if use_gpu { "enabled (CUDA lazy)" } else { "disabled" };
+    let gpu_status = if use_gpu {
+        "enabled (CUDA lazy)"
+    } else {
+        "disabled"
+    };
 
     Ok(format!(
         "Microscope Memory Status\n\
@@ -1300,9 +1304,8 @@ fn tool_recall(config: &Config, args: &Value) -> Result<String, String> {
 
     let mut output = format!("Recall '{}' (zoom D{}..D{})", query, zoom_lo, zoom_hi);
     // Load evidence ledger for confidence/class display.
-    let evidence_ledger = crate::epistemic::EvidenceLedger::load_or_init(
-        Path::new(&config.paths.output_dir),
-    );
+    let evidence_ledger =
+        crate::epistemic::EvidenceLedger::load_or_init(Path::new(&config.paths.output_dir));
     if novel {
         output.push_str(" [NOVEL TOPIC — low prior memory]");
     }
@@ -1323,7 +1326,9 @@ fn tool_recall(config: &Config, args: &Value) -> Result<String, String> {
             let layer = LAYER_NAMES.get(h.layer_id as usize).unwrap_or(&"?");
             let class = crate::epistemic::class_of_flags(h.flags);
             let ch = crate::epistemic::content_hash(text.trim());
-            let conf = evidence_ledger.records.get(&ch)
+            let conf = evidence_ledger
+                .records
+                .get(&ch)
                 .map(|r| r.confidence)
                 .unwrap_or(0);
             output.push_str(&format!(
@@ -1460,54 +1465,98 @@ fn tool_evidence_show(config: &Config, args: &Value) -> Result<String, String> {
             "distinct_sources": rec.distinct_sources,
             "confidence": rec.confidence,
             "first_seen_ms": rec.first_seen_ms,
-        }).to_string()),
-        None => Ok(format!("{{\"error\": \"no evidence record for hash {:016x}\"}}", ch)),
+        })
+        .to_string()),
+        None => Ok(format!(
+            "{{\"error\": \"no evidence record for hash {:016x}\"}}",
+            ch
+        )),
     }
 }
 
 fn tool_evidence_link(config: &Config, args: &Value) -> Result<String, String> {
-    let claim_text = args.get("claim").and_then(|v| v.as_str()).ok_or("Missing: claim")?;
-    let support_text = args.get("support").and_then(|v| v.as_str()).ok_or("Missing: support")?;
+    let claim_text = args
+        .get("claim")
+        .and_then(|v| v.as_str())
+        .ok_or("Missing: claim")?;
+    let support_text = args
+        .get("support")
+        .and_then(|v| v.as_str())
+        .ok_or("Missing: support")?;
     let source = args.get("source").and_then(|v| v.as_u64()).unwrap_or(0);
-    let class_str = args.get("class").and_then(|v| v.as_str()).unwrap_or("observation");
+    let class_str = args
+        .get("class")
+        .and_then(|v| v.as_str())
+        .unwrap_or("observation");
     let class: crate::epistemic::EpistemicClass = class_str.parse().map_err(|e: String| e)?;
     let output_dir = std::path::Path::new(&config.paths.output_dir);
-    let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default().as_millis() as u64;
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as u64;
     let mut ledger = crate::epistemic::EvidenceLedger::load_or_init(output_dir);
     let mut audit = crate::epistemic::AuditChain::load_or_init(output_dir);
     let claim_ch = if claim_text.len() == 16 && claim_text.chars().all(|c| c.is_ascii_hexdigit()) {
         u64::from_str_radix(claim_text, 16).map_err(|e| format!("invalid hex: {e}"))?
-    } else { crate::epistemic::content_hash(claim_text) };
-    let support_ch = if support_text.len() == 16 && support_text.chars().all(|c| c.is_ascii_hexdigit()) {
-        u64::from_str_radix(support_text, 16).map_err(|e| format!("invalid hex: {e}"))?
-    } else { crate::epistemic::content_hash(support_text) };
+    } else {
+        crate::epistemic::content_hash(claim_text)
+    };
+    let support_ch =
+        if support_text.len() == 16 && support_text.chars().all(|c| c.is_ascii_hexdigit()) {
+            u64::from_str_radix(support_text, 16).map_err(|e| format!("invalid hex: {e}"))?
+        } else {
+            crate::epistemic::content_hash(support_text)
+        };
     let provider = crate::embeddings::provider_from_config(&config.embedding, config.embedding.dim);
-    crate::epistemic::link_evidence(&mut ledger, &mut audit, claim_ch, support_ch, class, source, now,
-        Some(support_text), Some(claim_text), Some(provider.as_ref()))
-        .map_err(|e| e)?;
+    crate::epistemic::link_evidence(
+        &mut ledger,
+        &mut audit,
+        claim_ch,
+        support_ch,
+        class,
+        source,
+        now,
+        Some(support_text),
+        Some(claim_text),
+        Some(provider.as_ref()),
+    )
+    .map_err(|e| e)?;
     ledger.save(output_dir).map_err(|e| e)?;
     audit.save(output_dir).map_err(|e| e)?;
-    let conf = ledger.records.get(&claim_ch).map(|r| r.confidence).unwrap_or(0);
+    let conf = ledger
+        .records
+        .get(&claim_ch)
+        .map(|r| r.confidence)
+        .unwrap_or(0);
     Ok(serde_json::json!({"status":"linked","confidence":conf}).to_string())
 }
 
 fn tool_evidence_refute(config: &Config, args: &Value) -> Result<String, String> {
-    let claim_text = args.get("claim").and_then(|v| v.as_str()).ok_or("Missing: claim")?;
+    let claim_text = args
+        .get("claim")
+        .and_then(|v| v.as_str())
+        .ok_or("Missing: claim")?;
     let source = args.get("source").and_then(|v| v.as_u64()).unwrap_or(0);
     let output_dir = std::path::Path::new(&config.paths.output_dir);
-    let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default().as_millis() as u64;
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as u64;
     let mut ledger = crate::epistemic::EvidenceLedger::load_or_init(output_dir);
     let mut audit = crate::epistemic::AuditChain::load_or_init(output_dir);
     let claim_ch = if claim_text.len() == 16 && claim_text.chars().all(|c| c.is_ascii_hexdigit()) {
         u64::from_str_radix(claim_text, 16).map_err(|e| format!("invalid hex: {e}"))?
-    } else { crate::epistemic::content_hash(claim_text) };
-    crate::epistemic::refute(&mut ledger, &mut audit, claim_ch, source, now)
-        .map_err(|e| e)?;
+    } else {
+        crate::epistemic::content_hash(claim_text)
+    };
+    crate::epistemic::refute(&mut ledger, &mut audit, claim_ch, source, now).map_err(|e| e)?;
     ledger.save(output_dir).map_err(|e| e)?;
     audit.save(output_dir).map_err(|e| e)?;
-    let conf = ledger.records.get(&claim_ch).map(|r| r.confidence).unwrap_or(0);
+    let conf = ledger
+        .records
+        .get(&claim_ch)
+        .map(|r| r.confidence)
+        .unwrap_or(0);
     Ok(serde_json::json!({"status":"refuted","confidence":conf}).to_string())
 }
 
@@ -1515,39 +1564,48 @@ fn tool_evidence_audit(config: &Config, _args: &Value) -> Result<String, String>
     let output_dir = std::path::Path::new(&config.paths.output_dir);
     let chain = crate::epistemic::AuditChain::load_or_init(output_dir);
     let result = chain.verify();
-    let events: Vec<serde_json::Value> = chain.chunks.iter().skip(1).map(|c| {
-        serde_json::json!({
-            "event": format!("{:?}", c.record.event),
-            "content_hash": format!("{:016x}", c.record.content_hash),
-            "source_id": format!("{:016x}", c.record.source_id),
-            "delta": c.record.delta,
-            "note": c.record.note,
+    let events: Vec<serde_json::Value> = chain
+        .chunks
+        .iter()
+        .skip(1)
+        .map(|c| {
+            serde_json::json!({
+                "event": format!("{:?}", c.record.event),
+                "content_hash": format!("{:016x}", c.record.content_hash),
+                "source_id": format!("{:016x}", c.record.source_id),
+                "delta": c.record.delta,
+                "note": c.record.note,
+            })
         })
-    }).collect();
+        .collect();
     Ok(serde_json::json!({
         "total_chunks": chain.chunks.len(),
         "integrity": if result.is_ok() { "OK" } else { "FAIL" },
         "events": events,
-    }).to_string())
+    })
+    .to_string())
 }
 
 fn tool_evidence_gates(config: &Config, _args: &Value) -> Result<String, String> {
     let output_dir = std::path::Path::new(&config.paths.output_dir);
     let chain = crate::epistemic::AuditChain::load_or_init(output_dir);
-    let gates: Vec<serde_json::Value> = chain.chunks.iter()
+    let gates: Vec<serde_json::Value> = chain
+        .chunks
+        .iter()
         .filter(|c| c.record.event == crate::epistemic::AuditEvent::PromoGate)
         .map(|c| {
             serde_json::json!({
                 "content_hash": format!("{:016x}", c.record.content_hash),
                 "note": c.record.note,
             })
-        }).collect();
+        })
+        .collect();
     Ok(serde_json::json!({
         "blocked_count": gates.len(),
         "gates": gates,
-    }).to_string())
+    })
+    .to_string())
 }
-
 
 fn tool_find(config: &Config, args: &Value) -> Result<String, String> {
     let query = args
@@ -1641,7 +1699,7 @@ fn tool_build(config: &Config, args: &Value) -> Result<String, String> {
         .and_then(|v: &Value| v.as_bool())
         .unwrap_or(false);
 
-    crate::build::build(config, force)?;
+    crate::build::build(config, force, true)?;
 
     // Clear append log and emotions log after successful rebuild
     let append_path = Path::new(&config.paths.output_dir).join("append.bin");
@@ -3199,7 +3257,7 @@ fn tool_doctor(config: &Config, args: &Value) -> Result<String, String> {
 // ─── Rebuild Tool ───────────────────────────────────
 
 fn tool_rebuild(config: &Config, _args: &Value) -> Result<String, String> {
-    let outcome = crate::build::rebuild_pending(config, true)
+    let outcome = crate::build::rebuild_pending(config, true, true)
         .map_err(|e| format!("Rebuild failed: {}", e))?;
     let reader = MicroscopeReader::open(config)?;
     Ok(format!(
@@ -3835,4 +3893,3 @@ mod tests {
         assert_eq!(err.kind(), std::io::ErrorKind::InvalidData);
     }
 }
-

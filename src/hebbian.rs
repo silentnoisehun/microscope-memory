@@ -315,12 +315,22 @@ impl HebbianState {
     /// layout get `u32::MAX` and are dropped.
     pub fn remap_indexes(&mut self, old_to_new: &[u32]) {
         let old_len = self.activations.len();
-        let new_len = old_to_new.iter().copied().max().map_or(0, |m| m as usize + 1);
+        // u32::MAX marks "dropped" — it must not size the target vector, or a
+        // single unmatched block would allocate a 2^32-element array.
+        let new_len = old_to_new
+            .iter()
+            .copied()
+            .filter(|&m| m != u32::MAX)
+            .max()
+            .map_or(0, |m| m as usize + 1);
 
         // 1. Remap activations vector
         let mut new_activations = vec![ActivationRecord::default(); new_len];
-        for old_idx in 0..old_len.min(old_to_new.len()) {
-            let new_idx = old_to_new[old_idx];
+        for (old_idx, &new_idx) in old_to_new
+            .iter()
+            .enumerate()
+            .take(old_len.min(old_to_new.len()))
+        {
             if new_idx != u32::MAX && (new_idx as usize) < new_len {
                 new_activations[new_idx as usize] = self.activations[old_idx];
             }
@@ -330,15 +340,26 @@ impl HebbianState {
         // 2. Remap coactivation pair keys
         let mut new_coactivations = HashMap::new();
         for ((a, b), mut pair) in self.coactivations.drain() {
-            let na = if (a as usize) < old_to_new.len() { old_to_new[a as usize] } else { u32::MAX };
-            let nb = if (b as usize) < old_to_new.len() { old_to_new[b as usize] } else { u32::MAX };
+            let na = if (a as usize) < old_to_new.len() {
+                old_to_new[a as usize]
+            } else {
+                u32::MAX
+            };
+            let nb = if (b as usize) < old_to_new.len() {
+                old_to_new[b as usize]
+            } else {
+                u32::MAX
+            };
             if na != u32::MAX && nb != u32::MAX && na != nb {
                 let key = (na.min(nb), na.max(nb));
                 pair.block_a = key.0;
                 pair.block_b = key.1;
-                new_coactivations.entry(key).and_modify(|e: &mut CoactivationPair| {
-                    e.count = e.count.saturating_add(pair.count);
-                }).or_insert(pair);
+                new_coactivations
+                    .entry(key)
+                    .and_modify(|e: &mut CoactivationPair| {
+                        e.count = e.count.saturating_add(pair.count);
+                    })
+                    .or_insert(pair);
             }
         }
         self.coactivations = new_coactivations;
@@ -733,64 +754,99 @@ mod tests {
         assert_eq!(stats.fingerprint_count, 1);
     }
 }
-    // ── MM-001: remap_indexes tests ────────────────────
+// ── MM-001: remap_indexes tests ────────────────────
 
-    #[test]
-    fn mm001_remap_preserves_activation_energy() {
-        let mut hebb = HebbianState {
-            activations: vec![ActivationRecord::default(); 5],
-            coactivations: HashMap::new(),
-            fingerprints: Vec::new(),
-        };
-        // Block 2 has high energy
-        hebb.activations[2].energy = 0.95;
-        hebb.activations[2].activation_count = 42;
+#[test]
+fn mm001_remap_preserves_activation_energy() {
+    let mut hebb = HebbianState {
+        activations: vec![ActivationRecord::default(); 5],
+        coactivations: HashMap::new(),
+        fingerprints: Vec::new(),
+    };
+    // Block 2 has high energy
+    hebb.activations[2].energy = 0.95;
+    hebb.activations[2].activation_count = 42;
 
-        // Rebuild maps: old[0]->new[3], old[1]->new[0], old[2]->new[4], old[3]->new[1], old[4]->new[2]
-        let old_to_new = vec![3u32, 0, 4, 1, 2];
-        hebb.remap_indexes(&old_to_new);
+    // Rebuild maps: old[0]->new[3], old[1]->new[0], old[2]->new[4], old[3]->new[1], old[4]->new[2]
+    let old_to_new = vec![3u32, 0, 4, 1, 2];
+    hebb.remap_indexes(&old_to_new);
 
-        // Block 2's energy should now be at index 4
-        assert_eq!(hebb.activations[4].energy, 0.95);
-        assert_eq!(hebb.activations[4].activation_count, 42);
-        // Old index 2 should now be empty (default)
-        assert_eq!(hebb.activations[2].energy, 0.0);
-    }
+    // Block 2's energy should now be at index 4
+    assert_eq!(hebb.activations[4].energy, 0.95);
+    assert_eq!(hebb.activations[4].activation_count, 42);
+    // Old index 2 should now be empty (default)
+    assert_eq!(hebb.activations[2].energy, 0.0);
+}
 
-    #[test]
-    fn mm001_remap_coactivations_merge_duplicates() {
-        let mut hebb = HebbianState {
-            activations: vec![ActivationRecord::default(); 4],
-            coactivations: HashMap::new(),
-            fingerprints: Vec::new(),
-        };
-        // Two pairs that will merge after remap
-        hebb.coactivations.insert((0, 1), CoactivationPair { block_a: 0, block_b: 1, count: 3, last_ts_ms: 100 });
-        hebb.coactivations.insert((2, 3), CoactivationPair { block_a: 2, block_b: 3, count: 5, last_ts_ms: 200 });
+#[test]
+fn mm001_remap_coactivations_merge_duplicates() {
+    let mut hebb = HebbianState {
+        activations: vec![ActivationRecord::default(); 4],
+        coactivations: HashMap::new(),
+        fingerprints: Vec::new(),
+    };
+    // Two pairs that will merge after remap
+    hebb.coactivations.insert(
+        (0, 1),
+        CoactivationPair {
+            block_a: 0,
+            block_b: 1,
+            count: 3,
+            last_ts_ms: 100,
+        },
+    );
+    hebb.coactivations.insert(
+        (2, 3),
+        CoactivationPair {
+            block_a: 2,
+            block_b: 3,
+            count: 5,
+            last_ts_ms: 200,
+        },
+    );
 
-        // old[0]->new[0], old[1]->new[2], old[2]->new[0], old[3]->new[2]
-        // Both pairs map to (0, 2) — should merge counts
-        let old_to_new = vec![0u32, 2, 0, 2];
-        hebb.remap_indexes(&old_to_new);
+    // old[0]->new[0], old[1]->new[2], old[2]->new[0], old[3]->new[2]
+    // Both pairs map to (0, 2) — should merge counts
+    let old_to_new = vec![0u32, 2, 0, 2];
+    hebb.remap_indexes(&old_to_new);
 
-        assert_eq!(hebb.coactivations.len(), 1, "pairs should merge");
-        let merged = hebb.coactivations.values().next().unwrap();
-        assert_eq!(merged.count, 8, "counts should be summed");
-    }
+    assert_eq!(hebb.coactivations.len(), 1, "pairs should merge");
+    let merged = hebb.coactivations.values().next().unwrap();
+    assert_eq!(merged.count, 8, "counts should be summed");
+}
 
-    #[test]
-    fn mm001_remap_drops_out_of_range() {
-        let mut hebb = HebbianState {
-            activations: vec![ActivationRecord::default(); 3],
-            coactivations: HashMap::new(),
-            fingerprints: Vec::new(),
-        };
-        hebb.activations[1].energy = 0.5;
+#[test]
+fn mm001_remap_drops_out_of_range() {
+    let mut hebb = HebbianState {
+        activations: vec![ActivationRecord::default(); 3],
+        coactivations: HashMap::new(),
+        fingerprints: Vec::new(),
+    };
+    hebb.activations[1].energy = 0.5;
 
-        // Remap to a smaller array — old index 2 is out of range
-        let old_to_new = vec![0u32, 1];
-        hebb.remap_indexes(&old_to_new);
+    // Remap to a smaller array — old index 2 is out of range
+    let old_to_new = vec![0u32, 1];
+    hebb.remap_indexes(&old_to_new);
 
-        assert_eq!(hebb.activations.len(), 2);
-        assert_eq!(hebb.activations[1].energy, 0.5);
-    }
+    assert_eq!(hebb.activations.len(), 2);
+    assert_eq!(hebb.activations[1].energy, 0.5);
+}
+
+#[test]
+fn mm001_remap_ignores_drop_markers_when_sizing() {
+    let mut hebb = HebbianState {
+        activations: vec![ActivationRecord::default(); 3],
+        coactivations: HashMap::new(),
+        fingerprints: Vec::new(),
+    };
+    hebb.activations[1].energy = 0.5;
+
+    // A dropped block (u32::MAX) must NOT size the target vector: the old
+    // code computed new_len = max(map) + 1 and tried to allocate a
+    // 2^32-element array whenever any block was dropped.
+    let old_to_new = vec![0u32, 1, u32::MAX];
+    hebb.remap_indexes(&old_to_new);
+
+    assert_eq!(hebb.activations.len(), 2);
+    assert_eq!(hebb.activations[1].energy, 0.5);
+}

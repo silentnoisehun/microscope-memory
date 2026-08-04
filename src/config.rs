@@ -241,10 +241,18 @@ pub struct EpistemicConfig {
     pub eviction_evidence_bias: f32,
 }
 
-fn default_true() -> bool { true }
-fn default_min_sources() -> u32 { 1 }
-fn default_sim_threshold() -> f32 { 0.85 }
-fn default_search_k() -> usize { 8 }
+fn default_true() -> bool {
+    true
+}
+fn default_min_sources() -> u32 {
+    1
+}
+fn default_sim_threshold() -> f32 {
+    0.85
+}
+fn default_search_k() -> usize {
+    8
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ConfidenceWeights {
@@ -260,14 +268,27 @@ pub struct ConfidenceWeights {
 
 impl Default for ConfidenceWeights {
     fn default() -> Self {
-        Self { observation_w: 30, source_w: 18, refute_w: 25, age_penalty: 5 }
+        Self {
+            observation_w: 30,
+            source_w: 18,
+            refute_w: 25,
+            age_penalty: 5,
+        }
     }
 }
 
-fn default_obs_w() -> i32 { 30 }
-fn default_src_w() -> i32 { 18 }
-fn default_refute_w() -> i32 { 25 }
-fn default_age_pen() -> i32 { 5 }
+fn default_obs_w() -> i32 {
+    30
+}
+fn default_src_w() -> i32 {
+    18
+}
+fn default_refute_w() -> i32 {
+    25
+}
+fn default_age_pen() -> i32 {
+    5
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct FederatedIndex {

@@ -13,6 +13,7 @@ use crate::{
 use colored::Colorize;
 use rayon::prelude::*;
 use sha2::{Digest, Sha256};
+use std::collections::HashMap;
 use std::fs;
 use std::io::{BufWriter, Seek, Write};
 use std::path::Path;
@@ -25,7 +26,16 @@ pub struct RebuildOutcome {
 
 /// Rebuild the main index while holding the same process lock used by stores.
 /// The append log is removed only after a successful build.
-pub fn rebuild_pending(config: &Config, force_when_empty: bool) -> Result<RebuildOutcome, String> {
+///
+/// `heavy` controls regenerating the expensive deterministic sidecars
+/// (embedding vectors + structural fingerprint links). The auto-rebuild path
+/// passes `false`: it consolidates the append log fast and drops stale
+/// positional sidecars instead of re-serving them after a content shift.
+pub fn rebuild_pending(
+    config: &Config,
+    force_when_empty: bool,
+    heavy: bool,
+) -> Result<RebuildOutcome, String> {
     let _lock = FileLock::acquire(config)?;
     let output_dir = Path::new(&config.paths.output_dir);
     let append_path = output_dir.join("append.bin");
@@ -40,7 +50,7 @@ pub fn rebuild_pending(config: &Config, force_when_empty: bool) -> Result<Rebuil
 
     let previous_blocks = read_meta_block_count(output_dir);
 
-    build(config, true)?;
+    build(config, true, heavy)?;
 
     let rebuilt_blocks = read_meta_block_count(output_dir);
     if pending_entries > 0 && previous_blocks > 0 && rebuilt_blocks < previous_blocks {
@@ -79,7 +89,7 @@ pub fn maybe_auto_rebuild(config: &Config) -> Result<Option<usize>, String> {
         return Ok(None);
     }
 
-    let outcome = rebuild_pending(config, false)?;
+    let outcome = rebuild_pending(config, false, false)?;
     Ok(outcome.rebuilt.then_some(outcome.pending_entries))
 }
 
@@ -180,7 +190,12 @@ pub fn compute_layers_hash(config: &Config) -> [u8; 32] {
 }
 
 // ─── BUILD: layers/ → binary ─────────────────────────
-pub fn build(config: &Config, force: bool) -> Result<(), String> {
+/// Rebuild the binary index from the raw layer files.
+///
+/// `heavy` regenerates the expensive deterministic sidecars (embeddings +
+/// fingerprint links). Auto-rebuild passes `false` and drops stale copies so
+/// positional vectors/links are never served with wrong block indices.
+pub fn build(config: &Config, force: bool, heavy: bool) -> Result<(), String> {
     let layers_hash = compute_layers_hash(config);
 
     // Incremental build check — skip if layers unchanged
@@ -210,6 +225,17 @@ pub fn build(config: &Config, force: bool) -> Result<(), String> {
 
     // Load evidence ledger for flags stamping (epistemic class).
     let ledger = crate::epistemic::EvidenceLedger::load_or_init(output_dir);
+
+    // Capture the pre-rebuild index for content-based state remapping. Rebuild
+    // re-derives block positions from layer files, so positional sidecars
+    // (Hebbian, spaced repetition, archetypes, patterns, eureka) must be
+    // remapped by matching old block content to the new layout — not by the
+    // depth sort order, which is a no-op because blocks are already
+    // depth-ordered.
+    let old_snapshot = capture_old_snapshot(config);
+    let layers_changed = read_stored_layers_hash(output_dir)
+        .map(|stored| stored != layers_hash)
+        .unwrap_or(true);
 
     if !output_dir.exists() {
         fs::create_dir_all(output_dir).map_err(|e| format!("create output dir: {}", e))?;
@@ -576,15 +602,23 @@ pub fn build(config: &Config, force: bool) -> Result<(), String> {
     let n = blocks.len();
     println!("\n  {} blocks total", n);
 
-    // Sort by depth
+    // Sort by depth (a stable no-op in practice — blocks are built in depth
+    // order, so this leaves the layout untouched).
     let mut indices: Vec<usize> = (0..n).collect();
     indices.sort_by_key(|&i| blocks[i].depth);
 
-    // Remap parent indices after sort
-    let mut old_to_new = vec![0u32; n];
+    // Remap parent indices after the (no-op) sort — only used for header wiring.
+    let mut sort_old_to_new = vec![0u32; n];
     for (new_i, &old_i) in indices.iter().enumerate() {
-        old_to_new[old_i] = new_i as u32;
+        sort_old_to_new[old_i] = new_i as u32;
     }
+
+    // Content-based mapping from the PREVIOUS index layout to the new one.
+    // Sidecar states reference blocks by position; positions shift whenever
+    // layer entries are truncated (retention) or edited, so we match old block
+    // content (depth + layer + bytes) to the freshly built layout. Blocks that
+    // no longer exist map to u32::MAX and are dropped by the remap routines.
+    let content_old_to_new = compute_content_remap(&old_snapshot, &blocks);
 
     // Write binary files
     let output_dir = Path::new(&config.paths.output_dir);
@@ -617,7 +651,7 @@ pub fn build(config: &Config, force: bool) -> Result<(), String> {
         let parent = if b.parent_idx == u32::MAX {
             u32::MAX
         } else {
-            old_to_new[b.parent_idx as usize]
+            sort_old_to_new[b.parent_idx as usize]
         };
 
         let crc = crc16_ccitt(&b.data[..len as usize]);
@@ -787,58 +821,82 @@ pub fn build(config: &Config, force: bool) -> Result<(), String> {
         println!("  Depth {}: {:>5} blocks", d, count);
     }
 
-    // ═══ Embedding index (mock provider, or candle if enabled) ═══
-    if config.embedding.provider != "none" {
-        println!("\n  Building embedding index...");
-        let emb_path = output_dir.join("embeddings.bin");
-        let reader = MicroscopeReader::open(config)?;
-        let max_depth = config.embedding.max_depth;
+    // ═══ Embedding index + structural fingerprinting (heavy sidecars) ═══
+    // Regenerated only on explicit full builds. The light (auto) rebuild path
+    // drops stale copies instead of serving positional vectors/links that no
+    // longer match the rebuilt block layout.
+    if heavy {
+        // ═══ Embedding index (mock provider, or candle if enabled) ═══
+        if config.embedding.provider != "none" {
+            println!("\n  Building embedding index...");
+            let emb_path = output_dir.join("embeddings.bin");
+            let reader = MicroscopeReader::open(config)?;
+            let max_depth = config.embedding.max_depth;
 
-        let provider: Box<dyn crate::embeddings::EmbeddingProvider> =
-            crate::embeddings::provider_from_config(&config.embedding, config.embedding.dim);
+            let provider: Box<dyn crate::embeddings::EmbeddingProvider> =
+                crate::embeddings::provider_from_config(&config.embedding, config.embedding.dim);
 
-        match crate::embedding_index::build_embedding_index(
-            &*provider, &reader, max_depth, &emb_path,
-        ) {
-            Ok(()) => println!("  {} embeddings.bin built", "OK".green()),
-            Err(e) => eprintln!("  {} embedding build: {}", "ERR".red(), e),
+            match crate::embedding_index::build_embedding_index(
+                &*provider, &reader, max_depth, &emb_path,
+            ) {
+                Ok(()) => println!("  {} embeddings.bin built", "OK".green()),
+                Err(e) => eprintln!("  {} embedding build: {}", "ERR".red(), e),
+            }
         }
-    }
 
-    // ═══ Hebbian delta integration ═══
-    let hebb_path = output_dir.join("activations.bin");
-    if hebb_path.exists() {
-        let hebb = crate::hebbian::HebbianState::load_or_init(output_dir, n);
-        let drifted = hebb
-            .activations
-            .iter()
-            .filter(|r| {
-                r.drift_x.abs() > 0.001 || r.drift_y.abs() > 0.001 || r.drift_z.abs() > 0.001
-            })
-            .count();
+        // ═══ Hebbian delta integration ═══
+        let hebb_path = output_dir.join("activations.bin");
+        if hebb_path.exists() {
+            let hebb = crate::hebbian::HebbianState::load_or_init(output_dir, n);
+            let drifted = hebb
+                .activations
+                .iter()
+                .filter(|r| {
+                    r.drift_x.abs() > 0.001 || r.drift_y.abs() > 0.001 || r.drift_z.abs() > 0.001
+                })
+                .count();
 
-        if drifted > 0 {
-            apply_hebbian_deltas(output_dir, &hebb, n)?;
+            if drifted > 0 {
+                apply_hebbian_deltas(output_dir, &hebb, n)?;
+                println!(
+                    "  {} Hebbian deltas applied to {} blocks",
+                    "HEBBIAN".magenta(),
+                    drifted
+                );
+            }
+        }
+
+        // ═══ Structural fingerprinting ═══
+        {
+            let reader = MicroscopeReader::open(config)?;
+            let texts: Vec<&str> = (0..reader.block_count).map(|i| reader.text(i)).collect();
+            let table = crate::fingerprint::LinkTable::build(&texts);
+            table.save(output_dir)?;
+            let stats = table.stats();
             println!(
-                "  {} Hebbian deltas applied to {} blocks",
-                "HEBBIAN".magenta(),
-                drifted
+                "  {} {} links across {} blocks",
+                "FINGERPRINT".cyan(),
+                stats.link_count,
+                stats.block_count
             );
         }
-    }
-
-    // ═══ Structural fingerprinting ═══
-    {
-        let reader = MicroscopeReader::open(config)?;
-        let texts: Vec<&str> = (0..reader.block_count).map(|i| reader.text(i)).collect();
-        let table = crate::fingerprint::LinkTable::build(&texts);
-        table.save(output_dir)?;
-        let stats = table.stats();
+    } else if layers_changed {
+        // Light rebuild with content change: stale positional sidecars must not
+        // be served — drop them and rebuild on the next explicit `build`.
+        for name in ["embeddings.bin", "links.bin", "fingerprints.idx"] {
+            let p = output_dir.join(name);
+            if p.exists() {
+                let _ = fs::remove_file(&p);
+            }
+        }
         println!(
-            "  {} {} links across {} blocks",
-            "FINGERPRINT".cyan(),
-            stats.link_count,
-            stats.block_count
+            "  {} heavy sidecars skipped (embeddings, fingerprint); stale copies removed",
+            "LIGHT".cyan()
+        );
+    } else {
+        println!(
+            "  {} layers unchanged — heavy sidecars kept",
+            "LIGHT".cyan()
         );
     }
 
@@ -848,27 +906,70 @@ pub fn build(config: &Config, force: bool) -> Result<(), String> {
         crate::reader::build_emotions_from_log(output_dir, &reader)?;
     }
 
-    // ═══ Remap cognitive state after index reorder ═══
-    // MM-001 fix: rebuild reorders blocks by depth, which invalidates all
-    // positional indexes in Hebbian, PredictiveCache, and Mirror state.
-    // We remap them using the old_to_new mapping computed during sort.
+    // ═══ Remap cognitive state after the layout change ═══
+    // Rebuild re-derives block positions from layer files; every positional
+    // sidecar must be remapped through the content-based mapping so learned
+    // state keeps pointing at the right blocks after a retention shift or an
+    // edit. (MM-001 only covered Hebbian/PredictiveCache/Mirror and used the
+    // depth-sort mapping, which is the identity — the fix here matches content.)
     {
         let mut hebb = crate::hebbian::HebbianState::load_or_init(output_dir, n);
-        hebb.remap_indexes(&old_to_new);
-        hebb.save(output_dir).map_err(|e| format!("save hebbian after remap: {e}"))?;
-        println!("  {} Hebbian state remapped (MM-001)", "REMAP".magenta());
+        hebb.remap_indexes(&content_old_to_new);
+        // The remap sizes the vector to the highest surviving block; pad back
+        // to the full new block count so every block has a record again.
+        if hebb.activations.len() < n {
+            hebb.activations
+                .resize(n, crate::hebbian::ActivationRecord::default());
+        }
+        hebb.save(output_dir)
+            .map_err(|e| format!("save hebbian after remap: {e}"))?;
+        println!("  {} Hebbian state remapped (content)", "REMAP".magenta());
     }
     {
         let mut pc = crate::predictive_cache::PredictiveCache::load_or_init(output_dir);
-        pc.remap_indexes(&old_to_new);
-        pc.save(output_dir).map_err(|e| format!("save predictive_cache after remap: {e}"))?;
+        pc.remap_indexes(&content_old_to_new);
+        pc.save(output_dir)
+            .map_err(|e| format!("save predictive_cache after remap: {e}"))?;
         println!("  {} PredictiveCache remapped", "REMAP".magenta());
     }
     {
         let mut mirror = crate::mirror::MirrorState::load_or_init(output_dir);
-        mirror.remap_indexes(&old_to_new);
-        mirror.save(output_dir).map_err(|e| format!("save mirror after remap: {e}"))?;
+        mirror.remap_indexes(&content_old_to_new);
+        mirror
+            .save(output_dir)
+            .map_err(|e| format!("save mirror after remap: {e}"))?;
         println!("  {} MirrorState remapped", "REMAP".magenta());
+    }
+    {
+        let mut spaced = crate::spaced_repetition::SpacedRepetition::load_or_init(output_dir);
+        spaced.remap_indexes(&content_old_to_new);
+        spaced
+            .save(output_dir)
+            .map_err(|e| format!("save spaced after remap: {e}"))?;
+        println!("  {} SpacedRepetition remapped", "REMAP".magenta());
+    }
+    {
+        let mut archetypes = crate::archetype::ArchetypeState::load_or_init(output_dir);
+        archetypes.remap_indexes(&content_old_to_new);
+        archetypes
+            .save(output_dir)
+            .map_err(|e| format!("save archetypes after remap: {e}"))?;
+        println!("  {} Archetypes remapped", "REMAP".magenta());
+    }
+    {
+        let mut tg = crate::thought_graph::ThoughtGraphState::load_or_init(output_dir);
+        tg.remap_indexes(&content_old_to_new);
+        tg.save(output_dir)
+            .map_err(|e| format!("save thought_graph after remap: {e}"))?;
+        println!("  {} ThoughtPatterns remapped", "REMAP".magenta());
+    }
+    {
+        let mut eureka = crate::eureka::EurekaLog::load_or_init(output_dir);
+        eureka.remap_indexes(&content_old_to_new);
+        eureka
+            .save(output_dir)
+            .map_err(|e| format!("save eureka after remap: {e}"))?;
+        println!("  {} EurekaLog remapped", "REMAP".magenta());
     }
 
     println!("\n{}", "ZERO JSON. Pure binary. Done.".green().bold());
@@ -928,4 +1029,154 @@ fn apply_hebbian_deltas(
     hebb_clone
         .save(output_dir)
         .map_err(|e| format!("save cleared Hebbian: {}", e))
+}
+
+/// Snapshot of one block from the pre-rebuild index, used to remap positional
+/// sidecar state by content after a rebuild changes block positions.
+struct OldBlockSnapshot {
+    depth: u8,
+    layer_id: u8,
+    text: Vec<u8>,
+}
+
+/// Read every block of the current index into memory before it is overwritten.
+fn capture_old_snapshot(config: &Config) -> Option<Vec<OldBlockSnapshot>> {
+    let reader = MicroscopeReader::open(config).ok()?;
+    let snapshots: Vec<OldBlockSnapshot> = (0..reader.block_count)
+        .map(|i| {
+            let h = reader.header(i);
+            OldBlockSnapshot {
+                depth: h.depth,
+                layer_id: h.layer_id,
+                text: reader.text(i).as_bytes().to_vec(),
+            }
+        })
+        .collect();
+    Some(snapshots)
+}
+
+/// Read the layers content hash stored in the pre-rebuild meta.bin (MSC4).
+fn read_stored_layers_hash(output_dir: &Path) -> Option<[u8; 32]> {
+    let meta = fs::read(output_dir.join("meta.bin")).ok()?;
+    if meta.len() < 152 || &meta[0..4] != b"MSC4" {
+        return None;
+    }
+    let mut hash = [0u8; 32];
+    hash.copy_from_slice(&meta[120..152]);
+    Some(hash)
+}
+
+/// Build a positional remap from the OLD index layout to the NEW one by
+/// matching block content (depth + layer + bytes). Old blocks that have no
+/// counterpart in the new layout map to `u32::MAX` and are dropped by the
+/// sidecar remap routines. Duplicate content maps in order so repeated entries
+/// keep their relative positions.
+fn compute_content_remap(old: &Option<Vec<OldBlockSnapshot>>, new_blocks: &[RawBlock]) -> Vec<u32> {
+    let old = match old {
+        Some(v) => v,
+        None => return Vec::new(),
+    };
+    if old.is_empty() {
+        return Vec::new();
+    }
+
+    // key = (depth, layer_id, data bytes) → new layout positions (ascending).
+    let mut index: HashMap<(u8, u8, Vec<u8>), Vec<u32>> = HashMap::new();
+    for (j, b) in new_blocks.iter().enumerate() {
+        index
+            .entry((b.depth, b.layer_id, b.data.clone()))
+            .or_default()
+            .push(j as u32);
+    }
+
+    let mut cursor: HashMap<(u8, u8, Vec<u8>), usize> = HashMap::new();
+    let mut map = vec![u32::MAX; old.len()];
+    for (i, s) in old.iter().enumerate() {
+        let key = (s.depth, s.layer_id, s.text.clone());
+        if let Some(list) = index.get(&key) {
+            let c = cursor.entry(key).or_insert(0);
+            if *c < list.len() {
+                map[i] = list[*c];
+                *c += 1;
+            }
+        }
+    }
+    map
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn snap(depth: u8, layer_id: u8, text: &str) -> OldBlockSnapshot {
+        OldBlockSnapshot {
+            depth,
+            layer_id,
+            text: text.as_bytes().to_vec(),
+        }
+    }
+
+    fn block(depth: u8, layer_id: u8, text: &str) -> RawBlock {
+        RawBlock {
+            data: to_block(text),
+            depth,
+            x: 0.0,
+            y: 0.0,
+            z: 0.0,
+            layer_id,
+            parent_idx: u32::MAX,
+            child_count: 0,
+            importance: 5,
+        }
+    }
+
+    /// Retention shift: the first layer entry is truncated before rebuild, so
+    /// every surviving block moves one position earlier. The content remap must
+    /// follow the surviving blocks to their new positions.
+    #[test]
+    fn content_remap_follows_retention_shift() {
+        let old = Some(vec![
+            snap(3, 1, "Alpha first entry"),
+            snap(3, 1, "Beta second entry"),
+            snap(3, 1, "Gamma third entry"),
+        ]);
+        // New layout: Alpha is gone (retention), Beta and Gamma shift down.
+        let new_blocks = vec![
+            block(0, 0, "identity"),
+            block(3, 1, "Beta second entry"),
+            block(3, 1, "Gamma third entry"),
+            block(4, 1, "Beta second entry"),
+        ];
+        let map = compute_content_remap(&old, &new_blocks);
+        // Alpha has no counterpart → u32::MAX.
+        assert_eq!(map[0], u32::MAX);
+        // Beta (old #1) → first Beta in the new layout (#1). Note the D4
+        // sentence "Beta second entry" also matches; ordered matching assigns
+        // the first (D3) occurrence, which is what recall returns.
+        assert_eq!(map[1], 1);
+        assert_eq!(map[2], 2);
+    }
+
+    /// Rebuild with unchanged content: every old block maps to itself.
+    #[test]
+    fn content_remap_is_identity_for_unchanged_content() {
+        let old = Some(vec![
+            snap(3, 1, "Alpha first entry"),
+            snap(3, 1, "Beta second entry"),
+        ]);
+        let new_blocks = vec![
+            block(0, 0, "identity"),
+            block(3, 1, "Alpha first entry"),
+            block(3, 1, "Beta second entry"),
+        ];
+        let map = compute_content_remap(&old, &new_blocks);
+        assert_eq!(map, vec![1, 2]);
+    }
+
+    /// No old index (first build): empty mapping is safe.
+    #[test]
+    fn content_remap_empty_without_old_index() {
+        let map = compute_content_remap(&None, &[block(3, 1, "x")]);
+        assert!(map.is_empty());
+    }
 }

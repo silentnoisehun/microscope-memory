@@ -166,6 +166,22 @@ impl EurekaLog {
         fs::rename(&tmp_path, &path).map_err(|e| format!("rename eureka.bin: {}", e))
     }
 
+    /// Remap event block indices after a rebuild changed the block layout.
+    /// `old_to_new[old_idx] = new_idx`; events whose block no longer exists
+    /// are dropped.
+    pub fn remap_indexes(&mut self, old_to_new: &[u32]) {
+        self.events.retain_mut(|ev| {
+            if (ev.block_index as usize) < old_to_new.len() {
+                let new_idx = old_to_new[ev.block_index as usize];
+                if new_idx != u32::MAX {
+                    ev.block_index = new_idx;
+                    return true;
+                }
+            }
+            false
+        });
+    }
+
     /// Add a new event and save.
     pub fn record(&mut self, output_dir: &Path, event: EurekaEvent) -> Result<(), String> {
         self.events.push(event);

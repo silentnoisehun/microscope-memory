@@ -163,7 +163,8 @@ impl AIAdapter {
             .copied()
             .unwrap_or("long_term");
 
-        store_memory(&self.config,
+        store_memory(
+            &self.config,
             &text,
             layer_name,
             5, // default importance
@@ -192,10 +193,7 @@ impl AIAdapter {
 
         let block_idx = cmd.block_id as u32;
         let query_hash = cmd.block_id; // use block id as query identifier
-        state.record_activation(
-            &[(block_idx, cmd.weight_delta)],
-            query_hash,
-        );
+        state.record_activation(&[(block_idx, cmd.weight_delta)], query_hash);
 
         state.save(Path::new(&self.config.paths.output_dir))?;
 
@@ -237,15 +235,17 @@ impl AIAdapter {
     }
 }
 
-
 // ─── Windows Named Pipe Implementation ──────────────────
 
 #[cfg(windows)]
 mod windows_pipe {
     use std::ffi::CString;
-        use windows_sys::Win32::Foundation::{HANDLE, INVALID_HANDLE_VALUE, CloseHandle};
+    use windows_sys::Win32::Foundation::{CloseHandle, HANDLE, INVALID_HANDLE_VALUE};
     use windows_sys::Win32::Storage::FileSystem::{ReadFile, WriteFile, PIPE_ACCESS_DUPLEX};
-    use windows_sys::Win32::System::Pipes::{CreateNamedPipeA, ConnectNamedPipe, DisconnectNamedPipe, PIPE_TYPE_MESSAGE, PIPE_READMODE_MESSAGE, PIPE_WAIT, PIPE_REJECT_REMOTE_CLIENTS};
+    use windows_sys::Win32::System::Pipes::{
+        ConnectNamedPipe, CreateNamedPipeA, DisconnectNamedPipe, PIPE_READMODE_MESSAGE,
+        PIPE_REJECT_REMOTE_CLIENTS, PIPE_TYPE_MESSAGE, PIPE_WAIT,
+    };
 
     pub struct NamedPipeListener {
         handle: HANDLE,
@@ -259,17 +259,21 @@ mod windows_pipe {
             } else {
                 format!("\\\\.\\pipe\\{}", name)
             };
-            let c_name = CString::new(pipe_name).map_err(|e| format!("Invalid pipe name: {}", e))?;
+            let c_name =
+                CString::new(pipe_name).map_err(|e| format!("Invalid pipe name: {}", e))?;
 
             let handle = unsafe {
                 CreateNamedPipeA(
                     c_name.as_ptr() as *const u8,
                     PIPE_ACCESS_DUPLEX,
-                    PIPE_TYPE_MESSAGE | PIPE_READMODE_MESSAGE | PIPE_WAIT | PIPE_REJECT_REMOTE_CLIENTS,
-                    1, // max instances
-                    256, // out buffer
-                    256, // in buffer
-                    0, // default timeout
+                    PIPE_TYPE_MESSAGE
+                        | PIPE_READMODE_MESSAGE
+                        | PIPE_WAIT
+                        | PIPE_REJECT_REMOTE_CLIENTS,
+                    1,                // max instances
+                    256,              // out buffer
+                    256,              // in buffer
+                    0,                // default timeout
                     std::ptr::null(), // no security attrs
                 )
             };
@@ -286,13 +290,17 @@ mod windows_pipe {
             if connected == 0 {
                 // Client may already be connected; GetLastError would tell, but we proceed
             }
-            Ok(NamedPipeConnection { handle: self.handle })
+            Ok(NamedPipeConnection {
+                handle: self.handle,
+            })
         }
     }
 
     impl Drop for NamedPipeListener {
         fn drop(&mut self) {
-            unsafe { CloseHandle(self.handle); }
+            unsafe {
+                CloseHandle(self.handle);
+            }
         }
     }
 
@@ -349,10 +357,12 @@ mod windows_pipe {
 
     impl Drop for NamedPipeConnection {
         fn drop(&mut self) {
-            unsafe { DisconnectNamedPipe(self.handle); }
+            unsafe {
+                DisconnectNamedPipe(self.handle);
+            }
         }
     }
-}// ─── Cross-Platform Socket Listener ─────────────────────
+} // ─── Cross-Platform Socket Listener ─────────────────────
 
 /// Platform-specific socket listener for AI communication.
 pub struct AISocketListener {
@@ -464,7 +474,8 @@ impl AISocketListener {
                             op_code: 255,
                             ..AICommand::default()
                         };
-                        let response_bytes: [u8; 256] = unsafe { std::mem::transmute(error_response) };
+                        let response_bytes: [u8; 256] =
+                            unsafe { std::mem::transmute(error_response) };
                         let _ = conn.write_all(&response_bytes);
                     }
                 }
@@ -522,7 +533,7 @@ mod tests {
         config.memory_layers.layers = vec!["long_term".to_string()];
         config.embedding.provider = "none".to_string();
         std::fs::create_dir_all(&config.paths.layers_dir).unwrap();
-        crate::build::build(&config, true).unwrap();
+        crate::build::build(&config, true, true).unwrap();
 
         let mut adapter = AIAdapter::new(config).unwrap();
 
@@ -539,16 +550,3 @@ mod tests {
         );
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-

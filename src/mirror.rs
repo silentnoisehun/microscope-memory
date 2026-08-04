@@ -197,12 +197,20 @@ impl MirrorState {
 
         // Remap echo shared_blocks
         for echo in &mut self.echoes {
-            echo.shared_blocks = echo.shared_blocks.iter()
+            echo.shared_blocks = echo
+                .shared_blocks
+                .iter()
                 .filter_map(|&idx| {
                     if (idx as usize) < old_to_new.len() {
                         let new = old_to_new[idx as usize];
-                        if new != u32::MAX { Some(new) } else { None }
-                    } else { None }
+                        if new != u32::MAX {
+                            Some(new)
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
                 })
                 .collect();
         }

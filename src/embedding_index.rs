@@ -1,10 +1,17 @@
 //! Embedding index: mmap-backed pre-computed embedding vectors.
 //!
-//! Format: [u32 block_count][u32 dim][u32 max_depth][f32 × dim × block_count]
-//! Blocks at depth > max_depth or with trivial text (< 3 chars) are stored
-//! with a NaN sentinel in the first f32 element. embedding() returns None
-//! for these blocks. Zero vectors (all 0.0) indicate a failed embedding
-//! for a block within max_depth.
+//! Sparse format — only blocks that actually received an embedding are stored
+//! (depth <= max_depth, non-trivial text, non-zero vector). Previously every
+//! block held a full vector with a NaN sentinel for the ~99% un-embedded ones,
+//! which blew the file up to gigabytes for no benefit. Search now scans only
+//! the embedded subset.
+//!
+//! Layout:
+//!   [u32 embedded_count][u32 dim][u32 max_depth]
+//!   [u32 block_idx × embedded_count]      (ascending, for binary search)
+//!   [f32 × dim × embedded_count]
+//!
+//! `embedding(block_idx)` returns None for blocks without a stored vector.
 
 use std::fs;
 use std::path::Path;
@@ -17,15 +24,15 @@ use crate::embeddings::{cosine_similarity_simd, EmbeddingProvider};
 #[allow(dead_code)]
 pub struct EmbeddingIndex {
     data: memmap2::Mmap,
-    block_count: u32,
-    dim: u32,
+    embedded_count: usize,
+    dim: usize,
     max_depth: u32,
 }
 
 const HEADER_SIZE: usize = 12; // 3 × u32
 
 impl EmbeddingIndex {
-    /// Open an existing embeddings.bin file.
+    /// Open an existing embeddings.bin file (sparse format).
     pub fn open(path: &Path) -> Option<Self> {
         if !path.exists() {
             return None;
@@ -36,51 +43,46 @@ impl EmbeddingIndex {
             return None;
         }
 
-        let block_count = u32::from_le_bytes(data[0..4].try_into().unwrap());
-        let dim = u32::from_le_bytes(data[4..8].try_into().unwrap());
+        let embedded_count = u32::from_le_bytes(data[0..4].try_into().unwrap()) as usize;
+        let dim = u32::from_le_bytes(data[4..8].try_into().unwrap()) as usize;
         let max_depth = u32::from_le_bytes(data[8..12].try_into().unwrap());
 
-        let expected = HEADER_SIZE + block_count as usize * dim as usize * 4;
-        if data.len() < expected {
+        let expected = HEADER_SIZE
+            + embedded_count
+                .checked_mul(4)
+                .and_then(|v| v.checked_add(embedded_count.checked_mul(dim * 4)?))
+                .unwrap_or(usize::MAX);
+        if expected > data.len() {
             return None;
         }
 
         Some(EmbeddingIndex {
             data,
-            block_count,
+            embedded_count,
             dim,
             max_depth,
         })
     }
 
-    /// Get embedding for block at index (zero-copy mmap access).
-    pub fn embedding(&self, block_idx: usize) -> Option<&[f32]> {
-        if block_idx >= self.block_count as usize {
-            return None;
-        }
-        let offset = HEADER_SIZE + block_idx * self.dim as usize * 4;
-        let end = offset + self.dim as usize * 4;
-        if end > self.data.len() {
-            return None;
-        }
-        // Safety: data is aligned to f32 by construction during build
-        let ptr = self.data[offset..end].as_ptr() as *const f32;
-        let emb = unsafe { std::slice::from_raw_parts(ptr, self.dim as usize) };
-        // NaN sentinel marks blocks outside max_depth or with trivial text
-        if emb.first().is_some_and(|&v| v.is_nan()) {
-            return None;
-        }
-        Some(emb)
+    /// Number of stored (embedded) blocks.
+    pub fn block_count(&self) -> usize {
+        self.embedded_count
     }
 
-    /// Number of embedded blocks.
-    pub fn block_count(&self) -> usize {
-        self.block_count as usize
+    /// Get the embedding for a block index (zero-copy mmap access).
+    pub fn embedding(&self, block_idx: usize) -> Option<&[f32]> {
+        let ids = self.block_ids();
+        let pos = ids.binary_search(&(block_idx as u32)).ok()?;
+        let offset = HEADER_SIZE + self.embedded_count * 4 + pos * self.dim * 4;
+        let ptr = self.data[offset..].as_ptr() as *const f32;
+        // Safety: the vectors region is a multiple of 4 bytes past a 4-aligned
+        // base, and the size was validated in open().
+        Some(unsafe { std::slice::from_raw_parts(ptr, self.dim) })
     }
 
     /// Embedding dimension.
     pub fn dim(&self) -> usize {
-        self.dim as usize
+        self.dim
     }
 
     /// Max depth that was embedded.
@@ -92,25 +94,20 @@ impl EmbeddingIndex {
     /// Search for top-k most similar blocks to query embedding.
     /// Returns Vec<(similarity, block_index)> sorted descending.
     pub fn search(&self, query_emb: &[f32], k: usize) -> Vec<(f32, usize)> {
-        if query_emb.len() != self.dim as usize {
+        if query_emb.len() != self.dim {
             return vec![];
         }
 
-        let mut results: Vec<(f32, usize)> = (0..self.block_count as usize)
+        let ids = self.block_ids();
+        let mut results: Vec<(f32, usize)> = (0..self.embedded_count)
             .into_par_iter()
             .filter_map(|i| {
-                let emb = self.embedding(i)?;
-                // Check for zero embedding (failed embed for a block within max_depth)
-                let is_zero = emb.iter().all(|&v| v == 0.0);
-                if is_zero {
-                    return None;
-                }
+                let offset = HEADER_SIZE + self.embedded_count * 4 + i * self.dim * 4;
+                let ptr = self.data[offset..].as_ptr() as *const f32;
+                // Safety: validated in open(); i < embedded_count.
+                let emb = unsafe { std::slice::from_raw_parts(ptr, self.dim) };
                 let sim = cosine_similarity_simd(query_emb, emb);
-                if sim > 0.3 {
-                    Some((sim, i))
-                } else {
-                    None
-                }
+                (sim > 0.3).then_some((sim, ids[i] as usize))
             })
             .collect();
 
@@ -118,10 +115,20 @@ impl EmbeddingIndex {
         results.truncate(k);
         results
     }
+
+    /// Block-id lookup array (ascending u32 indices).
+    fn block_ids(&self) -> &[u32] {
+        let start = HEADER_SIZE;
+        let end = start + self.embedded_count * 4;
+        let ptr = self.data[start..end].as_ptr() as *const u32;
+        // Safety: start is 4-aligned and the region size was validated.
+        unsafe { std::slice::from_raw_parts(ptr, self.embedded_count) }
+    }
 }
 
-/// Build embedding index file from a provider and reader.
-/// Only embeds blocks at depth 0..=max_depth.
+/// Build a sparse embedding index file from a provider and reader.
+/// Only blocks at depth 0..=max_depth with non-trivial text get embedded;
+/// failed or zero embeddings are omitted (search treats them as absent).
 pub fn build_embedding_index(
     provider: &dyn EmbeddingProvider,
     reader: &crate::MicroscopeReader,
@@ -130,78 +137,62 @@ pub fn build_embedding_index(
 ) -> Result<(), String> {
     let dim = provider.dimension();
 
-    // Count blocks to embed (depth 0..=max_depth)
-    let mut embed_count = 0usize;
-    for d in 0..=max_depth as usize {
-        if d < reader.depth_ranges.len() {
-            embed_count += reader.depth_ranges[d].1 as usize;
+    // Pass 1: count blocks that qualify (depth <= max_depth, non-trivial text).
+    let total_blocks = reader.block_count;
+    let mut qualifying = Vec::new();
+    for i in 0..total_blocks {
+        let h = reader.header(i);
+        if h.depth <= max_depth && reader.text(i).len() >= 3 {
+            qualifying.push(i);
         }
     }
 
     println!(
-        "  Embedding {} blocks (D0-D{}, dim={})...",
-        embed_count, max_depth, dim
+        "  Embedding up to {} blocks (D0-D{}, dim={})...",
+        qualifying.len(),
+        max_depth,
+        dim
     );
 
-    // Build embeddings buffer: header + flat f32 vectors
-    // Blocks outside max_depth or with trivial text get NaN sentinel in first element.
-    let total_blocks = reader.block_count;
-    let mut buf = Vec::with_capacity(HEADER_SIZE + total_blocks * dim * 4);
+    let mut block_ids: Vec<u32> = Vec::with_capacity(qualifying.len());
+    let mut vectors: Vec<f32> = Vec::new();
 
-    // Header
-    buf.extend_from_slice(&(total_blocks as u32).to_le_bytes());
-    buf.extend_from_slice(&(dim as u32).to_le_bytes());
-    buf.extend_from_slice(&(max_depth as u32).to_le_bytes());
-
-    // Embed blocks
-    let zero_vec = vec![0.0f32; dim];
-    let mut embedded = 0usize;
-
-    for i in 0..total_blocks {
-        let h = reader.header(i);
-        if h.depth <= max_depth {
-            let text = reader.text(i);
-            if text.len() < 3 {
-                // Trivial/empty text: write NaN sentinel instead of zero vector
-                buf.extend_from_slice(&f32::NAN.to_le_bytes());
-                for _ in 1..dim {
-                    buf.extend_from_slice(&0.0f32.to_le_bytes());
-                }
-            } else {
-                match provider.embed(text) {
-                    Ok(emb) => {
-                        for &v in &emb {
-                            buf.extend_from_slice(&v.to_le_bytes());
-                        }
-                        embedded += 1;
-                        if embedded.is_multiple_of(1000) {
-                            eprint!("\r  Embedded {}/{}", embedded, embed_count);
-                        }
-                    }
-                    Err(_) => {
-                        for &v in &zero_vec {
-                            buf.extend_from_slice(&v.to_le_bytes());
-                        }
-                    }
-                }
+    for (n, &i) in qualifying.iter().enumerate() {
+        let text = reader.text(i);
+        match provider.embed(text) {
+            Ok(emb) if emb.len() == dim && emb.iter().any(|&v| v != 0.0) => {
+                block_ids.push(i as u32);
+                vectors.extend_from_slice(&emb);
             }
-        } else {
-            // Block outside max_depth: write NaN sentinel instead of zero vector
-            buf.extend_from_slice(&f32::NAN.to_le_bytes());
-            for _ in 1..dim {
-                buf.extend_from_slice(&0.0f32.to_le_bytes());
-            }
+            _ => {} // failed or zero embedding → omit (equivalent to current
+                    // NaN/zero filtering in search)
+        }
+        if n.is_multiple_of(1000) {
+            eprint!("\r  Embedded {}/{}", n, qualifying.len());
         }
     }
-    eprintln!("\r  Embedded {}/{}", embedded, embed_count);
+    eprintln!("\r  Embedded {}/{}", qualifying.len(), qualifying.len());
+
+    let mut buf = Vec::with_capacity(HEADER_SIZE + block_ids.len() * 4 + vectors.len() * 4);
+    buf.extend_from_slice(&(block_ids.len() as u32).to_le_bytes());
+    buf.extend_from_slice(&(dim as u32).to_le_bytes());
+    buf.extend_from_slice(&(max_depth as u32).to_le_bytes());
+    for &id in &block_ids {
+        buf.extend_from_slice(&id.to_le_bytes());
+    }
+    for &v in &vectors {
+        buf.extend_from_slice(&v.to_le_bytes());
+    }
 
     let tmp_path = output_path.with_extension("bin.tmp");
     fs::write(&tmp_path, &buf).map_err(|e| format!("write embeddings.bin: {}", e))?;
     fs::rename(&tmp_path, output_path).map_err(|e| format!("rename embeddings.bin: {}", e))?;
-    let size_kb = buf.len() as f64 / 1024.0;
     println!(
-        "  embeddings.bin: {:.1} KB ({} blocks, {} dim)",
-        size_kb, total_blocks, dim
+        "  embeddings.bin: {:.1} KB ({} stored vectors of {} blocks, dim {})",
+        buf.len() as f64 / 1024.0,
+        block_ids.len(),
+        total_blocks,
+        dim
     );
 
     Ok(())
@@ -213,59 +204,65 @@ mod tests {
     use std::io::Write;
 
     #[test]
-    fn test_embedding_index_roundtrip() {
-        let dir = std::env::temp_dir().join("mscope_emb_test");
+    fn test_embedding_index_sparse_roundtrip() {
+        let dir = std::env::temp_dir().join("mscope_emb_sparse_test");
         let _ = fs::create_dir_all(&dir);
         let path = dir.join("embeddings.bin");
 
-        // Build a small test file: 4 blocks, dim=4
+        // Sparse file: 3 stored vectors, dim=4, max_depth=2.
+        // Stored blocks: 0, 2, 5. Block 7 absent.
         let mut buf = Vec::new();
-        buf.extend_from_slice(&4u32.to_le_bytes()); // block_count
+        buf.extend_from_slice(&3u32.to_le_bytes()); // embedded_count
         buf.extend_from_slice(&4u32.to_le_bytes()); // dim
         buf.extend_from_slice(&2u32.to_le_bytes()); // max_depth
-
-        // Block 0: [1, 0, 0, 0]
+        for &id in &[0u32, 2, 5] {
+            buf.extend_from_slice(&id.to_le_bytes());
+        }
         for &v in &[1.0f32, 0.0, 0.0, 0.0] {
             buf.extend_from_slice(&v.to_le_bytes());
         }
-        // Block 1: [0, 1, 0, 0]
         for &v in &[0.0f32, 1.0, 0.0, 0.0] {
             buf.extend_from_slice(&v.to_le_bytes());
         }
-        // Block 2: zero (failed embed within max_depth)
-        for &v in &[0.0f32, 0.0, 0.0, 0.0] {
+        for &v in &[0.0f32, 0.0, 1.0, 0.0] {
             buf.extend_from_slice(&v.to_le_bytes());
-        }
-
-        // Block 3: NaN sentinel (outside max_depth)
-        buf.extend_from_slice(&f32::NAN.to_le_bytes());
-        for _ in 1..4 {
-            buf.extend_from_slice(&0.0f32.to_le_bytes());
         }
 
         let mut f = fs::File::create(&path).unwrap();
         f.write_all(&buf).unwrap();
 
         let idx = EmbeddingIndex::open(&path).unwrap();
-        assert_eq!(idx.block_count(), 4);
+        assert_eq!(idx.block_count(), 3);
         assert_eq!(idx.dim(), 4);
         assert_eq!(idx.max_depth(), 2);
 
-        let emb0 = idx.embedding(0).unwrap();
-        assert_eq!(emb0, &[1.0, 0.0, 0.0, 0.0]);
+        assert_eq!(idx.embedding(0).unwrap(), &[1.0, 0.0, 0.0, 0.0]);
+        assert_eq!(idx.embedding(2).unwrap(), &[0.0, 1.0, 0.0, 0.0]);
+        assert_eq!(idx.embedding(5).unwrap(), &[0.0, 0.0, 1.0, 0.0]);
+        assert!(idx.embedding(1).is_none());
+        assert!(idx.embedding(7).is_none());
 
-        // Search with query [1, 0, 0, 0] should find block 0
-        let results = idx.search(&[1.0, 0.0, 0.0, 0.0], 2);
-        assert!(!results.is_empty());
-        assert_eq!(results[0].1, 0); // block 0 should be most similar
-
-        // Block 3 (NaN sentinel) should return None from embedding()
-        assert!(idx.embedding(3).is_none());
-
-        // Search should not return block 3
+        // Query [1,0,0,0] should return block 0 first and never block 7.
         let results = idx.search(&[1.0, 0.0, 0.0, 0.0], 10);
-        assert!(!results.iter().any(|&(_, i)| i == 3));
+        assert_eq!(results[0].1, 0);
+        assert!(!results.iter().any(|&(_, i)| i == 7));
+        assert!(!results.iter().any(|&(_, i)| i == 1));
 
+        // Truncated file must fail open (never panic on short mmap).
+        let trunc = dir.join("truncated.bin");
+        fs::write(&trunc, &buf[..buf.len() - 3]).unwrap();
+        assert!(EmbeddingIndex::open(&trunc).is_none());
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_empty_index_open_fails_gracefully() {
+        let dir = std::env::temp_dir().join("mscope_emb_empty_test");
+        let _ = fs::create_dir_all(&dir);
+        let path = dir.join("embeddings.bin");
+        fs::write(&path, [0u8; 4]).unwrap();
+        assert!(EmbeddingIndex::open(&path).is_none());
         let _ = fs::remove_dir_all(&dir);
     }
 }

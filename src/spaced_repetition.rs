@@ -164,6 +164,22 @@ impl SpacedRepetition {
         fs::rename(&tmp_path, &path).map_err(|e| format!("rename spaced.bin: {}", e))
     }
 
+    /// Remap block indices after a rebuild changed the block layout.
+    /// `old_to_new[old_idx] = new_idx`; entries that no longer exist
+    /// (`u32::MAX`) are dropped.
+    pub fn remap_indexes(&mut self, old_to_new: &[u32]) {
+        self.blocks.retain_mut(|b| {
+            if (b.block_idx as usize) < old_to_new.len() {
+                let new_idx = old_to_new[b.block_idx as usize];
+                if new_idx != u32::MAX {
+                    b.block_idx = new_idx;
+                    return true;
+                }
+            }
+            false
+        });
+    }
+
     /// Keress egy blokkot block_idx alapján.
     pub fn find(&self, block_idx: u32) -> Option<&SpacedBlock> {
         self.blocks.iter().find(|b| b.block_idx == block_idx)

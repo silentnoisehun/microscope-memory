@@ -688,7 +688,9 @@ pub fn promote_recalled_blocks(
     let ledger = if epistemic_gate {
         crate::epistemic::EvidenceLedger::load_or_init(output_dir)
     } else {
-        crate::epistemic::EvidenceLedger { records: std::collections::HashMap::new() }
+        crate::epistemic::EvidenceLedger {
+            records: std::collections::HashMap::new(),
+        }
     };
 
     for i in 0..actual {
@@ -712,11 +714,18 @@ pub fn promote_recalled_blocks(
                     if start + crate::BLOCK_DATA_SIZE <= data.len() {
                         let block = &data[start..start + crate::BLOCK_DATA_SIZE];
                         let end = block.iter().position(|&b| b == 0).unwrap_or(block.len());
-                        crate::epistemic::content_hash(String::from_utf8_lossy(&block[..end]).trim())
-                    } else { 0 }
-                } else { 0 }
+                        crate::epistemic::content_hash(
+                            String::from_utf8_lossy(&block[..end]).trim(),
+                        )
+                    } else {
+                        0
+                    }
+                } else {
+                    0
+                }
             };
-            if let Err(_reason) = crate::epistemic::check_promotion_gate(&ledger, class, block_hash) {
+            if let Err(_reason) = crate::epistemic::check_promotion_gate(&ledger, class, block_hash)
+            {
                 // Gate blocked: log but do not promote.
                 continue;
             }

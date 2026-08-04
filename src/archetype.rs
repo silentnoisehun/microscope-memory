@@ -69,6 +69,25 @@ impl ArchetypeState {
         })
     }
 
+    /// Remap member block indices after a rebuild changed the block layout.
+    /// `old_to_new[old_idx] = new_idx`; members that no longer exist are
+    /// dropped, and archetypes left without members are removed.
+    pub fn remap_indexes(&mut self, old_to_new: &[u32]) {
+        for a in &mut self.archetypes {
+            let mut new_members = Vec::with_capacity(a.members.len());
+            for &m in &a.members {
+                if (m as usize) < old_to_new.len() {
+                    let new_idx = old_to_new[m as usize];
+                    if new_idx != u32::MAX {
+                        new_members.push(new_idx);
+                    }
+                }
+            }
+            a.members = new_members;
+        }
+        self.archetypes.retain(|a| !a.members.is_empty());
+    }
+
     /// Detect new archetypes from the resonance field and Hebbian state.
     /// Returns the number of new archetypes emerged.
     pub fn detect(

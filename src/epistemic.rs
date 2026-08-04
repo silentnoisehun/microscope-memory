@@ -151,8 +151,7 @@ pub fn confidence(record: &EvidenceRecord, now_ms: u64) -> u8 {
         0
     };
 
-    let raw = (record.support_count as i32) * obs_w
-        + (record.distinct_sources as i32) * source_w
+    let raw = (record.support_count as i32) * obs_w + (record.distinct_sources as i32) * source_w
         - (record.refute_count as i32) * refute_w
         - age_days * age_penalty;
 
@@ -179,10 +178,16 @@ impl EvidenceLedger {
         let path = output_dir.join("evidence.bin");
         let data = match fs::read(&path) {
             Ok(d) => d,
-            Err(_) => return Self { records: HashMap::new() },
+            Err(_) => {
+                return Self {
+                    records: HashMap::new(),
+                }
+            }
         };
         if data.len() < 4 || &data[0..4] != EVIDENCE_MAGIC {
-            return Self { records: HashMap::new() };
+            return Self {
+                records: HashMap::new(),
+            };
         }
         let mut records = HashMap::new();
         let mut off = 4;
@@ -209,39 +214,67 @@ impl EvidenceLedger {
     }
 
     /// Get or create a record for a content hash.
-    pub fn get_or_create(&mut self, content_hash: u64, class: EpistemicClass, source_id: u64, now_ms: u64) -> &mut EvidenceRecord {
-        self.records.entry(content_hash).or_insert_with(|| EvidenceRecord {
-            content_hash,
-            class,
-            source_id,
-            support_count: 0,
-            refute_count: 0,
-            distinct_sources: 0,
-            first_seen_ms: now_ms,
-            last_support_ms: 0,
-            last_refute_ms: 0,
-            confidence: 0,
-            flags: 0,
-        })
+    pub fn get_or_create(
+        &mut self,
+        content_hash: u64,
+        class: EpistemicClass,
+        source_id: u64,
+        now_ms: u64,
+    ) -> &mut EvidenceRecord {
+        self.records
+            .entry(content_hash)
+            .or_insert_with(|| EvidenceRecord {
+                content_hash,
+                class,
+                source_id,
+                support_count: 0,
+                refute_count: 0,
+                distinct_sources: 0,
+                first_seen_ms: now_ms,
+                last_support_ms: 0,
+                last_refute_ms: 0,
+                confidence: 0,
+                flags: 0,
+            })
     }
 }
 
 fn read_record(data: &[u8], off: usize) -> EvidenceRecord {
     let mut p = off;
-    let content_hash = u64::from_le_bytes(data[p..p+8].try_into().unwrap()); p += 8;
-    let class = EpistemicClass::from_flags(data[p]); p += 1;
-    let source_id = u64::from_le_bytes(data[p..p+8].try_into().unwrap()); p += 8;
-    let support_count = u32::from_le_bytes(data[p..p+4].try_into().unwrap()); p += 4;
-    let refute_count = u32::from_le_bytes(data[p..p+4].try_into().unwrap()); p += 4;
-    let distinct_sources = u32::from_le_bytes(data[p..p+4].try_into().unwrap()); p += 4;
-    let first_seen_ms = u64::from_le_bytes(data[p..p+8].try_into().unwrap()); p += 8;
-    let last_support_ms = u64::from_le_bytes(data[p..p+8].try_into().unwrap()); p += 8;
-    let last_refute_ms = u64::from_le_bytes(data[p..p+8].try_into().unwrap()); p += 8;
-    let confidence = data[p]; p += 1;
+    let content_hash = u64::from_le_bytes(data[p..p + 8].try_into().unwrap());
+    p += 8;
+    let class = EpistemicClass::from_flags(data[p]);
+    p += 1;
+    let source_id = u64::from_le_bytes(data[p..p + 8].try_into().unwrap());
+    p += 8;
+    let support_count = u32::from_le_bytes(data[p..p + 4].try_into().unwrap());
+    p += 4;
+    let refute_count = u32::from_le_bytes(data[p..p + 4].try_into().unwrap());
+    p += 4;
+    let distinct_sources = u32::from_le_bytes(data[p..p + 4].try_into().unwrap());
+    p += 4;
+    let first_seen_ms = u64::from_le_bytes(data[p..p + 8].try_into().unwrap());
+    p += 8;
+    let last_support_ms = u64::from_le_bytes(data[p..p + 8].try_into().unwrap());
+    p += 8;
+    let last_refute_ms = u64::from_le_bytes(data[p..p + 8].try_into().unwrap());
+    p += 8;
+    let confidence = data[p];
+    p += 1;
     let flags = data[p];
-    EvidenceRecord { content_hash, class, source_id, support_count, refute_count,
-                    distinct_sources, first_seen_ms, last_support_ms, last_refute_ms,
-                    confidence, flags }
+    EvidenceRecord {
+        content_hash,
+        class,
+        source_id,
+        support_count,
+        refute_count,
+        distinct_sources,
+        first_seen_ms,
+        last_support_ms,
+        last_refute_ms,
+        confidence,
+        flags,
+    }
 }
 
 fn write_record(buf: &mut Vec<u8>, r: &EvidenceRecord) {
@@ -314,31 +347,72 @@ impl AuditChain {
         let mut chunks = Vec::with_capacity(count);
         let mut off = 8;
         for _ in 0..count {
-            if off + AUDIT_CHUNK_SIZE > data.len() { break; }
-            let prev_hash: [u8; 32] = data[off..off+32].try_into().unwrap();
+            if off + AUDIT_CHUNK_SIZE > data.len() {
+                break;
+            }
+            let prev_hash: [u8; 32] = data[off..off + 32].try_into().unwrap();
             off += 32;
-            let ts_ms = u64::from_le_bytes(data[off..off+8].try_into().unwrap()); off += 8;
-            let event = match data[off] { 0=>AuditEvent::Store, 1=>AuditEvent::Link, 2=>AuditEvent::Refute, 3=>AuditEvent::PromoGate, 4=>AuditEvent::Reclass, _=>AuditEvent::Store }; off += 1;
-            let content_hash = u64::from_le_bytes(data[off..off+8].try_into().unwrap()); off += 8;
-            let source_id = u64::from_le_bytes(data[off..off+8].try_into().unwrap()); off += 8;
-            let delta = i32::from_le_bytes(data[off..off+4].try_into().unwrap()); off += 4;
-            let note_len = u16::from_le_bytes(data[off..off+2].try_into().unwrap()) as usize; off += 2;
-            let note_bytes = &data[off..off+64]; off += 64;
+            let ts_ms = u64::from_le_bytes(data[off..off + 8].try_into().unwrap());
+            off += 8;
+            let event = match data[off] {
+                0 => AuditEvent::Store,
+                1 => AuditEvent::Link,
+                2 => AuditEvent::Refute,
+                3 => AuditEvent::PromoGate,
+                4 => AuditEvent::Reclass,
+                _ => AuditEvent::Store,
+            };
+            off += 1;
+            let content_hash = u64::from_le_bytes(data[off..off + 8].try_into().unwrap());
+            off += 8;
+            let source_id = u64::from_le_bytes(data[off..off + 8].try_into().unwrap());
+            off += 8;
+            let delta = i32::from_le_bytes(data[off..off + 4].try_into().unwrap());
+            off += 4;
+            let note_len = u16::from_le_bytes(data[off..off + 2].try_into().unwrap()) as usize;
+            off += 2;
+            let note_bytes = &data[off..off + 64];
+            off += 64;
             let note = String::from_utf8_lossy(&note_bytes[..note_len.min(64)]).to_string();
-            let hash: [u8; 32] = data[off..off+32].try_into().unwrap(); off += 32;
-            chunks.push(AuditChunk { prev_hash, record: AuditRecord { ts_ms, event, content_hash, source_id, delta, note }, hash });
+            let hash: [u8; 32] = data[off..off + 32].try_into().unwrap();
+            off += 32;
+            chunks.push(AuditChunk {
+                prev_hash,
+                record: AuditRecord {
+                    ts_ms,
+                    event,
+                    content_hash,
+                    source_id,
+                    delta,
+                    note,
+                },
+                hash,
+            });
         }
         Self { chunks }
     }
 
     fn genesis() -> Self {
-        let record = AuditRecord { ts_ms: 0, event: AuditEvent::Store, content_hash: 0, source_id: 0, delta: 0, note: "genesis".into() };
+        let record = AuditRecord {
+            ts_ms: 0,
+            event: AuditEvent::Store,
+            content_hash: 0,
+            source_id: 0,
+            delta: 0,
+            note: "genesis".into(),
+        };
         let payload = encode_record_payload(&record);
         let mut hasher = Sha256::new();
         hasher.update([0u8; 32]); // prev_hash = zeros for genesis
         hasher.update(&payload);
         let hash: [u8; 32] = hasher.finalize().into();
-        Self { chunks: vec![AuditChunk { prev_hash: [0u8; 32], record, hash }] }
+        Self {
+            chunks: vec![AuditChunk {
+                prev_hash: [0u8; 32],
+                record,
+                hash,
+            }],
+        }
     }
 
     /// Append a new event and return the new chunk.
@@ -349,7 +423,11 @@ impl AuditChain {
         hasher.update(prev_hash);
         hasher.update(&payload);
         let hash: [u8; 32] = hasher.finalize().into();
-        let chunk = AuditChunk { prev_hash, record, hash };
+        let chunk = AuditChunk {
+            prev_hash,
+            record,
+            hash,
+        };
         self.chunks.push(chunk);
         self.chunks.last().unwrap()
     }
@@ -361,7 +439,11 @@ impl AuditChain {
         }
         for i in 0..self.chunks.len() {
             let chunk = &self.chunks[i];
-            let expected_prev = if i == 0 { [0u8; 32] } else { self.chunks[i-1].hash };
+            let expected_prev = if i == 0 {
+                [0u8; 32]
+            } else {
+                self.chunks[i - 1].hash
+            };
             if chunk.prev_hash != expected_prev {
                 return Err(i);
             }
@@ -396,7 +478,9 @@ impl AuditChain {
             let note_len = (note_bytes.len().min(64)) as u16;
             buf.extend_from_slice(&note_len.to_le_bytes());
             buf.extend_from_slice(&note_bytes[..note_len as usize]);
-            if note_bytes.len() < 64 { buf.extend_from_slice(&vec![0u8; 64 - note_bytes.len()]); }
+            if note_bytes.len() < 64 {
+                buf.extend_from_slice(&vec![0u8; 64 - note_bytes.len()]);
+            }
             buf.extend_from_slice(&chunk.hash);
         }
         fs::write(&tmp, &buf).map_err(|e| format!("write evidence_log.bin: {e}"))?;
@@ -416,7 +500,9 @@ fn encode_record_payload(r: &AuditRecord) -> Vec<u8> {
     let note_len = (note_bytes.len().min(64)) as u16;
     buf.extend_from_slice(&note_len.to_le_bytes());
     buf.extend_from_slice(&note_bytes[..note_len as usize]);
-    if note_bytes.len() < 64 { buf.extend_from_slice(&vec![0u8; 64 - note_bytes.len()]); }
+    if note_bytes.len() < 64 {
+        buf.extend_from_slice(&vec![0u8; 64 - note_bytes.len()]);
+    }
     buf
 }
 
@@ -469,12 +555,23 @@ pub fn link_evidence(
     // Check 1: same source_id as an existing record → echo.
     // Check 2: cosine similarity with claim text above threshold → self-echo.
     let is_new_source = compute_is_new_source(
-        ledger, support_hash, support_source, support_class, now_ms,
-        support_text, claim_text, provider,
+        ledger,
+        support_hash,
+        support_source,
+        support_class,
+        now_ms,
+        support_text,
+        claim_text,
+        provider,
     );
 
     // Get or create the claim record
-    let claim = ledger.get_or_create(claim_hash, EpistemicClass::Inference, support_source, now_ms);
+    let claim = ledger.get_or_create(
+        claim_hash,
+        EpistemicClass::Inference,
+        support_source,
+        now_ms,
+    );
     claim.support_count += 1;
     claim.last_support_ms = now_ms;
 
@@ -492,7 +589,9 @@ pub fn link_evidence(
         content_hash: claim_hash,
         source_id: support_source,
         delta: if is_new_source { 1 } else { 0 },
-        note: format!("support from {support_hash:016x} (class={support_class}, new_src={is_new_source})"),
+        note: format!(
+            "support from {support_hash:016x} (class={support_class}, new_src={is_new_source})"
+        ),
     });
 
     Ok(())
@@ -515,7 +614,9 @@ fn compute_is_new_source(
     provider: Option<&dyn crate::embeddings::EmbeddingProvider>,
 ) -> bool {
     // Check 1: same source_id as an existing record → echo
-    let same_source = ledger.records.get(&support_hash)
+    let same_source = ledger
+        .records
+        .get(&support_hash)
         .map(|r| r.source_id == support_source)
         .unwrap_or(false);
 
@@ -528,19 +629,22 @@ fn compute_is_new_source(
     let is_echo = same_source || cosine_echo;
 
     // Ensure the support block exists in the ledger
-    ledger.records.entry(support_hash).or_insert_with(|| EvidenceRecord {
-        content_hash: support_hash,
-        class: support_class,
-        source_id: support_source,
-        support_count: 0,
-        refute_count: 0,
-        distinct_sources: 0,
-        first_seen_ms: now_ms,
-        last_support_ms: 0,
-        last_refute_ms: 0,
-        confidence: 0,
-        flags: 0,
-    });
+    ledger
+        .records
+        .entry(support_hash)
+        .or_insert_with(|| EvidenceRecord {
+            content_hash: support_hash,
+            class: support_class,
+            source_id: support_source,
+            support_count: 0,
+            refute_count: 0,
+            distinct_sources: 0,
+            first_seen_ms: now_ms,
+            last_support_ms: 0,
+            last_refute_ms: 0,
+            confidence: 0,
+            flags: 0,
+        });
 
     !is_echo
 }
@@ -574,7 +678,12 @@ pub fn refute(
     refuter_source: u64,
     now_ms: u64,
 ) -> Result<(), String> {
-    let claim = ledger.get_or_create(claim_hash, EpistemicClass::Inference, refuter_source, now_ms);
+    let claim = ledger.get_or_create(
+        claim_hash,
+        EpistemicClass::Inference,
+        refuter_source,
+        now_ms,
+    );
     claim.refute_count += 1;
     claim.last_refute_ms = now_ms;
     claim.confidence = confidence(claim, now_ms);
@@ -600,7 +709,10 @@ pub fn check_promotion_gate(
     block_class: EpistemicClass,
     block_hash: u64,
 ) -> Result<(), String> {
-    if !matches!(block_class, EpistemicClass::Inference | EpistemicClass::Hypothesis) {
+    if !matches!(
+        block_class,
+        EpistemicClass::Inference | EpistemicClass::Hypothesis
+    ) {
         return Ok(()); // Observations and Evidence always pass
     }
     match ledger.records.get(&block_hash) {
@@ -630,7 +742,9 @@ mod tests {
         tempfile::tempdir().unwrap()
     }
 
-    fn ms(days: u64) -> u64 { days * 86_400_000 }
+    fn ms(days: u64) -> u64 {
+        days * 86_400_000
+    }
 
     // ── C1: Salience isolation ────────────────────────
 
@@ -648,11 +762,16 @@ mod tests {
         // Store a hypothesis
         let claim_hash = content_hash("the Microscope will be conscious by 2027");
         let _ = link_evidence(
-            &mut ledger, &mut audit,
+            &mut ledger,
+            &mut audit,
             claim_hash,
             content_hash("test"),
             EpistemicClass::Observation,
-            0xBEEF, ms(0), None, None, None,
+            0xBEEF,
+            ms(0),
+            None,
+            None,
+            None,
         );
 
         let before = ledger.records[&claim_hash].confidence;
@@ -667,7 +786,10 @@ mod tests {
         }
 
         let after = ledger.records[&claim_hash].confidence;
-        assert_eq!(before, after, "C1 violated: recall replay changed confidence");
+        assert_eq!(
+            before, after,
+            "C1 violated: recall replay changed confidence"
+        );
     }
 
     /// A1b: Directly verify confidence() has no energy parameter.
@@ -689,7 +811,10 @@ mod tests {
         let c1 = confidence(&rec, ms(20));
         let c2 = confidence(&rec, ms(30)); // more time passed
         assert!(c1 >= c2, "age_penalty should decrease confidence over time");
-        assert!(c1 > 0, "3 supports + 2 distinct sources should yield positive confidence");
+        assert!(
+            c1 > 0,
+            "3 supports + 2 distinct sources should yield positive confidence"
+        );
     }
 
     // ── C2: Self-echo prevention ──────────────────────
@@ -704,14 +829,41 @@ mod tests {
         let obs_hash = content_hash("observed fact");
 
         // Link from source A
-        link_evidence(&mut ledger, &mut audit, claim_hash, obs_hash, EpistemicClass::Observation, 0xAAAA, ms(0), None, None, None).unwrap();
+        link_evidence(
+            &mut ledger,
+            &mut audit,
+            claim_hash,
+            obs_hash,
+            EpistemicClass::Observation,
+            0xAAAA,
+            ms(0),
+            None,
+            None,
+            None,
+        )
+        .unwrap();
         let ds_after_first = ledger.records[&claim_hash].distinct_sources;
         assert_eq!(ds_after_first, 1);
 
         // Link again from SAME source (same source_id = echo)
-        link_evidence(&mut ledger, &mut audit, claim_hash, obs_hash, EpistemicClass::Observation, 0xAAAA, ms(1), None, None, None).unwrap();
+        link_evidence(
+            &mut ledger,
+            &mut audit,
+            claim_hash,
+            obs_hash,
+            EpistemicClass::Observation,
+            0xAAAA,
+            ms(1),
+            None,
+            None,
+            None,
+        )
+        .unwrap();
         let ds_after_second = ledger.records[&claim_hash].distinct_sources;
-        assert_eq!(ds_after_second, 1, "C2 violated: same source should not increase distinct_sources");
+        assert_eq!(
+            ds_after_second, 1,
+            "C2 violated: same source should not increase distinct_sources"
+        );
         // support_count SHOULD increase (it's still a link)
         assert_eq!(ledger.records[&claim_hash].support_count, 2);
     }
@@ -725,11 +877,37 @@ mod tests {
         let claim_hash = content_hash("a claim");
         let obs_hash = content_hash("observed fact");
 
-        link_evidence(&mut ledger, &mut audit, claim_hash, obs_hash, EpistemicClass::Observation, 0xAAAA, ms(0), None, None, None).unwrap();
-        link_evidence(&mut ledger, &mut audit, claim_hash, obs_hash, EpistemicClass::Observation, 0xBBBB, ms(1), None, None, None).unwrap();
+        link_evidence(
+            &mut ledger,
+            &mut audit,
+            claim_hash,
+            obs_hash,
+            EpistemicClass::Observation,
+            0xAAAA,
+            ms(0),
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+        link_evidence(
+            &mut ledger,
+            &mut audit,
+            claim_hash,
+            obs_hash,
+            EpistemicClass::Observation,
+            0xBBBB,
+            ms(1),
+            None,
+            None,
+            None,
+        )
+        .unwrap();
 
-        assert_eq!(ledger.records[&claim_hash].distinct_sources, 2,
-            "different sources should increase distinct_sources");
+        assert_eq!(
+            ledger.records[&claim_hash].distinct_sources, 2,
+            "different sources should increase distinct_sources"
+        );
     }
 
     // ── C3: Support restriction ───────────────────────
@@ -744,10 +922,21 @@ mod tests {
         let inf = content_hash("inference");
 
         let result = link_evidence(
-            &mut ledger, &mut audit, claim, inf,
-            EpistemicClass::Inference, 0x1, ms(0), None, None, None,
+            &mut ledger,
+            &mut audit,
+            claim,
+            inf,
+            EpistemicClass::Inference,
+            0x1,
+            ms(0),
+            None,
+            None,
+            None,
         );
-        assert!(result.is_err(), "C3 violated: Inference should not be able to support");
+        assert!(
+            result.is_err(),
+            "C3 violated: Inference should not be able to support"
+        );
         assert!(result.unwrap_err().contains("cannot serve as support"));
     }
 
@@ -761,10 +950,21 @@ mod tests {
         let hyp = content_hash("hypothesis");
 
         let result = link_evidence(
-            &mut ledger, &mut audit, claim, hyp,
-            EpistemicClass::Hypothesis, 0x1, ms(0), None, None, None,
+            &mut ledger,
+            &mut audit,
+            claim,
+            hyp,
+            EpistemicClass::Hypothesis,
+            0x1,
+            ms(0),
+            None,
+            None,
+            None,
         );
-        assert!(result.is_err(), "C3 violated: Hypothesis should not be able to support");
+        assert!(
+            result.is_err(),
+            "C3 violated: Hypothesis should not be able to support"
+        );
     }
 
     #[test]
@@ -776,7 +976,19 @@ mod tests {
         let claim = content_hash("claim");
         let obs = content_hash("observation");
 
-        assert!(link_evidence(&mut ledger, &mut audit, claim, obs, EpistemicClass::Observation, 0x1, ms(0), None, None, None).is_ok());
+        assert!(link_evidence(
+            &mut ledger,
+            &mut audit,
+            claim,
+            obs,
+            EpistemicClass::Observation,
+            0x1,
+            ms(0),
+            None,
+            None,
+            None
+        )
+        .is_ok());
     }
 
     #[test]
@@ -788,17 +1000,34 @@ mod tests {
         let claim = content_hash("claim");
         let evi = content_hash("evidence");
 
-        assert!(link_evidence(&mut ledger, &mut audit, claim, evi, EpistemicClass::Evidence, 0x1, ms(0), None, None, None).is_ok());
+        assert!(link_evidence(
+            &mut ledger,
+            &mut audit,
+            claim,
+            evi,
+            EpistemicClass::Evidence,
+            0x1,
+            ms(0),
+            None,
+            None,
+            None
+        )
+        .is_ok());
     }
 
     // ── C4: Promotion gate ────────────────────────────
 
     #[test]
     fn c4_gate_blocks_unsupported_inference() {
-        let ledger = EvidenceLedger { records: HashMap::new() };
+        let ledger = EvidenceLedger {
+            records: HashMap::new(),
+        };
         let hyp_hash = content_hash("unsupported hypothesis");
         let result = check_promotion_gate(&ledger, EpistemicClass::Hypothesis, hyp_hash);
-        assert!(result.is_err(), "C4 violated: gate should block unsupported hypothesis");
+        assert!(
+            result.is_err(),
+            "C4 violated: gate should block unsupported hypothesis"
+        );
     }
 
     #[test]
@@ -809,26 +1038,44 @@ mod tests {
 
         let claim_hash = content_hash("supported inference");
         let obs_hash = content_hash("supporting observation");
-        link_evidence(&mut ledger, &mut audit, claim_hash, obs_hash, EpistemicClass::Observation, 0xBEEF, ms(0), None, None, None).unwrap();
+        link_evidence(
+            &mut ledger,
+            &mut audit,
+            claim_hash,
+            obs_hash,
+            EpistemicClass::Observation,
+            0xBEEF,
+            ms(0),
+            None,
+            None,
+            None,
+        )
+        .unwrap();
 
         assert!(check_promotion_gate(&ledger, EpistemicClass::Inference, claim_hash).is_ok());
     }
 
     #[test]
     fn c4_gate_allows_observation_always() {
-        let ledger = EvidenceLedger { records: HashMap::new() };
+        let ledger = EvidenceLedger {
+            records: HashMap::new(),
+        };
         assert!(check_promotion_gate(&ledger, EpistemicClass::Observation, 42).is_ok());
     }
 
     #[test]
     fn c4_gate_allows_evidence_always() {
-        let ledger = EvidenceLedger { records: HashMap::new() };
+        let ledger = EvidenceLedger {
+            records: HashMap::new(),
+        };
         assert!(check_promotion_gate(&ledger, EpistemicClass::Evidence, 42).is_ok());
     }
 
     #[test]
     fn c4_gate_blocks_inference_no_record() {
-        let ledger = EvidenceLedger { records: HashMap::new() };
+        let ledger = EvidenceLedger {
+            records: HashMap::new(),
+        };
         assert!(check_promotion_gate(&ledger, EpistemicClass::Inference, 99).is_err());
     }
 
@@ -849,7 +1096,10 @@ mod tests {
                 note: format!("entry {i}"),
             });
         }
-        assert!(audit.verify().is_ok(), "C5: chain should verify after appends");
+        assert!(
+            audit.verify().is_ok(),
+            "C5: chain should verify after appends"
+        );
     }
 
     #[test]
@@ -872,8 +1122,15 @@ mod tests {
         // Tamper with the middle record's note
         audit.chunks[2].record.note = "TAMPERED".to_string();
         let result = audit.verify();
-        assert!(result.is_err(), "C5 violated: tampered chain should fail verification");
-        assert_eq!(result.unwrap_err(), 2, "tampered chunk should be at index 2");
+        assert!(
+            result.is_err(),
+            "C5 violated: tampered chain should fail verification"
+        );
+        assert_eq!(
+            result.unwrap_err(),
+            2,
+            "tampered chunk should be at index 2"
+        );
     }
 
     #[test]
@@ -883,8 +1140,12 @@ mod tests {
 
         for i in 0..3 {
             audit.append(AuditRecord {
-                ts_ms: ms(i), event: AuditEvent::Store, content_hash: i,
-                source_id: 0, delta: 0, note: format!("{i}"),
+                ts_ms: ms(i),
+                event: AuditEvent::Store,
+                content_hash: i,
+                source_id: 0,
+                delta: 0,
+                note: format!("{i}"),
             });
         }
         assert!(audit.verify().is_ok());
@@ -908,7 +1169,19 @@ mod tests {
 
         // Build up confidence with 3 supports from different sources
         for src in [0x100u64, 0x200, 0x300] {
-            link_evidence(&mut ledger, &mut audit, claim, obs, EpistemicClass::Observation, src, ms(0), None, None, None).unwrap();
+            link_evidence(
+                &mut ledger,
+                &mut audit,
+                claim,
+                obs,
+                EpistemicClass::Observation,
+                src,
+                ms(0),
+                None,
+                None,
+                None,
+            )
+            .unwrap();
         }
         let before_refute = ledger.records[&claim].confidence;
         assert!(before_refute > 0);
@@ -917,7 +1190,10 @@ mod tests {
         refute(&mut ledger, &mut audit, claim, 0x999, ms(1)).unwrap();
         refute(&mut ledger, &mut audit, claim, 0x999, ms(2)).unwrap();
         let after_refute = ledger.records[&claim].confidence;
-        assert!(after_refute < before_refute, "refutation should lower confidence");
+        assert!(
+            after_refute < before_refute,
+            "refutation should lower confidence"
+        );
     }
 
     // ── Self-reference ────────────────────────────────
@@ -929,7 +1205,18 @@ mod tests {
         let mut audit = AuditChain::load_or_init(dir.path());
 
         let h = content_hash("self-referencing claim");
-        let result = link_evidence(&mut ledger, &mut audit, h, h, EpistemicClass::Observation, 1, ms(0), None, None, None);
+        let result = link_evidence(
+            &mut ledger,
+            &mut audit,
+            h,
+            h,
+            EpistemicClass::Observation,
+            1,
+            ms(0),
+            None,
+            None,
+            None,
+        );
         assert!(result.is_err(), "self-reference should be blocked");
     }
 
@@ -943,15 +1230,28 @@ mod tests {
             let mut audit = AuditChain::load_or_init(dir.path());
 
             let claim = content_hash("persistent claim");
-            link_evidence(&mut ledger, &mut audit, claim,
-                           content_hash("obs"), EpistemicClass::Observation, 0xA, ms(0), None, None, None).unwrap();
+            link_evidence(
+                &mut ledger,
+                &mut audit,
+                claim,
+                content_hash("obs"),
+                EpistemicClass::Observation,
+                0xA,
+                ms(0),
+                None,
+                None,
+                None,
+            )
+            .unwrap();
             ledger.save(dir.path()).unwrap();
             audit.save(dir.path()).unwrap();
         }
 
         let ledger2 = EvidenceLedger::load_or_init(dir.path());
         let audit2 = AuditChain::load_or_init(dir.path());
-        assert!(ledger2.records.contains_key(&content_hash("persistent claim")));
+        assert!(ledger2
+            .records
+            .contains_key(&content_hash("persistent claim")));
         assert!(audit2.verify().is_ok());
     }
 
@@ -959,8 +1259,12 @@ mod tests {
 
     #[test]
     fn flags_roundtrip_class() {
-        for class in [EpistemicClass::Observation, EpistemicClass::Evidence,
-                      EpistemicClass::Inference, EpistemicClass::Hypothesis] {
+        for class in [
+            EpistemicClass::Observation,
+            EpistemicClass::Evidence,
+            EpistemicClass::Inference,
+            EpistemicClass::Hypothesis,
+        ] {
             let flags = class.into_flags(0xF8); // preserve upper bits
             assert_eq!(EpistemicClass::from_flags(flags), class);
             assert_eq!(flags & 0xF8, 0xF8, "upper bits preserved");
@@ -979,10 +1283,24 @@ mod tests {
         let mut prev_conf = 0u8;
 
         for src in 1u64..=5 {
-            link_evidence(&mut ledger, &mut audit, claim,
-                           content_hash("obs"), EpistemicClass::Observation, src, ms(0), None, None, None).unwrap();
+            link_evidence(
+                &mut ledger,
+                &mut audit,
+                claim,
+                content_hash("obs"),
+                EpistemicClass::Observation,
+                src,
+                ms(0),
+                None,
+                None,
+                None,
+            )
+            .unwrap();
             let cur = ledger.records[&claim].confidence;
-            assert!(cur >= prev_conf, "confidence should be non-decreasing with support");
+            assert!(
+                cur >= prev_conf,
+                "confidence should be non-decreasing with support"
+            );
             prev_conf = cur;
         }
     }
@@ -1004,15 +1322,25 @@ mod tests {
         let support_text = "the Microscope is a cognitive memory system";
 
         link_evidence(
-            &mut ledger, &mut audit, claim,
+            &mut ledger,
+            &mut audit,
+            claim,
             content_hash(support_text),
-            EpistemicClass::Observation, 0xAAAA, ms(0),
-            Some(support_text), Some(claim_text), Some(&provider),
-        ).unwrap();
+            EpistemicClass::Observation,
+            0xAAAA,
+            ms(0),
+            Some(support_text),
+            Some(claim_text),
+            Some(&provider),
+        )
+        .unwrap();
         let ds = ledger.records[&claim].distinct_sources;
         // Cosine echo: same source + similar text → should NOT count as new
         // (source_id match already catches this, but cosine adds defense-in-depth)
-        assert!(ds <= 1, "cosine echo should not inflate distinct_sources beyond 1");
+        assert!(
+            ds <= 1,
+            "cosine echo should not inflate distinct_sources beyond 1"
+        );
     }
 
     /// C2c: truly independent observations should increase distinct_sources.
@@ -1029,11 +1357,18 @@ mod tests {
         let obs1 = "the factory opens at 6am every morning";
 
         link_evidence(
-            &mut ledger, &mut audit, claim,
+            &mut ledger,
+            &mut audit,
+            claim,
             content_hash(obs1),
-            EpistemicClass::Observation, 0xAAAA, ms(0),
-            Some(obs1), Some(claim_text), Some(&provider),
-        ).unwrap();
+            EpistemicClass::Observation,
+            0xAAAA,
+            ms(0),
+            Some(obs1),
+            Some(claim_text),
+            Some(&provider),
+        )
+        .unwrap();
         let ds1 = ledger.records[&claim].distinct_sources;
         assert_eq!(ds1, 1, "first independent observation should count");
     }

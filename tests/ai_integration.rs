@@ -24,7 +24,7 @@ fn setup_test_memory() -> (tempfile::TempDir, Config) {
     config.embedding.provider = "mock".to_string();
 
     // Build the memory
-    microscope_memory::build::build(&config, true).expect("Failed to build test memory");
+    microscope_memory::build::build(&config, true, true).expect("Failed to build test memory");
 
     (tmp, config)
 }
@@ -112,5 +112,3 @@ fn test_lazy_merkle_updates() {
     let result = adapter.process_command(cmd);
     assert!(result.is_ok());
 }
-
-

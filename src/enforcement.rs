@@ -625,8 +625,8 @@ pub fn load_engine_strict(output_dir: &Path) -> Result<EnforcementEngine, String
 
     if has_audit {
         // Load the audit independently to surface corruption.
-        let chunks = load_audit(output_dir)
-            .map_err(|e| format!("enforcement audit unreadable: {e}"))?;
+        let chunks =
+            load_audit(output_dir).map_err(|e| format!("enforcement audit unreadable: {e}"))?;
         // Validate the whole chain: a single bad link means fail-closed.
         if !chunks.is_empty() {
             let mut probe = EnforcementEngine::new();

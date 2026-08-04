@@ -29,7 +29,7 @@ fn setup_test_env() -> (tempfile::TempDir, microscope_memory::config::Config) {
 #[test]
 fn test_full_build_pipeline() {
     let (_tmp, config) = setup_test_env();
-    microscope_memory::build::build(&config, true).expect("build failed");
+    microscope_memory::build::build(&config, true, true).expect("build failed");
 
     let output_dir = Path::new(&config.paths.output_dir);
     assert!(output_dir.join("meta.bin").exists());
@@ -40,7 +40,7 @@ fn test_full_build_pipeline() {
 #[test]
 fn test_build_and_read() {
     let (_tmp, config) = setup_test_env();
-    microscope_memory::build::build(&config, true).expect("build failed");
+    microscope_memory::build::build(&config, true, true).expect("build failed");
 
     let reader = microscope_memory::reader::MicroscopeReader::open(&config).expect("open reader");
     assert!(reader.block_count > 0);
@@ -49,7 +49,7 @@ fn test_build_and_read() {
 #[test]
 fn test_text_search() {
     let (_tmp, config) = setup_test_env();
-    microscope_memory::build::build(&config, true).expect("build failed");
+    microscope_memory::build::build(&config, true, true).expect("build failed");
     let reader = microscope_memory::reader::MicroscopeReader::open(&config).expect("open reader");
 
     let results = reader.find_text("Rust", 10);
@@ -59,7 +59,7 @@ fn test_text_search() {
 #[test]
 fn test_store_and_recall() {
     let (_tmp, config) = setup_test_env();
-    microscope_memory::build::build(&config, true).unwrap();
+    microscope_memory::build::build(&config, true, true).unwrap();
 
     microscope_memory::store_memory(
         &config,
@@ -80,7 +80,7 @@ fn test_store_and_recall() {
 fn test_find_includes_pending_append_entries() {
     let (_tmp, mut config) = setup_test_env();
     config.index.auto_rebuild = false;
-    microscope_memory::build::build(&config, true).unwrap();
+    microscope_memory::build::build(&config, true, true).unwrap();
 
     let marker = "pending-search-marker-7f3a";
     microscope_memory::store_memory(&config, marker, "long_term", 5).expect("store");
@@ -98,7 +98,7 @@ fn test_auto_rebuild_after_configured_threshold() {
     let (_tmp, mut config) = setup_test_env();
     config.index.auto_rebuild = true;
     config.index.auto_rebuild_entries = 2;
-    microscope_memory::build::build(&config, true).unwrap();
+    microscope_memory::build::build(&config, true, true).unwrap();
 
     microscope_memory::store_memory(&config, "auto-rebuild-first", "long_term", 5)
         .expect("first store");
@@ -120,7 +120,7 @@ fn test_auto_rebuild_after_configured_threshold() {
 fn test_rebuild_rejects_shrink_and_restores_append_log() {
     let (_tmp, mut config) = setup_test_env();
     config.index.auto_rebuild = false;
-    microscope_memory::build::build(&config, true).unwrap();
+    microscope_memory::build::build(&config, true, true).unwrap();
     microscope_memory::store_memory(&config, "shrink-guard-pending", "long_term", 5)
         .expect("store");
     fs::write(
@@ -129,7 +129,7 @@ fn test_rebuild_rejects_shrink_and_restores_append_log() {
     )
     .unwrap();
 
-    let error = microscope_memory::build::rebuild_pending(&config, false)
+    let error = microscope_memory::build::rebuild_pending(&config, false, true)
         .expect_err("shrinking rebuild must be rejected");
     assert!(error.contains("refusing rebuild shrink"));
 
@@ -145,7 +145,7 @@ fn test_rebuild_rejects_shrink_and_restores_append_log() {
     // (not cleared) when a shrink rebuild is rejected. The main
     // index files may have been overwritten by the build() call
     // inside rebuild_pending before it detected the shrink and
-    // returned Err — that is a pre-existing behaviour unchanged
+    // returned Err â€” that is a pre-existing behaviour unchanged
     // by the snapshot removal.
 }
 
@@ -154,11 +154,11 @@ fn test_incremental_build_skips() {
     let (_tmp, config) = setup_test_env();
 
     // First build
-    microscope_memory::build::build(&config, false).expect("build");
+    microscope_memory::build::build(&config, false, true).expect("build");
     let meta1 = fs::read(Path::new(&config.paths.output_dir).join("meta.bin")).unwrap();
 
     // Second build (should skip -- layers unchanged)
-    microscope_memory::build::build(&config, false).expect("build");
+    microscope_memory::build::build(&config, false, true).expect("build");
     let meta2 = fs::read(Path::new(&config.paths.output_dir).join("meta.bin")).unwrap();
 
     // Meta should be identical (no rebuild happened)
@@ -173,16 +173,16 @@ fn test_incremental_build_force() {
     let (_tmp, config) = setup_test_env();
 
     // First build
-    microscope_memory::build::build(&config, false).expect("build");
+    microscope_memory::build::build(&config, false, true).expect("build");
 
     // Force rebuild should complete without error
-    microscope_memory::build::build(&config, true).unwrap();
+    microscope_memory::build::build(&config, true, true).unwrap();
 }
 
 #[test]
 fn test_mql_query() {
     let (_tmp, config) = setup_test_env();
-    microscope_memory::build::build(&config, true).unwrap();
+    microscope_memory::build::build(&config, true, true).unwrap();
 
     let reader = microscope_memory::reader::MicroscopeReader::open(&config).expect("open reader");
     let appended = vec![];
@@ -196,7 +196,7 @@ fn test_mql_query() {
 #[test]
 fn test_mql_complex_query() {
     let (_tmp, config) = setup_test_env();
-    microscope_memory::build::build(&config, true).unwrap();
+    microscope_memory::build::build(&config, true, true).unwrap();
 
     let reader = microscope_memory::reader::MicroscopeReader::open(&config).expect("open reader");
     let appended = vec![];
@@ -239,7 +239,7 @@ fn execute_query(
 #[test]
 fn test_crc_integrity_after_build() {
     let (_tmp, config) = setup_test_env();
-    microscope_memory::build::build(&config, true).unwrap();
+    microscope_memory::build::build(&config, true, true).unwrap();
 
     let reader = microscope_memory::reader::MicroscopeReader::open(&config).expect("open reader");
 
@@ -260,7 +260,7 @@ fn test_crc_integrity_after_build() {
 #[test]
 fn test_merkle_integrity_after_build() {
     let (_tmp, config) = setup_test_env();
-    microscope_memory::build::build(&config, true).unwrap();
+    microscope_memory::build::build(&config, true, true).unwrap();
 
     let output_dir = Path::new(&config.paths.output_dir);
     let merkle_data = fs::read(output_dir.join("merkle.bin")).unwrap();
@@ -280,7 +280,7 @@ fn test_merkle_integrity_after_build() {
 #[test]
 fn test_cross_platform_merkle_consistency() {
     let (_tmp, config) = setup_test_env();
-    microscope_memory::build::build(&config, true).unwrap();
+    microscope_memory::build::build(&config, true, true).unwrap();
 
     let output_dir = Path::new(&config.paths.output_dir);
     let merkle_data = fs::read(output_dir.join("merkle.bin")).unwrap();
@@ -305,7 +305,7 @@ fn test_mcp_protocol_compatibility() {
     // Ensures the native MCP server responds correctly to standard requests
 
     let (_tmp, config) = setup_test_env();
-    microscope_memory::build::build(&config, true).unwrap();
+    microscope_memory::build::build(&config, true, true).unwrap();
 
     // Test initialize
     let init_request = serde_json::json!({
@@ -459,7 +459,7 @@ fn handle_mcp_request(
 #[test]
 fn test_snapshot_export_import() {
     let (_tmp, config) = setup_test_env();
-    microscope_memory::build::build(&config, true).unwrap();
+    microscope_memory::build::build(&config, true, true).unwrap();
 
     let output_dir = Path::new(&config.paths.output_dir);
     let archive_path = output_dir.join("test.mscope");
@@ -482,7 +482,7 @@ fn test_snapshot_export_import() {
 #[test]
 fn test_embedding_index_search() {
     let (_tmp, config) = setup_test_env();
-    microscope_memory::build::build(&config, true).unwrap();
+    microscope_memory::build::build(&config, true, true).unwrap();
 
     let output_dir = Path::new(&config.paths.output_dir);
     let emb_path = output_dir.join("embeddings.bin");
@@ -501,7 +501,7 @@ fn test_embedding_index_search() {
     }
 }
 
-// ─── Morphogenesis Integration ───────────────────────────
+// â”€â”€â”€ Morphogenesis Integration â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 #[test]
 fn test_morphogenesis_mycelium_growth_integration() {
@@ -522,7 +522,7 @@ fn test_morphogenesis_engine_evolve() {
     assert!(!results.is_empty(), "Should produce organisms");
 }
 
-// ─── Pattern Recognition Integration ─────────────────────
+// â”€â”€â”€ Pattern Recognition Integration â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 #[test]
 fn test_pattern_recognition_sequences() {
@@ -556,7 +556,7 @@ fn test_pattern_recognition_motifs() {
     assert!(!patterns.is_empty(), "Should have structural patterns");
 }
 
-// ─── Executive Integration ───────────────────────────────
+// â”€â”€â”€ Executive Integration â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 #[test]
 fn test_executive_schedule_and_cycle() {
@@ -580,7 +580,7 @@ fn test_executive_homeostasis() {
     assert!(actions.contains(&"energy_conservation".to_string()));
 }
 
-// ─── Planning Integration ────────────────────────────────
+// â”€â”€â”€ Planning Integration â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 #[test]
 fn test_planning_goal_decomposition() {
@@ -603,7 +603,7 @@ fn test_planning_create_and_execute() {
     assert!(step.is_some(), "Should execute first step");
 }
 
-// ─── Autopoiesis Integration ─────────────────────────────
+// â”€â”€â”€ Autopoiesis Integration â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 #[test]
 fn test_autopoiesis_template_and_mutation() {
@@ -638,7 +638,7 @@ fn test_autopoiesis_mutation_lifecycle() {
     assert!(!engine.list_mutations(None).is_empty());
 }
 
-// ─── Code Memory Integration ─────────────────────────────
+// â”€â”€â”€ Code Memory Integration â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 #[test]
 fn test_code_memory_store_and_recall() {
@@ -699,4 +699,96 @@ fn test_code_memory_stats() {
         vec![],
     );
     assert_eq!(cm.stats().0, 2);
+}
+
+// ─── MM-001 regression: retention shift must remap positional state ───
+//
+// Before the fix, rebuild mapped Hebbian/PredictiveCache/Mirror through the
+// depth-sort mapping, which is the identity — so when retention truncated the
+// oldest layer entry, every surviving block moved one position earlier and all
+// learned state silently pointed at the WRONG block (e.g. Beta #4 → #3 in the
+// empirical repro). The fix matches old block content to the new layout.
+
+#[test]
+fn test_retention_shift_remaps_state_files() {
+    use microscope_memory::spaced_repetition::{SpacedBlock, SpacedRepetition};
+
+    let (_tmp, config) = setup_test_env();
+    let output_dir = Path::new(&config.paths.output_dir);
+    let layers_dir = Path::new(&config.paths.layers_dir);
+
+    // Three memories in order (imp markers stripped on rebuild).
+    microscope_memory::store_memory(&config, "Alpha first entry about rust.", "long_term", 7)
+        .expect("store alpha");
+    microscope_memory::store_memory(&config, "Beta second entry about mmap.", "long_term", 6)
+        .expect("store beta");
+    microscope_memory::store_memory(&config, "Gamma third entry about zoom.", "long_term", 5)
+        .expect("store gamma");
+
+    // Build (light: no embeddings/fingerprints — fast and deterministic).
+    microscope_memory::build::build(&config, true, false).expect("build");
+
+    // Locate Beta's D3 block in the old layout.
+    let reader = microscope_memory::MicroscopeReader::open(&config).expect("open reader");
+    let hits = reader.find_text("Beta second entry about mmap.", 10);
+    let old_beta = hits
+        .iter()
+        .find(|(d, _)| *d == 3)
+        .map(|(_, i)| *i as u32)
+        .expect("Beta D3 block in old layout");
+    assert!(
+        old_beta >= 3,
+        "Beta should not be the first D3 block (got {old_beta})"
+    );
+
+    // Simulate a recall: spaced.bin points at Beta's block.
+    let spaced = SpacedRepetition {
+        blocks: vec![SpacedBlock {
+            block_idx: old_beta,
+            recall_count: 3,
+            last_recall_ms: 1_700_000_000_000,
+            interval_days: 2.5,
+            ease_factor: 2.5,
+            importance: 6,
+        }],
+    };
+    spaced.save(output_dir).expect("save spaced");
+
+    // Drop the mmap-backed reader before rebuilding: on Windows, creating
+    // microscope.bin fails while a user-mapped section is still open.
+    drop(reader);
+
+    // Retention: Alpha is truncated. Beta and Gamma shift one position earlier
+    // in the rebuilt index — exactly the MM-001 corruption scenario.
+    let layer_file = layers_dir.join("long_term.txt");
+    let kept = "(imp=6) Beta second entry about mmap.\n\n(imp=5) Gamma third entry about zoom.";
+    fs::write(&layer_file, kept).unwrap();
+
+    microscope_memory::build::build(&config, true, false).expect("rebuild after retention");
+
+    // Beta now sits at an earlier index.
+    let reader = microscope_memory::MicroscopeReader::open(&config).expect("open reader");
+    let hits = reader.find_text("Beta second entry about mmap.", 10);
+    let new_beta = hits
+        .iter()
+        .find(|(d, _)| *d == 3)
+        .map(|(_, i)| *i as u32)
+        .expect("Beta D3 block after rebuild");
+    assert!(
+        new_beta < old_beta,
+        "retention should shift Beta earlier ({old_beta} -> {new_beta})"
+    );
+
+    // The spaced record must follow Beta to its new index, not be dropped or
+    // point at the old (now wrong) position.
+    let after = SpacedRepetition::load_or_init(output_dir);
+    assert_eq!(
+        after.blocks.len(),
+        1,
+        "surviving recall must not be dropped"
+    );
+    assert_eq!(
+        after.blocks[0].block_idx, new_beta,
+        "spaced record must follow the block content through retention"
+    );
 }

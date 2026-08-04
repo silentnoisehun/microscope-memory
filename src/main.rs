@@ -208,12 +208,15 @@ fn recall(config: &Config, query: &str, k: usize) {
     // â”€â”€â”€ Attention: compute layer weights from context â”€â”€
     let output_dir_att = Path::new(&config.paths.output_dir);
     let mut attention = microscope_memory::attention::AttentionState::load_or_init(output_dir_att);
-    let hebb_pre =
+    let mut hebb =
         microscope_memory::hebbian::HebbianState::load_or_init(output_dir_att, reader.block_count);
     let tg_pre = microscope_memory::thought_graph::ThoughtGraphState::load_or_init(output_dir_att);
     let pc_pre = microscope_memory::predictive_cache::PredictiveCache::load_or_init(output_dir_att);
 
-    let emotional_energy = microscope_memory::emotional::emotional_field(&reader, &hebb_pre)
+    // Single emotional-field scan; reused for energy and the bias warp.
+    let emotional_field = microscope_memory::emotional::emotional_field(&reader, &hebb);
+    let emotional_energy = emotional_field
+        .as_ref()
         .map(|f| f.total_energy)
         .unwrap_or(0.0);
 
@@ -237,23 +240,19 @@ fn recall(config: &Config, query: &str, k: usize) {
     };
     let attn = attention.compute_attention(&attn_signals);
 
-    // Emotional bias warp: bend search coordinates toward emotional attractors
-    let output_dir_eb = Path::new(&config.paths.output_dir);
-    let hebb_eb =
-        microscope_memory::hebbian::HebbianState::load_or_init(output_dir_eb, reader.block_count);
+    // Emotional bias warp: bend search coordinates toward the precomputed centroid
     let emotional_weight = config.search.emotional_bias_weight * attn.weight(4);
-    let (qx, qy, qz) = microscope_memory::emotional::apply_emotional_bias(
+    let (qx, qy, qz) = microscope_memory::emotional::apply_emotional_bias_from_centroid(
         qx,
         qy,
         qz,
         emotional_weight,
-        &reader,
-        &hebb_eb,
+        emotional_field.as_ref().map(|f| f.centroid),
     );
 
     // === 21D Emotional State warp: add wave-based bias from stored state ===
     let (qx, qy, qz) = if config.search.emotion_21d_weight > 0.0 {
-        let emotion_file = output_dir_eb.join("emotion_21d.bin");
+        let emotion_file = output_dir_att.join("emotion_21d.bin");
         let state =
             microscope_memory::emotional_21d::EmotionalState21D::load_or_init(&emotion_file);
         let (edx, edy, edz) = microscope_memory::emotional_21d::emotion_21d_bias(&state);
@@ -271,10 +270,33 @@ fn recall(config: &Config, query: &str, k: usize) {
 
     let mut all_results: Vec<(f32, usize, bool)> = Vec::new();
 
-    for zoom in zoom_lo..=zoom_hi {
+    // Inverted text index prefilter: narrow the depth-range scan to blocks
+    // that can lexically match (token_similarity semantics), then run the
+    // exact scoring on those candidates — identical results, far fewer scans.
+    let lex_cands: Option<Vec<u32>> = reader
+        .text_index
+        .as_ref()
+        .and_then(|idx| idx.candidates_lexical(relevance_query.tokens()));
+
+    let mut ci = 0usize;
+    'zoom: for zoom in zoom_lo..=zoom_hi {
         let (start, count) = reader.depth_ranges[zoom as usize];
         let (start, count) = (start as usize, count as usize);
         for i in start..(start + count) {
+            if let Some(cands) = &lex_cands {
+                if cands.is_empty() {
+                    break 'zoom;
+                }
+                while ci < cands.len() && (cands[ci] as usize) < i {
+                    ci += 1;
+                }
+                if ci >= cands.len() {
+                    break 'zoom;
+                }
+                if (cands[ci] as usize) != i {
+                    continue;
+                }
+            }
             let text = reader.text(i);
             let lexical = relevance_query.lexical_score(text);
             if lexical > 0.0 {
@@ -380,8 +402,6 @@ fn recall(config: &Config, query: &str, k: usize) {
 
     // â”€â”€â”€ Hebbian + Mirror: record activations & detect resonance â”€â”€
     let output_dir = Path::new(&config.paths.output_dir);
-    let mut hebb =
-        microscope_memory::hebbian::HebbianState::load_or_init(output_dir, reader.block_count);
     let mut mirror = microscope_memory::mirror::MirrorState::load_or_init(output_dir);
     let activated: Vec<(u32, f32)> = all_results
         .iter()
@@ -2526,6 +2546,17 @@ async fn async_main() {
             println!(
                 "{}",
                 microscope_memory::self_model::format_self_model(&snap, &change)
+            );
+        }
+        Cmd::AwarenessTrace => {
+            let output_dir = Path::new(&config.paths.output_dir);
+            // Take a fresh snapshot to ensure the graph is up to date
+            let reader = open_reader(&config);
+            let mut self_model = microscope_memory::self_model::SelfModel::load_or_init(output_dir);
+            let _ = self_model.take_snapshot(&config, &reader, output_dir);
+            println!(
+                "{}",
+                microscope_memory::self_model::format_awareness_trace(output_dir)
             );
         }
         Cmd::Curiosity => {

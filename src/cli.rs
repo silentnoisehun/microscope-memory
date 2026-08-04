@@ -315,6 +315,8 @@ pub enum Cmd {
     Introspect,
     /// SelfModel - show the system's self-model snapshot
     SelfModel,
+    /// AwarenessTrace - show the reasoning graph behind 'I am aware'
+    AwarenessTrace,
     /// Curiosity - show what the system is curious about
     Curiosity,
     /// Monologue - generate an inner monologue (the system thinking)

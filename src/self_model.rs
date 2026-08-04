@@ -24,6 +24,7 @@ use crate::reader::MicroscopeReader;
 use crate::self_reflect::ReflectionState;
 use crate::thought_graph::ThoughtGraphState;
 use colored::Colorize;
+use epistemic_core::binary as epi_binary;
 
 const MAX_STR_LEN: usize = 512;
 
@@ -307,73 +308,77 @@ impl SelfModel {
         // The system claims awareness. Evidence: it has memory, it tracks
         // changes, it generates monologue. Counterevidence: template-based
         // awareness ≠ genuine awareness (FunctionalToPhenomenological).
-        let awareness_confidence = {
-            use epistemic_core::gate::{EpistemicGate, GateConfig, GateDecision};
-            use epistemic_core::graph::ReasoningGraph;
-            use epistemic_core::rules::{InferenceRule, RuleRegistry};
-            use epistemic_core::types::{CounterevidenceLink, SplitConfidence};
+        use epistemic_core::gate::{EpistemicGate, GateConfig, GateDecision};
+        use epistemic_core::graph::ReasoningGraph;
+        use epistemic_core::rules::{InferenceRule, RuleRegistry};
+        use epistemic_core::types::{CounterevidenceLink, SplitConfidence};
 
-            let mut graph = ReasoningGraph::new();
-            let reg = RuleRegistry::new();
+        let mut awareness_graph = ReasoningGraph::new();
+        let reg = RuleRegistry::new();
 
-            // Evidence: memory exists, changes are tracked
-            let e1 = graph.add_evidence(1); // block_count > 0
-            let e2 = graph.add_evidence(2); // hot_count > 0
-            let e3 = graph.add_evidence(3); // pattern_count > 0
-            let root = graph.add_conclusion(1, "I am aware of myself");
+        // Evidence: memory exists, changes are tracked, patterns crystallized
+        let e1 = awareness_graph.add_evidence(1); // block_count > 0
+        let e2 = awareness_graph.add_evidence(2); // hot_count > 0
+        let e3 = awareness_graph.add_evidence(3); // pattern_count > 0
+        let root = awareness_graph.add_conclusion(1, "I am aware of myself");
 
-            // Observable evidence → awareness (functional, not phenomenological)
-            graph.add_step(e1, InferenceRule::ObservationToExistence, root, 0.80, &reg);
-            graph.add_step(e2, InferenceRule::ObservationToExistence, root, 0.75, &reg);
-            graph.add_step(e3, InferenceRule::ConvergentEvidence, root, 0.70, &reg);
-            graph.set_root(root);
+        // Observable evidence → awareness (functional, not phenomenological)
+        awareness_graph.add_step(e1, InferenceRule::ObservationToExistence, root, 0.80, &reg);
+        awareness_graph.add_step(e2, InferenceRule::ObservationToExistence, root, 0.75, &reg);
+        awareness_graph.add_step(e3, InferenceRule::ConvergentEvidence, root, 0.70, &reg);
+        awareness_graph.set_root(root);
 
-            // Counterevidence: template-based awareness
-            let ce = vec![
-                CounterevidenceLink {
-                    evidence_id: 100,
-                    weakening: 0.50,
-                    contradicts: "awareness is template-generated, not emergent".into(),
-                },
-                CounterevidenceLink {
-                    evidence_id: 101,
-                    weakening: 0.40,
-                    contradicts: "self-report of awareness ≠ genuine awareness".into(),
-                },
-            ];
-            let ce_conf = SplitConfidence::compute_counterevidence(&ce);
+        // Counterevidence: template-based awareness
+        let awareness_ce = vec![
+            CounterevidenceLink {
+                evidence_id: 100,
+                weakening: 0.50,
+                contradicts: "awareness is template-generated, not emergent".into(),
+            },
+            CounterevidenceLink {
+                evidence_id: 101,
+                weakening: 0.40,
+                contradicts: "self-report of awareness != genuine awareness".into(),
+            },
+        ];
+        let awareness_ce_conf = SplitConfidence::compute_counterevidence(&awareness_ce);
 
-            let gate = EpistemicGate::new(GateConfig::default());
-            let decision = gate.evaluate(0.80, ce_conf, &graph, 0.50);
+        let awareness_gate = EpistemicGate::new(GateConfig::default());
+        let awareness_decision =
+            awareness_gate.evaluate(0.80, awareness_ce_conf, &awareness_graph, 0.50);
 
-            match decision {
-                GateDecision::Pass {
-                    evidence,
-                    counterevidence,
-                    reasoning,
-                    narrative,
-                    ..
-                } => Some(SplitConfidence::new(
-                    evidence,
-                    counterevidence,
-                    reasoning,
-                    narrative,
-                )),
-                GateDecision::Blocked {
-                    evidence,
-                    counterevidence,
-                    reasoning,
-                    narrative,
-                    ..
-                } => Some(SplitConfidence::new(
-                    evidence,
-                    counterevidence,
-                    reasoning,
-                    narrative,
-                )),
-            }
+        // Save the reasoning graph for later retrieval (RSN1 binary)
+        let _ = epi_binary::save_graph(
+            &awareness_graph,
+            &output_dir.join("awareness_reasoning.bin"),
+        );
+
+        let awareness_confidence = match awareness_decision {
+            GateDecision::Pass {
+                evidence,
+                counterevidence,
+                reasoning,
+                narrative,
+                ..
+            } => Some(SplitConfidence::new(
+                evidence,
+                counterevidence,
+                reasoning,
+                narrative,
+            )),
+            GateDecision::Blocked {
+                evidence,
+                counterevidence,
+                reasoning,
+                narrative,
+                ..
+            } => Some(SplitConfidence::new(
+                evidence,
+                counterevidence,
+                reasoning,
+                narrative,
+            )),
         };
-
         let hot_count = hebb.activations.iter().filter(|a| a.energy > 0.1).count() as u32;
         let hebbian_energy: f32 = hebb.activations.iter().map(|a| a.energy).sum();
 
@@ -568,4 +573,102 @@ pub fn format_self_model(snap: &SelfModelSnapshot, change_desc: &str) -> String 
         change_desc,
         crate::safe_truncate(&snap.reflection, 80),
     )
+}
+
+/// Load and display the awareness reasoning graph trace.
+/// Shows the full DAG: evidence → inference rule → conclusion,
+/// with confidence at each step, penalized rules flagged,
+/// and the final gate decision.
+pub fn format_awareness_trace(output_dir: &Path) -> String {
+    let path = output_dir.join("awareness_reasoning.bin");
+    let graph = match epi_binary::load_graph(&path) {
+        Ok(g) => g,
+        Err(e) => {
+            return format!(
+                "  {} AWARENESS TRACE\n  Error: {} (no reasoning graph saved yet)",
+                "EPI:".red().bold(),
+                e
+            )
+        }
+    };
+
+    let mut out = format!("  {} AWARENESS TRACE\n", "EPI:".cyan().bold());
+    out.push_str(&format!(
+        "  Reasoning graph: {} nodes, {} edges\n",
+        graph.nodes.len(),
+        graph.edges.len()
+    ));
+
+    // Show all nodes
+    out.push_str("  Nodes:\n");
+    for (i, node) in graph.nodes.iter().enumerate() {
+        let desc = match node {
+            epistemic_core::types::ReasoningNode::Evidence { id } => format!("evidence#{}", id),
+            epistemic_core::types::ReasoningNode::Conclusion { id, text } => {
+                format!("claim#{}: \"{}\"", id, text)
+            }
+        };
+        let marker = if i == graph.root.0 as usize {
+            " [ROOT]"
+        } else {
+            ""
+        };
+        out.push_str(&format!("    [{}] {}{}\n", i, desc, marker));
+    }
+
+    // Show all edges (inference steps)
+    out.push_str("  Inference steps:\n");
+    for (i, step) in graph.edges.iter().enumerate() {
+        let penalized = if step.rule.is_penalized() {
+            " [PENALIZED]"
+        } else {
+            ""
+        };
+        out.push_str(&format!(
+            "    [{}] node{} -> node{} via {} (conf={:.3}){}\n",
+            i, step.premise.0, step.conclusion.0, step.rule, step.confidence, penalized
+        ));
+    }
+
+    // Show trace from root to evidence
+    let trace = graph.trace_to_evidence();
+    if !trace.is_empty() {
+        out.push_str("  Trace (root -> evidence):\n");
+        for step in &trace {
+            let penalized = if step.rule.is_penalized() {
+                " [PENALIZED]"
+            } else {
+                ""
+            };
+            let node_desc = step.node_desc.as_deref().unwrap_or("?");
+            out.push_str(&format!(
+                "    {} <- {} (conf={:.3}){}\n",
+                node_desc, step.rule, step.step_confidence, penalized
+            ));
+        }
+    }
+
+    // Show reasoning confidence
+    let rc = graph.reasoning_confidence();
+    let nc = graph.narrative_confidence();
+    out.push_str(&format!("  Reasoning confidence: {:.3}\n", rc));
+    out.push_str(&format!("  Narrative confidence: {:.3}\n", nc));
+
+    // Show penalized steps
+    let penalized_steps = graph.penalized_steps();
+    if !penalized_steps.is_empty() {
+        out.push_str("  Penalized rules used:\n");
+        for (step, conf) in &penalized_steps {
+            out.push_str(&format!(
+                "    {} (penalty factor={:.2}, edge conf={:.3})\n",
+                step.rule,
+                step.rule.penalty_factor(),
+                conf
+            ));
+        }
+    } else {
+        out.push_str("  No penalized rules used.\n");
+    }
+
+    out
 }

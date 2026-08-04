@@ -41,6 +41,8 @@ pub mod resonance;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod sequential_thinking;
 pub mod snapshot;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod text_index;
 
 #[cfg(not(target_arch = "wasm32"))]
 pub mod consciousness_seqlock;
@@ -52,6 +54,10 @@ pub mod daydream;
 pub mod dream;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod emotional_contagion;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod emotional_episode;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod emotional_gate;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod eureka;
 #[cfg(not(target_arch = "wasm32"))]

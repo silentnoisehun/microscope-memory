@@ -133,6 +133,28 @@ pub struct EmotionalField {
     pub hottest_block: Option<(usize, f32)>,
 }
 
+/// Pure math version of `apply_emotional_bias` — bends the query point toward
+/// a precomputed emotional centroid. Public so recall paths can reuse the
+/// single `emotional_field` scan instead of rescanning all blocks.
+pub fn apply_emotional_bias_from_centroid(
+    qx: f32,
+    qy: f32,
+    qz: f32,
+    weight: f32,
+    centroid: Option<(f32, f32, f32)>,
+) -> (f32, f32, f32) {
+    if weight <= 0.0 {
+        return (qx, qy, qz);
+    }
+    match centroid {
+        None => (qx, qy, qz),
+        Some((cx, cy, cz)) => {
+            let w = weight.clamp(0.0, 1.0);
+            (qx + (cx - qx) * w, qy + (cy - qy) * w, qz + (cz - qz) * w)
+        }
+    }
+}
+
 /// Verify the emotional layer ID matches our constant.
 pub fn emotional_layer_name() -> &'static str {
     LAYER_NAMES
@@ -145,7 +167,7 @@ mod tests {
     use super::*;
     #[test]
     fn test_no_warp_at_zero_weight() {
-        let (x, _y, _z) = apply_emotional_bias_pure(0.5, 0.5, 0.5, 0.0, None);
+        let (x, _y, _z) = apply_emotional_bias_from_centroid(0.5, 0.5, 0.5, 0.0, None);
         assert!((x - 0.5).abs() < 0.001);
     }
 
@@ -153,7 +175,7 @@ mod tests {
     fn test_warp_with_centroid() {
         // Test the pure math: warp toward centroid
         let centroid = Some((0.2, 0.3, 0.4));
-        let (x, y, z) = apply_emotional_bias_pure(0.5, 0.5, 0.5, 0.5, centroid);
+        let (x, y, z) = apply_emotional_bias_from_centroid(0.5, 0.5, 0.5, 0.5, centroid);
         // Should move halfway toward centroid
         assert!((x - 0.35).abs() < 0.001);
         assert!((y - 0.4).abs() < 0.001);
@@ -163,7 +185,7 @@ mod tests {
     #[test]
     fn test_warp_full_weight() {
         let centroid = Some((0.2, 0.3, 0.4));
-        let (x, y, z) = apply_emotional_bias_pure(0.5, 0.5, 0.5, 1.0, centroid);
+        let (x, y, z) = apply_emotional_bias_from_centroid(0.5, 0.5, 0.5, 1.0, centroid);
         // Should move fully to centroid
         assert!((x - 0.2).abs() < 0.001);
         assert!((y - 0.3).abs() < 0.001);
@@ -172,7 +194,7 @@ mod tests {
 
     #[test]
     fn test_no_centroid() {
-        let (x, _y, _z) = apply_emotional_bias_pure(0.5, 0.5, 0.5, 1.0, None);
+        let (x, _y, _z) = apply_emotional_bias_from_centroid(0.5, 0.5, 0.5, 1.0, None);
         // No centroid → no warp
         assert!((x - 0.5).abs() < 0.001);
     }
@@ -180,25 +202,5 @@ mod tests {
     #[test]
     fn test_emotional_layer_name() {
         assert_eq!(emotional_layer_name(), "emotional");
-    }
-
-    /// Pure math version for unit testing without MicroscopeReader.
-    fn apply_emotional_bias_pure(
-        qx: f32,
-        qy: f32,
-        qz: f32,
-        weight: f32,
-        centroid: Option<(f32, f32, f32)>,
-    ) -> (f32, f32, f32) {
-        if weight <= 0.0 {
-            return (qx, qy, qz);
-        }
-        match centroid {
-            None => (qx, qy, qz),
-            Some((cx, cy, cz)) => {
-                let w = weight.clamp(0.0, 1.0);
-                (qx + (cx - qx) * w, qy + (cy - qy) * w, qz + (cz - qz) * w)
-            }
-        }
     }
 }

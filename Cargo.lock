@@ -906,6 +906,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "epistemic-core"
+version = "0.1.0"
+dependencies = [
+ "sha2",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "equivalent"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1979,6 +1987,7 @@ dependencies = [
  "clap",
  "colored",
  "criterion",
+ "epistemic-core",
  "getrandom 0.2.17",
  "half",
  "hex",

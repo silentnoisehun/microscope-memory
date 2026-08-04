@@ -1,0 +1,16 @@
+[package]
+name = "epistemic-core"
+version = "0.1.0"
+edition = "2021"
+authors = ["Microscope Contributors"]
+description = "Epistemic accountability core — Claim, Evidence, Reasoning graph, Split Confidence, Gate with penalized inference rules. Memory-system-agnostic."
+license = "MIT"
+keywords = ["epistemology", "evidence", "reasoning", "confidence", "ai"]
+categories = ["data-structures", "algorithms"]
+
+[dependencies]
+thiserror = "1.0"
+sha2 = "0.10"
+
+[dev-dependencies]
+tempfile = "3.8"

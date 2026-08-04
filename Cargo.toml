@@ -52,6 +52,7 @@ getrandom = { version = "0.2", features = ["js"] }
 serde_json = "1.0"
 zstd = { version = "0.13", optional = true }
 microscope-hooks = { path = "microscope-hooks" }
+epistemic-core = { path = "epistemic-core" }
 
 
 [target.'cfg(windows)'.dependencies]
@@ -119,4 +120,5 @@ lto = "thin"
 codegen-units = 1
 panic = "unwind"
 strip = false
+
 

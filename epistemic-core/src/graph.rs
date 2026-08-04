@@ -40,6 +40,23 @@ impl ReasoningGraph {
         id
     }
 
+    /// Add a counterevidence leaf node. Returns its node ID.
+    /// Counterevidence nodes weaken the claim without inference edges.
+    pub fn add_counterevidence(
+        &mut self,
+        evidence_id: EvidenceId,
+        weakening: f64,
+        contradicts: impl Into<String>,
+    ) -> ReasoningNodeId {
+        let id = ReasoningNodeId(self.nodes.len() as u32);
+        self.nodes.push(ReasoningNode::Counterevidence {
+            id: evidence_id,
+            weakening: weakening.clamp(0.0, 1.0),
+            contradicts: contradicts.into(),
+        });
+        id
+    }
+
     pub fn add_step(
         &mut self,
         premise: ReasoningNodeId,
@@ -105,10 +122,40 @@ impl ReasoningGraph {
             .collect()
     }
 
+    /// Get all counterevidence nodes in the graph.
+    pub fn counterevidence_nodes(&self) -> Vec<(&ReasoningNode, f64)> {
+        self.nodes
+            .iter()
+            .filter_map(|n| match n {
+                ReasoningNode::Counterevidence { weakening, .. } => Some((n, *weakening)),
+                _ => None,
+            })
+            .collect()
+    }
+
     /// Trace the full path from root back to all evidence leaves.
     pub fn trace_to_evidence(&self) -> Vec<TraceStep> {
         let mut trace = Vec::new();
         self.trace_node(self.root, &mut trace);
+        // Append counterevidence as trace steps
+        for node in &self.nodes {
+            if let ReasoningNode::Counterevidence {
+                id,
+                weakening,
+                contradicts,
+            } = node
+            {
+                trace.push(TraceStep {
+                    node: ReasoningNodeId(0),
+                    node_desc: Some(format!(
+                        "counterevidence#{} (w={:.2}): {}",
+                        id, weakening, contradicts
+                    )),
+                    rule: InferenceRule::ObservationToExistence,
+                    step_confidence: 1.0 - weakening,
+                });
+            }
+        }
         trace
     }
 
@@ -205,6 +252,13 @@ fn n_desc(n: &ReasoningNode) -> String {
     match n {
         ReasoningNode::Evidence { id } => format!("evidence#{id}"),
         ReasoningNode::Conclusion { id, text } => format!("claim#{id}: {text}"),
+        ReasoningNode::Counterevidence {
+            id,
+            weakening,
+            contradicts,
+        } => {
+            format!("counterevidence#{id} (w={weakening:.2}): {contradicts}")
+        }
     }
 }
 

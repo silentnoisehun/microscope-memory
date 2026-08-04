@@ -111,8 +111,18 @@ pub struct InferenceStep {
 
 #[derive(Debug, Clone)]
 pub enum ReasoningNode {
+    /// Leaf node — supporting evidence.
     Evidence { id: EvidenceId },
+    /// Internal node — an intermediate or final conclusion.
     Conclusion { id: ClaimId, text: String },
+    /// Leaf node — disconfirming evidence that weakens a claim.
+    /// Part of the Popperian falsifiability layer: every claim
+    /// must confront what weakens it, within the same graph.
+    Counterevidence {
+        id: EvidenceId,
+        weakening: f64,
+        contradicts: String,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

@@ -62,6 +62,19 @@ pub fn save_graph(graph: &ReasoningGraph, path: &Path) -> Result<(), String> {
                 buf.extend_from_slice(&len.to_le_bytes());
                 buf.extend_from_slice(text_bytes);
             }
+            ReasoningNode::Counterevidence {
+                id,
+                weakening,
+                contradicts,
+            } => {
+                buf.push(2); // Counterevidence
+                buf.extend_from_slice(&id.to_le_bytes());
+                buf.extend_from_slice(&weakening.to_le_bytes());
+                let ct_bytes = contradicts.as_bytes();
+                let len = ct_bytes.len() as u16;
+                buf.extend_from_slice(&len.to_le_bytes());
+                buf.extend_from_slice(ct_bytes);
+            }
         }
     }
 
@@ -116,6 +129,25 @@ pub fn load_graph(path: &Path) -> Result<ReasoningGraph, String> {
                     .map_err(|e| format!("invalid UTF-8 in node text: {e}"))?;
                 off += text_len;
                 graph.add_conclusion(id, text);
+            }
+            2 => {
+                // Counterevidence: id(8) + weakening(8) + text_len(2) + text
+                // Undo the pre-read text_len (it was actually the first 2 bytes of weakening)
+                off -= 2;
+                if off + 8 > data.len() {
+                    return Err("unexpected end of file in counterevidence node".into());
+                }
+                let weakening = f64::from_le_bytes(data[off..off + 8].try_into().unwrap());
+                off += 8;
+                if off + 2 > data.len() {
+                    return Err("unexpected end of file in counterevidence text length".into());
+                }
+                let ct_len = u16::from_le_bytes(data[off..off + 2].try_into().unwrap()) as usize;
+                off += 2;
+                let contradicts = String::from_utf8(data[off..off + ct_len].to_vec())
+                    .map_err(|e| format!("invalid UTF-8 in counterevidence text: {e}"))?;
+                off += ct_len;
+                graph.add_counterevidence(id, weakening, contradicts);
             }
             _ => return Err(format!("invalid node type: {node_type}")),
         }

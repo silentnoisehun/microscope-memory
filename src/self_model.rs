@@ -328,6 +328,18 @@ impl SelfModel {
         awareness_graph.add_step(e3, InferenceRule::ConvergentEvidence, root, 0.70, &reg);
         awareness_graph.set_root(root);
 
+        // Add counterevidence nodes to the graph
+        awareness_graph.add_counterevidence(
+            100,
+            0.50,
+            "awareness is template-generated, not emergent",
+        );
+        awareness_graph.add_counterevidence(
+            101,
+            0.40,
+            "self-report of awareness is not genuine awareness",
+        );
+
         // Counterevidence: template-based awareness
         let awareness_ce = vec![
             CounterevidenceLink {
@@ -607,6 +619,14 @@ pub fn format_awareness_trace(output_dir: &Path) -> String {
             epistemic_core::types::ReasoningNode::Conclusion { id, text } => {
                 format!("claim#{}: \"{}\"", id, text)
             }
+            epistemic_core::types::ReasoningNode::Counterevidence {
+                id,
+                weakening,
+                contradicts,
+            } => format!(
+                "counterevidence#{} (w={:.2}): {}",
+                id, weakening, contradicts
+            ),
         };
         let marker = if i == graph.root.0 as usize {
             " [ROOT]"
@@ -668,6 +688,31 @@ pub fn format_awareness_trace(output_dir: &Path) -> String {
         }
     } else {
         out.push_str("  No penalized rules used.\n");
+    }
+
+    // Show counterevidence nodes
+    let ce_nodes = graph.counterevidence_nodes();
+    if !ce_nodes.is_empty() {
+        out.push_str("  Counterevidence:\n");
+        for (node, weakening) in &ce_nodes {
+            if let epistemic_core::types::ReasoningNode::Counterevidence {
+                id, contradicts, ..
+            } = node
+            {
+                let ce_conf = 1.0 - weakening;
+                out.push_str(&format!(
+                    "    evidence#{} (weakening={:.2}, remaining={:.2}): {}\n",
+                    id, weakening, ce_conf, contradicts
+                ));
+            }
+        }
+        let combined: f64 = ce_nodes.iter().map(|(_, w)| 1.0 - w).product();
+        out.push_str(&format!(
+            "  Combined counterevidence confidence: {:.3}\n",
+            combined
+        ));
+    } else {
+        out.push_str("  No counterevidence in graph.\n");
     }
 
     out

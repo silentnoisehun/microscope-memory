@@ -130,6 +130,14 @@ pub struct EmotionalEpisode {
     pub decay_per_day: f64,
     /// Connected memory block IDs (resonance links).
     pub resonance_links: Vec<u64>,
+    /// Detected event type (Achievement, Error, Fix, Challenge, Building, Reflection, Connection, SelfCorrection, None)
+    pub event_type: String,
+    /// Detected speech act (Question, Imperative, Contemplation, Statement)
+    pub speech_act: String,
+    /// Detected context type (Code, Personal, Philosophical, Technical, Neutral)
+    pub context_type: String,
+    /// Was this a self-correction? (positive structural signal)
+    pub is_self_correction: bool,
 }
 
 impl EmotionalEpisode {
@@ -232,9 +240,64 @@ impl EmotionalEpisode {
             split_confidence,
             decay_per_day: 0.15,
             resonance_links: Vec::new(),
+            event_type: "Unknown".to_string(),
+            speech_act: "Statement".to_string(),
+            context_type: "Neutral".to_string(),
+            is_self_correction: false,
         }
     }
 
+    /// Apply time-based decay. Returns the decayed intensity (0.0–1.0).
+
+    /// Create an emotional episode from an extraction result.
+    /// This is the primary integration point: text → extract_emotion() → episode.
+    ///
+    /// Returns None if the extraction is not structural (no fake emotion).
+    pub fn from_extraction(
+        episode_id: u64,
+        trigger_evidence_id: u64,
+        extraction: &crate::emotion_extraction::ExtractionResult,
+        gate_config: &epistemic_core::gate::GateConfig,
+    ) -> Option<Self> {
+        // Principle 3: "unknown / uncertain" is legitimate.
+        // Only create episode if the extraction found a structural signal.
+        if !extraction.trigger_is_structural {
+            return None;
+        }
+
+        // Principle 3: low confidence = no episode, not forced emotion
+        if extraction.detection_confidence < 0.55 {
+            return None;
+        }
+
+        let event_type_str = format!("{:?}", extraction.event);
+        let speech_act_str = format!("{:?}", extraction.speech_act);
+        let context_type_str = format!("{:?}", extraction.context);
+
+        let mut episode = Self::new(
+            episode_id,
+            trigger_evidence_id,
+            extraction.pad,
+            &extraction.claim_text,
+            extraction.detection_confidence,
+            extraction.trigger_is_structural,
+            // Counterevidence: if detection confidence is low, weaken more
+            vec![epistemic_core::types::CounterevidenceLink {
+                evidence_id: 200,
+                weakening: (1.0 - extraction.detection_confidence).min(0.80),
+                contradicts: "structural emotion detection could be misinterpreted".into(),
+            }],
+            gate_config,
+        );
+
+        // Store the event type for later auditing (Principle 2)
+        episode.event_type = event_type_str;
+        episode.speech_act = speech_act_str;
+        episode.context_type = context_type_str;
+        episode.is_self_correction = extraction.is_self_correction;
+
+        Some(episode)
+    }
     /// Apply time-based decay. Returns the decayed intensity (0.0–1.0).
     pub fn decayed_intensity(&self) -> f64 {
         let age_ms = now_epoch_ms().saturating_sub(self.timestamp_ms);
@@ -438,6 +501,18 @@ impl EpisodeStore {
                 buf.extend_from_slice(&(ct_bytes.len() as u32).to_le_bytes()); // 4
                 buf.extend_from_slice(ct_bytes);
             }
+
+            // New fields: event_type, speech_act, context_type, is_self_correction
+            let et_bytes = ep.event_type.as_bytes();
+            buf.extend_from_slice(&(et_bytes.len() as u16).to_le_bytes());
+            buf.extend_from_slice(et_bytes);
+            let sa_bytes = ep.speech_act.as_bytes();
+            buf.extend_from_slice(&(sa_bytes.len() as u16).to_le_bytes());
+            buf.extend_from_slice(sa_bytes);
+            let ctx_bytes = ep.context_type.as_bytes();
+            buf.extend_from_slice(&(ctx_bytes.len() as u16).to_le_bytes());
+            buf.extend_from_slice(ctx_bytes);
+            buf.push(if ep.is_self_correction { 1u8 } else { 0u8 });
         }
 
         buf
@@ -541,6 +616,64 @@ impl EpisodeStore {
                 });
             }
 
+            // New fields (backward-compatible: use defaults if not present)
+            let (event_type, speech_act, context_type, is_self_correction) = if off + 2
+                <= data.len()
+            {
+                let et_len =
+                    u16::from_le_bytes(data[off..off + 2].try_into().unwrap_or([0; 2])) as usize;
+                off += 2;
+                let et = if off + et_len <= data.len() {
+                    let s = String::from_utf8_lossy(&data[off..off + et_len]).into_owned();
+                    off += et_len;
+                    s
+                } else {
+                    String::from("Unknown")
+                };
+                let sa = if off + 2 <= data.len() {
+                    let sa_len = u16::from_le_bytes(data[off..off + 2].try_into().unwrap_or([0; 2]))
+                        as usize;
+                    off += 2;
+                    if off + sa_len <= data.len() {
+                        let s = String::from_utf8_lossy(&data[off..off + sa_len]).into_owned();
+                        off += sa_len;
+                        s
+                    } else {
+                        String::from("Statement")
+                    }
+                } else {
+                    String::from("Statement")
+                };
+                let ct = if off + 2 <= data.len() {
+                    let ct_len = u16::from_le_bytes(data[off..off + 2].try_into().unwrap_or([0; 2]))
+                        as usize;
+                    off += 2;
+                    if off + ct_len <= data.len() {
+                        let s = String::from_utf8_lossy(&data[off..off + ct_len]).into_owned();
+                        off += ct_len;
+                        s
+                    } else {
+                        String::from("Neutral")
+                    }
+                } else {
+                    String::from("Neutral")
+                };
+                let sc = if off < data.len() {
+                    data[off] == 1
+                } else {
+                    false
+                };
+                off += 1;
+                (et, sa, ct, sc)
+            } else {
+                (
+                    "Unknown".to_string(),
+                    "Statement".to_string(),
+                    "Neutral".to_string(),
+                    false,
+                )
+            };
+
             episodes.push(EmotionalEpisode {
                 episode_id,
                 timestamp_ms,
@@ -555,6 +688,10 @@ impl EpisodeStore {
                 split_confidence,
                 decay_per_day,
                 resonance_links,
+                event_type,
+                speech_act,
+                context_type,
+                is_self_correction,
             });
         }
 

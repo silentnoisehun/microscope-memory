@@ -1196,6 +1196,33 @@ async fn async_main() {
                 None,
             )
             .expect("store failed");
+
+            // ── Fail-soft emotion extraction side-branch ──
+            // Principle 1: memory is already stored. This is a separate,
+            // fail-soft side-branch that adds emotional context if possible.
+            // If it fails, the memory is still safely stored.
+            let output_dir = std::path::Path::new(&config.paths.output_dir);
+            let extraction = microscope_memory::emotion_extraction::extract_emotion(&text);
+
+            // Principle 3: only create episode if structural signal detected
+            // and confidence is high enough. No fake emotion.
+            if extraction.trigger_is_structural && extraction.detection_confidence >= 0.55 {
+                let mut episode_store =
+                    microscope_memory::emotional_episode::EpisodeStore::load_or_init(output_dir);
+                let gate_config = epistemic_core::gate::GateConfig::default();
+
+                if let Some(episode) =
+                    microscope_memory::emotional_episode::EmotionalEpisode::from_extraction(
+                        episode_store.next_id,
+                        0, // trigger_evidence_id = 0 (text-based, not block-based)
+                        &extraction,
+                        &gate_config,
+                    )
+                {
+                    episode_store.add(episode);
+                    let _ = episode_store.save(output_dir);
+                }
+            }
         }
         Cmd::Timeline { window, k } => {
             let path = std::path::Path::new(&config.paths.output_dir).join("timeline.bin");

@@ -68,26 +68,26 @@ impl PadState {
         // PAD → 21D mapping based on Mehrabian's correspondences
         [
             p * a,                           // 0: joy
-            -p * a,                          // 1: sadness
-            -p * a * (1.0 - d),              // 2: anger
-            -p * a * d,                      // 3: fear
-            a * (1.0 - d) * 0.5,             // 4: surprise
-            -p * (1.0 - d),                  // 5: disgust
-            p * d,                           // 6: trust
-            a * d * 0.5,                     // 7: anticipation
-            p * a * d,                       // 8: love
-            p * d * 0.8,                     // 9: gratitude
-            a * d,                           // 10: curiosity
-            -d * a * 0.5,                    // 11: confusion
-            p * a * d * 0.7,                 // 12: pride
-            -p * a * (1.0 - d) * 0.7,        // 13: shame
-            -p * a * (1.0 - d),              // 14: anxiety
-            p * (1.0 - a) * d,               // 15: calm
-            p * a * d,                       // 16: excitement
+            -p * (1.0 - a),                  // 1: sadness (P-, A-, D- — low arousal)
+            -p * a * d * d,                  // 2: anger (P-, A+, D+ — assertive, d² sharpens split)
+            -p * a * (1.0 - d) * (1.0 - d), // 3: fear (P-, A+, D- — powerless, (1-d)² sharpens split)
+            a * (1.0 - d) * 0.5,            // 4: surprise
+            -p * d * (1.0 - a),             // 5: disgust (P-, A-, D+ — aversion with control)
+            p * d,                          // 6: trust
+            a * d * 0.5,                    // 7: anticipation
+            p * a * d,                      // 8: love
+            p * d * 0.8,                    // 9: gratitude
+            a * d,                          // 10: curiosity
+            -d * a * 0.5,                   // 11: confusion
+            p * a * d * 0.7,                // 12: pride
+            -p * a * (1.0 - d) * 0.7,       // 13: shame
+            -p * a * (1.0 - d),             // 14: anxiety
+            p * (1.0 - a) * d,              // 15: calm
+            p * a * d,                      // 16: excitement
             (-p).max(0.0) * (1.0 - a) * 0.3, // 17: boredom
-            p * a * d * 0.6,                 // 18: hope
-            -p * a * (1.0 - d) * 0.6,        // 19: regret
-            p * a * d * 0.5,                 // 20: empathy
+            p * a * d * 0.6,                // 18: hope
+            -p * a * (1.0 - d) * 0.6,       // 19: regret
+            p * a * d * 0.5,                // 20: empathy
         ]
     }
 }
@@ -780,6 +780,162 @@ mod tests {
         assert!(
             sum < 0.5,
             "failed episode should contribute weakly, got sum={sum}"
+        );
+    }
+
+    // ── PAD → Emotion Calibration Tests ──────────────
+    // These tests document the expected PAD → emotion correspondences
+    // based on Mehrabian's model. Each test verifies that a PAD state
+    // known to produce a specific emotion does so, and that the
+    // opposite PAD state does NOT produce it.
+    //
+    // Reference: Mehrabian, A. (1996). Pleasure-arousal-dominance:
+    // A general framework for describing and measuring individual
+    // differences in temperament.
+    //
+    // NOTE: Arousal uses 0.0–1.0 (0=calm, 1=activated).
+    //       Dominance uses 0.0–1.0 (0=submissive, 1=dominant).
+    //       Pleasure uses -1.0–+1.0.
+
+    /// Helper: extract a single emotion dimension from PAD.
+    fn emotion_idx(pad: PadState, idx: usize) -> f32 {
+        pad.to_21d()[idx]
+    }
+
+    // ── Anger: P-, A+, D+ (negative, high arousal, HIGH dominance) ──
+    #[test]
+    fn calibration_anger_high_dominance() {
+        let angry = PadState::new(-0.8, 0.9, 0.8); // P-, A+, D+
+        let v = angry.to_21d();
+        assert!(
+            v[2] > 0.3,
+            "anger should be strong at high dominance, got {}",
+            v[2]
+        );
+    }
+
+    #[test]
+    fn calibration_anger_low_dominance_is_weak() {
+        let not_angry = PadState::new(-0.8, 0.9, 0.1); // P-, A+, D-
+        let v = not_angry.to_21d();
+        assert!(
+            v[2] < 0.1,
+            "anger should be weak at low dominance, got {}",
+            v[2]
+        );
+    }
+
+    // ── Fear: P-, A+, D- (negative, high arousal, LOW dominance) ──
+    #[test]
+    fn calibration_fear_low_dominance() {
+        let afraid = PadState::new(-0.8, 0.9, 0.1); // P-, A+, D-
+        let v = afraid.to_21d();
+        assert!(
+            v[3] > 0.3,
+            "fear should be strong at low dominance, got {}",
+            v[3]
+        );
+    }
+
+    #[test]
+    fn calibration_fear_high_dominance_is_weak() {
+        let not_afraid = PadState::new(-0.8, 0.9, 0.8); // P-, A+, D+
+        let v = not_afraid.to_21d();
+        assert!(
+            v[3] < 0.1,
+            "fear should be weak at high dominance, got {}",
+            v[3]
+        );
+    }
+
+    // ── Sadness: P-, A-, D- (negative, LOW arousal) ──
+    #[test]
+    fn calibration_sadness_low_arousal() {
+        let sad = PadState::new(-0.7, 0.1, 0.2); // P-, A-, D-
+        let v = sad.to_21d();
+        assert!(
+            v[1] > 0.3,
+            "sadness should be strong at low arousal, got {}",
+            v[1]
+        );
+    }
+
+    #[test]
+    fn calibration_sadness_high_arousal_is_weak() {
+        let not_sad = PadState::new(-0.7, 0.9, 0.2); // P-, A+, D-
+        let v = not_sad.to_21d();
+        assert!(
+            v[1] < 0.1,
+            "sadness should be weak at high arousal, got {}",
+            v[1]
+        );
+    }
+
+    // ── Joy: P+, A+, D+ ──
+    #[test]
+    fn calibration_joy_positive_activated() {
+        let joyful = PadState::new(0.8, 0.7, 0.6);
+        let v = joyful.to_21d();
+        assert!(v[0] > 0.3, "joy should be strong, got {}", v[0]);
+    }
+
+    // ── Calm: P+, A-, D+ (positive, LOW arousal) ──
+    #[test]
+    fn calibration_calm_low_arousal_positive() {
+        let calm = PadState::new(0.6, 0.1, 0.7);
+        let v = calm.to_21d();
+        assert!(
+            v[15] > 0.1,
+            "calm should be present at low arousal + positive, got {}",
+            v[15]
+        );
+    }
+
+    // ── Neutral invariant: all zeros ──
+    #[test]
+    fn calibration_neutral_all_zero() {
+        let neutral = PadState::neutral();
+        let v = neutral.to_21d();
+        for (i, &val) in v.iter().enumerate() {
+            assert!(
+                val.abs() < 0.01,
+                "dimension {} should be zero at neutral, got {}",
+                i,
+                val
+            );
+        }
+    }
+
+    // ── Anger vs Fear dominance split ──
+    // The key invariant Máté flagged: anger and fear should be
+    // distinguished by dominance, not just valence/arousal.
+    #[test]
+    fn calibration_anger_fear_dominance_split() {
+        let same_pa = (-0.8f32, 0.9f32); // same pleasure + arousal
+
+        let angry = PadState::new(same_pa.0 as f64, same_pa.1 as f64, 0.8); // high dominance
+        let afraid = PadState::new(same_pa.0 as f64, same_pa.1 as f64, 0.1); // low dominance
+
+        let angry_v = angry.to_21d();
+        let afraid_v = afraid.to_21d();
+
+        // Same P+A, different D → anger and fear should split
+        assert!(
+            angry_v[2] > afraid_v[2],
+            "anger should be stronger at high D"
+        );
+        assert!(afraid_v[3] > angry_v[3], "fear should be stronger at low D");
+    }
+
+    // ── Disgust: P-, A-, D+ (negative, low arousal, HIGH dominance) ──
+    #[test]
+    fn calibration_disgust_high_dominance() {
+        let disgusted = PadState::new(-0.6, 0.1, 0.8); // P-, A-, D+
+        let v = disgusted.to_21d();
+        assert!(
+            v[5] > 0.05,
+            "disgust should be present at high dominance + low arousal, got {}",
+            v[5]
         );
     }
 }

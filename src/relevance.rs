@@ -32,6 +32,12 @@ impl RelevanceQuery {
         self.tokens.is_empty()
     }
 
+    /// The normalized query tokens (length > 2, deduplicated). Used by the
+    /// inverted text index to prefilter blocks before lexical scoring.
+    pub fn tokens(&self) -> &[String] {
+        &self.tokens
+    }
+
     /// Lexical relevance in `[0, 1]`.
     ///
     /// Exact query-token coverage is dominant.  A conservative prefix match

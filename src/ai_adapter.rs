@@ -316,7 +316,7 @@ mod windows_pipe {
                 let ok = unsafe {
                     ReadFile(
                         self.handle,
-                        buf.as_mut_ptr().add(total) as *mut u8,
+                        buf.as_mut_ptr().add(total),
                         (buf.len() - total) as u32,
                         &mut read,
                         std::ptr::null_mut(),
@@ -340,7 +340,7 @@ mod windows_pipe {
                 let ok = unsafe {
                     WriteFile(
                         self.handle,
-                        buf.as_ptr().add(total) as *const u8,
+                        buf.as_ptr().add(total),
                         (buf.len() - total) as u32,
                         &mut written,
                         std::ptr::null_mut(),

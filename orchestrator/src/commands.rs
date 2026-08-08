@@ -80,10 +80,3 @@ pub struct CommandIntent {
     pub cmd: CommandType,
     pub args: String,
 }
-
-pub fn parse_intent(raw_cmd: u8, raw_args: &[u8]) -> CommandIntent {
-    CommandIntent {
-        cmd: CommandType::from(raw_cmd),
-        args: String::from_utf8_lossy(raw_args).trim().to_string(),
-    }
-}

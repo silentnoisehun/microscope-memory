@@ -177,7 +177,7 @@ pub struct HookConfig {
     pub min_importance: u8,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct WriteConfig {
     pub enabled: bool,
     pub require_confirmation: bool,
@@ -211,11 +211,19 @@ impl Default for HookConfig {
 
 impl HookConfig {
     pub fn read_only() -> Self {
-        let mut config = Self::default();
-        config.read_only = true;
-        config.write.enabled = false;
-        config.enabled_hooks.insert(HookEvent::AfterResponse, false);
-        config
+        let mut enabled_hooks = HashMap::new();
+        enabled_hooks.insert(HookEvent::SessionStart, true);
+        enabled_hooks.insert(HookEvent::BeforePrompt, true);
+        enabled_hooks.insert(HookEvent::AfterResponse, false);
+        Self {
+            enabled_hooks,
+            write: WriteConfig {
+                enabled: false,
+                ..Default::default()
+            },
+            read_only: true,
+            ..Default::default()
+        }
     }
 
     pub fn full() -> Self {
@@ -339,6 +347,12 @@ pub struct HookManager {
     use_defaults: bool,
 }
 
+impl Default for HookManager {
+    fn default() -> Self {
+        Self::new(HookConfig::default())
+    }
+}
+
 impl HookManager {
     pub fn new(config: HookConfig) -> Self {
         Self {
@@ -346,10 +360,6 @@ impl HookManager {
             handlers: HashMap::new(),
             use_defaults: true,
         }
-    }
-
-    pub fn default() -> Self {
-        Self::new(HookConfig::default())
     }
 
     pub fn read_only() -> Self {
@@ -492,7 +502,7 @@ pub fn build_context_package(ctx: &HookContext) -> String {
         for c in &ctx.constraints {
             package.push_str(&format!("- {}\n", c));
         }
-        package.push_str("\n");
+        package.push('\n');
     }
 
     if !ctx.retrieved_memories.is_empty() {
@@ -506,7 +516,7 @@ pub fn build_context_package(ctx: &HookContext) -> String {
                 m.layer, m.depth, m.importance, m.distance, m.snippet
             ));
         }
-        package.push_str("\n");
+        package.push('\n');
     }
 
     package

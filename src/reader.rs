@@ -90,6 +90,7 @@ pub struct MicroscopeReader {
     pub block_count: usize,
     pub header_stride: usize,
     pub depth_ranges: [(u32, u32); 9],
+    pub text_index: Option<crate::text_index::TextIndex>,
 }
 
 impl MicroscopeReader {
@@ -192,12 +193,15 @@ impl MicroscopeReader {
             })
         };
 
+        let text_index = crate::text_index::TextIndex::open(&output_dir.join("text_index.bin"));
+
         Ok(MicroscopeReader {
             headers,
             data,
             block_count,
             header_stride,
             depth_ranges,
+            text_index,
         })
     }
 
@@ -1807,6 +1811,7 @@ mod tests {
             block_count: 1,
             header_stride: HEADER_SIZE,
             depth_ranges: [(0, 0); 9],
+            text_index: None,
         };
 
         // Valid index reads the (dummy, zeroed) header without issue.

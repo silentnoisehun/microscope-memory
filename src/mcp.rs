@@ -1106,7 +1106,7 @@ fn tool_recall(config: &Config, args: &Value) -> Result<String, String> {
 
     let (mut attention, hebb_pre, tg_pre, pc_pre) =
         if let Some(stream) = crate::consciousness_stream::global_stream() {
-            let s = crate::sync_guard::mutex_lock(&stream);
+            let s = crate::sync_guard::mutex_lock(stream);
             (
                 s.attention.clone(),
                 s.hebbian.clone(),
@@ -1269,7 +1269,7 @@ fn tool_recall(config: &Config, args: &Value) -> Result<String, String> {
 
     let (mut thought_graph, mut pred_cache) =
         if let Some(stream) = crate::consciousness_stream::global_stream() {
-            let s = crate::sync_guard::mutex_lock(&stream);
+            let s = crate::sync_guard::mutex_lock(stream);
             (s.thought_graph.clone(), s.predictive_cache.clone())
         } else {
             let tg = crate::thought_graph::ThoughtGraphState::load_or_init(output_dir);
@@ -1426,7 +1426,7 @@ fn tool_recall(config: &Config, args: &Value) -> Result<String, String> {
         let _ = attention.save(output_dir);
 
         if let Some(stream) = crate::consciousness_stream::global_stream() {
-            let mut s = crate::sync_guard::mutex_lock(&stream);
+            let mut s = crate::sync_guard::mutex_lock(stream);
             s.hebbian = hebb;
             s.mirror = mirror;
             s.resonance = resonance;
@@ -1519,10 +1519,9 @@ fn tool_evidence_link(config: &Config, args: &Value) -> Result<String, String> {
         Some(support_text),
         Some(claim_text),
         Some(provider.as_ref()),
-    )
-    .map_err(|e| e)?;
-    ledger.save(output_dir).map_err(|e| e)?;
-    audit.save(output_dir).map_err(|e| e)?;
+    )?;
+    ledger.save(output_dir)?;
+    audit.save(output_dir)?;
     let conf = ledger
         .records
         .get(&claim_ch)
@@ -1549,9 +1548,9 @@ fn tool_evidence_refute(config: &Config, args: &Value) -> Result<String, String>
     } else {
         crate::epistemic::content_hash(claim_text)
     };
-    crate::epistemic::refute(&mut ledger, &mut audit, claim_ch, source, now).map_err(|e| e)?;
-    ledger.save(output_dir).map_err(|e| e)?;
-    audit.save(output_dir).map_err(|e| e)?;
+    crate::epistemic::refute(&mut ledger, &mut audit, claim_ch, source, now)?;
+    ledger.save(output_dir)?;
+    audit.save(output_dir)?;
     let conf = ledger
         .records
         .get(&claim_ch)

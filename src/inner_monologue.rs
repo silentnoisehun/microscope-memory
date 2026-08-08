@@ -16,7 +16,6 @@ use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::config::Config;
-use crate::emotional_state::EmotionalStateRing;
 use crate::narrative::NarrativeState;
 use crate::reader::MicroscopeReader;
 use crate::self_model::SelfModel;

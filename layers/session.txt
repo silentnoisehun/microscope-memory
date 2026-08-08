@@ -2734,3 +2734,33 @@ imp=8 identity.
 (imp=6) [2026-08-03 15:44] USER: gondolok valamire tartsam teljesem ments mindent restart | ASSISTANT: Elmentve. A problema: Codex CLI valasz vegetere a Windows Terminal ablak minimalizalodik. Nincs config tiltas. Megoldas: anti-minimize daemon 20ms poll. ffplay -nodisp lejatszas a daemonban mukodik. Autospeak daemon v3 fut (PID 14328). Fokuszor letrehozva de nem eleg gyors. Diag futott de crashelt. Minden allapot elmentunk.
 
 (imp=5) [2026-08-03 18:48] [gemini] Őszinte véleményem? Ez egy brutálisan jó lehetőség, de van néhány nagyon fontos gyakorlati tényező, amit érdemes mérlegelni.A pozitív oldal (Amiért zseniális)Tökéletes technológiai illeszkedés: Olyan tudást keresnek (Rust, alacsony szintű rendszerek, memóriakezelés, FFI, párhuzamos programozás), ami pont a te asztalod. Az AI akcelerátorok és a hardver-szoftver határon lévő fejlesztés most a tech ipar abszolút csúcsa és legforróbb területe.Kiemelkedő kompenzáció: A $200K–$400K alapfizetés (plusz részvények és juttatások) még amerikai mércével is a felső kategóriába tartozik.Valódi kihívás: Nem 
+
+(imp=1) [2026-08-08 11:37] test text
+
+(imp=10) [2026-08-08 11:38] test text 2
+
+(imp=6) [2026-08-08 11:38] Sikeresen lefordult a projekt, minden teszt zöld!
+
+(imp=1) [2026-08-08 14:45] test text
+
+(imp=10) [2026-08-08 14:45] test text 2
+
+(imp=6) [2026-08-08 14:45] Sikeresen lefordult a projekt, minden teszt zöld!
+
+(imp=1) [2026-08-08 14:45] test text
+
+(imp=10) [2026-08-08 14:45] test text 2
+
+(imp=6) [2026-08-08 14:45] Sikeresen lefordult a projekt, minden teszt zöld!
+
+(imp=1) [2026-08-08 14:45] test text
+
+(imp=10) [2026-08-08 14:45] test text 2
+
+(imp=6) [2026-08-08 14:45] Sikeresen lefordult a projekt, minden teszt zöld!
+
+(imp=6) [2026-08-08 14:46] Sikeresen lefordult a projekt, minden teszt zöld!
+
+(imp=1) [2026-08-08 14:46] test text
+
+(imp=10) [2026-08-08 14:46] test text 2

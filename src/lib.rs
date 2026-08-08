@@ -54,7 +54,6 @@ pub mod daydream;
 pub mod dream;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod emotion_extraction;
-pub mod pipeline;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod emotional_contagion;
 #[cfg(not(target_arch = "wasm32"))]
@@ -66,6 +65,7 @@ pub mod eureka;
 #[cfg(not(target_arch = "wasm32"))]
 #[cfg(not(target_arch = "wasm32"))]
 pub mod narrative;
+pub mod pipeline;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod reconsolidation;
 #[cfg(not(target_arch = "wasm32"))]

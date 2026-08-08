@@ -89,7 +89,7 @@ impl TextIndex {
         let postings_bytes = total_postings.checked_mul(4)?;
         if postings_start < offsets_end
             || data.len() < postings_start.checked_add(postings_bytes)?
-            || postings_start % 4 != 0
+            || !postings_start.is_multiple_of(4)
         {
             return None;
         }

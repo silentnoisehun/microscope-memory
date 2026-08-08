@@ -17,7 +17,6 @@ use crate::archetype::ArchetypeState;
 use crate::attention::AttentionState;
 use crate::config::Config;
 use crate::emotional_episode::{EpisodeStore, PadState};
-use crate::emotional_state::EmotionalStateRing;
 use crate::hebbian::HebbianState;
 use crate::narrative::NarrativeState;
 use crate::reader::MicroscopeReader;
@@ -134,7 +133,6 @@ impl SelfModelSnapshot {
                     let re = f64::from_le_bytes(data[pos..pos + 8].try_into().ok()?);
                     pos += 8;
                     let na = f64::from_le_bytes(data[pos..pos + 8].try_into().ok()?);
-                    pos += 8;
                     Some(epistemic_core::types::SplitConfidence::new(ev, ce, re, na))
                 } else {
                     None

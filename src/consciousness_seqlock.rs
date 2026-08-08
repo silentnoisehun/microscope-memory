@@ -442,7 +442,7 @@ impl MappedSnapshotWriter {
             .read(true)
             .write(true)
             .create(true)
-            .truncate(true)
+            .truncate(false)
             .open(path)
             .map_err(|e| format!("create snapshot file: {e}"))?;
         file.set_len(MmapSnapshot::FILE_SIZE as u64)
@@ -479,6 +479,7 @@ impl MappedSnapshotWriter {
             .read(true)
             .write(true)
             .create(true)
+            .truncate(false)
             .open(path)
             .map_err(|e| format!("open snapshot file: {e}"))?;
 

@@ -145,6 +145,7 @@ impl EmotionalEpisode {
     ///
     /// This constructs the reasoning graph, counterevidence, and runs
     /// the gate automatically.
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         episode_id: u64,
         trigger_evidence_id: u64,
@@ -246,8 +247,6 @@ impl EmotionalEpisode {
             is_self_correction: false,
         }
     }
-
-    /// Apply time-based decay. Returns the decayed intensity (0.0–1.0).
 
     /// Create an emotional episode from an extraction result.
     /// This is the primary integration point: text → extract_emotion() → episode.
@@ -933,11 +932,6 @@ mod tests {
     // NOTE: Arousal uses 0.0–1.0 (0=calm, 1=activated).
     //       Dominance uses 0.0–1.0 (0=submissive, 1=dominant).
     //       Pleasure uses -1.0–+1.0.
-
-    /// Helper: extract a single emotion dimension from PAD.
-    fn emotion_idx(pad: PadState, idx: usize) -> f32 {
-        pad.to_21d()[idx]
-    }
 
     // ── Anger: P-, A+, D+ (negative, high arousal, HIGH dominance) ──
     #[test]

@@ -611,10 +611,8 @@ pub fn load_engine_strict(output_dir: &Path) -> Result<EnforcementEngine, String
     let audit_path = output_dir.join("enforcement-audit.bin");
     let has_audit = audit_path.exists();
 
-    if has_audit || has_state {
-        if !output_dir.is_dir() {
-            return Err("enforcement state dir is not a directory".to_string());
-        }
+    if (has_audit || has_state) && !output_dir.is_dir() {
+        return Err("enforcement state dir is not a directory".to_string());
     }
 
     let engine = if has_state {

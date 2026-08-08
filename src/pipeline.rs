@@ -61,14 +61,7 @@ pub fn store_memory_pipeline(
     let emotion_event = format!("{:?}", extraction.event);
 
     // 3-6. Persistence + timeline + emotion log + auto-rebuild
-    store_memory_with_status(
-        config,
-        normalized,
-        layer,
-        imp,
-        None,
-        Some(emotion_vector),
-    )?;
+    store_memory_with_status(config, normalized, layer, imp, None, Some(emotion_vector))?;
 
     Ok(StoreResult {
         stored: true,
@@ -100,14 +93,7 @@ pub fn store_memory_pipeline_with_status(
     let emotion_vector = extraction.pad.to_21d();
     let emotion_event = format!("{:?}", extraction.event);
 
-    store_memory_with_status(
-        config,
-        normalized,
-        layer,
-        imp,
-        status,
-        Some(emotion_vector),
-    )?;
+    store_memory_with_status(config, normalized, layer, imp, status, Some(emotion_vector))?;
 
     Ok(StoreResult {
         stored: true,

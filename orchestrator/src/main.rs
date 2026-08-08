@@ -4,10 +4,10 @@ mod dispatcher;
 mod modules;
 
 use dispatcher::SpineDispatcher;
+use futures_util::{SinkExt, StreamExt};
+use std::error::Error;
 use tokio::net::TcpListener;
 use tokio_tungstenite::accept_async;
-use futures_util::{StreamExt, SinkExt};
-use std::error::Error;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -60,7 +60,7 @@ async fn handle_connection(
         while let Some(Ok(msg)) = ws_receiver.next().await {
             if msg.is_text() {
                 let text = msg.to_text().unwrap_or("");
-                
+
                 // Check if it's a command (e.g., starts with '/')
                 if text.starts_with('/') {
                     println!("[Dispatcher] Command detected: {}", text);

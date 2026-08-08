@@ -528,7 +528,7 @@ pub fn extract_emotion(text: &str) -> ExtractionResult {
 
     // 7. Build claim text
     let claim_text = if is_self_correction {
-        format!("self-correction detected — humility/learning signal (structural, not negative)")
+        "self-correction detected — humility/learning signal (structural, not negative)".to_string()
     } else {
         format!(
             "{:?} event in {:?} context via {:?} speech act",
@@ -760,7 +760,7 @@ mod tests {
         // Real text from this conversation
         let r = extract_emotion("szerintem még most sem elég az érzelem detektálás, azt érzem");
         assert_eq!(r.event, StructuralEvent::Challenge);
-        assert!(r.is_self_correction == false);
+        assert!(!r.is_self_correction);
         assert!(r.pad.arousal > 0.5, "challenge should raise arousal");
     }
 }

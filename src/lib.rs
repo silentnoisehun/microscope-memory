@@ -54,6 +54,7 @@ pub mod daydream;
 pub mod dream;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod emotion_extraction;
+pub mod pipeline;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod emotional_contagion;
 #[cfg(not(target_arch = "wasm32"))]

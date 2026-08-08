@@ -32,8 +32,12 @@ impl RelevanceQuery {
         self.tokens.is_empty()
     }
 
+<<<<<<< HEAD
     /// The normalized query tokens (length > 2, deduplicated). Used by the
     /// inverted text index to prefilter blocks before lexical scoring.
+=======
+    /// Access the query tokens (for lexical index candidates).
+>>>>>>> abe1c40 (refactor(memory): unify canonical store pipeline)
     pub fn tokens(&self) -> &[String] {
         &self.tokens
     }

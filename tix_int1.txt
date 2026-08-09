@@ -1,0 +1,84 @@
+warning: `panic` setting is ignored for `bench` profile
+   Compiling microscope-memory v0.8.2 (D:\codex\microscope-memory)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 19.71s
+     Running tests\integration.rs (target\debug\deps\integration-96e4d266258d5a77.exe)
+
+running 1 test
+Building microscope from raw layers (zero JSON)...
+  > long_term: 4 items
+
+  388 blocks total
+  merkle: 388 leaves, root=93cc585580e23e1f95d97dbc831b6a9fe5a89336d3927952ec0a44edeb8d010e
+
+  headers: 19400 bytes (18.9 KB)
+  data:    1875 bytes (1.8 KB)
+  meta:    152 bytes
+  TOTAL:   20.9 KB
+  cache:   L1d (32KB)
+  Depth 0:     1 blocks
+  Depth 1:     1 blocks
+  Depth 2:     1 blocks
+  Depth 3:     4 blocks
+  Depth 4:     4 blocks
+  Depth 5:    25 blocks
+  Depth 6:    56 blocks
+  Depth 7:   148 blocks
+  Depth 8:   148 blocks
+  LIGHT heavy sidecars skipped (embeddings, fingerprint); stale copies removed
+  REMAP Hebbian state remapped (content)
+  REMAP PredictiveCache remapped
+  REMAP MirrorState remapped
+  REMAP SpacedRepetition remapped
+  REMAP Archetypes remapped
+  REMAP ThoughtPatterns remapped
+  REMAP EurekaLog remapped
+
+ZERO JSON. Pure binary. Done.
+  AUTO-REBUILD 1 append entries consolidated
+  STORED D5 [long_term/blue] (0.242,0.203,0.220) Rust borrow checker is strict
+  68864300 ns
+  STORED D5 [long_term/blue] (0.002,0.057,0.087) Memory is managed by ownership
+  11819900 ns
+  STORED D5 [long_term/blue] (0.066,0.208,0.154) Rusting in the rain tonight
+  14891400 ns
+Building microscope from raw layers (zero JSON)...
+  > long_term: 6 items
+
+  506 blocks total
+  merkle: 506 leaves, root=851c52ed0520e0cd44e39464457320e5ff9e4c71cb1320d5213d5de21f8851d2
+
+  headers: 25300 bytes (24.7 KB)
+  data:    2371 bytes (2.3 KB)
+  meta:    152 bytes
+  TOTAL:   27.2 KB
+  cache:   L1d (32KB)
+  Depth 0:     1 blocks
+  Depth 1:     1 blocks
+  Depth 2:     2 blocks
+  Depth 3:     6 blocks
+  Depth 4:     6 blocks
+  Depth 5:    35 blocks
+  Depth 6:    73 blocks
+  Depth 7:   191 blocks
+  Depth 8:   191 blocks
+
+  Building embedding index...
+  Embedding up to 16 blocks (D0-D4, dim=384)...
+  Embedded 0/16  Embedded 16/16
+  embeddings.bin: 24.1 KB (16 stored vectors of 506 blocks, dim 384)
+  OK embeddings.bin built
+  OK text_index.bin built
+  FINGERPRINT 3579 links across 506 blocks
+  REMAP Hebbian state remapped (content)
+  REMAP PredictiveCache remapped
+  REMAP MirrorState remapped
+  REMAP SpacedRepetition remapped
+  REMAP Archetypes remapped
+  REMAP ThoughtPatterns remapped
+  REMAP EurekaLog remapped
+
+ZERO JSON. Pure binary. Done.
+test test_text_index_find_matches_full_scan ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 32 filtered out; finished in 0.20s
+

@@ -443,12 +443,13 @@ pub struct AbsentiaStats {
 pub fn apply_absentia_to_field(
     absentia: &AbsentiaState,
     field: &mut crate::morphogenesis::MorphogenField,
+    evidence_confidence: u8,
 ) {
     // Minden gradiens-pontnál kiszámoljuk a shadow értéket
     // és megszorozzuk a gradienst (1 - shadow)-val
     let keys: Vec<(i32, i32, i32)> = field.gradients.keys().cloned().collect();
     for key in keys {
-        let shadow = compute_absence_shadow(absentia, key.0 as f64, key.1 as f64, key.2 as f64);
+        let shadow = compute_absence_shadow(absentia, key.0 as f64, key.1 as f64, key.2 as f64, evidence_confidence);
         if shadow > 0.01 {
             if let Some(val) = field.gradients.get_mut(&key) {
                 *val *= 1.0 - shadow;
@@ -469,6 +470,7 @@ pub fn compute_absence_shadow(
     x: f64,
     y: f64,
     z: f64,
+    evidence_confidence: u8,
 ) -> f64 {
     let mut shadow = 0.0f64;
 
@@ -499,7 +501,15 @@ pub fn compute_absence_shadow(
 
     // Korlátozzuk [0.0, 0.95] tartományba — soha nem teljesen 1.0
     // (a teljes blokkolás veszélyes, mindig hagyunk kis esélyt)
-    shadow.min(0.95)
+    let base_shadow = shadow.min(0.95);
+
+    // Evidence moduláció: ha van evidence, a shadow csökken
+    // evidence_confidence: 0-100 → evidence_factor: 0.0-1.0
+    let evidence_factor = evidence_confidence as f64 / 100.0;
+    // A shadow csökken az evidence-szel: shadow * (1 - evidence * 0.8)
+    // Max 80%-os csökkenés — soha nem szünteti meg teljesen
+    let final_shadow = base_shadow * (1.0 - evidence_factor * 0.8);
+    final_shadow.max(0.0)
 }
 
 /// Presence-driven growth ↔ absence-driven inhibition teszt.
@@ -542,4 +552,3 @@ pub struct PresenceAbsenceResult {
     pub effective_gradient: f64,
     pub growth_inhibited: bool,
 }
-

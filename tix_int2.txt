@@ -1,0 +1,109 @@
+warning: `panic` setting is ignored for `bench` profile
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.43s
+     Running tests\integration.rs (target\debug\deps\integration-96e4d266258d5a77.exe)
+
+running 1 test
+Building microscope from raw layers (zero JSON)...
+  > long_term: 4 items
+
+  393 blocks total
+  merkle: 393 leaves, root=7d19e9341e3f9d19e0ed98dbad9ad191723c889aa612c6fff9f5bb801d0daa9c
+
+  headers: 19650 bytes (19.2 KB)
+  data:    1887 bytes (1.8 KB)
+  meta:    152 bytes
+  TOTAL:   21.2 KB
+  cache:   L1d (32KB)
+  Depth 0:     1 blocks
+  Depth 1:     1 blocks
+  Depth 2:     1 blocks
+  Depth 3:     4 blocks
+  Depth 4:     4 blocks
+  Depth 5:    25 blocks
+  Depth 6:    57 blocks
+  Depth 7:   150 blocks
+  Depth 8:   150 blocks
+  LIGHT heavy sidecars skipped (embeddings, fingerprint); stale copies removed
+  REMAP Hebbian state remapped (content)
+  REMAP PredictiveCache remapped
+  REMAP MirrorState remapped
+  REMAP SpacedRepetition remapped
+  REMAP Archetypes remapped
+  REMAP ThoughtPatterns remapped
+  REMAP EurekaLog remapped
+
+ZERO JSON. Pure binary. Done.
+  AUTO-REBUILD 1 append entries consolidated
+  STORED D5 [long_term/blue] (0.144,0.015,0.136) Alpha entry for light rebuild
+  65594400 ns
+Building microscope from raw layers (zero JSON)...
+  > long_term: 4 items
+
+  393 blocks total
+  merkle: 393 leaves, root=7d19e9341e3f9d19e0ed98dbad9ad191723c889aa612c6fff9f5bb801d0daa9c
+
+  headers: 19650 bytes (19.2 KB)
+  data:    1887 bytes (1.8 KB)
+  meta:    152 bytes
+  TOTAL:   21.2 KB
+  cache:   L1d (32KB)
+  Depth 0:     1 blocks
+  Depth 1:     1 blocks
+  Depth 2:     1 blocks
+  Depth 3:     4 blocks
+  Depth 4:     4 blocks
+  Depth 5:    25 blocks
+  Depth 6:    57 blocks
+  Depth 7:   150 blocks
+  Depth 8:   150 blocks
+
+  Building embedding index...
+  Embedding up to 11 blocks (D0-D4, dim=384)...
+  Embedded 0/11  Embedded 11/11
+  embeddings.bin: 16.6 KB (11 stored vectors of 393 blocks, dim 384)
+  OK embeddings.bin built
+  OK text_index.bin built
+  FINGERPRINT 2723 links across 393 blocks
+  REMAP Hebbian state remapped (content)
+  REMAP PredictiveCache remapped
+  REMAP MirrorState remapped
+  REMAP SpacedRepetition remapped
+  REMAP Archetypes remapped
+  REMAP ThoughtPatterns remapped
+  REMAP EurekaLog remapped
+
+ZERO JSON. Pure binary. Done.
+Building microscope from raw layers (zero JSON)...
+  > long_term: 1 items
+
+  83 blocks total
+  merkle: 83 leaves, root=14f3382cf39f4a09f39bc54164a6860be1ad9ee0bba1b1d0b91a9822ec88ea5f
+
+  headers: 4150 bytes (4.1 KB)
+  data:    523 bytes (0.5 KB)
+  meta:    152 bytes
+  TOTAL:   4.7 KB
+  cache:   L1d (32KB)
+  Depth 0:     1 blocks
+  Depth 1:     1 blocks
+  Depth 2:     1 blocks
+  Depth 3:     1 blocks
+  Depth 4:     1 blocks
+  Depth 5:     6 blocks
+  Depth 6:    12 blocks
+  Depth 7:    30 blocks
+  Depth 8:    30 blocks
+  LIGHT heavy sidecars skipped (embeddings, fingerprint); stale copies removed
+  REMAP Hebbian state remapped (content)
+  REMAP PredictiveCache remapped
+  REMAP MirrorState remapped
+  REMAP SpacedRepetition remapped
+  REMAP Archetypes remapped
+  REMAP ThoughtPatterns remapped
+  REMAP EurekaLog remapped
+
+ZERO JSON. Pure binary. Done.
+test test_light_rebuild_drops_stale_text_index ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 32 filtered out; finished in 0.19s
+

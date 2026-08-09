@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ÉLŐ RAKTÁR — Intelligens Raktárvezérlés | Rudolf Logisztika</title>
+<style>
+:root{
+  --bg:#0d1117; --bg2:#161b22; --bg3:#21262d; --border:#30363d;
+  --green:#2ea043; --green-d:#1a7f37; --yellow:#e3b341; --red:#f85149;
+  --blue:#388bfd; --purple:#a371f7; --orange:#db6d28;
+  --text:#e6edf3; --text-d:#7d8590; --text-dd:#484f58;
+}
+*{box-sizing:border-box;margin:0;padding:0;font-family:'Segoe UI',system-ui,-apple-system,sans-serif}
+body{background:var(--bg);color:var(--text);line-height:1.6;overflow-x:hidden}
+
+.hero{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:40px 20px;position:relative;background:radial-gradient(ellipse at 50% 0%,rgba(46,160,67,0.08),transparent 70%),var(--bg)}
+.hero h1{font-size:clamp(2.5rem,8vw,5rem);font-weight:800;letter-spacing:-2px;background:linear-gradient(135deg,var(--green),var(--yellow));-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:16px}
+.hero .tagline{font-size:clamp(1.1rem,3vw,1.6rem);color:var(--text-d);max-width:640px;margin-bottom:16px}
+.hero .subtag{font-size:1rem;color:var(--text-dd);margin-bottom:36px}
+.hero .badge{display:inline-block;padding:6px 16px;border:1px solid var(--border);border-radius:20px;font-size:13px;color:var(--text-d);margin-bottom:24px;background:var(--bg2)}
+.hero .badge .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--green);margin-right:8px;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
+.hero-cta{display:flex;gap:16px;flex-wrap:wrap;justify-content:center}
+.btn{padding:14px 32px;border-radius:8px;font-size:16px;font-weight:600;cursor:pointer;border:none;transition:all .2s}
+.btn-primary{background:var(--green);color:#fff}.btn-primary:hover{background:var(--green-d);transform:translateY(-2px);box-shadow:0 8px 24px rgba(46,160,67,0.3)}
+.btn-ghost{background:transparent;color:var(--text);border:1px solid var(--border)}.btn-ghost:hover{border-color:var(--text-d);background:var(--bg2)}
+
+nav{position:fixed;top:0;left:0;right:0;z-index:100;background:rgba(13,17,23,0.85);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);padding:12px 24px;display:flex;align-items:center;justify-content:space-between}
+nav .logo{font-weight:800;font-size:18px;color:var(--green)}
+nav .links{display:flex;gap:24px}
+nav .links a{color:var(--text-d);font-size:14px;transition:color .2s;cursor:pointer}
+nav .links a:hover{color:var(--text)}
+@media(max-width:640px){nav .links{display:none}}
+
+section{padding:80px 20px;max-width:1100px;margin:0 auto}
+.section-label{font-size:13px;text-transform:uppercase;letter-spacing:2px;color:var(--green);margin-bottom:12px;font-weight:600}
+.section-title{font-size:clamp(1.8rem,4vw,2.6rem);font-weight:700;margin-bottom:16px;letter-spacing:-1px}
+.section-sub{font-size:1.15rem;color:var(--text-d);max-width:700px;margin-bottom:48px}
+
+.problem-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px}
+.problem-card{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:28px;position:relative;overflow:hidden}
+.problem-card .icon{font-size:32px;margin-bottom:16px}
+.problem-card h3{font-size:18px;margin-bottom:8px;color:var(--text)}
+.problem-card p{color:var(--text-d);font-size:15px}
+.problem-card .x{position:absolute;top:16px;right:16px;color:var(--red);font-size:20px;opacity:0.4}
+
+.flow{display:flex;flex-direction:column;gap:0;position:relative}
+.flow-step{display:flex;gap:24px;align-items:flex-start;padding:24px 0;position:relative}
+.flow-step:not(:last-child)::after{content:'';position:absolute;left:27px;top:64px;bottom:0;width:2px;background:var(--border)}
+.flow-num{flex-shrink:0;width:56px;height:56px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:20px;border:2px solid;z-index:1}
+.flow-num.green{border-color:var(--green);color:var(--green);background:rgba(46,160,67,0.1)}
+.flow-num.yellow{border-color:var(--yellow);color:var(--yellow);background:rgba(227,179,65,0.1)}
+.flow-num.blue{border-color:var(--blue);color:var(--blue);background:rgba(56,139,253,0.1)}
+.flow-num.purple{border-color:var(--purple);color:var(--purple);background:rgba(163,113,247,0.1)}
+.flow-content h3{font-size:20px;margin-bottom:8px}
+.flow-content p{color:var(--text-d);font-size:15px;max-width:600px}
+.flow-content .detail{margin-top:12px;padding:12px 16px;background:var(--bg2);border-radius:8px;border-left:3px solid var(--border);font-size:13px;color:var(--text-dd)}
+
+.demo-wrapper{background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:24px;overflow:hidden}
+.demo-layout{display:grid;grid-template-columns:320px 1fr;gap:20px}
+@media(max-width:880px){.demo-layout{grid-template-columns:1fr}}
+.terminal-mock{background:#000;border:3px solid var(--bg3);border-radius:16px;padding:20px;display:flex;flex-direction:column;align-items:center;justify-content:space-between;min-height:440px;text-align:center}
+.terminal-mock .label{color:var(--text-dd);font-size:11px;text-transform:uppercase;letter-spacing:1px}
+.terminal-arrow{font-size:100px;transition:transform .3s,color .3s;margin:20px 0;color:var(--green)}
+.terminal-status{padding:12px;border-radius:8px;font-weight:600;font-size:16px;width:100%;background:var(--bg3);transition:all .3s}
+.terminal-status.alert{background:var(--red);animation:blink .4s infinite alternate}
+.terminal-status.success{background:var(--green-d)}
+@keyframes blink{from{opacity:1}to{opacity:0.4}}
+.warehouse-map{background:#0a0e14;border:1px solid var(--border);border-radius:12px;position:relative;min-height:440px;display:grid;grid-template-columns:repeat(12,1fr);grid-template-rows:repeat(8,1fr);gap:2px;padding:12px}
+.wh-cell{background:var(--bg2);border:1px solid var(--border);border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:9px;color:var(--text-dd);position:relative}
+.wh-cell.shelf{background:#1c2330}
+.wh-cell.target{background:var(--green-d);color:#fff;font-weight:bold}
+.wh-cell.occupied{background:#3d4450;color:#fff}
+.wh-cell.occupied-2{background:#4a5260;color:#fff}
+.wh-cell.wrong{background:var(--red);color:#fff;font-weight:bold;animation:blink .5s infinite alternate}
+.wh-cell .bag{font-size:14px}
+.wh-forklift{position:absolute;width:28px;height:28px;border-radius:50%;background:var(--yellow);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:10px;color:#000;transition:all .4s ease;z-index:10;box-shadow:0 0 12px rgba(227,179,65,0.6)}
+.demo-controls{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap}
+.demo-controls .btn{font-size:14px;padding:10px 20px}
+.demo-legend{display:flex;gap:16px;margin-top:12px;flex-wrap:wrap;font-size:12px;color:var(--text-d)}
+.demo-legend span{display:flex;align-items:center;gap:6px}
+.demo-legend .sw{width:14px;height:14px;border-radius:3px}
+
+.pilot-box{background:linear-gradient(135deg,rgba(46,160,67,0.06),rgba(56,139,253,0.06));border:1px solid var(--border);border-radius:16px;padding:40px;margin-top:32px}
+.pilot-timeline{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-top:28px}
+.pilot-phase{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:20px}
+.pilot-phase .week{font-size:12px;color:var(--green);font-weight:600;text-transform:uppercase;letter-spacing:1px}
+.pilot-phase h4{font-size:16px;margin:8px 0}
+.pilot-phase p{font-size:13px;color:var(--text-d)}
+.pilot-metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:16px;margin-top:24px}
+.metric{text-align:center;padding:20px;background:var(--bg2);border:1px solid var(--border);border-radius:10px}
+.metric .num{font-size:2.2rem;font-weight:800;color:var(--green)}
+.metric .desc{font-size:13px;color:var(--text-d);margin-top:4px}
+
+.benefit-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px}
+.benefit{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:24px;text-align:center}
+.benefit .big{font-size:2.5rem;margin-bottom:12px}
+.benefit h4{font-size:16px;margin-bottom:6px}
+.benefit p{font-size:13px;color:var(--text-d)}
+
+.cost-table{width:100%;border-collapse:collapse;margin-top:24px}
+.cost-table th,.cost-table td{padding:14px 16px;text-align:left;border-bottom:1px solid var(--border)}
+.cost-table th{color:var(--text-d);font-size:13px;text-transform:uppercase;letter-spacing:1px}
+.cost-table td{font-size:15px}
+.cost-table .zero{color:var(--green);font-weight:700}
+.cost-table .minimal{color:var(--yellow);font-weight:600}
+
+footer{border-top:1px solid var(--border);padding:40px 20px;text-align:center;color:var(--text-dd);font-size:14px}
+footer .logo{font-weight:800;color:var(--green);font-size:16px;margin-bottom:8px}
+
+.fade-in{opacity:0;transform:translateY(20px);transition:all .6s ease}
+.fade-in.visible{opacity:1;transform:translateY(0)}
+
+.spec-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-top:24px}
+.spec-item{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:20px}
+.spec-item .k{font-size:12px;color:var(--text-d);text-transform:uppercase;letter-spacing:1px}
+.spec-item .v{font-size:20px;font-weight:700;margin-top:4px;color:var(--text)}
+</style>
+</head>
+<body>
+
+<nav>
+<div class="logo">▶ ÉLŐ RAKTÁR</div>
+<div class="links">
+<a onclick="document.getElementById('problem').scrollIntoView({behavior:'smooth'})">Probléma</a>
+<a onclick="document.getElementById('solution').scrollIntoView({behavior:'smooth'})">Megoldás</a>
+<a onclick="document.getElementById('demo').scrollIntoView({behavior:'smooth'})">Élő Demó</a>
+<a onclick="document.getElementById('pilot').scrollIntoView({behavior:'smooth'})">Prototípus</a>
+<a onclick="document.getElementById('cost').scrollIntoView({behavior:'smooth'})">Költség</a>
+</div>
+</nav>
+
+<div class="hero">
+<div class="badge"><span class="dot"></span> Rudolf Logisztika — Tatabánya · Lotte részleg</div>
+<h1>ÉLŐ RAKTÁR</h1>
+<p class="tagline">A targoncás csak vezet. Minden mást a rendszer intéz — Wi-Fi nélkül, meglévő eszközökön, emberi hiba nélkül. 20 ember helyett 5 elég. A leltár mindig él.</p>
+<p class="subtag">750 kg-os granulátum zsákok · 2 magasan tárolva · automatikus pozíciókövetés</p>
+<div class="hero-cta">
+<button class="btn btn-primary" onclick="document.getElementById('demo').scrollIntoView({behavior:'smooth'})">Nézd meg a demót</button>
+<button class="btn btn-ghost" onclick="document.getElementById('pilot').scrollIntoView({behavior:'smooth'})">Prototípus terv Gábornak</button>
+</div>
+</div>
+
+<section id="problem" class="fade-in">
+<div class="section-label">A jelenlegi helyzet</div>
+<h2 class="section-title">Miért nem működik a jelenlegi rendszer?</h2>
+<p class="section-sub">A tatabányai külső raktár Lotte részlegén a betárolás kaotikus. 750 kg-os granulátum zsákok érkeznek, 2 magasan tároljuk őket — de a rendszer nem tartja számon, hol mi van.</p>
+<div class="problem-grid">
+<div class="problem-card"><span class="x">✕</span><div class="icon">🧠</div><h3>Kognitív túlterheltség</h3><p>A targoncásnak kódokat kell keresnie, helyeket megjegyeznie, manuálisan rögzítenie. Közben 750 kg-os zsákokat mozgat.</p></div>
+<div class="problem-card"><span class="x">✕</span><div class="icon">📡</div><h3>Nincs Wi-Fi</h3><p>Az objektumban nincs kiépített hálózat. Minden online raktári rendszer használhatatlan.</p></div>
+<div class="problem-card"><span class="x">✕</span><div class="icon">🔍</div><h3>Eltűnt zsákok</h3><p>Senki nem tudja, melyik 750 kg-os zsák hol van. A fizikai leltározás lassú és gyakran hiányt talál.</p></div>
+<div class="problem-card"><span class="x">✕</span><div class="icon">⏱️</div><h3>Időveszteség</h3><p>A tárhelyek előzetes ellenőrzése és a keresgélés órákat emészt fel műszakonként. A zsákokat 2 magasan kell rakni — ez extra figyelmet igényel.</p></div>
+</div>
+
+<div class="spec-grid" style="margin-top:32px">
+<div class="spec-item"><div class="k">Termék</div><div class="v">Granulátum</div></div>
+<div class="spec-item"><div class="k">Csomagolás</div><div class="v">750 kg Big Bag</div></div>
+<div class="spec-item"><div class="k">Magasság</div><div class="v">2 zsák maximálisan</div></div>
+<div class="spec-item"><div class="k">Ügyfél</div><div class="v">Lotte</div></div>
+</div>
+</section>
+
+<section id="solution" class="fade-in">
+<div class="section-label">A megoldás</div>
+<h2 class="section-title">Hogyan működik a ÉLŐ RAKTÁR?</h2>
+<p class="section-sub">A targoncásnak egyetlen feladata van: követni a nyilat. Minden más — szkennelés, navigáció, rögzítés, leltár, hibavédelem — automatikusan történik a háttérben.</p>
+
+<div class="flow">
+<div class="flow-step">
+<div class="flow-num green">1</div>
+<div class="flow-content">
+<h3>Zsák felvétele — egyetlen szkennelés</h3>
+<p>A sofőr beolvassa a 750 kg-os zsák címkéjét a meglévő Motorola terminállal. Ezzel kész. Nincs tárhelykód keresése, nincs előzetes helyfoglalás.</p>
+<div class="detail">A rendszer azonnal generál egy célkoordinátát — a legközelebbi szabad helyre, figyelembe véve a 2 magas rakási szabályt (nem küld oda, ahol már 2 zsák van).</div>
+</div>
+</div>
+
+<div class="flow-step">
+<div class="flow-num yellow">2</div>
+<div class="flow-content">
+<h3>Nyíl a képernyőn — GPS a raktárban</h3>
+<p>A terminál kijelzőjén egyetlen nagy nyíl jelenik meg. Mutatja az irányt. A sofőr követi — mint egy navigáció. Nem kell tudnia hová megy vagy mit visz.</p>
+<div class="detail">A pozíciót a terminál beépített mozgásérzékelői (giroszkóp + gyorsulásmérő) számolják — Wi-Fi nélkül, inerciális navigációval.</div>
+</div>
+</div>
+
+<div class="flow-step">
+<div class="flow-num blue">3</div>
+<div class="flow-content">
+<h3>Lerakás és automata rögzítés</h3>
+<p>A sofőr a nyíl által mutatott pontra érkezik. A kijelző zöld pipára vált. Leteszi a zsákot, és a rendszer automatikusan elmenti a pontos koordinátát + a magassági szintet (1. vagy 2. réteg).</p>
+<div class="detail">A zsák azonosítója, a térbeli pozíció és a rakási szint (L1/L2) összekötve kerül a helyi adatbázisba. A leltár ezzel kész — nincs utólagos fizikai leltározás.</div>
+</div>
+</div>
+
+<div class="flow-step">
+<div class="flow-num purple">4</div>
+<div class="flow-content">
+<h3>Hibavédelem — nem lehet átverni</h3>
+<p>Ha a sofőr rossz helyre teszi le a zsákot, a terminál azonnal hangosan sípol és pirosan villog. Ha mégis otthagyja, a rendszer elmenti a téves pozíciót és azonnal riasztja Gábort.</p>
+<div class="detail">A zsák sosem vész el — a tényleges pozíció mindig ismert, még hibás lerakás esetén is. A riasztás valós idejű: Gábor látja a dashboardon, melyik targonca, hol, mit tett le rosszul.</div>
+</div>
+</div>
+</div>
+</section>
+
+<section id="demo" class="fade-in">
+<div class="section-label">Élő demó</div>
+<h2 class="section-title">Próbáld ki itt — most</h2>
+<p class="section-sub">Bal oldalon azt látod, amit a targoncás lát a Motorola kijelzőjén. Jobb oldalon a műszakvezetői raktártérkép — 750 kg-os granulátum zsákok, 2 magasan.</p>
+
+<div class="demo-wrapper">
+<div class="demo-layout">
+<div class="terminal-mock">
+<div class="label">Motorola Terminál — Targoncás nézet</div>
+<div class="terminal-arrow" id="demoArrow">↑</div>
+<div class="terminal-status" id="demoStatus">Várakozás... Nyomd meg a gombot</div>
+<div class="label" id="demoInfo" style="color:var(--text-dd)">—</div>
+</div>
+<div>
+<div class="warehouse-map" id="whMap"></div>
+<div class="demo-controls">
+<button class="btn btn-primary" onclick="runDemo(false)">Szabályos betárolás</button>
+<button class="btn btn-ghost" style="border-color:var(--red);color:var(--red)" onclick="runDemo(true)">Hibás lerakás szimuláció</button>
+<button class="btn btn-ghost" onclick="resetDemo()">Reset</button>
+</div>
+<div class="demo-legend">
+<span><div class="sw" style="background:#3d4450"></div>1 zsák (L1)</span>
+<span><div class="sw" style="background:#4a5260"></div>2 zsák (L2 — tele)</span>
+<span><div class="sw" style="background:var(--green-d)"></div>Célpozíció</span>
+<span><div class="sw" style="background:var(--yellow);border-radius:50%"></div>Targonca</span>
+<span><div class="sw" style="background:var(--red)"></div>Hibás lerakás</span>
+</div>
+</div>
+</div>
+</div>
+</section>
+
+<section id="pilot" class="fade-in">
+<div class="section-label">Prototípus terv</div>
+<h2 class="section-title">Teszteljük egy raktárszekcióban — 2 hét alatt</h2>
+<p class="section-sub">Nem kell az egész raktárt átalakítani. A Lotte részleg egyetlen folyosójában, egy targoncával, 2 hétig teszteljük a rendszert. Utána mérjük az eredményt.</p>
+
+<div class="pilot-box">
+<h3 style="font-size:20px;margin-bottom:8px">Pilot projekt: 1 folyosó · 1 targonca · 2 hét</h3>
+<p style="color:var(--text-d);font-size:15px">A prototípus a Lotte részleg egyetlen szekciójában fut. Csak a 750 kg-os granulátum zsákok betárolását teszteljük. Nincs Wi-Fi szükség, nincs új hardver, csak a meglévő Motorola terminálra kerül egy app.</p>
+
+<div class="pilot-timeline">
+<div class="pilot-phase">
+<div class="week">1-2. nap</div>
+<h4>Raktártérképezés</h4>
+<p>A tesztszekció méreteinek digitalizálása. Zsákhelyek koordináta-hálója, 2 szinttel (L1/L2). ~2 óra.</p>
+</div>
+<div class="pilot-phase">
+<div class="week">3. nap</div>
+<h4>App telepítése</h4>
+<p>A ÉLŐ RAKTÁR app feltelepül egyetlen Motorola terminálra. Kioszk mód. Szenzorkalibrálás a targoncára.</p>
+</div>
+<div class="pilot-phase">
+<div class="week">4-8. nap</div>
+<h4>Éles teszt</h4>
+<p>A kijelölt targoncás a tesztszekcióban dolgozik a rendszerrel. Valós 750 kg-os zsákok, valós betárolás, 2 magasan.</p>
+</div>
+<div class="pilot-phase">
+<div class="week">9-10. nap</div>
+<h4>Eredmény mérés</h4>
+<p>Hibaszám, keresési idő, leltár pontosság összehasonlítása. Jelentés Gábornak. Döntés a kiterjesztésről.</p>
+</div>
+</div>
+
+<div class="pilot-metrics">
+<div class="metric"><div class="num">0 Ft</div><div class="desc">Hardver befektetés</div></div>
+<div class="metric"><div class="num">1</div><div class="desc">Targonca résztvevő</div></div>
+<div class="metric"><div class="num">10 nap</div><div class="desc">Teljes tesztidőszak</div></div>
+<div class="metric"><div class="num">1 folyosó</div><div class="desc">Tesztszekció</div></div>
+</div>
+
+<div style="margin-top:28px;padding:20px;background:var(--bg2);border-radius:10px;border-left:4px solid var(--yellow)">
+<h4 style="margin-bottom:8px">Mit mérünk a pilot után?</h4>
+<ul style="color:var(--text-d);font-size:14px;padding-left:20px;line-height:2">
+<li><strong style="color:var(--text)">Hibás lerakások száma</strong> — before/after összehasonlítás</li>
+<li><strong style="color:var(--text)">Átlagos betárolási idő zsákonként</strong> — másodpercben</li>
+<li><strong style="color:var(--text)">Leltár pontosság</strong> — a rendszer koordinátái vs. fizikai valóság</li>
+<li><strong style="color:var(--text)">Targoncás visszajelzés</strong> — mennyivel könnyebb-e a munka</li>
+<li><strong style="color:var(--text)">2 magas rakás biztonság</strong> — a rendszer tiltja a 3. réteget</li>
+</ul>
+</div>
+
+<div style="margin-top:24px;padding:16px 20px;background:rgba(46,160,67,0.08);border:1px solid var(--green-d);border-radius:10px">
+<p style="font-size:14px;color:var(--text)"><strong>Ha a pilot sikeres</strong> — a rendszert fokozatosan kiterjesztjük a többi folyosóra és targoncára. Ha nem — semmit nem veszítettünk, mert nem volt hardverbefektetés.</p>
+</div>
+</div>
+</section>
+
+<section class="fade-in">
+<div class="section-label">Eredmények</div>
+<h2 class="section-title">Mit kap a cég?</h2>
+<div class="benefit-grid">
+<div class="benefit"><div class="big">🎯</div><h4>0% betárolási hiba</h4><p>A hiba azonnali hang- és fényjelzést vált ki. A téves pozíció is rögzítve lesz.</p></div>
+<div class="benefit"><div class="big">📦</div><h4>Folyamatos leltár</h4><p>A rendszer valós időben tudja minden 750 kg-os zsák pozícióját és szintjét (L1/L2).</p></div>
+<div class="benefit"><div class="big">🧭</div><h4>GPS a raktárban</h4><p>Bármelyik zsák pillanatok alatt megtalálható — koordinátára és szintre pontosan.</p></div>
+<div class="benefit"><div class="big">🚜</div><h4>Nulla gond a sofőrnek</h4><p>Csak vezet és követi a nyilat. Nincs kódolás, nincs döntés, nincs adminisztráció.</p></div>
+<div class="benefit"><div class="big">📶</div><h4>Wi-Fi nélkül működik</h4><p>Inerciális navigáció — az eszköz saját szenzorai számolják a pozíciót.</p></div>
+<div class="benefit"><div class="big">🚫</div><h4>3. réteg tiltás</h4><p>A rendszer nem enged 3 zsákot rakni egymásra — biztonsági szabály kikényszerítve.</p></div>
+</div>
+</section>
+
+<section id="cost" class="fade-in">
+<div class="section-label">Befektetés</div>
+<h2 class="section-title">Mennyibe kerül?</h2>
+<p class="section-sub">A rendszer 90%-ban szoftver. A meglévő eszközparkra és infrastruktúrára épül.</p>
+<table class="cost-table">
+<tr><th>Tétel</th><th>Szükséges</th><th>Költség</th></tr>
+<tr><td>Androidos ipari terminálok</td><td>Meglévő Motorola/Zebra eszközök</td><td class="zero">0 Ft</td></tr>
+<tr><td>Wi-Fi hálózat</td><td>Nem szükséges (inerciális)</td><td class="zero">0 Ft</td></tr>
+<tr><td>Új szenzorok, kamerák</td><td>Nem szükséges</td><td class="zero">0 Ft</td></tr>
+<tr><td>Targonca tartókonzol</td><td>Ha még nincs, 1 db/targonca</td><td class="minimal">~20.000 Ft/gép</td></tr>
+<tr><td>Szoftverfejlesztés (app + backend)</td><td>Saját fejlesztés</td><td>Fejlesztési idő</td></tr>
+<tr><td>Raktártérképezés</td><td>Egyszeri digitalizálás</td><td>~2 óra/szekció</td></tr>
+</table>
+</section>
+
+<footer>
+<div class="logo">▶ ÉLŐ RAKTÁR</div>
+<p>Intelligens raktárvezérlés — Rudolf Logisztika, Tatabánya · Lotte részleg</p>
+<p style="margin-top:8px">Prototípus terv · Készült: 2026. augusztus</p>
+</footer>
+
+<script>
+var COLS=12, ROWS=8, TOTAL=COLS*ROWS;
+var whMap=document.getElementById('whMap');
+var cells=[];
+var shelves=new Set([14,15,16,17,26,27,28,29,38,39,40,41,50,51,52,53,62,63,64,65,74,75,76,77]);
+var occupied1=new Set([20,21,22,33,44,55,66,71,72]);
+var occupied2=new Set([20,21,22]);
+
+for(var i=0;i<TOTAL;i++){
+  var c=document.createElement('div');
+  var cls='wh-cell';
+  if(shelves.has(i)) cls+=' shelf';
+  else if(occupied2.has(i)){cls+=' occupied-2'; c.innerHTML='<span class="bag">⬛⬛</span>';}
+  else if(occupied1.has(i)){cls+=' occupied'; c.innerHTML='<span class="bag">⬛</span>';}
+  c.className=cls;
+  c.id='wh-'+i;
+  whMap.appendChild(c);
+  cells.push(c);
+}
+
+var fl=document.createElement('div');
+fl.className='wh-forklift';
+fl.textContent='T1';
+fl.style.display='none';
+whMap.appendChild(fl);
+
+function posFL(idx){
+  var c=cells[idx];
+  var rect=whMap.getBoundingClientRect();
+  var cRect=c.getBoundingClientRect();
+  fl.style.display='flex';
+  fl.style.left=(cRect.left-rect.left+cRect.width/4)+'px';
+  fl.style.top=(cRect.top-rect.top+cRect.height/4)+'px';
+}
+
+var arrow=document.getElementById('demoArrow');
+var status=document.getElementById('demoStatus');
+var info=document.getElementById('demoInfo');
+var timer=null;
+
+function resetDemo(){
+  if(timer){clearInterval(timer);timer=null;}
+  for(var i=0;i<TOTAL;i++){
+    var c=cells[i];
+    if(shelves.has(i)) c.className='wh-cell shelf';
+    else if(occupied2.has(i)){c.className='wh-cell occupied-2'; c.innerHTML='<span class="bag">⬛⬛</span>';}
+    else if(occupied1.has(i)){c.className='wh-cell occupied'; c.innerHTML='<span class="bag">⬛</span>';}
+    else{c.className='wh-cell'; c.innerHTML='';}
+  }
+  fl.style.display='none';
+  arrow.textContent='↑'; arrow.style.color='var(--green)'; arrow.style.transform='rotate(0deg)';
+  status.className='terminal-status'; status.textContent='Várakozás... Nyomd meg a gombot';
+  status.style.background='var(--bg3)';
+  info.textContent='—';
+}
+
+function runDemo(errorMode){
+  resetDemo();
+  var start=2;
+  var target=83;
+  // Find a free non-shelf non-occupied cell near 83
+  for(var t=target;t<TOTAL;t++){if(!shelves.has(t)&&!occupied1.has(t)&&!occupied2.has(t)){target=t;break;}}
+  if(cells[target]) cells[target].className='wh-cell target';
+  info.textContent='Cél: Zóna '+target+' · 750 kg granulátum · L1';
+  status.className='terminal-status'; status.textContent='KÖVESD A NYILAT'; status.style.background='var(--bg3)';
+
+  var path=[start];
+  var col=start%COLS, row=Math.floor(start/COLS);
+  var tCol=target%COLS, tRow=Math.floor(target/COLS);
+  while(row<tRow){row++;path.push(row*COLS+col);}
+  while(col<tCol){col++;path.push(row*COLS+col);}
+  if(errorMode){var stop=Math.max(0,path.length-4);path=path.slice(0,stop+1);}
+
+  var step=0;
+  posFL(path[0]);
+  timer=setInterval(function(){
+    step++;
+    if(step>=path.length){
+      clearInterval(timer);timer=null;
+      if(errorMode){
+        var wrongIdx=path[path.length-1];
+        if(cells[wrongIdx]) cells[wrongIdx].className='wh-cell wrong';
+        arrow.textContent='⚠'; arrow.style.color='var(--red)';
+        status.className='terminal-status alert'; status.textContent='HIBA! ROSSZ HELY!';
+        info.textContent='Téves pozíció: Zóna '+wrongIdx+' → Riasztás Gábornak';
+      } else {
+        if(cells[target]){cells[target].className='wh-cell occupied'; cells[target].innerHTML='<span class="bag">⬛</span>';}
+        arrow.textContent='✓'; arrow.style.color='var(--green)';
+        status.className='terminal-status success'; status.textContent='MEGÉRKEZTÉL! LETEHETED';
+        info.textContent='750 kg zsák rögzítve: Zóna '+target+' · L1 ✓';
+      }
+      return;
+    }
+    var prev=path[step-1], cur=path[step];
+    posFL(cur);
+    var d=cur-prev;
+    if(d===COLS){arrow.style.transform='rotate(180deg)';arrow.textContent='↓';}
+    else if(d===-COLS){arrow.style.transform='rotate(0deg)';arrow.textContent='↑';}
+    else if(d===1){arrow.style.transform='rotate(90deg)';arrow.textContent='→';}
+    else if(d===-1){arrow.style.transform='rotate(-90deg)';arrow.textContent='←';}
+    if(step>=path.length-3&&!errorMode){
+      arrow.style.color='var(--yellow)';
+      status.style.background='rgba(227,179,65,0.2)';
+      status.textContent='LASSÍTS — Közeledsz a célhoz';
+    }
+  },500);
+}
+
+var observer=new IntersectionObserver(function(entries){
+  entries.forEach(function(e){if(e.isIntersecting)e.target.classList.add('visible');});
+},{threshold:0.1});
+document.querySelectorAll('.fade-in').forEach(function(el){observer.observe(el);});
+</script>
+</body>
+</html>

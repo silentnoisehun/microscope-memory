@@ -362,8 +362,6 @@ impl CognitiveMorphogenesisEngine {
         apply_evidence_modulation(&mut field, evidence_ledger, headers);
         apply_prediction_modulation(&mut field, predictive_cache);
         apply_emotion_modulation(&mut field, emotional_state);
-        // Absentia shadow term: effective_gradient = positive_gradient * (1 - absence_shadow)
-        crate::absentia::apply_absentia_to_field(absentia, &mut field);
 
         // Globális komponens-értékek (cikluson kívül)
         let pred_hr = predictive_cache.stats.hit_rate();
@@ -377,6 +375,10 @@ impl CognitiveMorphogenesisEngine {
             .sum::<f64>()
             / evidence_ledger.records.len().max(1) as f64;
         let evi_conf_u8 = evi_conf.clamp(0.0, 100.0) as u8;
+
+        // Absentia shadow term: effective_gradient = positive_gradient * (1 - absence_shadow)
+        // A shadow-t az evidence modulálja: ha van evidence, a shadow csökken
+        crate::absentia::apply_absentia_to_field(absentia, &mut field, evi_conf_u8);
 
         for &(block_idx, _score) in activated_blocks {
             let idx = block_idx as usize;

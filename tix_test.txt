@@ -1,0 +1,15 @@
+warning: `panic` setting is ignored for `bench` profile
+   Compiling microscope-memory v0.8.2 (D:\codex\microscope-memory)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 4.66s
+     Running unittests src\lib.rs (target\debug\deps\microscope_memory-71905e0ed3788623.exe)
+
+running 6 tests
+test text_index::tests::tokenize_basic ... ok
+test text_index::tests::missing_or_empty_lexical ... ok
+test text_index::tests::roundtrip_and_substring_candidates ... ok
+test text_index::tests::lexical_candidates_match_token_similarity ... ok
+test text_index::tests::truncated_or_corrupt_file_fails_open ... ok
+test text_index::tests::scale_search_is_selective ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 344 filtered out; finished in 0.57s
+

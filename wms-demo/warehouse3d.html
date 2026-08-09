@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ÉLŐ RAKTÁR 3D Raktar</title>
+<style>
+:root{--bg:#0d1117;--bg2:#161b22;--bg3:#21262d;--border:#30363d;--green:#2ea043;--green-d:#1a7f37;--yellow:#e3b341;--red:#f85149;--blue:#388bfd;--purple:#a371f7;--orange:#db6d28;--text:#e6edf3;--text-d:#7d8590;--text-dd:#484f58}
+*{box-sizing:border-box;margin:0;padding:0;font-family:'Segoe UI',system-ui,sans-serif}
+body{background:var(--bg);color:var(--text);overflow:hidden;height:100vh;display:flex;flex-direction:column}
+#topbar{padding:10px 20px;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;z-index:10;flex-wrap:wrap;gap:8px}
+#topbar .logo{font-weight:800;font-size:17px;color:var(--green)}
+#topbar .info{font-size:12px;color:var(--text-d)}
+#topbar .info b{color:var(--text)}
+#mode-tabs{display:flex;gap:0;margin-left:auto}
+#mode-tabs button{padding:6px 16px;border:1px solid var(--border);background:var(--bg3);color:var(--text-d);font-size:13px;cursor:pointer;font-weight:600}
+#mode-tabs button:first-child{border-radius:6px 0 0 6px}
+#mode-tabs button:last-child{border-radius:0 6px 6px 0;border-left:none}
+#mode-tabs button.active{background:var(--green);color:#fff;border-color:var(--green)}
+#main{flex:1;display:flex;overflow:hidden}
+#canvas-container{flex:1;position:relative;overflow:hidden}
+canvas{display:block;width:100%;height:100%}
+#sidebar{width:360px;flex-shrink:0;background:var(--bg2);border-left:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
+@media(max-width:900px){#sidebar{width:280px}}
+#sidebar .sb-header{padding:14px 18px;border-bottom:1px solid var(--border);font-size:13px;text-transform:uppercase;letter-spacing:1px;color:var(--text-d);font-weight:600;display:flex;justify-content:space-between;align-items:center}
+#sidebar .sb-header .count{font-size:11px;color:var(--green);background:rgba(46,160,67,0.15);padding:2px 8px;border-radius:10px}
+#task-list{flex:1;overflow-y:auto;padding:8px}
+#task-list::-webkit-scrollbar{width:6px}
+#task-list::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+.shipment-card{background:var(--bg3);border:1px solid var(--border);border-radius:10px;margin-bottom:10px;overflow:hidden}
+.shipment-card.inbound{border-left:3px solid var(--green)}
+.shipment-card.outbound{border-left:3px solid var(--orange)}
+.shipment-card .sc-header{padding:12px 14px;display:flex;justify-content:space-between;align-items:center;cursor:pointer}
+.shipment-card .sc-id{font-weight:700;font-size:15px;color:var(--text)}
+.shipment-card .sc-id .icon{margin-right:6px}
+.shipment-card .sc-status{font-size:11px;padding:3px 10px;border-radius:10px;font-weight:600}
+.sc-status.queued{background:rgba(125,133,144,0.2);color:var(--text-d)}
+.sc-status.active{background:rgba(56,139,253,0.2);color:var(--blue)}
+.sc-status.done{background:rgba(46,160,67,0.2);color:var(--green)}
+.shipment-card .sc-body{padding:0 14px 12px;display:none}
+.shipment-card.expanded .sc-body{display:block}
+.shipment-card .sc-info{font-size:12px;color:var(--text-d);margin-bottom:8px;line-height:1.6}
+.shipment-card .sc-info .opt{color:var(--purple);font-weight:600}
+.shipment-card .sc-info .out{color:var(--orange);font-weight:600}
+.bag-row{display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:6px;font-size:12px;margin-bottom:3px}
+.bag-row.queued{background:rgba(125,133,144,0.1);color:var(--text-d)}
+.bag-row.dispatched{background:rgba(56,139,253,0.1);color:var(--blue)}
+.bag-row.transporting{background:rgba(227,179,65,0.1);color:var(--yellow)}
+.bag-row.placing{background:rgba(163,113,247,0.1);color:var(--purple)}
+.bag-row.done{background:rgba(46,160,67,0.1);color:var(--green)}
+.bag-row .b-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.bag-row .b-id{font-weight:600;min-width:70px}
+.bag-row .b-fork{font-size:10px;color:var(--text-dd);margin-left:auto}
+#dispatch-panel{padding:14px 18px;border-top:1px solid var(--border);background:var(--bg3)}
+#dispatch-panel h4{font-size:13px;color:var(--text-d);margin-bottom:10px;text-transform:uppercase;letter-spacing:1px}
+.dp-row{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+.dp-stat{flex:1;text-align:center;padding:10px 6px;background:var(--bg2);border:1px solid var(--border);border-radius:6px}
+.dp-stat .n{font-size:1.4rem;font-weight:800}
+.dp-stat .l{font-size:10px;color:var(--text-d);text-transform:uppercase}
+.dp-stat.green .n{color:var(--green)}.dp-stat.yellow .n{color:var(--yellow)}.dp-stat.blue .n{color:var(--blue)}.dp-stat.purple .n{color:var(--purple)}.dp-stat.orange .n{color:var(--orange)}
+#dispatch-btn{width:100%;padding:12px;border:1px solid var(--green);background:rgba(46,160,67,0.1);color:var(--green);border-radius:8px;cursor:pointer;font-size:14px;font-weight:600;transition:all .2s;margin-bottom:8px}
+#dispatch-btn:hover{background:var(--green);color:#fff}
+#dispatch-out{width:100%;padding:12px;border:1px solid var(--orange);background:rgba(219,109,40,0.1);color:var(--orange);border-radius:8px;cursor:pointer;font-size:14px;font-weight:600;transition:all .2s}
+#dispatch-out:hover{background:var(--orange);color:#fff}
+#hud{position:absolute;top:12px;left:12px;background:rgba(13,17,23,0.9);border:1px solid var(--border);border-radius:10px;padding:12px 16px;font-size:12px;color:var(--text-d);max-width:290px;backdrop-filter:blur(8px)}
+#hud h3{color:var(--text);font-size:14px;margin-bottom:8px}
+#hud .row{display:flex;justify-content:space-between;padding:3px 0}
+#hud .val{color:var(--green);font-weight:600}
+#hud .opt{color:var(--purple);font-weight:600}
+#hud .out{color:var(--orange);font-weight:600}
+#view-controls{position:absolute;bottom:12px;left:50%;transform:translateX(-50%);display:flex;gap:6px;background:rgba(13,17,23,0.9);border:1px solid var(--border);border-radius:10px;padding:6px;backdrop-filter:blur(8px)}
+#view-controls button{padding:7px 14px;border:1px solid var(--border);border-radius:5px;background:var(--bg2);color:var(--text-d);font-size:11px;cursor:pointer;transition:all .2s;white-space:nowrap}
+#view-controls button:hover{border-color:var(--text-d);color:var(--text)}
+#view-controls button.active{background:var(--green);color:#fff;border-color:var(--green)}
+#loading{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:var(--text-d);font-size:16px}
+#opt-toast{position:absolute;top:12px;right:12px;max-width:340px;background:rgba(13,17,23,0.95);border:1px solid var(--purple);border-radius:10px;padding:12px 16px;font-size:12px;color:var(--text-d);backdrop-filter:blur(8px);display:none}
+#opt-toast h4{color:var(--purple);font-size:13px;margin-bottom:6px}
+#opt-toast .ot-line{padding:2px 0}
+#opt-toast.outbound{border-color:var(--orange)}
+#opt-toast.outbound h4{color:var(--orange)}
+</style>
+</head>
+<body>
+<div id="topbar">
+<div class="logo">▶ ÉLŐ RAKTÁR — 3D Raktar</div>
+<div class="info"><b>Rudolf Logisztika · Tatabanya · Lotte</b> — ÉLŐ RAKTÁR — 20 ember helyett 5 · betárolás + kitárolás · élő leltár</div>
+<div id="mode-tabs">
+<button class="active" onclick="setTab('in')">BEtarolas</button>
+<button onclick="setTab('out')">KITarolas</button>
+</div>
+</div>
+<div id="main">
+<div id="canvas-container">
+<div id="loading">3D betoltes...</div>
+<div id="hud" style="display:none">
+<h3>Raktar</h3>
+<div class="row"><span>Csarnokok</span><span class="val">2 (veg egymas mellett)</span></div>
+<div class="row"><span>Beallo</span><span class="val">3 bal + 4 hatso</span></div>
+<div class="row"><span>Targoncak</span><span class="val">2 db</span></div>
+<div class="row"><span>Betarolas</span><span class="opt">Cluster (egy helyre)</span></div>
+<div class="row"><span>Kitarolas</span><span class="out">Picker list -> auto dispatch</span></div>
+</div>
+<div id="opt-toast" style="display:none"><h4 id="ot-title">Optimalizacio</h4><div id="opt-text"></div></div>
+<div id="view-controls" style="display:none">
+<button id="btnOrbit" class="active" onclick="setMode('orbit')">Szabad</button>
+<button id="btnTop" onclick="setMode('top')">Felulrol</button>
+<button id="btnFollow" onclick="setMode('follow')">Kovetes</button>
+</div>
+</div>
+<div id="sidebar">
+<div class="sb-header"><span id="sb-title">Kamion rendelesek (betarolas)</span><span class="count" id="ship-count">0</span></div>
+<div id="task-list"></div>
+<div id="dispatch-panel">
+<h4>Statisztika</h4>
+<div class="dp-row">
+<div class="dp-stat green"><div class="n" id="stat-done">0</div><div class="l">Kesz</div></div>
+<div class="dp-stat yellow"><div class="n" id="stat-active">0</div><div class="l">Folyamatban</div></div>
+<div class="dp-stat blue"><div class="n" id="stat-queued">0</div><div class="l">Varakozik</div></div>
+<div class="dp-stat orange"><div class="n" id="stat-out">0</div><div class="l">Kitarolas</div></div>
+</div>
+<button id="dispatch-btn" onclick="dispatchInbound()">Betarolas: uj konténer (10 zsak)</button>
+<button id="dispatch-out" onclick="dispatchOutbound()">Kitarolas: picker list kuldes (admin)</button>
+</div>
+</div>
+</div>
+<script type="importmap">{ "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js", "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/" } }</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+const container = document.getElementById('canvas-container');
+const loading = document.getElementById('loading');
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0a0e14);
+scene.fog = new THREE.Fog(0x0a0e14, 250, 700);
+const camera = new THREE.PerspectiveCamera(55, container.clientWidth/container.clientHeight, 0.5, 2000);
+camera.position.set(160, 110, 160);
+const renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(container.clientWidth, container.clientHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+container.appendChild(renderer.domElement);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true; controls.dampingFactor = 0.08;
+controls.maxPolarAngle = Math.PI/2 - 0.05; controls.minDistance = 30; controls.maxDistance = 600;
+
+scene.add(new THREE.AmbientLight(0x404858, 0.6));
+const sun = new THREE.DirectionalLight(0xffffff, 0.7);
+sun.position.set(100, 200, 80); sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.camera.left = -300; sun.shadow.camera.right = 300;
+sun.shadow.camera.top = 300; sun.shadow.camera.bottom = -300;
+sun.shadow.camera.near = 10; sun.shadow.camera.far = 600;
+scene.add(sun);
+scene.add(new THREE.HemisphereLight(0x8899ff, 0x1a1a2a, 0.3));
+
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(700, 500), new THREE.MeshStandardMaterial({color:0x1a1f28, roughness:0.95}));
+ground.rotation.x = -Math.PI/2; ground.receiveShadow = true; scene.add(ground);
+scene.add(new THREE.GridHelper(700, 70, 0x1c2330, 0x141a22));
+
+const matWall = new THREE.MeshStandardMaterial({color:0x4a6a4a, roughness:0.8, side:THREE.DoubleSide});
+const matWallBack = new THREE.MeshStandardMaterial({color:0x3a5a3a, roughness:0.8, side:THREE.DoubleSide});
+const matRoof = new THREE.MeshStandardMaterial({color:0x2a3a3a, roughness:0.9, transparent:true, opacity:0.22, side:THREE.DoubleSide});
+const matFloor = new THREE.MeshStandardMaterial({color:0x232830, roughness:0.9});
+const matDockFrame = new THREE.MeshStandardMaterial({color:0x666, roughness:0.6, metalness:0.3});
+const matBag1 = new THREE.MeshStandardMaterial({color:0xe8d5a0, roughness:0.85});
+const matBag2 = new THREE.MeshStandardMaterial({color:0xc4a860, roughness:0.85});
+const matBagNew = new THREE.MeshStandardMaterial({color:0xd4b878, roughness:0.85});
+const matStaged = new THREE.MeshStandardMaterial({color:0xdb6d28, roughness:0.85});
+const matClusterZone = new THREE.MeshBasicMaterial({color:0xa371f7, transparent:true, opacity:0.15, side:THREE.DoubleSide});
+const matStagingZone = new THREE.MeshBasicMaterial({color:0xdb6d28, transparent:true, opacity:0.15, side:THREE.DoubleSide});
+
+function createBag(level, type) {
+  const g = new THREE.Group();
+  const w=3.0, h=3.2, d=3.0;
+  let mat = matBag1;
+  if (level === 2) mat = matBag2;
+  else if (type === 'new') mat = matBagNew;
+  else if (type === 'staged') mat = matStaged;
+  const body = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), mat);
+  body.castShadow = true; g.add(body);
+  const loopMat = new THREE.MeshStandardMaterial({color:0x8a7a4a, roughness:0.9});
+  const loopGeo = new THREE.TorusGeometry(0.3, 0.08, 6, 12);
+  [[-0.8,h/2,-0.8],[0.8,h/2,-0.8],[-0.8,h/2,0.8],[0.8,h/2,0.8]].forEach(p=>{
+    const l = new THREE.Mesh(loopGeo, loopMat);
+    l.position.set(p[0],p[1],p[2]); l.rotation.x = Math.PI/2; g.add(l);
+  });
+  g.userData = {level, type};
+  return g;
+}
+
+function createDock(x, z, facing, label) {
+  const g = new THREE.Group();
+  const frame = new THREE.Mesh(new THREE.BoxGeometry(5, 5.5, 0.4), matDockFrame);
+  frame.position.y = 2.75; g.add(frame);
+  const door = new THREE.Mesh(new THREE.BoxGeometry(4.4, 4.8, 0.3), new THREE.MeshStandardMaterial({color:0x222, roughness:0.8}));
+  door.position.y = 2.4; g.add(door);
+  const line = new THREE.Mesh(new THREE.PlaneGeometry(5, 0.3), new THREE.MeshBasicMaterial({color:0xe3b341, side:THREE.DoubleSide}));
+  line.position.y = 0.15;
+  if (facing === 'left') { line.rotation.y = Math.PI/2; line.position.x = 0.25; }
+  else { line.position.z = 0.25; }
+  g.add(line);
+  const cv = document.createElement('canvas'); cv.width = 64; cv.height = 64;
+  const ctx = cv.getContext('2d');
+  ctx.fillStyle = '#1a1a1a'; ctx.fillRect(0,0,64,64);
+  ctx.strokeStyle = '#e3b341'; ctx.lineWidth = 3; ctx.strokeRect(2,2,60,60);
+  ctx.fillStyle = '#e3b341'; ctx.font = 'bold 20px sans-serif';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(label, 32, 32);
+  const tex = new THREE.CanvasTexture(cv);
+  const plate = new THREE.Mesh(new THREE.PlaneGeometry(1.2,1.2), new THREE.MeshBasicMaterial({map:tex, side:THREE.DoubleSide}));
+  plate.position.set(1.8, 4.8, 0.3); g.add(plate);
+  g.position.set(x, 0, z);
+  if (facing === 'left') g.rotation.y = Math.PI/2;
+  return g;
+}
+
+function createHall(cx, cz, w, d, name) {
+  const g = new THREE.Group();
+  const h = 12, wallT = 0.3;
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(w, d), matFloor);
+  floor.rotation.x = -Math.PI/2; floor.position.y = 0.05; floor.receiveShadow = true; g.add(floor);
+  const bw = new THREE.Mesh(new THREE.BoxGeometry(w, h, wallT), matWallBack);
+  bw.position.set(0, h/2, -d/2); g.add(bw);
+  const segW = (w - 8) / 2;
+  const fL = new THREE.Mesh(new THREE.BoxGeometry(segW, h, wallT), matWall); fL.position.set(-(segW/2+4), h/2, d/2); g.add(fL);
+  const fR = new THREE.Mesh(new THREE.BoxGeometry(segW, h, wallT), matWall); fR.position.set(segW/2+4, h/2, d/2); g.add(fR);
+  const fT = new THREE.Mesh(new THREE.BoxGeometry(8, h-6, wallT), matWall); fT.position.set(0, h-3, d/2); g.add(fT);
+  const rw = new THREE.Mesh(new THREE.BoxGeometry(wallT, h, d), matWall); rw.position.set(w/2, h/2, 0); g.add(rw);
+  const roof = new THREE.Mesh(new THREE.PlaneGeometry(w, d), matRoof);
+  roof.rotation.x = -Math.PI/2; roof.position.y = h; g.add(roof);
+  const beamMat = new THREE.MeshStandardMaterial({color:0x3a4a4a, roughness:0.8});
+  for (let bz = -d/2+6; bz <= d/2-6; bz += 12) {
+    const b = new THREE.Mesh(new THREE.BoxGeometry(w, 0.5, 0.5), beamMat);
+    b.position.set(0, h-0.3, bz); g.add(b);
+  }
+  const cv = document.createElement('canvas'); cv.width = 256; cv.height = 64;
+  const ctx = cv.getContext('2d');
+  ctx.fillStyle = '#2ea043'; ctx.fillRect(0,0,256,64);
+  ctx.fillStyle = '#fff'; ctx.font = 'bold 28px sans-serif';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(name, 128, 32);
+  const tex = new THREE.CanvasTexture(cv);
+  const lbl = new THREE.Mesh(new THREE.PlaneGeometry(8, 1.2), new THREE.MeshBasicMaterial({map:tex, side:THREE.DoubleSide}));
+  lbl.position.set(0, h+1.5, d/2+0.2); g.add(lbl);
+  g.position.set(cx, 0, cz);
+  return g;
+}
+
+const hallW = 80, hallD = 60, gap = 10;
+const hallX = 0;
+const hall1Z = -gap/2 - hallD/2;
+const hall2Z = hall1Z - hallD - gap;
+scene.add(createHall(hallX, hall1Z, hallW, hallD, 'CSARNOK 1'));
+scene.add(createHall(hallX, hall2Z, hallW, hallD, 'CSARNOK 2'));
+
+const dockWallX = hallX - hallW/2 - 2;
+const dockPositions = [];
+const dockSpan = hallD * 2 + gap;
+const dockSpacing = dockSpan / 3;
+for (let i = 0; i < 3; i++) {
+  const z = hall1Z + hallD/2 - dockSpan/2 + dockSpacing/2 + i * dockSpacing;
+  scene.add(createDock(dockWallX, z, 'left', String(i+1)));
+  dockPositions.push({x: dockWallX, z, id: 'D' + (i+1), side: 'left'});
+}
+const backDockZ = hall2Z - hallD/2 - 2;
+for (let i = 0; i < 4; i++) {
+  const x = hallX - hallW/2 + 10 + (hallW - 20) * i / 3;
+  scene.add(createDock(x, backDockZ, 'back', 'B' + (i+1)));
+  dockPositions.push({x, z: backDockZ, id: 'B' + (i+1), side: 'back'});
+}
+
+const stagingAreas = [];
+dockPositions.filter(d => d.side === 'left').forEach(d => {
+  const zone = new THREE.Mesh(new THREE.PlaneGeometry(8, 12), matStagingZone.clone());
+  zone.rotation.x = -Math.PI/2;
+  zone.position.set(d.x + 6, 0.15, d.z);
+  zone.visible = false;
+  scene.add(zone);
+  stagingAreas.push({dock: d, zone, bags: [], x: d.x + 6, z: d.z});
+});
+
+const bagGroup = new THREE.Group();
+scene.add(bagGroup);
+const bagSlots = [];
+const clusterZones = [];
+
+function buildSlotGrid(cx, cz, w, d, hallNum) {
+  const bagSize = 3.2, aisleW = 5;
+  const rowPitch = bagSize + aisleW, colPitch = bagSize + 0.8;
+  const halfW = w/2 - 6, halfD = d/2 - 6;
+  const cols = Math.floor((halfW*2)/colPitch);
+  const rows = Math.floor((halfD*2)/rowPitch);
+  const sx = cx - (cols*colPitch)/2 + colPitch/2;
+  const sz = cz - (rows*rowPitch)/2 + rowPitch/2;
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const x = sx + c * colPitch, z = sz + r * rowPitch;
+      bagSlots.push({x, z, occupied: false, hasL2: false, mesh1: null, mesh2: null, cluster: null, hall: hallNum, row: r, col: c});
+    }
+  }
+  return {cols, rows, sx, sz, colPitch, rowPitch, hallNum};
+}
+
+const grid1 = buildSlotGrid(hallX, hall1Z, hallW, hallD, 1);
+const grid2 = buildSlotGrid(hallX, hall2Z, hallW, hallD, 2);
+
+bagSlots.forEach(s => {
+  if (Math.random() < 0.35) {
+    const b1 = createBag(1, 'old'); b1.position.set(s.x, 1.6, s.z); bagGroup.add(b1);
+    s.occupied = true; s.mesh1 = b1;
+    if (Math.random() < 0.3) {
+      const b2 = createBag(2, 'old'); b2.position.set(s.x, 1.6+3.2, s.z); bagGroup.add(b2);
+      s.hasL2 = true; s.mesh2 = b2;
+    }
+  }
+});
+// === CLUSTER OPTIMIZATION ===
+function findClusterZone(numBags) {
+  for (const grid of [grid1, grid2]) {
+    for (let r = 0; r < grid.rows - 1; r++) {
+      for (let c = 0; c < grid.cols - 4; c++) {
+        const block = [];
+        let ok = true;
+        for (let dr = 0; dr < 2 && ok; dr++) {
+          for (let dc = 0; dc < 5 && ok; dc++) {
+            const slot = bagSlots.find(s => s.hall === grid.hallNum && s.row === r+dr && s.col === c+dc);
+            if (!slot || (slot.occupied && slot.hasL2)) ok = false;
+            else block.push(slot);
+          }
+        }
+        if (ok && block.length >= numBags) return block.slice(0, numBags);
+      }
+    }
+    for (let r = 0; r < grid.rows; r++) {
+      const block = [];
+      for (let c = 0; c < grid.cols && block.length < numBags; c++) {
+        const slot = bagSlots.find(s => s.hall === grid.hallNum && s.row === r && s.col === c);
+        if (slot && (!slot.occupied || !slot.hasL2)) block.push(slot);
+        else block.length = 0;
+      }
+      if (block.length >= numBags) return block.slice(0, numBags);
+    }
+  }
+  return bagSlots.filter(s => !s.occupied || !s.hasL2).slice(0, numBags);
+}
+
+function highlightCluster(slots, id) {
+  if (slots.length === 0) return null;
+  let minX=Infinity,maxX=-Infinity,minZ=Infinity,maxZ=-Infinity;
+  slots.forEach(s => { minX=Math.min(minX,s.x); maxX=Math.max(maxX,s.x); minZ=Math.min(minZ,s.z); maxZ=Math.max(maxZ,s.z); });
+  const w = maxX-minX+5, d = maxZ-minZ+5;
+  const cx = (minX+maxX)/2, cz = (minZ+maxZ)/2;
+  const zone = new THREE.Mesh(new THREE.PlaneGeometry(w, d), matClusterZone.clone());
+  zone.rotation.x = -Math.PI/2; zone.position.set(cx, 0.15, cz);
+  scene.add(zone); clusterZones.push(zone);
+  return {center: {x: cx, z: cz}};
+}
+
+// === FORKLIFTS ===
+const forkColors = [0xf1c40f, 0x388bfd];
+const forkNames = ['T1', 'T2'];
+const forklifts = [];
+
+function createForklift(idx, startX, startZ) {
+  const g = new THREE.Group();
+  const color = forkColors[idx];
+  const mat = new THREE.MeshStandardMaterial({color, roughness:0.5, metalness:0.2});
+  const body = new THREE.Mesh(new THREE.BoxGeometry(2, 2.5, 4), mat);
+  body.position.y = 2; body.castShadow = true; g.add(body);
+  const cabin = new THREE.Mesh(new THREE.BoxGeometry(2, 1.5, 1.5), new THREE.MeshStandardMaterial({color:0x222, roughness:0.3, transparent:true, opacity:0.6}));
+  cabin.position.set(0, 3.5, -0.5); g.add(cabin);
+  const forkMat = new THREE.MeshStandardMaterial({color:0x888, roughness:0.4, metalness:0.5});
+  [-0.6, 0.6].forEach(x => { const f = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.2, 3), forkMat); f.position.set(x, 1, 2.5); g.add(f); });
+  const mastMat = new THREE.MeshStandardMaterial({color:0x666, roughness:0.4, metalness:0.4});
+  [-0.8, 0.8].forEach(x => { const m = new THREE.Mesh(new THREE.BoxGeometry(0.15, 5, 0.15), mastMat); m.position.set(x, 3, 1.8); g.add(m); });
+  const wheelGeo = new THREE.CylinderGeometry(0.6, 0.6, 0.5, 12);
+  const wheelMat = new THREE.MeshStandardMaterial({color:0x222, roughness:0.8});
+  [[-1,0.6,-1.3],[1,0.6,-1.3],[-1,0.6,1.3],[1,0.6,1.3]].forEach(p=>{
+    const w = new THREE.Mesh(wheelGeo, wheelMat); w.rotation.z = Math.PI/2; w.position.set(p[0],p[1],p[2]); g.add(w);
+  });
+  const cv = document.createElement('canvas'); cv.width = 64; cv.height = 32;
+  const ctx = cv.getContext('2d'); ctx.fillStyle = '#000'; ctx.fillRect(0,0,64,32);
+  ctx.fillStyle = '#' + color.toString(16).padStart(6,'0'); ctx.font = 'bold 18px sans-serif';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(forkNames[idx], 32, 16);
+  const tex = new THREE.CanvasTexture(cv);
+  const plate = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 0.8), new THREE.MeshBasicMaterial({map:tex, side:THREE.DoubleSide}));
+  plate.position.set(0, 4.5, -1); g.add(plate);
+  g.position.set(startX, 0, startZ); scene.add(g);
+  const arrowMat = new THREE.MeshStandardMaterial({color, emissive:color, emissiveIntensity:0.4, roughness:0.5});
+  const arrow = new THREE.Mesh(new THREE.ConeGeometry(1.2, 3, 6), arrowMat);
+  arrow.visible = false; scene.add(arrow);
+  return {group: g, arrow, pathLine: null, name: forkNames[idx], color, state: 'idle', path: [], pathIdx: 0, speed: 18, carryingBag: null, targetSlot: null, currentBag: null, assignedShip: null, direction: 'in'};
+}
+
+forklifts.push(createForklift(0, dockWallX + 6, dockPositions[0].z));
+forklifts.push(createForklift(1, dockWallX + 6, dockPositions[1].z));
+
+// === PATH GENERATION ===
+function generatePath(from, to) {
+  const path = [{x: from.x, z: from.z}];
+  path.push({x: hallX, z: from.z});
+  path.push({x: hallX, z: to.z});
+  path.push({x: to.x, z: to.z});
+  return path;
+}
+
+function moveForklift(fork, dt) {
+  if (fork.path.length === 0) return;
+  const target = fork.path[fork.pathIdx];
+  if (!target) return;
+  const dx = target.x - fork.group.position.x;
+  const dz = target.z - fork.group.position.z;
+  const dist = Math.sqrt(dx*dx + dz*dz);
+  if (dist < 1.5) {
+    fork.pathIdx++;
+    if (fork.pathIdx >= fork.path.length) onForkliftArrive(fork);
+  } else {
+    const move = fork.speed * dt;
+    fork.group.position.x += (dx/dist) * move;
+    fork.group.position.z += (dz/dist) * move;
+    fork.group.rotation.y = Math.atan2(dx, dz);
+    fork.arrow.position.set(fork.group.position.x, 7, fork.group.position.z);
+    const nt = fork.path[fork.pathIdx];
+    if (nt) { const adx=nt.x-fork.group.position.x, adz=nt.z-fork.group.position.z; const ad=Math.sqrt(adx*adx+adz*adz); if(ad>0.1){fork.arrow.rotation.x=Math.PI; fork.arrow.rotation.y=Math.atan2(adx,adz);} }
+  }
+}
+
+// === SHIPMENTS ===
+let shipCounter = 0;
+let bagCounter = 0;
+const shipments = [];
+let currentTab = 'in';
+
+function dispatchInbound() {
+  shipCounter++;
+  const dock = dockPositions[Math.floor(Math.random() * dockPositions.length)];
+  const cluster = findClusterZone(10);
+  const bags = [];
+  for (let i = 0; i < 10; i++) {
+    bagCounter++;
+    bags.push({id: 'Z-' + String(bagCounter).padStart(4, '0'), status: 'queued', from: dock, to: cluster[i], forkliftIdx: null});
+    if (cluster[i]) cluster[i].cluster = shipCounter;
+  }
+  const ship = {id: 'BE-' + String(shipCounter).padStart(3, '0'), type: 'inbound', dockId: dock.id, dock, bags, cluster, status: 'queued', doneCount: 0};
+  shipments.push(ship);
+  const hl = highlightCluster(cluster, ship.id);
+  showToast('in', ship, cluster, dock);
+  renderShipments();
+  tryAssignTasks();
+}
+window.dispatchInbound = dispatchInbound;
+
+function dispatchOutbound() {
+  shipCounter++;
+  // Admin sends picker list - system finds matching bags in storage
+  const occupied = bagSlots.filter(s => s.occupied);
+  if (occupied.length < 3) { alert('Nincs elég zsák a raktárban!'); return; }
+  const numBags = Math.min(Math.floor(Math.random() * 4) + 3, occupied.length);
+  const picked = [];
+  const shuffled = occupied.sort(() => Math.random() - 0.5);
+  for (let i = 0; i < numBags; i++) {
+    const slot = shuffled[i];
+    bagCounter++;
+    // Find staging area
+    const staging = stagingAreas[Math.floor(Math.random() * stagingAreas.length)];
+    picked.push({id: 'P-' + String(bagCounter).padStart(4, '0'), status: 'queued', from: slot, to: {x: staging.x, z: staging.z + (picked.length * 4 - 8), isStaging: true, stagingRef: staging}, forkliftIdx: null, sourceSlot: slot});
+  }
+  const dock = picked[0].to.stagingRef.dock;
+  const ship = {id: 'KI-' + String(shipCounter).padStart(3, '0'), type: 'outbound', dockId: dock.id, dock, bags: picked, status: 'queued', doneCount: 0, pickerList: true};
+  shipments.push(ship);
+  // Show staging zone
+  const staging = picked[0].to.stagingRef;
+  staging.zone.visible = true;
+  showToast('out', ship, null, dock, numBags);
+  renderShipments();
+  tryAssignTasks();
+}
+window.dispatchOutbound = dispatchOutbound;
+
+function showToast(type, ship, cluster, dock, numBags) {
+  const toast = document.getElementById('opt-toast');
+  const title = document.getElementById('ot-title');
+  const text = document.getElementById('opt-text');
+  if (type === 'in') {
+    toast.classList.remove('outbound');
+    title.textContent = 'Betarolas: cluster optimalizacio';
+    const hall = cluster[0] ? (cluster[0].hall === 1 ? 'Csarnok 1' : 'Csarnok 2') : '-';
+    text.innerHTML = '<div class="ot-line">' + ship.id + ' — 10 dupla zsak (750 kg)</div><div class="ot-line">Erkezett: ' + dock.id + ' beallo</div><div class="ot-line">Celzona: ' + hall + ' — egy helyre kerul</div>';
+  } else {
+    toast.classList.add('outbound');
+    title.textContent = 'Kitarolas: picker list';
+    text.innerHTML = '<div class="ot-line">' + ship.id + ' — ' + numBags + ' zsak kitarolva</div><div class="ot-line">Admin kuldi a picker listat</div><div class="ot-line">Rakodo hely: ' + dock.id + ' beallo</div><div class="ot-line">Targoncak azonnal indulnak</div>';
+  }
+  toast.style.display = 'block';
+  setTimeout(() => { toast.style.display = 'none'; }, 6000);
+}
+
+function getNextBag() {
+  for (const ship of shipments) {
+    if (ship.status === 'done') continue;
+    const bag = ship.bags.find(b => b.status === 'queued');
+    if (bag) return {ship, bag};
+  }
+  return null;
+}
+
+function tryAssignTasks() {
+  const idle = forklifts.filter(f => f.state === 'idle');
+  for (const fork of idle) {
+    const next = getNextBag();
+    if (!next) break;
+    next.bag.status = 'dispatched';
+    next.bag.forkliftIdx = forklifts.indexOf(fork);
+    next.ship.status = 'active';
+    fork.assignedShip = next.ship;
+    fork.currentBag = next.bag;
+    fork.direction = next.ship.type === 'inbound' ? 'in' : 'out';
+    const fp = {x: fork.group.position.x, z: fork.group.position.z};
+    if (fork.direction === 'in') {
+      fork.state = 'pickup';
+      fork.targetSlot = next.bag.to;
+      fork.path = generatePath(fp, next.bag.from);
+    } else {
+      fork.state = 'pickup';
+      fork.targetSlot = next.bag.to;
+      fork.sourceSlot = next.bag.from;
+      fork.path = generatePath(fp, {x: next.bag.from.x, z: next.bag.from.z});
+    }
+    fork.pathIdx = 0;
+    fork.arrow.visible = true;
+    if (fork.pathLine) scene.remove(fork.pathLine);
+    const pts = [new THREE.Vector3(fp.x, 0.3, fp.z)];
+    fork.path.forEach(p => pts.push(new THREE.Vector3(p.x, 0.3, p.z)));
+    fork.pathLine = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({color: fork.color, transparent: true, opacity: 0.5}));
+    scene.add(fork.pathLine);
+  }
+  renderShipments();
+}
+
+function onForkliftArrive(fork) {
+  if (fork.state === 'pickup') {
+    fork.state = 'transporting';
+    fork.currentBag.status = 'transporting';
+    if (fork.direction === 'in') {
+      // INBOUND: picked up from dock, now go to cluster slot
+      fork.carryingBag = createBag(1, 'new');
+    } else {
+      // OUTBOUND: picked up from storage, now go to staging area
+      fork.carryingBag = createBag(1, 'staged');
+      // Remove bag from storage
+      if (fork.sourceSlot) {
+        if (fork.sourceSlot.mesh2) { bagGroup.remove(fork.sourceSlot.mesh2); fork.sourceSlot.mesh2 = null; fork.sourceSlot.hasL2 = false; }
+        else if (fork.sourceSlot.mesh1) { bagGroup.remove(fork.sourceSlot.mesh1); fork.sourceSlot.mesh1 = null; fork.sourceSlot.occupied = false; }
+      }
+    }
+    fork.carryingBag.position.set(0, 3.5, 2);
+    fork.carryingBag.scale.set(0.8, 0.8, 0.8);
+    fork.group.add(fork.carryingBag);
+    var fp2 = {x: fork.group.position.x, z: fork.group.position.z};
+    fork.path = generatePath(fp2, fork.targetSlot);
+    fork.pathIdx = 0;
+    if (fork.pathLine) scene.remove(fork.pathLine);
+    const pts = [new THREE.Vector3(fp2.x, 0.3, fp.z)];
+    fork.path.forEach(p => pts.push(new THREE.Vector3(p.x, 0.3, p.z)));
+    fork.pathLine = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({color: fork.color, transparent: true, opacity: 0.5}));
+    scene.add(fork.pathLine);
+    renderShipments();
+  } else if (fork.state === 'transporting') {
+    fork.state = 'placing';
+    fork.currentBag.status = 'placing';
+    if (fork.carryingBag) { fork.group.remove(fork.carryingBag); fork.carryingBag = null; }
+    if (fork.direction === 'in' && fork.targetSlot) {
+      if (!fork.targetSlot.occupied) {
+        const bag = createBag(1, 'new'); bag.position.set(fork.targetSlot.x, 1.6, fork.targetSlot.z);
+        bagGroup.add(bag);
+        fork.targetSlot.occupied = true; fork.targetSlot.mesh1 = bag;
+      } else if (!fork.targetSlot.hasL2) {
+        const bag = createBag(2, 'new'); bag.position.set(fork.targetSlot.x, 1.6+3.2, fork.targetSlot.z);
+        bagGroup.add(bag);
+        fork.targetSlot.hasL2 = true; fork.targetSlot.mesh2 = bag;
+      }
+    } else if (fork.direction === 'out' && fork.targetSlot) {
+      // Place bag at staging area
+      const bag = createBag(1, 'staged'); bag.position.set(fork.targetSlot.x, 1.6, fork.targetSlot.z);
+      bagGroup.add(bag);
+    }
+    renderShipments();
+    setTimeout(() => {
+      fork.currentBag.status = 'done';
+      fork.assignedShip.doneCount++;
+      if (fork.assignedShip.doneCount >= fork.assignedShip.bags.length) {
+        fork.assignedShip.status = 'done';
+        // Hide staging zone if outbound done
+        if (fork.assignedShip.type === 'outbound') {
+          const staging = stagingAreas.find(s => s.dock.id === fork.assignedShip.dockId);
+          if (staging) setTimeout(() => { staging.zone.visible = false; }, 3000);
+        }
+      }
+      fork.state = 'done';
+      fork.arrow.visible = false;
+      if (fork.pathLine) { scene.remove(fork.pathLine); fork.pathLine = null; }
+      renderShipments();
+      setTimeout(() => { fork.state = 'idle'; fork.currentBag = null; fork.path = []; fork.pathIdx = 0; tryAssignTasks(); }, 1000);
+    }, 600);
+  }
+}
+
+// === UI ===
+function setTab(tab) {
+  currentTab = tab;
+  document.querySelectorAll('#mode-tabs button').forEach(b => b.classList.remove('active'));
+  if (tab === 'in') { document.querySelectorAll('#mode-tabs button')[0].classList.add('active'); document.getElementById('sb-title').textContent = 'Kamion rendelesek (betarolas)'; }
+  else { document.querySelectorAll('#mode-tabs button')[1].classList.add('active'); document.getElementById('sb-title').textContent = 'Kitarolas (picker list)'; }
+  renderShipments();
+}
+window.setTab = setTab;
+
+function renderShipments() {
+  const list = document.getElementById('task-list');
+  let bagDone = 0, activeCount = 0, queuedCount = 0, outCount = 0;
+  const visible = shipments.filter(s => currentTab === 'in' ? s.type === 'inbound' : s.type === 'outbound');
+  list.innerHTML = visible.slice().reverse().map(ship => {
+    const statusLabels = {queued: 'Varakozik', active: 'Folyamatban', done: 'Kesz'};
+    const isOut = ship.type === 'outbound';
+    const icon = isOut ? '📤' : '🚛';
+    const total = ship.bags.length;
+    if (ship.status === 'done') bagDone += total;
+    else if (ship.status === 'active') { activeCount += total - ship.doneCount; }
+    else queuedCount += total;
+    if (isOut) outCount++;
+
+    const bagRows = ship.bags.map(b => {
+      const sl = {queued:'queued',dispatched:'dispatched',transporting:'transporting',placing:'placing',done:'done'}[b.status];
+      const slLabel = {queued:'varakozik',dispatched:'inditva',transporting:'szallitas',placing:'lerakas',done:'kesz'}[b.status];
+      const fkn = b.forkliftIdx !== null ? forkNames[b.forkliftIdx] : '-';
+      const color = b.forkliftIdx !== null ? '#' + forkColors[b.forkliftIdx].toString(16).padStart(6,'0') : '#555';
+      let route = '';
+      if (isOut) {
+        route = b.from ? 'R' + b.from.row + 'C' + b.from.col : '';
+      } else {
+        route = b.to ? 'R' + b.to.row + 'C' + b.to.col : '';
+      }
+      return '<div class="bag-row ' + sl + '"><div class="b-dot" style="background:' + color + '"></div><span class="b-id">' + b.id + '</span><span>' + slLabel + (route ? ' (' + route + ')' : '') + '</span><span class="b-fork">' + fkn + '</span></div>';
+    }).join('');
+
+    let info = '';
+    if (isOut) {
+      info = 'Admin picker list → ' + ship.dockId + ' rakodo hely<br>' + total + ' zsak kitarolva<br>Kesz: ' + ship.doneCount + '/' + total;
+    } else {
+      const hall = ship.cluster[0] ? (ship.cluster[0].hall === 1 ? 'Csarnok 1' : 'Csarnok 2') : '-';
+      const cs = ship.cluster[Math.floor(ship.cluster.length/2)];
+      info = ship.dockId + ' beallo → <span class="opt">' + hall + ' R' + (cs?cs.row:0) + 'C' + (cs?cs.col:0) + '</span> (cluster)<br>10 dupla zsak (750 kg)<br>Kesz: ' + ship.doneCount + '/10';
+    }
+
+    return '<div class="shipment-card ' + (isOut ? 'outbound' : 'inbound') + (ship.status === 'done' ? ' done' : '') + '" onclick="this.classList.toggle(\'expanded\')"><div class="sc-header"><span class="sc-id"><span class="icon">' + icon + '</span>' + ship.id + '</span><span class="sc-status ' + (ship.status === 'done' ? 'done' : ship.status === 'active' ? 'active' : 'queued') + '">' + statusLabels[ship.status] + ' (' + ship.doneCount + '/' + total + ')</span></div><div class="sc-body"><div class="sc-info">' + info + '</div>' + bagRows + '</div></div>';
+  }).join('');
+
+  document.getElementById('stat-done').textContent = bagDone;
+  document.getElementById('stat-active').textContent = activeCount;
+  document.getElementById('stat-queued').textContent = queuedCount;
+  document.getElementById('stat-out').textContent = outCount;
+  document.getElementById('ship-count').textContent = visible.length;
+}
+
+setTimeout(() => { const first = document.querySelector('.shipment-card'); if (first) first.classList.add('expanded'); }, 500);
+
+// === CAMERA ===
+let camMode = 'orbit';
+function setMode(mode) {
+  camMode = mode;
+  document.querySelectorAll('#view-controls button').forEach(b => b.classList.remove('active'));
+  if (mode === 'orbit') { document.getElementById('btnOrbit').classList.add('active'); controls.enabled = true; }
+  else if (mode === 'top') { document.getElementById('btnTop').classList.add('active'); controls.enabled = true; animateCam(0, 300, 0); }
+  else if (mode === 'follow') { document.getElementById('btnFollow').classList.add('active'); controls.enabled = false; }
+}
+window.setMode = setMode;
+function animateCam(x, y, z) {
+  const s = camera.position.clone(), e = new THREE.Vector3(x,y,z);
+  let t = 0; const step = () => { t += 0.02; if (t>1) t=1; const e2 = 1-Math.pow(1-t,3); camera.position.lerpVectors(s, e, e2); if (t<1) requestAnimationFrame(step); };
+  step();
+}
+
+window.addEventListener('resize', () => {
+  camera.aspect = container.clientWidth / container.clientHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(container.clientWidth, container.clientHeight);
+});
+
+// Auto-start
+dispatchInbound();
+
+// === RENDER LOOP ===
+const clock = new THREE.Clock();
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), 0.1);
+  forklifts.forEach(fork => {
+    if (fork.state === 'pickup' || fork.state === 'transporting') moveForklift(fork, dt);
+  });
+  if (camMode === 'follow') {
+    const active = forklifts.find(f => f.state !== 'idle' && f.state !== 'done') || forklifts[0];
+    const off = new THREE.Vector3(0, 8, -14);
+    off.applyAxisAngle(new THREE.Vector3(0,1,0), active.group.rotation.y);
+    camera.position.lerp(active.group.position.clone().add(off), 0.08);
+    controls.target.lerp(active.group.position, 0.08);
+  }
+  clusterZones.forEach((z, i) => {
+    z.material.opacity = 0.12 + Math.sin(clock.elapsedTime * 1.5 + i) * 0.06;
+  });
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+loading.style.display = 'none';
+document.getElementById('hud').style.display = 'block';
+document.getElementById('view-controls').style.display = 'flex';
+animate();
+</script>
+</body>
+</html>

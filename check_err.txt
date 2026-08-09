@@ -1,0 +1,3 @@
+warning: `panic` setting is ignored for `bench` profile
+    Checking microscope-memory v0.8.2 (D:\codex\microscope-memory)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 5.32s

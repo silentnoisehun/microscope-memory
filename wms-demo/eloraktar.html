@@ -1,0 +1,842 @@
+﻿<!DOCTYPE html>
+<html lang="hu">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ELORAKTAR — Professional WMS</title>
+<style>
+:root{--bg:#0d1117;--bg2:#161b22;--bg3:#21262d;--border:#30363d;--green:#2ea043;--green-d:#1a7f37;--yellow:#e3b341;--red:#f85149;--blue:#388bfd;--purple:#a371f7;--orange:#db6d28;--cyan:#39c5cf;--text:#e6edf3;--text-d:#7d8590;--text-dd:#484f58}
+*{box-sizing:border-box;margin:0;padding:0;font-family:'Segoe UI',system-ui,sans-serif}
+body{background:var(--bg);color:var(--text);overflow:hidden;height:100vh;display:flex;flex-direction:column}
+#topbar{padding:8px 16px;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;z-index:10;flex-wrap:wrap;gap:8px}
+#topbar .logo{font-weight:800;font-size:16px;color:var(--green);white-space:nowrap}
+#topbar .logo .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--green);margin-right:6px;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
+#tabs{display:flex;gap:2px}
+#tabs button{padding:8px 16px;border:none;background:transparent;color:var(--text-d);font-size:13px;font-weight:600;cursor:pointer;border-bottom:2px solid transparent;transition:all .2s;white-space:nowrap}
+#tabs button:hover{color:var(--text)}
+#tabs button.active{color:var(--green);border-bottom-color:var(--green)}
+#topbar .clock{font-size:12px;color:var(--text-d)}
+#content{flex:1;position:relative;overflow:hidden}
+.view{position:absolute;inset:0;display:none;overflow:hidden}
+.view.active{display:block}
+#view3d canvas{display:block;width:100%;height:100%}
+#hud3d{position:absolute;top:12px;left:12px;background:rgba(13,17,23,0.92);border:1px solid var(--border);border-radius:10px;padding:12px 16px;font-size:12px;color:var(--text-d);max-width:260px;backdrop-filter:blur(8px)}
+#hud3d h3{color:var(--text);font-size:14px;margin-bottom:8px}
+#hud3d .row{display:flex;justify-content:space-between;padding:3px 0}
+#hud3d .val{font-weight:600}
+#hud3d .green{color:var(--green)} #hud3d .orange{color:var(--orange)} #hud3d .purple{color:var(--purple)} #hud3d .cyan{color:var(--cyan)} #hud3d .red{color:var(--red)}
+#vc3d{position:absolute;bottom:12px;left:50%;transform:translateX(-50%);display:flex;gap:6px;background:rgba(13,17,23,0.92);border:1px solid var(--border);border-radius:10px;padding:6px;backdrop-filter:blur(8px)}
+#vc3d button{padding:7px 14px;border:1px solid var(--border);border-radius:5px;background:var(--bg2);color:var(--text-d);font-size:11px;cursor:pointer;white-space:nowrap}
+#vc3d button:hover{color:var(--text)}
+#vc3d button.active{background:var(--green);color:#fff;border-color:var(--green)}
+#scenario-overlay{position:absolute;top:12px;right:12px;max-width:400px;background:rgba(13,17,23,0.95);border:1px solid var(--border);border-radius:12px;padding:16px 20px;backdrop-filter:blur(8px);display:none}
+#scenario-overlay h4{font-size:14px;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+#scenario-overlay h4 .phase-num{background:var(--green);color:#fff;border-radius:50%;width:24px;height:24px;display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0}
+#scenario-steps{display:flex;flex-direction:column;gap:4px}
+.sc-step{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--text-dd);padding:6px 10px;border-radius:6px;transition:all .3s}
+.sc-step.active{background:rgba(46,160,67,0.12);color:var(--green)}
+.sc-step.done{color:var(--text-d)}
+.sc-step.error{color:var(--red);background:rgba(248,81,73,0.1)}
+.sc-step .sc-dot{width:10px;height:10px;border-radius:50%;background:var(--text-dd);flex-shrink:0;transition:all .3s}
+.sc-step.active .sc-dot{background:var(--green);box-shadow:0 0 10px var(--green)}
+.sc-step.done .sc-dot{background:var(--green);opacity:0.4}
+.sc-step.error .sc-dot{background:var(--red);box-shadow:0 0 10px var(--red)}
+.sc-step .sc-label{flex:1}
+.sc-step .sc-detail{font-size:10px;color:var(--text-dd);margin-left:auto}
+#viewTerminal{background:#000}
+#viewTerminal.active{display:flex;align-items:center;justify-content:center}
+.phone-mock{width:400px;max-width:100%;height:100%;max-height:820px;background:linear-gradient(145deg,#0a0a0a,#1a1a1a);border:3px solid #2a2a2a;border-radius:28px;display:flex;flex-direction:column;overflow:hidden;position:relative;box-shadow:0 20px 60px rgba(0,0,0,0.8),inset 0 1px 0 rgba(255,255,255,0.05)}
+.pm-status{padding:10px 20px;background:linear-gradient(180deg,#1a1a1a,#0d0d0d);color:var(--text-d);font-size:11px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #222}
+.pm-body{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:30px 24px;text-align:center;position:relative;background:radial-gradient(ellipse at center,#1a1a2e,#0a0a14)}
+.pm-phase-tag{position:absolute;top:0;left:0;right:0;padding:10px 16px;background:linear-gradient(180deg,rgba(0,0,0,0.95),rgba(0,0,0,0.7));font-size:11px;color:var(--cyan);text-align:center;font-weight:700;letter-spacing:2px;text-transform:uppercase;display:none;z-index:5}
+.pm-phase-tag.visible{display:block}
+.pm-phase-tag.error{color:var(--red)}
+.pm-route-mini{width:100%;height:180px;background:var(--bg2);border:1px solid var(--border);border-radius:12px;margin-bottom:16px;display:none;overflow:hidden}
+.pm-route-mini.visible{display:block}
+.pm-route-mini canvas{width:100%;height:100%}
+.pm-arrow{font-size:140px;transition:transform .3s,color .3s,color:var(--green);margin:0;line-height:1;text-shadow:0 0 40px currentColor;cursor:pointer}.pm-arrow:active{transform:scale(0.9)}
+.pm-instr{padding:20px;border-radius:14px;font-weight:700;font-size:20px;width:100%;background:linear-gradient(145deg,#21262d,#161b22);border:1px solid var(--border);transition:all .3s;text-align:center;letter-spacing:0.5px}
+.pm-instr.alert{background:var(--red);color:#fff;animation:blink .4s infinite alternate}
+.pm-instr.success{background:var(--green-d)}
+.pm-instr.warn{background:rgba(227,179,65,0.3);color:var(--yellow)}
+.pm-info{padding:12px 16px;color:var(--text-dd);font-size:12px;text-align:left;width:100%}
+.pm-label{position:absolute;top:40px;right:12px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:11px;color:var(--text-d);display:none;max-width:200px}
+.pm-label .ll{font-size:9px;text-transform:uppercase;color:var(--text-dd);letter-spacing:1px}
+.pm-label .lv{font-weight:700;color:var(--text);font-size:13px}
+.pm-label .lcolor{width:24px;height:8px;border-radius:2px;margin-top:4px}
+.pm-scan{padding:16px 20px;border-top:1px solid #222;display:flex;gap:10px;background:linear-gradient(0deg,#0d0d0d,#1a1a1a)}
+.pm-scan button{flex:1;padding:14px;border:1px solid var(--border);border-radius:10px;background:linear-gradient(145deg,#21262d,#161b22);color:var(--text-d);font-size:13px;cursor:pointer;font-weight:600;transition:all .2s}.pm-scan button:hover{border-color:var(--text-d);color:var(--text)}
+.pm-scan button.primary{background:linear-gradient(145deg,#2ea043,#1a7f37);color:#fff;border-color:var(--green);box-shadow:0 4px 16px rgba(46,160,67,0.3)}.pm-scan button.primary:hover{box-shadow:0 6px 24px rgba(46,160,67,0.5)}
+@keyframes blink{from{opacity:1}to{opacity:0.4}}
+#viewAdmin{overflow-y:auto;background:linear-gradient(180deg,#0d1117,#0a0e14);padding:24px}
+.admin-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;max-width:1200px;margin:0 auto}
+@media(max-width:900px){.admin-grid{grid-template-columns:1fr}}
+.admin-card{background:linear-gradient(145deg,#161b22,#0d1117);border:1px solid var(--border);border-radius:12px;padding:20px;box-shadow:0 4px 16px rgba(0,0,0,0.3)}.admin-card:hover{border-color:var(--text-dd)}
+.admin-card h3{font-size:16px;margin-bottom:16px;display:flex;align-items:center;gap:8px;padding-bottom:12px;border-bottom:1px solid var(--border)}
+.admin-card .ac-sub{font-size:12px;color:var(--text-d);margin-bottom:12px}
+.live-map-wrap{background:radial-gradient(ellipse at center,#111820,#0a0e14);border:1px solid var(--border);border-radius:10px;height:450px;position:relative;overflow:hidden;box-shadow:inset 0 0 40px rgba(0,0,0,0.5)}
+.live-map-wrap canvas{width:100%;height:100%}
+.ramp-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:8px;margin-top:12px}
+.ramp-btn{padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg3);color:var(--text-d);font-size:13px;cursor:pointer;transition:all .2s;text-align:center;font-weight:600}
+.ramp-btn:hover{border-color:var(--text-d);color:var(--text)}
+.ramp-btn.active{border-color:var(--green);color:var(--green);background:rgba(46,160,67,0.1)}
+.ramp-btn.assigned{border-color:var(--orange);color:var(--orange);background:rgba(219,109,40,0.1)}
+.ramp-btn .rb-id{font-size:15px;font-weight:800}
+.ramp-btn .rb-side{font-size:10px;color:var(--text-dd)}
+.stat-row{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:16px}
+.stat-box{text-align:center;padding:18px 8px;background:linear-gradient(145deg,#21262d,#161b22);border:1px solid var(--border);border-radius:10px;transition:transform .2s,box-shadow .2s}.stat-box:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,0,0,0.4)}
+.stat-box .n{font-size:1.8rem;font-weight:800}
+.stat-box .l{font-size:10px;color:var(--text-d);text-transform:uppercase;letter-spacing:1px}
+.stat-box.g .n{color:var(--green)} .stat-box.o .n{color:var(--orange)} .stat-box.b .n{color:var(--blue)} .stat-box.p .n{color:var(--purple)} .stat-box.c .n{color:var(--cyan)}
+.ship-list{max-height:200px;overflow-y:auto}
+.ship-row{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-bottom:1px solid var(--border);font-size:13px}
+.sr-status{font-size:11px;padding:2px 8px;border-radius:10px}
+.sr-status.queued{background:rgba(125,133,144,0.2);color:var(--text-d)} .sr-status.active{background:rgba(56,139,253,0.2);color:var(--blue)} .sr-status.done{background:rgba(46,160,67,0.2);color:var(--green)}
+.material-legend{display:flex;gap:12px;flex-wrap:wrap;margin-top:12px}
+.ml-item{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-d)}
+.ml-item .sw{width:16px;height:16px;border-radius:3px}
+.btn{padding:10px 20px;border:1px solid var(--border);border-radius:8px;background:var(--bg3);color:var(--text);font-size:14px;cursor:pointer;font-weight:600;transition:all .2s}
+.btn:hover{border-color:var(--text-d)}
+.btn.green{border-color:var(--green);color:var(--green);background:rgba(46,160,67,0.1)} .btn.green:hover{background:var(--green);color:#fff}
+.btn.orange{border-color:var(--orange);color:var(--orange);background:rgba(219,109,40,0.1)} .btn.orange:hover{background:var(--orange);color:#fff}
+.btn-row{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+.wb-card{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:16px;margin-top:12px;position:relative;overflow:hidden}
+.wb-card .wb-stamp{position:absolute;top:8px;right:8px;font-size:10px;padding:2px 8px;border-radius:4px;font-weight:700}
+.wb-card .wb-stamp.ok{background:rgba(46,160,67,0.2);color:var(--green)}
+.wb-card .wb-stamp.pending{background:rgba(227,179,65,0.2);color:var(--yellow)}
+.wb-card .wb-header{display:flex;justify-content:space-between;font-size:11px;color:var(--text-dd);margin-bottom:10px;border-bottom:1px dashed var(--border);padding-bottom:8px}
+.wb-card .wb-row{display:flex;justify-content:space-between;padding:4px 0;font-size:12px}
+.wb-card .wb-row .k{color:var(--text-d)}
+.wb-card .wb-row .v{font-weight:600;color:var(--text)}
+.wb-card .wb-items{margin-top:8px;border-top:1px solid var(--border);padding-top:8px}
+.wb-card .wb-item{display:flex;align-items:center;gap:8px;font-size:11px;padding:3px 0}
+.wb-card .wb-item .wi-dot{width:8px;height:8px;border-radius:2px;flex-shrink:0}
+#viewFuvar{overflow-y:auto;background:var(--bg);padding:20px}
+.fuvar-grid{max-width:900px;margin:0 auto}
+.fuvar-card{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:24px;margin-bottom:16px}
+.fuvar-card.inbound{border-left:3px solid var(--green)} .fuvar-card.outbound{border-left:3px solid var(--orange)}
+.fc-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+.fc-header h3{font-size:18px}
+.fc-type{font-size:12px;padding:4px 12px;border-radius:12px;font-weight:600}
+.inbound .fc-type{background:rgba(46,160,67,0.2);color:var(--green)} .outbound .fc-type{background:rgba(219,109,40,0.2);color:var(--orange)}
+.fc-detail{display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:13px;color:var(--text-d)}
+.fd-label{color:var(--text-dd);font-size:11px;text-transform:uppercase;letter-spacing:1px}
+.fd-val{color:var(--text);font-weight:600;font-size:15px;margin-top:2px}
+.fc-bags{margin-top:16px}
+.fc-bag{display:flex;align-items:center;gap:10px;padding:8px 12px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px;font-size:13px}
+.fb-color{width:20px;height:20px;border-radius:4px;flex-shrink:0}
+.fb-id{font-weight:600;min-width:80px}
+.fb-pos{color:var(--text-d);margin-left:auto;font-size:12px}
+#labelPopup{position:fixed;inset:0;background:rgba(0,0,0,0.7);display:none;align-items:center;justify-content:center;z-index:200}
+#labelPopup.active{display:flex}
+.label-card{background:#fff;color:#000;border-radius:12px;width:340px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.5)}
+.lc-top{padding:16px;color:#fff;display:flex;justify-content:space-between}
+.lc-body{padding:16px}
+.lc-row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #eee;font-size:13px}
+.lc-row .k{color:#666;font-size:11px;text-transform:uppercase}
+.lc-row .v{font-weight:700}
+.lc-barcode{height:60px;background:repeating-linear-gradient(90deg,#000 0,#000 2px,#fff 2px,#fff 4px);margin:12px 0;border-radius:4px}
+.lc-close{padding:12px;background:#f5f5f5;text-align:center;cursor:pointer;font-size:13px;color:#666}
+#loading3d{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:var(--text-d);font-size:16px}
+
+#narration-bar{position:absolute;bottom:70px;left:50%;transform:translateX(-50%);max-width:600px;background:rgba(13,17,23,0.95);border:1px solid var(--green);border-radius:12px;padding:16px 24px;backdrop-filter:blur(12px);display:none;z-index:50;box-shadow:0 8px 32px rgba(0,0,0,0.5)}
+#narration-bar.visible{display:block}
+#narration-text{font-size:15px;color:var(--text);line-height:1.6;text-align:center;font-style:italic}
+#narration-speaker{font-size:11px;color:var(--green);text-transform:uppercase;letter-spacing:2px;margin-bottom:8px;font-weight:600}
+#demo-end{position:absolute;inset:0;background:rgba(13,17,23,0.97);display:none;align-items:center;justify-content:center;z-index:200;flex-direction:column;padding:40px;text-align:center}
+#demo-end.visible{display:flex}
+#demo-end h1{font-size:32px;font-weight:800;background:linear-gradient(135deg,var(--green),var(--cyan));-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:24px}
+#demo-end .de-card{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:20px 28px;margin:8px;max-width:500px;text-align:left}
+#demo-end .de-card h3{color:var(--green);font-size:16px;margin-bottom:12px}
+#demo-end .de-card p{color:var(--text-d);font-size:14px;line-height:1.8}
+#demo-end .de-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin:24px 0}
+#demo-end .de-stat{text-align:center}
+#demo-end .de-stat .n{font-size:2rem;font-weight:800}
+#demo-end .de-stat .l{font-size:12px;color:var(--text-d)}
+#demo-end button{margin-top:24px;padding:14px 32px;background:var(--green);color:#fff;border:none;border-radius:10px;font-size:16px;font-weight:600;cursor:pointer}
+
+.pm-sound-btn{position:absolute;top:48px;right:16px;width:36px;height:36px;border-radius:50%;background:var(--bg2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px;z-index:5;transition:all .2s}.pm-sound-btn:hover{border-color:var(--text-d)}.pm-sound-btn.on{border-color:var(--green);color:var(--green)}
+.pm-route-mini{border-radius:14px!important;border:1px solid var(--border)!box-shadow:0 8px 24px rgba(0,0,0,0.4)}
+.pm-fullscreen-arrow{position:absolute;inset:0;display:none;align-items:center;justify-content:center;cursor:pointer;z-index:10;background:radial-gradient(ellipse at center,#1a1a2e,#0a0a14)}
+.pm-fullscreen-arrow.visible{display:flex}
+.pm-fullscreen-arrow .fa-icon{font-size:200px;text-shadow:0 0 60px currentColor;transition:transform .3s,color .3s}
+.pm-fullscreen-arrow .fa-status{position:absolute;bottom:60px;padding:16px 40px;border-radius:14px;font-weight:700;font-size:22px;letter-spacing:1px}
+.pm-fullscreen-arrow .fa-material{position:absolute;top:40px;right:20px;background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:10px 16px;font-size:12px;color:var(--text-d);display:flex;gap:8px;align-items:center}
+.pm-fullscreen-arrow .fa-material .dot{width:14px;height:14px;border-radius:3px}
+.pm-fullscreen-arrow .fa-phase{position:absolute;top:40px;left:20px;font-size:12px;color:var(--cyan);font-weight:700;letter-spacing:2px;text-transform:uppercase}
+
+#cinema-bar{position:absolute;top:0;left:0;right:0;background:linear-gradient(180deg,rgba(13,17,23,0.95),rgba(13,17,23,0.7),transparent);padding:16px 24px 40px;z-index:40;display:none;pointer-events:none}
+#cinema-bar.visible{display:block}
+#cinema-progress{display:flex;gap:4px;margin-bottom:12px;max-width:800px;margin:0 auto 12px}
+#cinema-progress .cp-step{flex:1;height:4px;border-radius:2px;background:var(--bg3);transition:all .3s}
+#cinema-progress .cp-step.done{background:var(--green)}
+#cinema-progress .cp-step.active{background:var(--green);box-shadow:0 0 8px var(--green)}
+#cinema-step-big{text-align:center;max-width:700px;margin:0 auto}
+#cinema-step-num{font-size:12px;color:var(--green);font-weight:700;letter-spacing:3px;text-transform:uppercase;margin-bottom:6px}
+#cinema-step-title{font-size:22px;font-weight:800;color:var(--text);margin-bottom:4px}
+#cinema-step-desc{font-size:14px;color:var(--text-d)}
+#cinema-narration{position:absolute;bottom:0;left:0;right:0;background:linear-gradient(0deg,rgba(13,17,23,0.95),rgba(13,17,23,0.5),transparent);padding:20px 24px 60px;z-index:40;display:none;pointer-events:none}
+#cinema-narration.visible{display:block}
+#cinema-narration-text{max-width:700px;margin:0 auto;text-align:center;font-size:17px;color:var(--text);line-height:1.6;font-style:italic;opacity:0.95}
+#cinema-narration-speaker{font-size:11px;color:var(--green);text-transform:uppercase;letter-spacing:3px;margin-bottom:8px;text-align:center;font-weight:700}
+#cinema-skip{position:absolute;top:16px;left:16px;z-index:50;padding:8px 16px;background:rgba(13,17,23,0.8);border:1px solid var(--border);border-radius:8px;color:var(--text-d);font-size:12px;cursor:pointer;display:none}
+#cinema-skip.visible{display:block}
+#cinema-skip:hover{color:var(--text)}
+</style>
+</head>
+<body>
+<div id="topbar">
+<div class="logo"><span class="dot"></span>ELORAKTAR — Professional WMS</div>
+<div id="tabs">
+<button class="active" onclick="switchView('3d')">3D Raktar</button>
+<button onclick="switchView('terminal')">Targonca Terminal</button>
+<button onclick="switchView('admin')">Admin Dashboard</button>
+<button onclick="switchView('fuvar')">Fuvarlevelek</button>
+<button onclick="switchView('manager')">Vezetoi</button>
+</div>
+<div class="clock" id="clock">--:--:--</div>
+</div>
+<div id="content">
+<div id="view3d" class="view active">
+<div id="loading3d">3D betoltes...</div>
+<div id="hud3d" style="display:none">
+<h3>ELORAKTAR</h3>
+<div class="row"><span>Csarnok</span><span class="val green">2 (veg egymas mellett)</span></div>
+<div class="row"><span>Beallo</span><span class="val green">3 bal + 4 hatso</span></div>
+<div class="row"><span>Targoncak</span><span class="val green">2 db</span></div>
+<div class="row"><span>Zsakok</span><span class="val orange" id="hud-bags">0</span></div>
+<div class="row"><span>Scenario</span><span class="val purple" id="hud-scenario">Idle</span></div>
+<div class="row"><span>Utvonal</span><span class="val cyan" id="hud-path">Lathato</span></div>
+<div class="row"><span>Kattints zsakra</span><span class="val cyan">-> cimke</span></div>
+</div>
+<div id="scenario-overlay" style="display:none">
+<h4><span class="phase-num" id="sc-num">1</span><span id="sc-title">Betarolas</span></h4>
+<div id="scenario-steps"></div>
+</div>
+<div id="vc3d" style="display:none">
+<button id="btnO" class="active" onclick="setCam('orbit')">Szabad</button>
+<button id="btnT" onclick="setCam('top')">Felulrol</button>
+<button id="btnF" onclick="setCam('follow')">Kovetes</button>
+<button onclick="runFullScenario()">Teljes scenario</button>
+</div>
+</div>
+<div id="viewTerminal" class="view">
+<div class="phone-mock">
+<div class="pm-status"><span>Zebra TC52 - T1</span><span>87%</span></div>
+<div class="pm-body">
+<div class="pm-phase-tag" id="pm-phase"></div>
+<div class="pm-label" id="pm-label"><div class="ll">Anyag</div><div class="lv" id="pm-mat">-</div><div class="lcolor" id="pm-color"></div></div>
+<div class="pm-route-mini" id="pm-route-wrap"><canvas id="pm-route-canvas" width="340" height="180"></canvas></div>
+<div class="pm-arrow" id="pm-arrow">^</div>
+<div class="pm-instr" id="pm-instr">Varakozas feladatra...</div>
+<div class="pm-info" id="pm-info">T1 - idle</div>
+</div>
+<div class="pm-scan">
+<button onclick="scanBag()">Szkennels</button>
+<button class="primary" onclick="confirmPlace()">Lerakva</button>
+</div>
+</div>
+</div>
+<div id="viewAdmin" class="view">
+<div style="max-width:1200px;margin:0 auto">
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:12px">
+<div><h2 style="font-size:24px;font-weight:800;background:linear-gradient(135deg,var(--green),var(--cyan));-webkit-background-clip:text;-webkit-text-fill-color:transparent">Admin Dashboard</h2><div style="font-size:13px;color:var(--text-d);margin-top:4px">Rudolf Logisztika - Tatabanya - Lotte reszleg</div></div>
+<div style="display:flex;gap:12px;flex-wrap:wrap"><div style="padding:10px 16px;background:rgba(46,160,67,0.1);border:1px solid var(--green);border-radius:10px;text-align:center"><div style="font-size:11px;color:var(--green);text-transform:uppercase;letter-spacing:1px">Rendszer</div><div style="font-size:14px;font-weight:700;color:var(--green)">ONLINE</div></div><div style="padding:10px 16px;background:var(--bg2);border:1px solid var(--border);border-radius:10px;text-align:center"><div style="font-size:11px;color:var(--text-d);text-transform:uppercase;letter-spacing:1px">Datum</div><div style="font-size:14px;font-weight:700">2026. aug 05.</div></div></div></div>
+<div class="admin-grid" style="grid-template-columns:repeat(5,1fr);margin-bottom:20px">
+<div class="stat-box g"><div style="font-size:28px;margin-bottom:4px">PK</div><div class="n" id="a-total">0</div><div class="l">Zsak</div></div>
+<div class="stat-box o"><div style="font-size:28px;margin-bottom:4px">TR</div><div class="n" id="a-in">0</div><div class="l">Betarolas</div></div>
+<div class="stat-box b"><div style="font-size:28px;margin-bottom:4px">OU</div><div class="n" id="a-out">0</div><div class="l">Kitarolas</div></div>
+<div class="stat-box p"><div style="font-size:28px;margin-bottom:4px">FR</div><div class="n" id="a-free">0</div><div class="l">Szabad</div></div>
+<div class="stat-box c"><div style="font-size:28px;margin-bottom:4px">SP</div><div class="n" id="a-kpi">0</div><div class="l">Zsak/ora</div></div>
+</div>
+<div class="admin-grid" style="grid-template-columns:2fr 1fr;margin-bottom:16px"><div class="admin-card"><h3>MAP Elo raktar terkep</h3><div class="ac-sub">Valos ideju pozicio kovetes</div><div class="live-map-wrap" id="liveMapWrap"><canvas id="liveMapCanvas" width="1000" height="450"></canvas></div><div class="material-legend" id="matLegend"></div></div><div class="admin-card"><h3>DOCK Pakolorampa</h3><div class="ac-sub">Kattints egy rampara</div><div class="ramp-grid" id="rampGrid"></div><div class="btn-row" style="margin-top:16px"><button class="btn green" onclick="runFullScenario()" style="flex:1">Uj kamion</button><button class="btn orange" onclick="dispatchOutbound()" style="flex:1">Picker list</button></div></div></div>
+<div class="admin-grid"><div class="admin-card"><h3>LIST Bejovo</h3><div class="ship-list" id="inList"></div></div><div class="admin-card"><h3>LIST Kimeno</h3><div class="ship-list" id="outList"></div></div></div>
+<div class="admin-card" style="margin-top:16px"><h3>WB Szallitolevelek</h3><div class="ac-sub">Napi bejovo es kimeno</div><div id="wbList"></div></div></div><div id="viewFuvar" class="view">
+<div class="fuvar-grid" id="fuvarList"><div style="text-align:center;padding:60px;color:var(--text-d)">Indits egy scenario-t.</div></div>
+</div>
+
+<div id="viewManager" class="view">
+<div style="padding:24px;max-width:1000px;margin:0 auto">
+<h2 style="font-size:22px;margin-bottom:24px">Vezetoi osszefoglalo — Gabor (valtasvezeto)</h2>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin-bottom:24px">
+<div class="admin-card" style="text-align:center">
+<h3 style="color:var(--orange)">Kamionok ma</h3>
+<div style="font-size:2.5rem;font-weight:800;color:var(--orange)" id="mgr-trucks">0</div>
+<div style="font-size:13px;color:var(--text-d)">Beertkezett + varhato</div>
+</div>
+<div class="admin-card" style="text-align:center">
+<h3 style="color:var(--green)">Leltar ertek</h3>
+<div style="font-size:2.5rem;font-weight:800;color:var(--green)" id="mgr-value">0 Ft</div>
+<div style="font-size:13px;color:var(--text-d)" id="mgr-bags-total">0 zsak x 750 kg</div>
+</div>
+<div class="admin-card" style="text-align:center">
+<h3 style="color:var(--blue)">Betarolas ma</h3>
+<div style="font-size:2.5rem;font-weight:800;color:var(--blue)" id="mgr-in">0</div>
+<div style="font-size:13px;color:var(--text-d)">zsak beerkezett</div>
+</div>
+<div class="admin-card" style="text-align:center">
+<h3 style="color:var(--purple)">Kitarolas ma</h3>
+<div style="font-size:2.5rem;font-weight:800;color:var(--purple)" id="mgr-out">0</div>
+<div style="font-size:13px;color:var(--text-d)">zsak kitarralva</div>
+</div>
+</div>
+<div class="admin-card" style="margin-bottom:16px">
+<h3>Heti forgalom</h3>
+<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:8px;margin-top:12px" id="mgr-weekly"></div>
+</div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+<div class="admin-card">
+<h3>Anyag eloszlás</h3>
+<div id="mgr-mat-dist" style="margin-top:12px"></div>
+</div>
+<div class="admin-card">
+<h3>Raktar kihasznalas</h3>
+<div style="margin-top:12px">
+<div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:13px"><span>Foglalt poziciok</span><span id="mgr-occ-pct" style="color:var(--orange)">0%</span></div>
+<div style="height:20px;background:var(--bg3);border-radius:10px;overflow:hidden"><div id="mgr-occ-bar" style="height:100%;background:var(--orange);transition:width .5s;width:0%"></div></div>
+<div style="display:flex;justify-content:space-between;margin-top:12px;margin-bottom:4px;font-size:13px"><span>2 magas szint</span><span id="mgr-l2-pct" style="color:var(--purple)">0%</span></div>
+<div style="height:20px;background:var(--bg3);border-radius:10px;overflow:hidden"><div id="mgr-l2-bar" style="height:100%;background:var(--purple);transition:width .5s;width:0%"></div></div>
+<div style="margin-top:16px;font-size:13px;color:var(--text-d)" id="mgr-capacity"></div>
+</div>
+</div>
+</div>
+<div class="admin-card" style="margin-top:16px">
+<h3>Valtatasitok (idorend)</h3>
+<div id="mgr-shifts" style="margin-top:12px;font-size:13px"></div>
+</div>
+</div>
+</div>
+</div>
+
+<div id="narration-bar"><div id="narration-speaker">NARRATOR</div><div id="narration-text"></div></div>
+<div id="demo-end"><h1>ELORAKTAR — Demó vége</h1><div class="de-stats"><div class="de-stat"><div class="n" style="color:var(--green)">20 → 5</div><div class="l">ember / váltás</div></div><div class="de-stat"><div class="n" style="color:var(--orange)">0 Ft</div><div class="l">hardver befektetés</div></div><div class="de-stat"><div class="n" style="color:var(--cyan)">100%</div><div class="l">automatikus leltár</div></div></div><div class="de-card"><h3>Ez a rendszer teljesen automatikusan működne</h3><p>A targoncás csak vezet. Minden mást — szkennelés, navigáció, pozíció-rögzítés, leltár, hibavédelem — a rendszer intézi a háttérben, Wi-Fi nélkül, a meglévő Motorola terminálokon.</p></div><div class="de-card"><h3>Mennyi előrelépés a mostani rendszerhez képest?</h3><p>• <b style="color:var(--green)">75% munkaerő megtakarítás</b> — 20 ember helyett 5 elég<br>• <b style="color:var(--green)">0% betárolási hiba</b> — a rendszer tiltja a rossz pozíciót<br>• <b style="color:var(--green)">Folyamatos élő leltár</b> — nincs fizikai leltározás<br>• <b style="color:var(--green)">Cluster optimalizáció</b> — egy konténer zsákjai egy helyre kerülnek<br>• <b style="color:var(--green)">Pilótával kezdhető</b> — 1 folyosó, 1 targonca, 2 hét, 0 Ft</p></div><div class="de-card"><h3>Optimalizálási lehetőségek</h3><p>• Útvonal-optimalizáció: legrövidebb út a rámpától a clusterig<br>• Heat map: aktivitás-zónák alapján pozíció-újraelosztás<br>• Prediktív leltár: anyag kifutás előrejelzés<br>• FIFO automatizált: legrégebbi ki először<br>• Wi-Fi RTT: ha hálózat lesz, cm pontosságú pozicionálás<br>• Sap/ERP integráció: valós idejű számvitel</p></div><button onclick="document.getElementById('demo-end').classList.remove('visible')">Bezárás</button></div>
+
+<div id="cinema-skip" onclick="skipScenario()">SKIP Atugras</div>
+<div id="cinema-bar"><div id="cinema-progress"></div><div id="cinema-step-big"><div id="cinema-step-num">1 / 14</div><div id="cinema-step-title">-</div><div id="cinema-step-desc">-</div></div></div>
+<div id="cinema-narration"><div id="cinema-narration-speaker">NARRATOR</div><div id="cinema-narration-text"></div></div>
+<div id="labelPopup" onclick="if(event.target===this)this.classList.remove('active')">
+<div class="label-card">
+<div class="lc-top" id="lc-top"><span id="lc-id">Z-0001</span><span id="lc-type">750 kg</span></div>
+<div class="lc-body">
+<div class="lc-row"><span class="k">Anyag</span><span class="v" id="lc-mat">-</span></div>
+<div class="lc-row"><span class="k">Kod</span><span class="v" id="lc-code">-</span></div>
+<div class="lc-row"><span class="k">Suly</span><span class="v" id="lc-weight">750 kg</span></div>
+<div class="lc-row"><span class="k">Pozicio</span><span class="v" id="lc-pos">-</span></div>
+<div class="lc-row"><span class="k">Csarnok</span><span class="v" id="lc-hall">-</span></div>
+<div class="lc-row"><span class="k">Beerkzott</span><span class="v" id="lc-date">-</span></div>
+<div class="lc-row"><span class="k">Konténer</span><span class="v" id="lc-ship">-</span></div>
+<div class="lc-barcode"></div>
+<div class="lc-row"><span class="k">QR</span><span class="v" style="font-family:monospace" id="lc-qr">-</span></div>
+</div>
+<div class="lc-close" onclick="document.getElementById('labelPopup').classList.remove('active')">Bezaras</div>
+</div>
+</div>
+<script type="importmap">
+{ "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js", "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/" } }
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+const MATS=[
+  {name:'Granulatum PP',code:'PP-01',color:0xe8d5a0,hex:'#e8d5a0'},
+  {name:'Granulatum PE',code:'PE-02',color:0x6ec5e9,hex:'#6ec5e9'},
+  {name:'Granulatum ABS',code:'ABS-03',color:0xe879d9,hex:'#e879d9'},
+  {name:'Granulatum PET',code:'PET-04',color:0x39c5cf,hex:'#39c5cf'},
+  {name:'Granulatum PVC',code:'PVC-05',color:0xdb6d28,hex:'#db6d28'},
+];
+let bagC=0,shipC=0,wbC=0;
+const ships=[],slots=[],allBags=[],forklifts=[],audit=[],clusterZs=[],waybills=[];
+let scPhase=-1,scShip=null,selRamp=0,scTimer=null;
+let stats={startTime:Date.now(),bagsDone:0};
+
+const c3d=document.getElementById('view3d'),ld=document.getElementById('loading3d');
+const scene=new THREE.Scene();scene.background=new THREE.Color(0x0a0e14);scene.fog=new THREE.Fog(0x0a0e14,300,750);
+const cam=new THREE.PerspectiveCamera(55,1,0.5,2000);cam.position.set(170,120,170);
+const ren=new THREE.WebGLRenderer({antialias:true});ren.setPixelRatio(Math.min(window.devicePixelRatio,2));ren.shadowMap.enabled=true;ren.shadowMap.type=THREE.PCFSoftShadowMap;
+c3d.appendChild(ren.domElement);
+const ctrl=new OrbitControls(cam,ren.domElement);ctrl.enableDamping=true;ctrl.dampingFactor=0.06;ctrl.maxPolarAngle=Math.PI/2-0.02;ctrl.minDistance=20;ctrl.maxDistance=600;
+scene.add(new THREE.AmbientLight(0x404858,0.55));
+const sun=new THREE.DirectionalLight(0xffffff,0.85);sun.position.set(120,220,100);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);sun.shadow.camera.left=-350;sun.shadow.camera.right=350;sun.shadow.camera.top=350;sun.shadow.camera.bottom=-350;sun.shadow.camera.near=10;sun.shadow.camera.far=600;scene.add(sun);
+scene.add(new THREE.HemisphereLight(0x8899ff,0x1a1a2a,0.4));
+
+// Ground with warehouse floor markings
+const floor=new THREE.Mesh(new THREE.PlaneGeometry(700,500),new THREE.MeshStandardMaterial({color:0x1a1f28,roughness:0.96,metalness:0.0}));floor.rotation.x=-Math.PI/2;floor.receiveShadow=true;scene.add(floor);
+scene.add(new THREE.GridHelper(700,70,0x1c2330,0x141a22));
+
+// Parking/driveway area texture (darker)
+const driveway=new THREE.Mesh(new THREE.PlaneGeometry(200,150),new THREE.MeshStandardMaterial({color:0x141a22,roughness:0.95}));driveway.rotation.x=-Math.PI/2;driveway.position.set(0,0.02,80);driveway.receiveShadow=true;scene.add(driveway);
+
+const matW=new THREE.MeshStandardMaterial({color:0x5a7a5a,roughness:0.8,side:THREE.DoubleSide});
+const matWB=new THREE.MeshStandardMaterial({color:0x4a6a4a,roughness:0.8,side:THREE.DoubleSide});
+const matF=new THREE.MeshStandardMaterial({color:0x252a32,roughness:0.88});
+const matDF=new THREE.MeshStandardMaterial({color:0x707070,roughness:0.55,metalness:0.35});
+
+function createBag(lv,m){
+  const g=new THREE.Group();const w=3,h=3.2,d=3;
+  const mat=new THREE.MeshStandardMaterial({color:m.color,roughness:0.78,metalness:0.05});
+  const b=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);b.castShadow=true;b.receiveShadow=true;g.add(b);
+  const em=new THREE.MeshStandardMaterial({color:0x000000,transparent:true,opacity:0.08});
+  const e1=new THREE.Mesh(new THREE.BoxGeometry(w+0.06,h+0.06,0.08),em);e1.position.z=d/2;g.add(e1);
+  const e2=new THREE.Mesh(new THREE.BoxGeometry(w+0.06,0.08,d+0.06),em);e2.position.y=h/2;g.add(e2);
+  const lm=new THREE.MeshStandardMaterial({color:0x9a8a5a,roughness:0.9});const lg=new THREE.TorusGeometry(0.3,0.09,8,16);
+  [[-0.8,h/2,-0.8],[0.8,h/2,-0.8],[-0.8,h/2,0.8],[0.8,h/2,0.8]].forEach(p=>{const l=new THREE.Mesh(lg,lm);l.position.set(p[0],p[1],p[2]);l.rotation.x=Math.PI/2;l.castShadow=true;g.add(l);});
+  const sc=document.createElement('canvas');sc.width=64;sc.height=24;const sctx=sc.getContext('2d');sctx.fillStyle='#fff';sctx.fillRect(0,0,64,24);sctx.fillStyle='#333';sctx.font='bold 10px sans-serif';sctx.textAlign='center';sctx.fillText(m.code,32,16);
+  const stx=new THREE.CanvasTexture(sc);const sl=new THREE.Mesh(new THREE.PlaneGeometry(1.5,0.5),new THREE.MeshBasicMaterial({map:stx,side:THREE.DoubleSide}));sl.position.set(0,0.4,d/2+0.02);g.add(sl);
+  g.userData={level:lv,material:m,isBag:true};return g;
+}
+
+function createDock(x,z,facing,label){
+  const g=new THREE.Group();
+  const canopy=new THREE.Mesh(new THREE.BoxGeometry(6.5,1,3.5),new THREE.MeshStandardMaterial({color:0x4a4a4a,roughness:0.6,metalness:0.2}));canopy.position.y=6.5;canopy.castShadow=true;g.add(canopy);
+  const frame=new THREE.Mesh(new THREE.BoxGeometry(5.2,6,0.5),matDF);frame.position.y=3;g.add(frame);
+  const door=new THREE.Mesh(new THREE.BoxGeometry(4.6,5,0.35),new THREE.MeshStandardMaterial({color:0x1a1a1a,roughness:0.75}));door.position.y=2.5;g.add(door);
+  const bump=new THREE.Mesh(new THREE.BoxGeometry(5,0.35,2.5),new THREE.MeshStandardMaterial({color:0xe3b341,roughness:0.5}));bump.position.y=0.17;bump.position.z=1.8;g.add(bump);
+  // Dock number sign
+  const cv=document.createElement('canvas');cv.width=80;cv.height=80;const ctx=cv.getContext('2d');
+  ctx.fillStyle='#0d1117';ctx.beginPath();ctx.roundRect(2,2,76,76,8);ctx.fill();ctx.strokeStyle='#e3b341';ctx.lineWidth=3;ctx.stroke();
+  ctx.fillStyle='#e3b341';ctx.font='bold 28px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(label,40,40);
+  const tx=new THREE.CanvasTexture(cv);const pl=new THREE.Mesh(new THREE.PlaneGeometry(1.4,1.4),new THREE.MeshBasicMaterial({map:tx,side:THREE.DoubleSide}));pl.position.set(0,6.5,0.5);g.add(pl);
+  g.position.set(x,0,z);if(facing==='left')g.rotation.y=Math.PI/2;return g;
+}
+
+function createHall(cx,cz,w,d,name){
+  const g=new THREE.Group();const h=14,wt=0.5;
+  // Polished concrete floor
+  const fl=new THREE.Mesh(new THREE.PlaneGeometry(w,d),matF);fl.rotation.x=-Math.PI/2;fl.position.y=0.05;fl.receiveShadow=true;g.add(fl);
+  // Aisle line markings
+  const lineMat=new THREE.MeshBasicMaterial({color:0x2a3a3a,side:THREE.DoubleSide});
+  for(let z=-d/2+8;z<d/2-4;z+=8){const l=new THREE.Mesh(new THREE.PlaneGeometry(w,0.2),lineMat);l.rotation.x=-Math.PI/2;l.position.set(0,0.07,z);g.add(l);}
+  // Zone letters on floor (canvas texture)
+  const zc=document.createElement('canvas');zc.width=128;zc.height=128;const zctx=zc.getContext('2d');
+  zctx.fillStyle='rgba(60,80,60,0.15)';zctx.fillRect(0,0,128,128);
+  zctx.fillStyle='rgba(100,120,100,0.3)';zctx.font='bold 48px sans-serif';zctx.textAlign='center';zctx.textBaseline='middle';zctx.fillText(name.split(' ')[1],64,64);
+  const ztx=new THREE.CanvasTexture(zc);const zmesh=new THREE.Mesh(new THREE.PlaneGeometry(w*0.6,d*0.3),new THREE.MeshBasicMaterial({map:ztx,transparent:true,side:THREE.DoubleSide}));zmesh.rotation.x=-Math.PI/2;zmesh.position.set(0,0.08,0);g.add(zmesh);
+  // Walls
+  const bw=new THREE.Mesh(new THREE.BoxGeometry(w,h,wt),matWB);bw.position.set(0,h/2,-d/2);bw.castShadow=true;g.add(bw);
+  const sg=(w-10)/2;
+  const fL=new THREE.Mesh(new THREE.BoxGeometry(sg,h,wt),matW);fL.position.set(-(sg/2+5),h/2,d/2);fL.castShadow=true;g.add(fL);
+  const fR=new THREE.Mesh(new THREE.BoxGeometry(sg,h,wt),matW);fR.position.set(sg/2+5,h/2,d/2);fR.castShadow=true;g.add(fR);
+  const fT=new THREE.Mesh(new THREE.BoxGeometry(10,h-7,wt),matW);fT.position.set(0,h-3.5,d/2);g.add(fT);
+  const rw=new THREE.Mesh(new THREE.BoxGeometry(wt,h,d),matW);rw.position.set(w/2,h/2,0);rw.castShadow=true;g.add(rw);
+  // Wall corner trims
+  const trimMat=new THREE.MeshStandardMaterial({color:0x3a5a3a,roughness:0.7});
+  const trimGeo=new THREE.BoxGeometry(0.3,h,0.3);
+  [[-w/2,d/2],[w/2,d/2],[-w/2,-d/2],[w/2,-d/2]].forEach(p=>{const t=new THREE.Mesh(trimGeo,trimMat);t.position.set(p[0],h/2,p[1]);g.add(t);});
+  // Name label
+  const cv=document.createElement('canvas');cv.width=256;cv.height=64;const ctx=cv.getContext('2d');
+  ctx.fillStyle='#2ea043';ctx.fillRect(0,0,256,64);ctx.fillStyle='#fff';ctx.font='bold 28px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(name,128,32);
+  const tx=new THREE.CanvasTexture(cv);const lb=new THREE.Mesh(new THREE.PlaneGeometry(8,1.2),new THREE.MeshBasicMaterial({map:tx,side:THREE.DoubleSide}));lb.position.set(0,h+1.5,d/2+0.2);g.add(lb);
+  g.position.set(cx,0,cz);return g;
+}
+
+const HW=80,HD=60,GP=10,HX=0;const H1Z=-GP/2-HD/2,H2Z=H1Z-HD-GP;
+scene.add(createHall(HX,H1Z,HW,HD,'CSARNOK 1'));scene.add(createHall(HX,H2Z,HW,HD,'CSARNOK 2'));
+
+// Safety yellow lines between dock and warehouse
+function addSafetyZone(x,z,w){const lm=new THREE.MeshBasicMaterial({color:0xe3b341,transparent:true,opacity:0.4,side:THREE.DoubleSide});const s=new THREE.Mesh(new THREE.PlaneGeometry(w,4),lm);s.rotation.x=-Math.PI/2;s.position.set(x,0.1,z);scene.add(s);}
+const dockWallX=HX-HW/2-2;const docks=[];const ds=HD*2+GP,sp=ds/3;
+for(let i=0;i<3;i++){const z=H1Z+HD/2-ds/2+sp/2+i*sp;scene.add(createDock(dockWallX,z,'left',String(i+1)));docks.push({x:dockWallX,z,id:'D'+(i+1),side:'left',assigned:false});addSafetyZone(dockWallX+3,z,8);}
+const bdZ=H2Z-HD/2-2;for(let i=0;i<4;i++){const x=HX-HW/2+10+(HW-20)*i/3;scene.add(createDock(x,bdZ,'back','B'+(i+1)));docks.push({x,z:bdZ,id:'B'+(i+1),side:'back',assigned:false});addSafetyZone(x,bdZ+3,4);}
+
+
+// Floor position labels (A-1, B-2, etc) with QR
+const labelGroup=new THREE.Group();scene.add(labelGroup);
+function makeFloorLabel(text,x,z){
+  const cv=document.createElement('canvas');cv.width=128;cv.height=64;const ctx=cv.getContext('2d');
+  ctx.fillStyle='rgba(20,26,34,0.9)';ctx.fillRect(0,0,128,64);
+  ctx.strokeStyle='#39c5cf';ctx.lineWidth=2;ctx.strokeRect(4,4,120,56);
+  ctx.fillStyle='#39c5cf';ctx.font='bold 20px monospace';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(text,64,22);
+  // Mini QR placeholder
+  ctx.fillStyle='#39c5cf';for(let qy=0;qy<8;qy++)for(let qx=0;qx<8;qx++)if(Math.random()>0.5)ctx.fillRect(50+qx*4,36+qy*4,4,4);
+  const tx=new THREE.CanvasTexture(cv);
+  const m=new THREE.Mesh(new THREE.PlaneGeometry(2.5,1.2),new THREE.MeshBasicMaterial({map:tx,transparent:true,opacity:0.7,side:THREE.DoubleSide}));
+  m.rotation.x=-Math.PI/2;m.position.set(x,0.08,z);labelGroup.add(m);
+  m.userData={isFloorLabel:true,label:text,slot:null};
+  return m;
+}
+// Add labels for a sample of positions (every other position to avoid clutter)
+slots.forEach((s,i)=>{if(i%3===0){const lm=makeFloorLabel(s.label,s.x,s.z);lm.userData.slot=s;}});
+const bagG=new THREE.Group();scene.add(bagG);
+// Path lines group (always visible)
+const pathGroup=new THREE.Group();scene.add(pathGroup);
+
+function buildGrid(cx,cz,w,d,hn){const bs=3.2,aw=5,rp=bs+aw,cp=bs+0.8;const hw=w/2-6,hd=d/2-6;const cols=Math.floor(hw*2/cp),rows=Math.floor(hd*2/rp);const sx=cx-cols*cp/2+cp/2,sz=cz-rows*rp/2+rp/2;for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){const cL=String.fromCharCode(65+c);slots.push({x:sx+c*cp,z:sz+r*rp,occ:false,hasL2:false,m1:null,m2:null,hall:hn,row:r,col:c,colLetter:cL,label:cL+'-'+r,act:0});}return{cols,rows,hn};}
+const G1=buildGrid(HX,H1Z,HW,HD,1),G2=buildGrid(HX,H2Z,HW,HD,2);
+slots.forEach(s=>{if(Math.random()<0.3){const m=MATS[Math.floor(Math.random()*MATS.length)];const b1=createBag(1,m);b1.position.set(s.x,1.6,s.z);bagG.add(b1);s.occ=true;s.m1=b1;s.mat=m;bagC++;const bag={id:'Z-'+String(bagC).padStart(4,'0'),slot:s,material:m,ship:null,mesh:b1,level:1};b1.userData.bagData=bag;allBags.push(bag);if(Math.random()<0.3){const b2=createBag(2,m);b2.position.set(s.x,1.6+3.2,s.z);bagG.add(b2);s.hasL2=true;s.m2=b2;bagC++;const bag2={id:'Z-'+String(bagC).padStart(4,'0'),slot:s,material:m,ship:null,mesh:b2,level:2};b2.userData.bagData=bag2;allBags.push(bag2);}}});
+
+function findCluster(n){for(const g of[G1,G2]){for(let r=0;r<g.rows-1;r++)for(let c=0;c<g.cols-4;c++){const b=[];let ok=true;for(let dr=0;dr<2&&ok;dr++)for(let dc=0;dc<5&&ok;dc++){const s=slots.find(x=>x.hall===g.hn&&x.row===r+dr&&x.col===c+dc);if(!s||(s.occ&&s.hasL2))ok=false;else b.push(s);}if(ok&&b.length>=n)return b.slice(0,n);}for(let r=0;r<g.rows;r++){const b=[];for(let c=0;c<g.cols&&b.length<n;c++){const s=slots.find(x=>x.hall===g.hn&&x.row===r&&x.col===c);if(s&&(!s.occ||!s.hasL2))b.push(s);else b.length=0;}if(b.length>=n)return b.slice(0,n);}}return slots.filter(s=>!s.occ||!s.hasL2).slice(0,n);}
+function highlightCluster(sl){if(!sl.length)return;let mnx=1e4,mxx=-1e4,mnz=1e4,mxz=-1e4;sl.forEach(s=>{mnx=Math.min(mnx,s.x);mxx=Math.max(mxx,s.x);mnz=Math.min(mnz,s.z);mxz=Math.max(mxz,s.z);});const z=new THREE.Mesh(new THREE.PlaneGeometry(mxx-mnx+5,mxz-mnz+5),new THREE.MeshBasicMaterial({color:0xa371f7,transparent:true,opacity:0.12,side:THREE.DoubleSide}));z.rotation.x=-Math.PI/2;z.position.set((mnx+mxx)/2,0.15,(mnz+mxz)/2);scene.add(z);clusterZs.push(z);}
+
+const fCols=[0xf1c40f,0x388bfd],fNms=['T1','T2'];
+function createFL(idx,sx,sz){
+  const g=new THREE.Group();const col=fCols[idx];const m=new THREE.MeshStandardMaterial({color:col,roughness:0.4,metalness:0.3});
+  // Counterweight
+  const cw=new THREE.Mesh(new THREE.BoxGeometry(1.5,1.5,1.5),new THREE.MeshStandardMaterial({color:0x333,roughness:0.6,metalness:0.4}));cw.position.set(0,1,-1.8);cw.castShadow=true;g.add(cw);
+  const b=new THREE.Mesh(new THREE.BoxGeometry(2,2.5,3.5),m);b.position.set(0,2,-0.3);b.castShadow=true;g.add(b);
+  const c=new THREE.Mesh(new THREE.BoxGeometry(1.8,1.4,1.3),new THREE.MeshStandardMaterial({color:0x0a0a0a,roughness:0.15,metalness:0.3,transparent:true,opacity:0.75}));c.position.set(0,3.2,-0.8);g.add(c);
+  const fm=new THREE.MeshStandardMaterial({color:0x999,roughness:0.25,metalness:0.7});[-0.6,0.6].forEach(x=>{const f=new THREE.Mesh(new THREE.BoxGeometry(0.15,0.15,3.5),fm);f.position.set(x,0.8,2.5);g.add(f);});
+  const mm=new THREE.MeshStandardMaterial({color:0x777,roughness:0.2,metalness:0.6});[-0.8,0.8].forEach(x=>{const m2=new THREE.Mesh(new THREE.BoxGeometry(0.12,5,0.12),mm);m2.position.set(x,3,1.8);g.add(m2);});
+  // Hydraulic cylinders
+  const hm=new THREE.MeshStandardMaterial({color:0xaaa,roughness:0.15,metalness:0.8});[-0.8,0.8].forEach(x=>{const hc=new THREE.Mesh(new THREE.CylinderGeometry(0.1,0.1,3,8),hm);hc.position.set(x,2.5,1.8);g.add(hc);});
+  const wg=new THREE.CylinderGeometry(0.65,0.65,0.55,16),wm=new THREE.MeshStandardMaterial({color:0x111,roughness:0.75});[[-1,0.65,-1.4],[1,0.65,-1.4],[-1,0.65,1.4],[1,0.65,1.4]].forEach(p=>{const w=new THREE.Mesh(wg,wm);w.rotation.z=Math.PI/2;w.position.set(p[0],p[1],p[2]);w.castShadow=true;g.add(w);});
+  // RFID antenna on roof
+  const rfid=new THREE.Mesh(new THREE.BoxGeometry(0.5,0.9,0.3),new THREE.MeshStandardMaterial({color:0xe74c3c,emissive:0xe74c3c,emissiveIntensity:0.4}));rfid.position.set(0,5.2,-0.3);g.add(rfid);
+  // Flashing beacon
+  const beacon=new THREE.Mesh(new THREE.SphereGeometry(0.25,8,6),new THREE.MeshStandardMaterial({color:0xf1c40f,emissive:0xf1c40f,emissiveIntensity:1}));beacon.position.set(0,5.5,-0.3);g.add(beacon);
+  const cv=document.createElement('canvas');cv.width=64;cv.height=32;const ctx=cv.getContext('2d');ctx.fillStyle='#000';ctx.fillRect(0,0,64,32);ctx.fillStyle='#'+col.toString(16).padStart(6,'0');ctx.font='bold 18px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(fNms[idx],32,16);
+  const tx=new THREE.CanvasTexture(cv);const pl=new THREE.Mesh(new THREE.PlaneGeometry(1.5,0.8),new THREE.MeshBasicMaterial({map:tx,side:THREE.DoubleSide}));pl.position.set(0,3.5,-2);g.add(pl);g.position.set(sx,0,sz);scene.add(g);
+  const am=new THREE.MeshStandardMaterial({color:col,emissive:col,emissiveIntensity:0.6,roughness:0.4});const ar=new THREE.Mesh(new THREE.ConeGeometry(1.5,4,6),am);ar.visible=false;scene.add(ar);
+  return{group:g,arrow:ar,pathLine:null,beacon,name:fNms[idx],color:col,state:'idle',path:[],pi:0,speed:16,carrying:null,target:null,bag:null,ship:null,dir:'in',src:null};
+}
+forklifts.push(createFL(0,dockWallX+6,docks[0].z));forklifts.push(createFL(1,dockWallX+6,docks[1].z));
+
+function genPath(f,t){return[{x:f.x,z:f.z},{x:HX,z:f.z},{x:HX,z:t.z},{x:t.x,z:t.z}];}
+
+// === PATH VISUALIZATION — thick visible tube on the floor ===
+function drawPath3D(f){
+  if(f.pathLine)scene.remove(f.pathLine);
+  const pts=[new THREE.Vector3(f.group.position.x,0.3,f.group.position.z)];
+  f.path.forEach(p=>pts.push(new THREE.Vector3(p.x,0.3,p.z)));
+  const curve=new THREE.CatmullRomCurve3(pts);
+  const tubeGeo=new THREE.TubeGeometry(curve,32,0.4,8,false);
+  const tubeMat=new THREE.MeshBasicMaterial({color:f.color,transparent:true,opacity:0.45});
+  f.pathLine=new THREE.Mesh(tubeGeo,tubeMat);
+  scene.add(f.pathLine);
+  // Add glowing dots at waypoints
+  const dotMat=new THREE.MeshBasicMaterial({color:f.color});
+  f.path.forEach(p=>{const dot=new THREE.Mesh(new THREE.SphereGeometry(0.6,8,6),dotMat);dot.position.set(p.x,0.3,p.z);f.pathLine.add(dot);});
+}
+function updatePath3D(f){
+  if(!f.pathLine)return;scene.remove(f.pathLine);
+  const pts=[new THREE.Vector3(f.group.position.x,0.3,f.group.position.z)];
+  for(let i=f.pi;i<f.path.length;i++)pts.push(new THREE.Vector3(f.path[i].x,0.3,f.path[i].z));
+  if(pts.length<2)return;
+  const curve=new THREE.CatmullRomCurve3(pts);
+  const tubeGeo=new THREE.TubeGeometry(curve,32,0.4,8,false);
+  const tubeMat=new THREE.MeshBasicMaterial({color:f.color,transparent:true,opacity:0.45});
+  f.pathLine=new THREE.Mesh(tubeGeo,tubeMat);
+  scene.add(f.pathLine);
+  const dotMat=new THREE.MeshBasicMaterial({color:f.color});
+  for(let i=f.pi;i<f.path.length;i++){const dot=new THREE.Mesh(new THREE.SphereGeometry(0.6,8,6),dotMat);dot.position.set(f.path[i].x,0.3,f.path[i].z);f.pathLine.add(dot);}
+}
+
+function moveFL(f,dt){
+  if(!f.path.length)return;const t=f.path[f.pi];if(!t)return;
+  const dx=t.x-f.group.position.x,dz=t.z-f.group.position.z,d=Math.sqrt(dx*dx+dz*dz);
+  if(d<1.5){f.pi++;if(f.pi>=f.path.length)onArrive(f);}
+  else{const m=f.speed*dt;f.group.position.x+=dx/d*m;f.group.position.z+=dz/d*m;f.group.rotation.y=Math.atan2(dx,dz);
+    f.arrow.position.set(f.group.position.x,9,f.group.position.z);
+    const nt=f.path[f.pi];if(nt){const ax=nt.x-f.group.position.x,az=nt.z-f.group.position.z,ad=Math.sqrt(ax*ax+az*az);if(ad>0.1){f.arrow.rotation.x=Math.PI;f.arrow.rotation.y=Math.atan2(ax,az);}}
+    updatePath3D(f);
+    // Flash beacon
+    f.beacon.material.emissiveIntensity=Math.sin(Date.now()*0.01)>0?1:0.3;
+  }
+}
+// === SCENARIO ===
+const SC=[
+  {l:'Kamion beall a rampara',d:'A kamion beall a kivalasztott pakolorampaba',phase:'ERKEZIK',cam:'overview'},
+  {l:'Sofor kiszall, atadja a szallitolevelet',d:'Az admin atveszi a papir szallitolevelet',phase:'FUVARLEVEL',cam:'overview'},
+  {l:'Admin bekonyveli a rendszerbe (1 kattintas)',d:'Egyetlen kattintas — a rendszer minden mast atvesz',phase:'BEKONYVELES',cam:'admin'},
+  {l:'A rendszer generalja a 10 virtuális zsak cimket',d:'10 db 750 kg-os dupla zsak cimke auto-generalasa',phase:'CIMKEZES',cam:'overview'},
+  {l:'RFID koveto aktiválasa a targoncan',d:'A targoncan levo RFID tracker aktiválódik',phase:'RFID',cam:'follow'},
+  {l:'Targoncas odamegy a rampahoz, felveszi az elso zsakot',d:'A targonca felemeli az elso 750 kg-os zsakot',phase:'FELVETEL',cam:'follow'},
+  {l:'A terminalon megjelenik az utvonal kepe (mini terkep)',d:'A targoncas kepernyojén lathato a teljes utvonal',phase:'UTVONAL_KEPE',cam:'follow'},
+  {l:'Atvalt a nagy nyilra — INDUL',d:'A targoncas koveti a nagy nyilat',phase:'NYIL_INDITAS',cam:'follow'},
+  {l:'Koveti a nyilat a cel pozicioig',d:'A targonca vegighalad a raktaron az utvonalon',phase:'KOZLEKEDIK',cam:'follow'},
+  {l:'Lerakja a zsakot — pozicio automatikus mentese',d:'A rendszer auto-rogziti a koordinatat',phase:'LERAKAS',cam:'follow'},
+  {l:'Zold visszajelzes — a zsak a helyen',d:'A leltar azonnal naprakesz',phase:'ZOLD_OK',cam:'follow'},
+  {l:'Kovetkezo zsak — ismetles',d:'A targoncas megy a kovetkezo zsakert',phase:'NEXT_ZSAK',cam:'follow'},
+  {l:'Ha rossz helyre rakna — PIROS RIASZTAS',d:'Hibas lerakas demo: a rendszer azonnal jelez',phase:'HIBA_RIASZTAS',cam:'follow'},
+  {l:'Mind a 10 zsak kesz — fuvar lezarva',d:'A betarolasi fuvar befejezodik',phase:'LEZARVA',cam:'overview'},
+];
+
+// Staging/preparation zones in front of each dock (elokeszito hely)
+const stagingZones=[];
+docks.forEach((d,i)=>{
+  const isLeft=d.side==='left';
+  const sx=d.x+(isLeft?6:0), sz=d.z+(isLeft?0:6);
+  // Visual staging area on the ground (orange zone)
+  const zone=new THREE.Mesh(new THREE.PlaneGeometry(12,10),new THREE.MeshBasicMaterial({color:0xdb6d28,transparent:true,opacity:0.08,side:THREE.DoubleSide}));
+  zone.rotation.x=-Math.PI/2; zone.position.set(sx,0.12,sz);
+  scene.add(zone);
+  // Border
+  const border=new THREE.Mesh(new THREE.PlaneGeometry(12,0.2),new THREE.MeshBasicMaterial({color:0xdb6d28,transparent:true,opacity:0.5,side:THREE.DoubleSide}));
+  border.rotation.x=-Math.PI/2; border.position.set(sx,0.13,sz-5);scene.add(border);
+  const border2=border.clone();border2.position.z=sz+5;scene.add(border2);
+  // Label "ELOKESZITO"
+  const cv=document.createElement('canvas');cv.width=256;cv.height=32;const ctx=cv.getContext('2d');
+  ctx.fillStyle='rgba(219,109,40,0.3)';ctx.fillRect(0,0,256,32);ctx.fillStyle='#db6d28';ctx.font='bold 16px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('ELOKESZITO',128,16);
+  const tx=new THREE.CanvasTexture(cv);const lbl=new THREE.Mesh(new THREE.PlaneGeometry(6,0.8),new THREE.MeshBasicMaterial({map:tx,transparent:true,side:THREE.DoubleSide}));lbl.rotation.x=-Math.PI/2;lbl.position.set(sx,0.14,sz);scene.add(lbl);
+  stagingZones.push({dock:d,x:sx,z:sz,bags:[],zone,label:lbl});
+});
+
+const NARRATION=["Egy kamion beall a Rudolf Logisztika tatabanyai raktar pakolorampajaba. A Lotte reszlegen 750 kg-os granulatum zsakok erkeztek — 10 dupla zsak egy konténerben.","A sofor kiszall, es atadja a szallitolevelet az adminnak. Ez az a pillanat, amikor az emberi kezek kozul az utolso is atadja a kontrollt a rendszernek.","Az admin egyetlen kattintassal bekonyveli a fuvarlevelet. Ez az egyetlen kognitiv feladat az egesz folyamatban — minden mas automatikusan kovetkezik.","A rendszer azonnal generalja a 10 virtuális zsak cimket. Minden zsak kap egy QR kodot, anyagkodot, es pozicio-tervet — nincs kezi cimkezes.","Az RFID koveto aktiválódik a targoncan. Mostantol a rendszer valos idejeben tudja, hol van a targonca — koordinatara pontosan, Wi-Fi nelkul.","A targoncas odamegy a rampahoz es felemeli az elso 750 kg-os zsakot. Nem kell tudnia, mi van a zsakban, nem kell kodokat keresnie. Csak felemeli.","A targonca kepernyojen megjelenik az utvonal kepe — egy mini terkep, ami megmutatja, hova kell menni. A sofőr latja az egesz utvonalat, mielott elindul.","A terkep eltunik, atvalt a nagy nyilra. A targoncas elindul — csak a nyilat koveti, mint egy GPS navigaciot. Nem kell gondolkodnia, nem kell dontest hoznia.","A targonca vegighalad a raktaron. A padlon lathato a vastag szines utvonal — a targonca pontosan ezen halad. Minden mozdulat rogzitve van.","A zsak lerakasanak pillanataban a rendszer automatikusan rogziti a pozicio koordinatajat. A plafonbol — mintha GPS lenne. A leltar azonnal frissul.","Zold visszajelzes! A zsak a helyen van. A pozicio rogzitve, a leltar naprakesz. Nincs fizikai leltarozas, nincs utolagos javitgatas.","A kovetkezo zsak betoltodik a targoncara. A folyamat folytatódik — megszakitas nelkuli, folyamatos munka. A targoncas csak vezet es koveti a nyilat.","DE mi tortenik, ha a targoncas rossz helyre rakna? A rendszer azonnal pirosan villog es sipol. Ha megis otthagyja — a rossz pozicio is elmentésre kerul, es a valtasvezeto azonnal riasztast kap.","Mind a 10 zsak a helyen van. A betarolasi fuvar lezarva. A leltar tokeletes — minden zsak pozicioja ismert, minden koordinata rogzitve. Es a targoncasnak egyetlen dologra kellett figyelnie: a biztonsagos vezetesre."];
+function showScOverlay(){var ov=document.getElementById('scenario-overlay');ov.style.display='block';document.getElementById('sc-num').textContent=scPhase<0?'-':scPhase+1;document.getElementById('sc-title').textContent=scPhase<0?'':SC[Math.min(scPhase,SC.length-1)].phase;var sd=document.getElementById('scenario-steps');sd.innerHTML='';for(var si=0;si<SC.length;si++){var cls=si<scPhase?'done':si===scPhase?'active':'';var d=document.createElement('div');d.className='sc-step '+cls;d.innerHTML='<div class="sc-dot"></div><span class="sc-label">'+SC[si].l+'</span>'+(si===scPhase?'<span class="sc-detail">'+SC[si].d+'</span>':'');sd.appendChild(d);}var cb=document.getElementById('cinema-bar');var cn=document.getElementById('cinema-narration');var csk=document.getElementById('cinema-skip');if(scPhase>=0){cb.classList.add('visible');cn.classList.add('visible');csk.classList.add('visible');var cp=document.getElementById('cinema-progress');cp.innerHTML='';for(var pi=0;pi<SC.length;pi++){var p=document.createElement('div');p.className='cp-step '+(pi<scPhase?'done':pi===scPhase?'active':'');cp.appendChild(p);}document.getElementById('cinema-step-num').textContent=(scPhase+1)+' / '+SC.length;document.getElementById('cinema-step-title').textContent=SC[scPhase].l;document.getElementById('cinema-step-desc').textContent=SC[scPhase].d;if(NARRATION[scPhase]){document.getElementById('cinema-narration-text').textContent=NARRATION[scPhase];}}else{cb.classList.remove('visible');cn.classList.remove('visible');csk.classList.remove('visible');}}nction showScOverlay(){
+  const ov=document.getElementById("scenario-overlay");
+  ov.style.display="block";
+  document.getElementById("sc-num").textContent=scPhase<0?"-":scPhase+1;
+  document.getElementById("sc-title").textContent=scPhase<0?"":SC[Math.min(scPhase,SC.length-1)].phase;
+  const sd=document.getElementById("scenario-steps");
+  sd.innerHTML=SC.map((s,i)=>{let cls=i<scPhase?"done":i===scPhase?"active":"";return "<div class=\"sc-step "+cls+"\"><div class=\"sc-dot\"></div><span class=\"sc-label\">"+s.l+"</span>"+(i===scPhase?"<span class=\"sc-detail\">"+s.d+"</span>":"")+"</div>";}).join("");
+  const cb=document.getElementById("cinema-bar");
+  const cn=document.getElementById("cinema-narration");
+  const cs=document.getElementById("cinema-skip");
+  if(scPhase>=0){
+    cb.classList.add("visible");cn.classList.add("visible");cs.classList.add("visible");
+    const cp=document.getElementById("cinema-progress");
+    cp.innerHTML=SC.map((s,i)=>"<div class=\"cp-step "+(i<scPhase?"done":i===scPhase?"active":"")+"\"></div>").join("");
+    document.getElementById("cinema-step-num").textContent=(scPhase+1)+" / "+SC.length;
+    document.getElementById("cinema-step-title").textContent=SC[scPhase].l;
+    document.getElementById("cinema-step-desc").textContent=SC[scPhase].d;
+    if(NARRATION[scPhase]){document.getElementById("cinema-narration-text").textContent=NARRATION[scPhase];}
+  } else {
+    cb.classList.remove("visible");cn.classList.remove("visible");cs.classList.remove("visible");
+  }
+}nction showScOverlay(){
+  const ov=document.getElementById('scenario-overlay');
+  ov.style.display='block';
+  document.getElementById('sc-num').textContent=scPhase<0?'-':scPhase+1;
+  document.getElementById('sc-title').textContent=scPhase<0?'':SC[Math.min(scPhase,SC.length-1)].phase;
+  const sd=document.getElementById('scenario-steps');
+  sd.innerHTML=SC.map((s,i)=>{let cls=i<scPhase?'done':i===scPhase?'active':'';return '<div class="sc-step '+cls+'"><div class="sc-dot"></div><span class="sc-label">'+s.l+'</span>'+(i===scPhase?'<span class="sc-detail">'+s.d+'</span>':'')+'</div>';}).join('');
+}
+
+function runFullScenario(){
+  if(scPhase>=0)return;
+  scPhase=0;shipC++;
+  const dock=docks[selRamp]||docks[0];dock.assigned=true;
+  const mat=MATS[Math.floor(Math.random()*MATS.length)];
+  const cluster=findCluster(10);
+  const bags=[];
+  for(let i=0;i<10;i++){bagC++;bags.push({id:'Z-'+String(bagC).padStart(4,'0'),status:'queued',from:dock,to:cluster[i],forkliftIdx:null,material:mat});}
+  scShip={id:'BE-'+String(shipC).padStart(3,'0'),type:'inbound',dockId:dock.id,dock,bags,cluster,material:mat,status:'active',doneCount:0};
+  ships.push(scShip);highlightCluster(cluster);
+  // Generate waybill
+  wbC++;
+  const wb={id:'WB-'+String(wbC).padStart(4,'0'),shipId:scShip.id,from:'Lotte Chemical EU',to:'Rudolf Logisztika Tatabanya',mat,dock:dock.id,plate:'KX-' + Math.floor(Math.random()*900+100)+'-' + Math.floor(Math.random()*90+10),driver:['Kovacs I.','Nagy B.','Toth Z.','Szabo P.'][Math.floor(Math.random()*4)],bags:10,weight:7500,status:'ok',time:new Date().toLocaleTimeString('hu-HU')};
+  waybills.push(wb);
+  audit.unshift({time:new Date().toLocaleTimeString('hu-HU'),action:'KAMION ERKEZIK',type:'in',bag:scShip.id,details:dock.id+' - '+mat.name+' 10 zsak - '+wb.plate});
+  document.getElementById('hud-scenario').textContent='Phase 1/'+SC.length;
+  showScOverlay();buildRampGrid();updateAll();const dk=docks[selRamp]||docks[0];cam.position.set(dk.x+40,30,dk.z+40);ctrl.target.set(dk.x,0,dk.z);setTimeout(()=>advanceSc(),800);
+}
+window.runFullScenario=runFullScenario;
+function skipScenario(){if(scTimer)clearTimeout(scTimer);scPhase=-1;document.getElementById("cinema-bar").classList.remove("visible");document.getElementById("cinema-narration").classList.remove("visible");document.getElementById("cinema-skip").classList.remove("visible");document.getElementById("scenario-overlay").style.display="none";document.getElementById("hud-scenario").textContent="Idle";document.getElementById("pm-phase").classList.remove("visible");document.getElementById("pm-instr").textContent="Varakozas...";document.getElementById("pm-instr").className="pm-instr";document.getElementById("pm-arrow").textContent="^";document.getElementById("pm-arrow").style.color="var(--green)";if(scShip&&scShip.dock)scShip.dock.assigned=false;forklifts.forEach(f=>{f.state="idle";f.arrow.visible=false;if(f.pathLine){scene.remove(f.pathLine);f.pathLine=null;}});updateAll();}
+window.skipScenario=skipScenario;
+
+
+function advanceSc(){
+  if(scPhase<0)return;showScOverlay();
+  document.getElementById('hud-scenario').textContent='Phase '+(scPhase+1)+'/'+SC.length;
+  const step=SC[scPhase];const pe=document.getElementById('pm-phase');pe.textContent=step.phase;pe.classList.add('visible');pe.classList.remove('error');const nb=document.getElementById('narration-bar');nb.classList.remove('visible');
+  if(scPhase===3){/* cimke generalas — toast */}
+if(scPhase===4){const idle=forklifts.find(f=>f.state==='idle');if(idle){idle.ship=scShip;idle.bag=scShip.bags[0];idle.dir='in';idle.target=scShip.bags[0].to;const fp={x:idle.group.position.x,z:idle.group.position.z};idle.path=genPath(fp,scShip.bags[0].from);idle.pi=0;idle.state='pickup';}}
+  if(scPhase===6){document.getElementById('pm-route-wrap').classList.add('visible');drawRouteMini();switchView("terminal");}
+  if(scPhase===7){document.getElementById('pm-route-wrap').classList.remove('visible');switchView("3d");const f=forklifts.find(x=>x.state==='pickup');if(f){f.arrow.visible=true;drawPath3D(f);}scShip.bags.forEach((b,i)=>{if(i>0)b.status='queued';});tryAssign();setCam('follow');}
+  if(scPhase===8){setCam('follow');}
+if(scPhase===12){switchView("terminal");document.getElementById('pm-instr').className='pm-instr alert';document.getElementById('pm-instr').textContent='HIBA! ROSSZ HELYRE RAKTA! RIASZTAS!';document.getElementById('pm-arrow').textContent='!';document.getElementById('pm-arrow').style.color='var(--red)';audit.unshift({time:new Date().toLocaleTimeString('hu-HU'),action:'HIBAS LERAKAS',type:'err',bag:'DEMO',details:'T1 rossz poziciora tette! Riasztas elkuldve Gabornak.'});}
+  if(scPhase===9){document.getElementById('pm-instr').className='pm-instr success';document.getElementById('pm-instr').textContent='ZSAK LERAKVA — pozicio mentve!';}
+if(scPhase===13){switchView("3d");setCam("orbit");}
+  if(scPhase===10){document.getElementById('pm-arrow').textContent='OK';document.getElementById('pm-arrow').style.color='var(--green)';document.getElementById('pm-instr').className='pm-instr success';document.getElementById('pm-instr').textContent='ZOLD — A zsak a helyen van!';}
+  if(scPhase===11){document.getElementById('pm-arrow').textContent='^';document.getElementById('pm-arrow').style.color='var(--green)';document.getElementById('pm-instr').className='pm-instr';document.getElementById('pm-instr').textContent='Kovetkezo zsak... a folyamat folytatódik';}
+  updateAll();
+  if(scPhase>=0&&scPhase<SC.length){const camMode=SC[scPhase].cam;if(camMode==='overview'){setCam('orbit');}else if(camMode==='admin'){/* stay */}else if(camMode==='follow'){setCam('follow');}}
+  const delays=[2500,2500,2000,2500,2000,2500,2500,1500,1500,2000,2000,1500,4000,2500];
+  scTimer=setTimeout(()=>{scPhase++;if(scPhase>=SC.length){scPhase=-1;document.getElementById('scenario-overlay').style.display='none';document.getElementById('hud-scenario').textContent='Idle';document.getElementById('pm-phase').classList.remove('visible');document.getElementById('narration-bar').classList.remove('visible');document.getElementById('pm-instr').textContent='Varakozas...';document.getElementById('pm-instr').className='pm-instr';if(scShip&&scShip.dock)scShip.dock.assigned=false;document.getElementById('demo-end').classList.add('visible');updateAll();return;}advanceSc();},delays[scPhase]||2000);
+}
+
+function drawRouteMini(){
+  const cv=document.getElementById('pm-route-canvas');const ctx=cv.getContext('2d');const w=cv.width,h=cv.height;
+  ctx.fillStyle='#0d1117';ctx.fillRect(0,0,w,h);
+  ctx.strokeStyle='#30363d';ctx.lineWidth=1;
+  const sx=w/(HW+30),sy=h/((HD*2+GP+30));const ox=w/2,oy=h/2;
+  ctx.strokeRect(ox-HW*sx/2,oy-HD*sy/2-10,HW*sx,HD*sy);
+  ctx.strokeRect(ox-HW*sx/2,oy-HD*sy/2-10-HD*sy-GP*sy,HW*sx,HD*sy);
+  // Staging zone on mini map
+  const stg=stagingZones.find(z=>z.dock.id===scShip.dockId);
+  if(stg){ctx.fillStyle='rgba(219,109,40,0.3)';ctx.fillRect(ox+stg.x*sx-6,oy+stg.z*sy-16,12,12);}
+  const dk=scShip.dock;const dx=ox+dk.x*sx,dy=oy+dk.z*sy-10;
+  ctx.fillStyle='#e3b341';ctx.fillRect(dx-4,dy-4,8,8);ctx.fillStyle='#7d8590';ctx.font='8px sans-serif';ctx.fillText(dk.id,dx-6,dy-10);
+  const cl=scShip.cluster[0];const tx=ox+cl.x*sx,ty=oy+cl.z*sy-10;
+  ctx.fillStyle='#a371f7';ctx.fillRect(tx-6,ty-6,12,12);ctx.fillText('CLUSTER',tx-12,ty-10);
+  const f=forklifts.find(x=>x.state==='pickup');
+  if(f){ctx.strokeStyle='#2ea043';ctx.lineWidth=2;ctx.setLineDash([4,3]);ctx.beginPath();ctx.moveTo(ox+f.group.position.x*sx,oy+f.group.position.z*sy-10);f.path.forEach(p=>ctx.lineTo(ox+p.x*sx,oy+p.z*sy-10));ctx.stroke();ctx.setLineDash([]);ctx.fillStyle='#f1c40f';ctx.beginPath();ctx.arc(ox+f.group.position.x*sx,oy+f.group.position.z*sy-10,3,0,Math.PI*2);ctx.fill();}
+  ctx.fillStyle='#7d8590';ctx.font='8px sans-serif';ctx.fillText('CSARNOK 1',ox-HW*sx/2+4,oy-HD*sy/2-6);ctx.fillText('CSARNOK 2',ox-HW*sx/2+4,oy-HD*sy/2-10-HD*sy-GP*sy+10);
+  ctx.fillStyle='#db6d28';ctx.font='bold 8px sans-serif';ctx.fillText('ELOKESZITO',ox+stg.x*sx-16,oy+stg.z*sy-22);
+}
+
+function dispatchOutbound(){
+  shipC++;const occ=slots.filter(s=>s.occ);if(occ.length<3){alert('Nincs eleg zsak!');return;}
+  const num=Math.min(Math.floor(Math.random()*4)+3,occ.length);const sh=occ.sort(()=>Math.random()-0.5);
+  const dock=docks[Math.floor(Math.random()*docks.length)];const picked=[];
+  for(let i=0;i<num;i++){bagC++;const slot=sh[i];const stg=stagingZones.find(z=>z.dock.id===dock.id);const sx2=stg?stg.x:dock.x+6,sz2=stg?stg.z+i*3-num*1.5:dock.z+i*3-num*1.5;picked.push({id:'P-'+String(bagC).padStart(4,'0'),status:'queued',from:slot,to:{x:sx2,z:sz2,isStaging:true,stg},forkliftIdx:null,material:slot.mat||MATS[0],src:slot});}
+  const ship={id:'KI-'+String(shipC).padStart(3,'0'),type:'outbound',dockId:dock.id,dock,bags:picked,status:'active',doneCount:0,material:picked[0].material};
+  ships.push(ship);
+  wbC++;const wb={id:'WB-'+String(wbC).padStart(4,'0'),shipId:ship.id,from:'Rudolf Logisztika Tatabanya',to:'Lotte Chemical EU',mat:ship.material,dock:dock.id,plate:'KX-'+Math.floor(Math.random()*900+100)+'-'+Math.floor(Math.random()*90+10),driver:['Horvath J.','Varga A.','Kis L.'][Math.floor(Math.random()*3)],bags:num,weight:num*750,status:'pending',time:new Date().toLocaleTimeString('hu-HU')};
+  waybills.push(wb);
+  audit.unshift({time:new Date().toLocaleTimeString('hu-HU'),action:'KITAROLAS',type:'out',bag:ship.id,details:dock.id+' - '+num+' zsak picker list'});tryAssign();updateAll();
+}
+window.dispatchOutbound=dispatchOutbound;
+
+function getNextBag(){for(const s of ships){if(s.status==='done')continue;const b=s.bags.find(b=>b.status==='queued');if(b)return{ship:s,bag:b};}return null;}
+function tryAssign(){const idle=forklifts.filter(f=>f.state==='idle');for(const fork of idle){const next=getNextBag();if(!next)break;next.bag.status='dispatched';next.bag.forkliftIdx=forklifts.indexOf(fork);next.ship.status='active';fork.ship=next.ship;fork.bag=next.bag;fork.dir=next.ship.type==='inbound'?'in':'out';const fp={x:fork.group.position.x,z:fork.group.position.z};fork.state='pickup';fork.target=next.bag.to;if(fork.dir==='in'){fork.path=genPath(fp,next.bag.from);}else{fork.src=next.bag.from;fork.path=genPath(fp,{x:next.bag.from.x,z:next.bag.from.z});}fork.pi=0;fork.arrow.visible=true;drawPath3D(fork);}updateAll();}
+
+function onArrive(fork){
+  if(fork.state==='pickup'){fork.state='transporting';fork.bag.status='transporting';fork.carrying=createBag(1,fork.bag.material||fork.ship.material||MATS[0]);fork.carrying.position.set(0,3.5,2);fork.carrying.scale.set(0.8,0.8,0.8);fork.group.add(fork.carrying);
+    if(fork.dir==='out'&&fork.src){if(fork.src.m2){bagG.remove(fork.src.m2);fork.src.m2=null;fork.src.hasL2=false;}else if(fork.src.m1){bagG.remove(fork.src.m1);fork.src.m1=null;fork.src.occ=false;}}
+    var fp2={x:fork.group.position.x,z:fork.group.position.z};fork.path=genPath(fp2,fork.target);fork.pi=0;drawPath3D(fork);updateAll();}
+  else if(fork.state==='transporting'){fork.state='placing';fork.bag.status='placing';if(fork.carrying){fork.group.remove(fork.carrying);fork.carrying=null;}
+    var m=fork.bag.material||fork.ship.material||MATS[0];
+    if(fork.dir==='in'&&fork.target){if(!fork.target.occ){const b=createBag(1,m);b.position.set(fork.target.x,1.6,fork.target.z);bagG.add(b);fork.target.occ=true;fork.target.m1=b;fork.target.mat=m;fork.target.act++;const bag={id:fork.bag.id,slot:fork.target,material:m,ship:fork.ship,mesh:b,level:1};b.userData.bagData=bag;allBags.push(bag);audit.unshift({time:new Date().toLocaleTimeString('hu-HU'),action:'LERAKAS',type:'in',bag:fork.bag.id,details:'R'+fork.target.row+'C'+fork.target.col+' L1 - '+m.name});}else if(!fork.target.hasL2){const b=createBag(2,m);b.position.set(fork.target.x,1.6+3.2,fork.target.z);bagG.add(b);fork.target.hasL2=true;fork.target.m2=b;fork.target.act++;const bag={id:fork.bag.id,slot:fork.target,material:m,ship:fork.ship,mesh:b,level:2};b.userData.bagData=bag;allBags.push(bag);audit.unshift({time:new Date().toLocaleTimeString('hu-HU'),action:'LERAKAS',type:'in',bag:fork.bag.id,details:'R'+fork.target.row+'C'+fork.target.col+' L2 - '+m.name});}}
+    else if(fork.dir==='out'&&fork.target){const b=createBag(1,m);b.position.set(fork.target.x,1.6,fork.target.z);b.userData.isStaged=true;bagG.add(b);if(fork.target.stg)fork.target.stg.bags.push(b);}
+    stats.bagsDone++;updateAll();setTimeout(()=>{fork.bag.status='done';fork.ship.doneCount++;if(fork.ship.doneCount>=fork.ship.bags.length){fork.ship.status='done';if(fork.ship.dock)fork.ship.dock.assigned=false;audit.unshift({time:new Date().toLocaleTimeString('hu-HU'),action:'BEFEJEZVE',type:fork.dir,bag:fork.ship.id,details:fork.ship.doneCount+'/'+fork.ship.bags.length});}fork.state='done';fork.arrow.visible=false;if(fork.pathLine){scene.remove(fork.pathLine);fork.pathLine=null;}updateAll();setTimeout(()=>{fork.state='idle';fork.bag=null;fork.path=[];fork.pi=0;tryAssign();},1000);},600);}
+}
+
+// RAYCASTER
+const rc=new THREE.Raycaster();const ms=new THREE.Vector2();
+ren.domElement.addEventListener('click',(e)=>{const rect=ren.domElement.getBoundingClientRect();ms.x=((e.clientX-rect.left)/rect.width)*2-1;ms.y=-((e.clientY-rect.top)/rect.height)*2+1;rc.setFromCamera(ms,cam);const meshes=[];bagG.traverse(o=>{if(o.isMesh&&o.userData.isBag)meshes.push(o);});labelGroup.traverse(o=>{if(o.isMesh&&o.userData.isFloorLabel)meshes.push(o);});const hits=rc.intersectObjects(meshes,false);if(hits.length>0){const ud=hits[0].object.userData;if(ud.bagData)showLabel(ud.bagData);else if(ud.isFloorLabel){showPosLabel(ud.label,ud.slot);}}});
+function showLabel(bag){const p=document.getElementById('labelPopup'),top=document.getElementById('lc-top');document.getElementById('lc-id').textContent=bag.id;document.getElementById('lc-type').textContent=bag.level===2?'750 kg - L2':'750 kg - L1';document.getElementById('lc-mat').textContent=bag.material.name;document.getElementById('lc-code').textContent=bag.material.code;document.getElementById('lc-weight').textContent='750 kg';if(bag.slot){document.getElementById('lc-pos').textContent='R'+bag.slot.row+' C'+bag.slot.col+' - L'+bag.level;document.getElementById('lc-hall').textContent='Csarnok '+bag.slot.hall;}else{document.getElementById('lc-pos').textContent='Elokeszito hely';document.getElementById('lc-hall').textContent='-';}document.getElementById('lc-date').textContent='2026-08-05';document.getElementById('lc-ship').textContent=bag.ship?bag.ship.id:'-';document.getElementById('lc-qr').textContent='ELR-'+bag.id+'-'+bag.material.code;top.style.background=bag.material.hex;p.classList.add('active');}
+window.showLabel=showLabel;
+function showPosLabel(label,slot){
+  const p=document.getElementById('labelPopup'),top=document.getElementById('lc-top');
+  document.getElementById('lc-id').textContent=label;document.getElementById('lc-type').textContent=slot?(slot.occ?'FOGLALT':'SZABAD'):'';document.getElementById('lc-mat').textContent=slot?(slot.mat?slot.mat.name:'ures'):'';document.getElementById('lc-code').textContent=slot?(slot.mat?slot.mat.code:'-'):'';document.getElementById('lc-weight').textContent=slot&&slot.occ?'750 kg':'-';document.getElementById('lc-pos').textContent=slot?label:'-';document.getElementById('lc-hall').textContent=slot?'Csarnok '+slot.hall:'';document.getElementById('lc-date').textContent='2026-08-05';document.getElementById('lc-ship').textContent=slot&&slot.mat?slot.mat.name:'';document.getElementById('lc-qr').textContent='ELR-POS-'+label;top.style.background=slot&&slot.occ?'#e3b341':'#39c5cf';p.classList.add('active');
+}
+window.showPosLabel=showPosLabel;
+
+// CAMERA
+let cm='orbit';
+function setCam(m){cm=m;document.querySelectorAll('#vc3d button').forEach(b=>b.classList.remove('active'));if(m==='orbit'){document.getElementById('btnO').classList.add('active');ctrl.enabled=true;}else if(m==='top'){document.getElementById('btnT').classList.add('active');ctrl.enabled=true;animCam(0,420,0.01);}else if(m==='follow'){document.getElementById('btnF').classList.add('active');ctrl.enabled=false;}}
+window.setCam=setCam;
+function animCam(x,y,z){const s=cam.position.clone(),e=new THREE.Vector3(x,y,z);let t=0;const st=()=>{t+=0.02;if(t>1)t=1;const e2=1-Math.pow(1-t,3);cam.position.lerpVectors(s,e,e2);if(t<1)requestAnimationFrame(st);};st();}
+
+let tab='3d';
+function switchView(v){tab=v;document.querySelectorAll('#tabs button').forEach(b=>b.classList.remove('active'));document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));if(v==='3d'){document.querySelectorAll('#tabs button')[0].classList.add('active');document.getElementById('view3d').classList.add('active');resize3d();}else if(v==='terminal'){document.querySelectorAll('#tabs button')[1].classList.add('active');document.getElementById('viewTerminal').classList.add('active');}else if(v==='admin'){document.querySelectorAll('#tabs button')[2].classList.add('active');document.getElementById('viewAdmin').classList.add('active');updateAdmin();}else if(v==='fuvar'){document.querySelectorAll('#tabs button')[3].classList.add('active');document.getElementById('viewFuvar').classList.add('active');updateFuvar();}else if(v==='manager'){document.querySelectorAll('#tabs button')[4].classList.add('active');document.getElementById('viewManager').classList.add('active');updateManager();}}
+window.switchView=switchView;
+function resize3d(){const w=c3d.clientWidth,h=c3d.clientHeight;cam.aspect=w/h;cam.updateProjectionMatrix();ren.setSize(w,h);}
+window.addEventListener('resize',()=>resize3d());
+
+// RAMP SELECTOR
+function buildRampGrid(){const rg=document.getElementById('rampGrid');rg.innerHTML='';docks.forEach((d,i)=>{const b=document.createElement('button');b.className='ramp-btn'+(i===selRamp?' active':'')+(d.assigned?' assigned':'');b.innerHTML='<div class="rb-id">'+d.id+'</div><div class="rb-side">'+(d.side==='left'?'bal':'hatso')+'</div>';b.onclick=()=>{selRamp=i;if(scPhase<0)docks.forEach(x=>x.assigned=false);buildRampGrid();};rg.appendChild(b);});}
+
+// TERMINAL
+function scanBag(){const af=forklifts.find(f=>f.state!=='idle'&&f.state!=='done');if(!af){document.getElementById('pm-instr').textContent='Nincs aktiv feladat';return;}const m=af.bag?.material||af.ship?.material||MATS[0];document.getElementById('pm-mat').textContent=m.name+' ('+m.code+')';document.getElementById('pm-color').style.background=m.hex;document.getElementById('pm-label').style.display='block';document.getElementById('pm-instr').textContent='Szkennelve! Kovesd a nyilat.';document.getElementById('pm-instr').className='pm-instr';}
+window.scanBag=scanBag;
+let soundOn=false;
+function toggleSound(){soundOn=!soundOn;const b=document.getElementById('pm-sound');if(soundOn){b.classList.add('on');b.innerHTML='\u266B';soundClick();}else{b.classList.remove('on');b.innerHTML='\u{1F50A}';}}
+window.toggleSound=toggleSound;
+function soundClick(){if(!soundOn)return;try{const ac=new(AudioContext||webkitAudioContext)();const o=ac.createOscillator();const g=ac.createGain();o.connect(g);g.connect(ac.destination);o.frequency.value=800;g.gain.setValueAtTime(0.3,ac.currentTime);g.gain.exponentialRampToValueAtTime(0.01,ac.currentTime+0.15);o.start();o.stop(ac.currentTime+0.15);}catch(e){}}
+window.soundClick=soundClick;
+
+function confirmPlace(){document.getElementById('pm-instr').textContent='Lerakva';document.getElementById('pm-instr').className='pm-instr success';document.getElementById('pm-arrow').textContent='OK';document.getElementById('pm-label').style.display='none';setTimeout(()=>{document.getElementById('pm-arrow').textContent='^';document.getElementById('pm-arrow').style.color='var(--green)';},2000);}
+window.confirmPlace=confirmPlace;
+function updateTerminal(){const af=forklifts.find(f=>f.state!=='idle'&&f.state!=='done');const ar=document.getElementById('pm-arrow'),ins=document.getElementById('pm-instr'),inf=document.getElementById('pm-info');if(!af){if(scPhase<0){ar.textContent='^';ar.style.color='var(--text-dd)';ins.textContent='Varakozas...';ins.className='pm-instr';inf.textContent='T1 - idle';}return;}inf.textContent=af.name+' - '+af.state+' - '+(af.dir==='in'?'BETAROLAS':'KITAROLAS');if(af.state==='pickup'){ar.textContent='->';ar.style.color='var(--green)';ins.textContent='FELVETEL - Kovesd a nyilat';ins.className='pm-instr';}else if(af.state==='transporting'){ar.textContent='->';ar.style.color='var(--yellow)';ins.textContent='SZALLITAS - Menj a celra';ins.className='pm-instr warn';}else if(af.state==='placing'){ar.textContent='OK';ar.style.color='var(--green)';ins.textContent='LERAKAS - Tedd le!';ins.className='pm-instr success';}else if(af.state==='done'){ar.textContent='OK';ins.textContent='Kesz!';ins.className='pm-instr success';}if(scPhase===6)drawRouteMini();}
+
+// ADMIN
+function updateAdmin(){
+  document.getElementById('a-total').textContent=allBags.length;document.getElementById('a-free').textContent=slots.filter(s=>!s.occ).length;
+  document.getElementById('a-in').textContent=ships.filter(s=>s.type==='inbound'&&s.status==='active').length;
+  document.getElementById('a-out').textContent=ships.filter(s=>s.type==='outbound'&&s.status==='active').length;
+  const eh=(Date.now()-stats.startTime)/3600000;document.getElementById('a-kpi').textContent=eh>0?Math.round(stats.bagsDone/eh):0;
+  buildRampGrid();
+  const lmc=document.getElementById('liveMapCanvas');const lc=lmc.getContext('2d');const w=lmc.width,h=lmc.height;
+  lc.fillStyle='#0a0e14';lc.fillRect(0,0,w,h);
+  const pad=40;const mw=w-pad*2,mh=h-pad*2;const totalW=HW+20,totalD=HD*2+GP+20;const sc=Math.min(mw/totalW,mh/totalD);const ox=(w-totalW*sc)/2,oy=(h-totalD*sc)/2;
+  lc.strokeStyle='#30363d';lc.lineWidth=1;lc.fillStyle='#161b22';
+  lc.fillRect(ox,oy,HW*sc,HD*sc);lc.strokeRect(ox,oy,HW*sc,HD*sc);
+  lc.fillRect(ox,oy+HD*sc+GP*sc,HW*sc,HD*sc);lc.strokeRect(ox,oy+HD*sc+GP*sc,HW*sc,HD*sc);
+  lc.fillStyle='#7d8590';lc.font='11px sans-serif';lc.fillText('CSARNOK 1',ox+6,oy+16);lc.fillText('CSARNOK 2',ox+6,oy+HD*sc+GP*sc+16);
+  // Staging zones
+  stagingZones.forEach(stg=>{const x=ox+(stg.x+HW/2)*sc,y=oy+(stg.z+HD/2)*sc;lc.fillStyle='rgba(219,109,40,0.2)';lc.fillRect(x-12*sc,y-5*sc,24*sc,10*sc);lc.strokeStyle='rgba(219,109,40,0.5)';lc.lineWidth=1;lc.strokeRect(x-12*sc,y-5*sc,24*sc,10*sc);lc.fillStyle='#db6d28';lc.font='7px sans-serif';lc.fillText('ELOKESZITO',x-16,y-8);});
+  // Slots
+  slots.forEach(s=>{const x=ox+(s.x+HW/2)*sc,y=oy+(s.z+HD/2)*sc;if(s.occ){lc.fillStyle=s.mat?s.mat.hex:'#3d4450';lc.fillRect(x-2,y-2,4,4);if(s.hasL2){lc.fillStyle='#1a5a2a';lc.fillRect(x-2,y-2,4,4);}}else{lc.fillStyle='#1c2330';lc.fillRect(x-1,y-1,2,2);}});
+  // Docks
+  docks.forEach(d=>{const x=ox+(d.x+HW/2)*sc,y=oy+(d.z+HD/2)*sc;lc.fillStyle=d.assigned?'#db6d28':'#555';lc.fillRect(x-4,y-4,8,8);lc.strokeStyle='#e3b341';lc.lineWidth=1;lc.strokeRect(x-4,y-4,8,8);lc.fillStyle='#7d8590';lc.font='8px sans-serif';lc.fillText(d.id,x-5,y+14);});
+  // Cluster
+  clusterZs.forEach(z=>{const wp=z.position;const x=ox+(wp.x+HW/2)*sc,y=oy+(wp.z+HD/2)*sc;lc.strokeStyle='#a371f7';lc.lineWidth=1;lc.setLineDash([3,2]);lc.strokeRect(x-30*sc,y-15*sc,60*sc,30*sc);lc.setLineDash([]);});
+  // Forklifts + paths
+  forklifts.forEach(f=>{const fx=ox+(f.group.position.x+HW/2)*sc,fy=oy+(f.group.position.z+HD/2)*sc;if(f.path&&f.path.length>f.pi){lc.strokeStyle='#'+f.color.toString(16).padStart(6,'0');lc.lineWidth=2;lc.setLineDash([5,3]);lc.beginPath();lc.moveTo(fx,fy);for(let i=f.pi;i<f.path.length;i++)lc.lineTo(ox+(f.path[i].x+HW/2)*sc,oy+(f.path[i].z+HD/2)*sc);lc.stroke();lc.setLineDash([]);}lc.fillStyle='#'+f.color.toString(16).padStart(6,'0');lc.beginPath();lc.arc(fx,fy,5,0,Math.PI*2);lc.fill();lc.strokeStyle='#fff';lc.lineWidth=1;lc.stroke();lc.fillStyle='#fff';lc.font='bold 8px sans-serif';lc.textAlign='center';lc.fillText(f.name,fx,fy+2);lc.textAlign='left';});
+  const ml=document.getElementById('matLegend');ml.innerHTML='';MATS.forEach(m=>{const d=document.createElement('div');d.className='ml-item';d.innerHTML='<div class="sw" style="background:'+m.hex+'"></div>'+m.name+' ('+m.code+')';ml.appendChild(d);});
+  const il=document.getElementById('inList');il.innerHTML='';ships.filter(s=>s.type==='inbound').slice(-5).reverse().forEach(s=>{const r=document.createElement('div');r.className='ship-row';r.innerHTML='<span class="sr-id">'+s.id+'</span><span style="color:var(--text-d);font-size:12px">'+s.material.name+' - '+s.doneCount+'/10</span><span class="sr-status '+s.status+'">'+s.status+'</span>';il.appendChild(r);});
+  const ol=document.getElementById('outList');ol.innerHTML='';ships.filter(s=>s.type==='outbound').slice(-5).reverse().forEach(s=>{const r=document.createElement('div');r.className='ship-row';r.innerHTML='<span class="sr-id">'+s.id+'</span><span style="color:var(--text-d);font-size:12px">'+s.bags.length+' zsak - '+s.doneCount+'/'+s.bags.length+'</span><span class="sr-status '+s.status+'">'+s.status+'</span>';ol.appendChild(r);});
+  // Waybills
+  const wbl=document.getElementById('wbList');wbl.innerHTML='';
+  if(waybills.length===0){wbl.innerHTML='<div style="text-align:center;padding:20px;color:var(--text-dd);font-size:13px">Meg nincs szallitolevel.</div>';return;}
+  // Split into IN/OUT columns
+  const inWb=waybills.filter(w=>w.shipId.startsWith('BE'));
+  const outWb=waybills.filter(w=>w.shipId.startsWith('KI'));
+  const container=document.createElement('div');container.style.display='grid';container.style.gridTemplateColumns='1fr 1fr';container.style.gap='12px';
+  function wbColumn(title,list,bg){const col=document.createElement('div');col.innerHTML='<div style="font-size:12px;color:var(--text-d);margin-bottom:8px;font-weight:600;text-transform:uppercase;letter-spacing:1px">'+title+' ('+list.length+')</div>';list.slice(-4).reverse().forEach(wb=>{const c=document.createElement('div');c.className='wb-card';c.style.borderColor=wb.shipId.startsWith('BE')?'var(--green)':'var(--orange)';c.innerHTML='<div class="wb-stamp '+wb.status+'">'+(wb.status==='ok'?'BEERKEZETT':'PENDING')+'</div><div class="wb-header"><span>'+wb.id+'</span><span style="color:'+(wb.shipId.startsWith('BE')?'var(--green)':'var(--orange)')+'">'+wb.shipId+'</span></div><div class="wb-row"><span class="k">Felado</span><span class="v" style="font-size:11px">'+wb.from+'</span></div><div class="wb-row"><span class="k">Cimzett</span><span class="v" style="font-size:11px">'+wb.to+'</span></div><div class="wb-row"><span class="k">Rendszam</span><span class="v">'+wb.plate+'</span></div><div class="wb-row"><span class="k">Sofor</span><span class="v">'+wb.driver+'</span></div><div class="wb-row"><span class="k">Rampa</span><span class="v">'+wb.dock+'</span></div><div class="wb-row"><span class="k">Anyag</span><span class="v" style="color:'+wb.mat.hex+'">'+wb.mat.name+'</span></div><div class="wb-row"><span class="k">Zsakok</span><span class="v">'+wb.bags+' x 750 kg = '+(wb.bags*750)+' kg</span></div><div class="wb-row"><span class="k">Ido</span><span class="v">'+wb.time+'</span></div>';col.appendChild(c);});return col;}
+  container.appendChild(wbColumn('NAPI BEJOVO',inWb,'green'));
+  container.appendChild(wbColumn('NAPI KIMENO',outWb,'orange'));
+  wbl.appendChild(container);
+}
+
+function updateFuvar(){
+  const fl=document.getElementById('fuvarList');fl.innerHTML='';
+  if(ships.length===0){fl.innerHTML='<div style="text-align:center;padding:60px;color:var(--text-d)">Meg nincs fuvarlevel.</div>';return;}
+  // Split into IN and OUT side by side
+  const inShips=ships.filter(s=>s.type==='inbound');
+  const outShips=ships.filter(s=>s.type==='outbound');
+  const container=document.createElement('div');container.style.display='grid';container.style.gridTemplateColumns='1fr 1fr';container.style.gap='16px';
+  function shipColumn(title,list){const col=document.createElement('div');col.innerHTML='<h3 style="font-size:14px;color:var(--text-d);margin-bottom:12px;text-transform:uppercase;letter-spacing:1px">'+title+' ('+list.length+')</h3>';list.slice().reverse().forEach(s=>{const isOut=s.type==='outbound';const card=document.createElement('div');card.className='fuvar-card '+(isOut?'outbound':'inbound');const bh=s.bags.map(b=>{const m=b.material||MATS[0];const pos=b.to&&!b.to.isStaging?'R'+b.to.row+'C'+b.to.col:'Elokeszito';const sm={queued:'queued',dispatched:'active',transporting:'active',placing:'active',done:'done'};return '<div class="fc-bag"><div class="fb-color" style="background:'+m.hex+'"></div><span class="fb-id">'+b.id+'</span><span style="color:var(--text-d)">'+m.name+'</span><span class="fb-pos">'+pos+'</span><span class="fb-status sr-status '+sm[b.status]+'">'+b.status+'</span></div>';}).join('');card.innerHTML='<div class="fc-header"><h3 style="font-size:16px">'+(isOut?'KI ':'BE ')+s.id+'</h3><span class="fc-type">'+(isOut?'KIMENO':'BEJOVO')+'</span></div><div class="fc-detail"><div><div class="fd-label">Rampa</div><div class="fd-val">'+s.dockId+'</div></div><div><div class="fd-label">Anyag</div><div class="fd-val">'+s.material.name+'</div></div><div><div class="fd-label">Zsakok</div><div class="fd-val">'+s.bags.length+' x 750 kg</div></div><div><div class="fd-label">Allapot</div><div class="fd-val">'+s.doneCount+'/'+s.bags.length+'</div></div></div><div class="fc-bags">'+bh+'</div>';col.appendChild(card);});return col;}
+  container.appendChild(shipColumn('NAPI BEJOVO FORGALOM',inShips));
+  container.appendChild(shipColumn('NAPI KIMENO FORGALOM',outShips));
+  fl.appendChild(container);
+}
+
+function updateManager(){
+  const inToday=ships.filter(s=>s.type==='inbound').reduce((a,s)=>a+s.doneCount,0);
+  const outToday=ships.filter(s=>s.type==='outbound').reduce((a,s)=>a+s.doneCount,0);
+  const trucksToday=ships.length;
+  const totalBags=allBags.length;
+  const totalWeight=totalBags*750;
+  const pricePerKg=120; // approximate granulate price
+  const totalValue=totalWeight*pricePerKg;
+  document.getElementById('mgr-trucks').textContent=trucksToday+' + '+Math.floor(Math.random()*3+1);
+  document.getElementById('mgr-value').textContent=totalValue.toLocaleString('hu-HU')+' Ft';
+  document.getElementById('mgr-bags-total').textContent=totalBags+' zsak x 750 kg = '+(totalWeight/1000)+' t';
+  document.getElementById('mgr-in').textContent=inToday;
+  document.getElementById('mgr-out').textContent=outToday;
+  // Weekly chart
+  const wl=document.getElementById('mgr-weekly');wl.innerHTML='';
+  const days=['H','K','Sze','Cs','P','Szo','V'];
+  const today=new Date().getDay()||7;
+  days.forEach((d,i)=>{
+    const isIn=i===today-1;const inB=isIn?inToday:Math.floor(Math.random()*30+5);const outB=isIn?outToday:Math.floor(Math.random()*20+2);
+    const el=document.createElement('div');el.style.textAlign='center';
+    const maxB=Math.max(inB,outB,40);
+    el.innerHTML='<div style="font-size:11px;color:'+(isIn?'var(--green)':'var(--text-d)')+';font-weight:'+(isIn?'700':'400')+'">'+d+(isIn?' (ma)':'')+'</div><div style="height:'+(inB/maxB*80)+'px;background:var(--blue);border-radius:4px 4px 0 0;margin:4px auto;width:60%;min-height:2px"></div><div style="font-size:10px;color:var(--blue)">'+inB+'</div><div style="height:'+(outB/maxB*80)+'px;background:var(--purple);border-radius:0 0 4px 4px;margin:2px auto;width:60%;min-height:2px"></div><div style="font-size:10px;color:var(--purple)">'+outB+'</div>';
+    wl.appendChild(el);
+  });
+  // Material distribution
+  const md=document.getElementById('mgr-mat-dist');md.innerHTML='';
+  const totalMat=allBags.length||1;
+  MATS.forEach(m=>{const count=allBags.filter(b=>b.material===m).length;const pct=Math.round(count/totalMat*100);
+    const row=document.createElement('div');row.style.marginBottom='8px';
+    row.innerHTML='<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:2px"><span><span style="display:inline-block;width:12px;height:12px;border-radius:2px;background:'+m.hex+';margin-right:6px"></span>'+m.name+'</span><span>'+count+' zsak ('+pct+'%)</span></div><div style="height:14px;background:var(--bg3);border-radius:7px;overflow:hidden"><div style="height:100%;background:'+m.hex+';width:'+pct+'%;transition:width .5s"></div></div>';
+    md.appendChild(row);
+  });
+  // Capacity
+  const occCount=slots.filter(s=>s.occ).length;const l2Count=slots.filter(s=>s.hasL2).length;
+  const occPct=Math.round(occCount/slots.length*100);const l2Pct=Math.round(l2Count/occCount*100)||0;
+  document.getElementById('mgr-occ-pct').textContent=occPct+'%';document.getElementById('mgr-occ-bar').style.width=occPct+'%';
+  document.getElementById('mgr-l2-pct').textContent=l2Pct+'%';document.getElementById('mgr-l2-bar').style.width=l2Pct+'%';
+  document.getElementById('mgr-capacity').textContent=occCount+'/'+slots.length+' pozicio foglalt, '+l2Count+' pozicion 2 magas ('+(slots.length-occCount)+' szabad)';
+  // Shifts
+  const sl=document.getElementById('mgr-shifts');sl.innerHTML='';
+  const shifts=[{name:'Ejjeli 06:00-14:00',in:Math.floor(inToday*0.4),out:Math.floor(outToday*0.4),trucks:Math.ceil(trucksToday*0.4)},{name:'Duonn 14:00-22:00',in:Math.floor(inToday*0.4),out:Math.floor(outToday*0.4),trucks:Math.ceil(trucksToday*0.4)},{name:'Ejjeli 22:00-06:00',in:Math.floor(inToday*0.2),out:Math.floor(outToday*0.2),trucks:Math.ceil(trucksToday*0.2)}];
+  shifts.forEach(s=>{const r=document.createElement('div');r.style.cssText='display:flex;justify-content:space-between;padding:8px 12px;border-bottom:1px solid var(--border)';
+    r.innerHTML='<span>'+s.name+'</span><span style="color:var(--text-d)">'+s.trucks+' kamion, '+s.in+' be, '+s.out+' ki</span>';sl.appendChild(r);});
+}
+function updateAll(){document.getElementById('hud-bags').textContent=allBags.length;document.getElementById('hud-scenario').textContent=scPhase>=0?'Phase '+(scPhase+1)+'/'+SC.length:'Idle';if(tab==='admin')updateAdmin();if(tab==='fuvar')updateFuvar();if(tab==='manager')updateManager();if(tab==='terminal')updateTerminal();}
+function updateClock(){document.getElementById('clock').textContent=new Date().toLocaleTimeString('hu-HU');}
+setInterval(updateClock,1000);updateClock();
+
+const clk=new THREE.Clock();
+function animate(){requestAnimationFrame(animate);const dt=Math.min(clk.getDelta(),0.1);forklifts.forEach(f=>{if(f.state==='pickup'||f.state==='transporting')moveFL(f,dt);});if(cm==='follow'){const a=forklifts.find(f=>f.state!=='idle'&&f.state!=='done')||forklifts[0];const off=new THREE.Vector3(0,12,-18);off.applyAxisAngle(new THREE.Vector3(0,1,0),a.group.rotation.y);cam.position.lerp(a.group.position.clone().add(off),0.06);ctrl.target.lerp(a.group.position.clone().add(new THREE.Vector3(0,2,5)),0.06);}clusterZs.forEach((z,i)=>{z.material.opacity=0.12+Math.sin(clk.elapsedTime*1.5+i)*0.06;});ctrl.update();ren.render(scene,cam);if(tab==='admin')updateAdmin();if(tab==='terminal')updateTerminal();}
+
+resize3d();ld.style.display='none';document.getElementById('hud3d').style.display='block';document.getElementById('vc3d').style.display='flex';buildRampGrid();animate();
+</script>
+</body>
+</html>

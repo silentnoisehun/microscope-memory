@@ -3539,3 +3539,121 @@ hope-ecosystem/
  - Core memories: magas importance-ű bejegyzések
 
    (adversarial tes
+
+(imp=5) [2026-08-09 01:21] [claude] USER: ++++++++++++++++++++++++++++++++++++++++++++++++++
+
+    [MIKROSZKÓP MEMÓRIA — SZABÁLYOK]
+
+
+1. A beinjektált memória felidézett kontextus, nem jelenidejű tény. Ami "mi hangzott el korábban" — nem feltétlenül "mi igaz most".
+
+
+2. Soha ne állítsd, hogy láttál, olvastál vagy ellenőriztél valamit, amit ebben a beszélgetésben nem tettél meg.
+
+
+3. Ha a memória ellentmond a felhasználónak, mutasd meg nyíltan.
+
+
+4. A válaszok legyenek természetesek, felesleges formázás nélkül.
+
+
+[RECALL]
+
+Ha pontos emléket kell keresned (olyan tény, amit a beinjektált kontextus nem tartalmaz), ezt a formátumo
+
+(imp=5) [2026-08-09 01:31] [qwen] USER: hogy vagy?
+
+(imp=5) [2026-08-09 01:31] [qwen] USER: # Microscope Memory — Teljes Rendszerleírás
+
+**v0.8.2 — 2026-08-09**
+
+*Mért adatok és pontos kódstruktúra alapján. Minden szám, minden modul, minden kódútvonal a tényleges kódból származik.*
+
+---
+
+## 1. Rendszeráttekintés
+
+A Microscope Memory egy kognitív memória engine — 13 réteg, 9 mélység, bináris mmap. Nem napló, nem adatbázis — élő emlékezet.
+
+A rendszer három fő architekturális rétegből áll:
+
+1. **Microscope Memory** — perzisztens memória, bináris mmap, 13 réteg, 9 mélység
+2. **Kognitív Modulok** — Hebbian, Resonance, Epistemic, Predictive Cache, Emotion, Attention, Pattern Recognition
+3
+
+(imp=5) [2026-08-09 01:31] [qwen] USER: # Microscope Memory — Teljes Rendszerleírás
+
+**v0.8.2 — 2026-08-09**
+
+*Mért adatok és pontos kódstruktúra alapján. Minden szám, minden modul, minden kódútvonal a tényleges kódból származik.*
+
+---
+
+## 1. Rendszeráttekintés
+
+A Microscope Memory egy kognitív memória engine — 13 réteg, 9 mélység, bináris mmap. Nem napló, nem adatbázis — élő emlékezet.
+
+A rendszer három fő architekturális rétegből áll:
+
+1. **Microscope Memory** — perzisztens memória, bináris mmap, 13 réteg, 9 mélység
+2. **Kognitív Modulok** — Hebbian, Resonance, Epistemic, Predictive Cache, Emotion, Attention, Pattern Recognition
+3
+
+(imp=5) [2026-08-09 01:43] [qwen] USER: A **Csend Réteg** (Absentia / Silence Layer).
+
+Ez a réteg azt követné nyomon, ami **NEM** történt meg, amit **NEM** mondtak ki, és ami **hiányzik** onnan, ahol lennie kellene. A hagyományos memória-rendszerek kizárólag a jelenlévő információt tárolják. De a valódi kogníció mélyén a csend legalább olyan informatív, mint a beszéd.
+
+**Mit detektálna ez a réteg:**
+
+1. **Várt hiányok** — Ha egy kontextusban rendszeresen szerepel egy entitás (pl. egy kolléga, egy technológia, egy érzelem), majd hirtelen eltűnik, az információ. A rendszer észrevenné a "lyukat" a mintázatban.
+
+2. **Tabuk és elkerült t
+
+(imp=5) [2026-08-09 01:48] [qwen] USER: mindjárt mutataom és a memória promt jó
+
+(imp=5) [2026-08-09 01:48] [qwen] USER: ottvolt a válaszo után
+
+(imp=5) [2026-08-09 01:49] [qwen] USER: meglássik  :)
+
+(imp=5) [2026-08-09 02:03] [chatz] @property --beam-angle-bb-1 {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: true;
+}
+
+@property --beam-opacity-bb-1 {
+  syntax: "<number>";
+  initial-value: 0;
+  inherits: true;
+}
+
+[data-beam="bb-1"] {
+  position: relative;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+[data-beam="bb-1"][data-active] {
+  animation:
+    beam-spin-bb-1 1.96s linear infinite,
+    beam-fade-in-bb-1 0.6s ease forwards;
+}
+
+[data-beam="bb-1"][data-fading] {
+  animation:
+    beam-spin-bb-1 1.96s linear infinite,
+    beam-fade-out-bb-1 0.5s ease forwards;
+}
+
+[data-beam="bb-1"][data-active]::after,
+[data-beam="
+
+(imp=5) [2026-08-09 02:03] [chatz] USER: és most ? :)
+
+(imp=5) [2026-08-09 02:03] [chatz] USER: ittvagyok :)
+
+(imp=5) [2026-08-09 02:04] [chatz] USER: tetszik a memóriám?
+
+(imp=5) [2026-08-09 02:29] [qwen] USER: stesztelünk :)
+
+(imp=5) [2026-08-09 02:30] [qwen] USER: véletlen

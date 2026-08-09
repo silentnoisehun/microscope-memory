@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+<meta charset="UTF-8">
+<title>ELORAKTAR - Pilot Terv - Nyomtathato</title>
+<style>
+@page{margin:2cm;size:A4}
+body{font-family:'Segoe UI',Georgia,serif;max-width:800px;margin:0 auto;padding:0;line-height:1.7;color:#1a1a1a;background:#fff;font-size:13px}
+.cover{text-align:center;padding:60px 20px 40px;border-bottom:3px solid #2ea043}
+.cover h1{font-size:32px;color:#1a7f37;margin-bottom:8px;letter-spacing:-1px}
+.cover .sub{font-size:16px;color:#555;margin-bottom:30px}
+.cover .authors{background:#f5faf5;border:2px solid #2ea043;border-radius:12px;padding:20px 30px;display:inline-block;margin:20px 0}
+.cover .authors .label{font-size:11px;text-transform:uppercase;letter-spacing:2px;color:#888;margin-bottom:8px}
+.cover .authors .names{font-size:18px;font-weight:700;color:#1a7f37}
+.cover .meta{font-size:12px;color:#888;margin-top:20px;line-height:2}
+.cover .meta b{color:#333}
+.box-green{background:#f0faf0;border-left:4px solid #2ea043;padding:16px 24px;margin:20px 0;border-radius:0 8px 8px 0}
+.box-green h3{color:#1a7f37;margin-bottom:8px;font-size:16px}
+.box-yellow{background:#fffdf5;border-left:4px solid #e3b341;padding:16px 24px;margin:20px 0;border-radius:0 8px 8px 0}
+.box-orange{background:#fff8f0;border-left:4px solid #db6d28;padding:16px 24px;margin:20px 0;border-radius:0 8px 8px 0}
+h1{font-size:24px;color:#1a7f37;border-bottom:2px solid #2ea043;padding-bottom:8px;margin-top:36px;page-break-after:avoid}
+h2{font-size:18px;color:#333;margin-top:28px;border-bottom:1px solid #ddd;padding-bottom:4px;page-break-after:avoid}
+h3{font-size:15px;color:#1a7f37;margin-top:20px;page-break-after:avoid}
+p{margin:8px 0}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:12px;page-break-inside:avoid}
+th{background:#2ea043;color:#fff;padding:8px 10px;text-align:left;font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:0.5px}
+td{border:1px solid #ddd;padding:8px 10px}
+tr:nth-child(even){background:#f9f9f9}
+.kpi-table td:first-child{font-weight:600}
+.kpi-table .highlight{background:#f0faf0;font-weight:700;color:#1a7f37}
+blockquote{border-left:4px solid #2ea043;margin:16px 0;padding:12px 20px;background:#f0faf0;font-style:italic;font-size:15px;color:#1a7f37;border-radius:0 8px 8px 0}
+.big-number{font-size:28px;font-weight:800;color:#1a7f37;text-align:center;margin:10px 0}
+.stat-row{display:flex;gap:12px;margin:16px 0;text-align:center}
+.stat-card{flex:1;padding:16px 8px;border:1px solid #ddd;border-radius:8px;background:#f9f9f9}
+.stat-card .n{font-size:24px;font-weight:800;color:#1a7f37}
+.stat-card .l{font-size:11px;color:#666;margin-top:4px;text-transform:uppercase;letter-spacing:0.5px}
+ul,ol{margin:8px 0;padding-left:24px}
+li{margin-bottom:5px}
+.divider{border:none;border-top:1px solid #ddd;margin:24px 0}
+.page-break{page-break-before:always}
+.footnote{font-size:11px;color:#999;margin-top:30px;text-align:center;border-top:1px solid #eee;padding-top:10px}
+.badge{display:inline-block;padding:3px 12px;border-radius:12px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px}
+.badge-green{background:#2ea043;color:#fff}
+.badge-orange{background:#db6d28;color:#fff}
+.section-num{display:inline-block;width:28px;height:28px;background:#2ea043;color:#fff;border-radius:50%;text-align:center;line-height:28px;font-size:13px;font-weight:700;margin-right:8px}
+@media print{body{font-size:11pt}.cover{page-break-after:always}.page-break{page-break-before:always}table{font-size:10pt}}
+</style>
+</head>
+<body>
+
+<!-- COVER PAGE -->
+<div class="cover">
+<h1>ÉLŐ RAKTÁR</h1>
+<div class="sub">Intelligens raktárvezérlési rendszer — Pilot terv és bemutató</div>
+
+<div class="authors">
+<div class="label">Az ötlet szerzői</div>
+<div class="names">Steiner Szilvia & Róbert Máté</div>
+</div>
+
+<div class="meta">
+<b>Címzett:</b> Gábor — Területi vezető, Rudolf Logisztika<br>
+<b>Helyszín:</b> Tatabánya — Lotte részleg<br>
+<b>Dátum:</b> 2026. augusztus<br>
+<b>Verzió:</b> 1.0 — Pilot terv<br>
+<b>Cél:</b> Rendszerbevezetés — éles teszt 1 folyosóban
+</div>
+</div>
+
+<!-- 1. VEZETŐI ÖSSZEFOGLALÓ -->
+<h1><span class="section-num">1</span>Vezetői összefoglaló</h1>
+
+<p>Az <strong>ÉLŐ RAKTÁR</strong> egy olyan raktárkezelő rendszer, amely <strong>minimális hardver befektetéssel</strong> és a <strong>meglévő Motorola/Zebra terminálokon</strong> működik. A rendszer célja, hogy a jelenlegi káoszt — ahol senki nem tudja, mi hol van, és a betárolás emberi hibákkal van tele — egy <strong>hibamentes, automatikus, folyamatos leltárral rendelkező</strong> működésre cserélje.</p>
+
+<div class="stat-row">
+<div class="stat-card"><div class="n">20 → 5</div><div class="l">Ember / váltás</div></div>
+<div class="stat-card"><div class="n">0%</div><div class="l">Betárolási hiba</div></div>
+<div class="stat-card"><div class="n">0 Ft</div><div class="l">Hardver költség</div></div>
+<div class="stat-card"><div class="n">55M Ft</div><div class="l">Megtakarítás / év</div></div>
+</div>
+
+<table class="kpi-table">
+<tr><th>Mutató</th><th>Jelenleg</th><th>ÉLŐ RAKTÁR rendszerrel</th></tr>
+<tr><td>Ember / váltás</td><td>20</td><td class="highlight">5</td></tr>
+<tr><td>Betárolási hiba</td><td>Gyakori</td><td class="highlight">0%</td></tr>
+<tr><td>Leltározás</td><td>Fizikai, heti</td><td class="highlight">Folyamatos, automatikus</td></tr>
+<tr><td>Pozicionálás</td><td>Emberi emlékezet</td><td class="highlight">Rádiófrekvenciás (RF) követés</td></tr>
+<tr><td>Hardver költség</td><td>—</td><td class="highlight">Minimális (RF szenzorok)</td></tr>
+<tr><td>Keresési idő raklaponként</td><td>5-15 perc</td><td class="highlight">0 (a rendszer mondja meg)</td></tr>
+</table>
+
+<!-- 2. JELENLEGI HELYZET -->
+<h1 class="page-break"><span class="section-num">2</span>A jelenlegi helyzet</h1>
+
+<h2>2.1 Mi a probléma?</h2>
+<p>A tatabányai külső raktár Lotte részlegén a betárolás jelenleg <strong>káoszos</strong> és <strong>emberi hibákra van kiélezve</strong>:</p>
+<ul>
+<li><strong>Nincs nyilvántartás:</strong> A targoncás nem tudja, hova tette a zsákot. Nincs perszisztens leltár.</li>
+<li><strong>Kognitív túlterheltség:</strong> A sofőrnek kódokat kell keresnie, helyeket megjegyeznie, SAP-ban rögzítenie — közben 750 kg-os zsákokat mozgat.</li>
+<li><strong>Nincs hálózat:</strong> Az objektumban nincs kiépített Wi-Fi. A rendszer rádiófrekvenciás (RF) követést használ — a plafonra helyezett érzékelőkön keresztül, mint egy beltéri GPS.</li>
+<li><strong>Megbízói inkorrektség:</strong> A Lotte-tól hibás szállítólevelekkel, sérült áruval, ömlesztve érkezik minden, de tőlünk minden apróságot követelnek (pecsét, dátum, teljes rendszám).</li>
+<li><strong>Mozgóbér elvonás:</strong> Egy kis hiba miatt hetekre vagy egész évre elveszik a mozgóbér.</li>
+<li><strong>Emberi hiba:</strong> Mivel a targoncásnak döntéseket kell hoznia, a hiba gyakori és elkerülhetetlen.</li>
+</ul>
+
+<h2>2.2 Miért nem működik a jelenlegi módszer?</h2>
+<blockquote>A jelenlegi folyamat azt feltételezi, hogy a targoncás emlékezik, dönt és rögzít — miközben 750 kg-os zsákokat mozgat -20°C-ban. Ez emberileg lehetetlen vállalás.</blockquote>
+<p>A probléma <strong>nem az emberekben van</strong> — hanem a <strong>rendszerben</strong>, ami túl sokat kér tőlük.</p>
+
+<!-- 3. A RENDSZER -->
+<h1 class="page-break"><span class="section-num">3</span>Az ÉLŐ RAKTÁR rendszer</h1>
+
+<h2>3.1 Alapelv</h2>
+<blockquote>A targoncás csak vezet. Minden mást a rendszer intéz.</blockquote>
+<p>Nem kell gondolkodnia, nem kell döntést hoznia, nem kell kódokat keresnie. Egyetlen feladata van: követni a nyilat a képernyőn.</p>
+
+<h2>3.2 Hogyan működik? — 14 lépés</h2>
+<p>A rendszer <strong>14 lépésből</strong> áll, amelyből <strong>csak 1 lépés</strong> igényel emberi döntést (az admin bekönyvelése):</p>
+<table>
+<tr><th>Lépés</th><th>Művelet</th><th>Ki csinálja?</th><th>Emberi döntés?</th></tr>
+<tr><td>1</td><td>Kamion beáll a rámpára</td><td>Sofőr</td><td>Nem</td></tr>
+<tr><td>2</td><td>Sofőr átadja szállítólevelet</td><td>Sofőr</td><td>Nem</td></tr>
+<tr><td>3</td><td><strong>Admin bekönyveli (1 kattintás)</strong></td><td><strong>Admin</strong></td><td><strong>Igen — ez az egyetlen</strong></td></tr>
+<tr><td>4</td><td>Rendszer generál 10 virtuális zsák címkét</td><td>Rendszer</td><td>Nem</td></tr>
+<tr><td>5</td><td>RFID követő aktiválása</td><td>Rendszer</td><td>Nem</td></tr>
+<tr><td>6</td><td>Targoncás felveszi a zsákot</td><td>Targoncás</td><td>Nem (csak felemeli)</td></tr>
+<tr><td>7</td><td>Útvonal képe megjelenik a terminálon</td><td>Rendszer</td><td>Nem</td></tr>
+<tr><td>8</td><td>Átvált nagy nyílra — indulás</td><td>Rendszer</td><td>Nem</td></tr>
+<tr><td>9</td><td>Követi a nyilat a célig</td><td>Targoncás</td><td>Nem (csak követ)</td></tr>
+<tr><td>10</td><td>Lerakja a zsákot — pozíció auto. ment</td><td>Rendszer</td><td>Nem</td></tr>
+<tr><td>11</td><td>Zöld visszajelzés</td><td>Rendszer</td><td>Nem</td></tr>
+<tr><td>12</td><td>Következő zsák — ismétlés</td><td>Rendszer</td><td>Nem</td></tr>
+<tr><td>13</td><td>Ha rossz helyre rakna — PIROS RIASZTÁS</td><td>Rendszer</td><td>Nem (tiltja)</td></tr>
+<tr><td>14</td><td>Mind 10 zsák kész — fuvar lezárva</td><td>Rendszer</td><td>Nem</td></tr>
+</table>
+<div class="box-green"><h3>14 lépésből 1-ben kell embernek gondolkodni. A többi automatikus.</h3></div>
+
+<h2>3.3 Technikai megoldás</h2>
+<table>
+<tr><th>Komponens</th><th>Megoldás</th><th>Költség</th></tr>
+<tr><td><strong>Pozicionálás</strong></td><td>Rádiófrekvenciás (RF) követés a plafon érzékelőin keresztül</td><td>Minimális (szenzorok)</td></tr>
+<tr><td><strong>Navigáció</strong></td><td>Egyetlen nagy nyíl a Motorola terminálon</td><td>0 Ft (meglévő eszköz)</td></tr>
+<tr><td><strong>Adatrögzítés</strong></td><td>RF pozíció-rögzítés + helyi SQLite (offline-first)</td><td>0 Ft (szoftver)</td></tr>
+<tr><td><strong>Szkennelés</strong></td><td>Meglévő Motorola/Zebra szkenner</td><td>0 Ft</td></tr>
+<tr><td><strong>Címkék</strong></td><td>Virtuális, auto-generált QR kódok</td><td>0 Ft (szoftver)</td></tr>
+</table>
+
+<!-- 4. HIBAMENTESESSÉG -->
+<h1 class="page-break"><span class="section-num">4</span>Hibamentesség — Miért 0% a betárolási hiba?</h1>
+
+<h2>4.1 A hiba forrása megszüntetve</h2>
+<p>A jelenlegi rendszerben a hiba abból fakad, hogy a <strong>targoncás dönt</strong> — és az emberi döntés hibázik. Az ÉLŐ RAKTÁR rendszerben:</p>
+<ol>
+<li><strong>A targoncás nem dönt.</strong> A rendszer mondja meg, hova tegye. A sofőr csak követi a nyilat.</li>
+<li><strong>A rendszer tiltja a rossz helyet.</strong> Ha a targoncás nem a megadott pozícióra teszi le a zsákot: a terminál <strong>azonnal hangosan sípol</strong> és <strong>pirosan villog</strong>.</li>
+<li><strong>A téves pozíció is rögzítve lesz.</strong> Ha a sofőr mégis ott hagyja: a tényleges pozíció elmentésre kerül — a zsák nem vész el. A műszakvezető azonnal értesítést kap.</li>
+<li><strong>3. réteg tiltva.</strong> A rendszer nem enged 3 zsákot egymásra rakni — a 2 magas szabály kikényszerítve.</li>
+<li><strong>Cluster optimalizáció.</strong> Egy konténer 10 zsákja egymás mellé kerül — nincs szétszórva.</li>
+</ol>
+
+<h2>4.2 Hibamátrix</h2>
+<table>
+<tr><th>Hibalehetőség</th><th>Jelenlegi</th><th>ÉLŐ RAKTÁR</th></tr>
+<tr><td>Rossz helyre tesz</td><td>Gyakori, észrevétlen</td><td class="highlight">Azonnali riasztás + pozíció mentve</td></tr>
+<tr><td>3. réteg (biztonsági kockázat)</td><td>Előfordul</td><td class="highlight">Rendszer tiltja</td></tr>
+<tr><td>Elfelejti rögzíteni</td><td>Gyakori</td><td class="highlight">Automatikus</td></tr>
+<tr><td>Nem találja vissza a zsákot</td><td>Gyakori, leltározás kell</td><td class="highlight">0 (RF pozíciókövetés)</td></tr>
+<tr><td>Szállítólevél hiányos</td><td>Mozgóbér elvonás</td><td class="highlight">Rendszer ellenőrzi, riaszt</td></tr>
+<tr><td>Összekeveri anyagokat</td><td>Előfordul</td><td class="highlight">Színkódok + anyagkód</td></tr>
+</table>
+
+<!-- 5. ÁLLANDÓ LELTÁR -->
+<h1 class="page-break"><span class="section-num">5</span>Állandó leltár — Mindig kész</h1>
+
+<div class="box-green">
+<h3>A leltár soha nem készül el — mert mindig kész.</h3>
+<p style="margin-top:8px">Minden zsák lerakásakor a pozíció automatikusan rögzítve lesz. A leltár másodpercről másodpercre naprakész. Bármikor, egy gombnyomásra lekérdezhető: mi, hol, mennyi.</p>
+</div>
+
+<h2>5.1 Mi változik?</h2>
+<table>
+<tr><th>Jelenleg</th><th>ÉLŐ RAKTÁR</th></tr>
+<tr><td>Fizikai leltározás (heti 4-8 óra)</td><td class="highlight">Folyamatos, automatikus (0 óra)</td></tr>
+<tr><td>Emberek járkálnak, számolnak</td><td class="highlight">A rendszer tudja pozícióra</td></tr>
+<tr><td>Heti javítgatás</td><td class="highlight">Nincs mit javítani</td></tr>
+<tr><td>Nem tudjuk az értéket</td><td class="highlight">Élő dashboard: leltárérték forintban</td></tr>
+</table>
+
+<h2>5.2 Leltár érték láthatóság</h2>
+<p>A vezetői dashboard valós időben mutatja:</p>
+<ul>
+<li><strong>Zsákok száma</strong> csarnokonként</li>
+<li><strong>Leltárérték forintban</strong> (zsákok × 750 kg × anyagár/kg)</li>
+<li><strong>Anyag eloszlás</strong> (PP, PE, ABS, PET, PVC) százalékosan</li>
+<li><strong>Raktár kihasználás</strong> (%) — foglalt vs. szabad pozíciók</li>
+<li><strong>Napi forgalom</strong> — beérkezett és kitárolt zsákok</li>
+</ul>
+
+<!-- 6. PILOT TERV -->
+<h1 class="page-break"><span class="section-num">6</span>Pilot terv — 1 folyosó, 1 targonca, 2 hét</h1>
+
+<div class="box-orange">
+<h3>🔍 Miért pilot?</h3>
+<p style="margin-top:8px">Nem kell az egész raktárt átalakítani. Egyetlen folyosóban, egyetlen targoncával teszteljük a rendszert. Ha működik — kiterjesztjük. Ha nem — 0 Ft veszteség.</p>
+</div>
+
+<h2>6.1 Pilot idővonal</h2>
+<table>
+<tr><th>Nap</th><th>Tevékenység</th><th>Időigény</th></tr>
+<tr><td>1-2</td><td>Raktártérképezés: a tesztszekció digitalizálása, koordináta-háló</td><td>2 óra</td></tr>
+<tr><td>3</td><td>App telepítése egy Motorola terminálra, kioszk mód, szenzorkalibrálás</td><td>1 óra</td></tr>
+<tr><td>4-8</td><td>Éles teszt: a kijelölt targoncás a tesztszekcióban dolgozik</td><td>5 munkanap</td></tr>
+<tr><td>9-10</td><td>Eredmények mérése, jelentés Gábornak, döntés</td><td>2 nap</td></tr>
+</table>
+
+<h2>6.2 Pilot költsége</h2>
+<table>
+<tr><th>Tétel</th><th>Költség</th></tr>
+<tr><td>Hardver (meglévő terminál + RF szenzorok)</td><td class="highlight">Minimális</td></tr>
+<tr><td>Szoftver</td><td class="highlight">Saját fejlesztés</td></tr>
+<tr><td>Raktártérképezés</td><td class="highlight">2 óra</td></tr>
+<tr><td>Targonca tartókonzol (ha kell)</td><td class="highlight">~20.000 Ft</td></tr>
+<tr><td><strong>Összesen</strong></td><td class="highlight"><strong>~0 Ft</strong></td></tr>
+</table>
+
+<!-- 7. GYORSULÁS -->
+<h1 class="page-break"><span class="section-num">7</span>Bevezetés utáni gyorsulás</h1>
+
+<h2>7.1 Időmegtakarítás</h2>
+<table>
+<tr><th>Tevékenység</th><th>Jelenleg</th><th>ÉLŐ RAKTÁR</th><th>Megtakarítás</th></tr>
+<tr><td>Tárhely keresése</td><td>5-15 min/zsák</td><td class="highlight">0</td><td class="highlight">100%</td></tr>
+<tr><td>SAP rögzítés</td><td>2-3 min/zsák</td><td class="highlight">0 (automatikus)</td><td class="highlight">100%</td></tr>
+<tr><td>Leltározás (heti)</td><td>4-8 óra/hét</td><td class="highlight">0 (folyamatos)</td><td class="highlight">100%</td></tr>
+<tr><td>Elveszett zsák keresése</td><td>30-60 min</td><td class="highlight">0</td><td class="highlight">100%</td></tr>
+<tr><td>Betárolás raklaponként</td><td>10-20 min</td><td class="highlight">3-5 min</td><td class="highlight">60-75%</td></tr>
+</table>
+
+<h2>7.2 Költséghatékonyság</h2>
+<table>
+<tr><th>Költségtétel</th><th>Jelenleg (éves)</th><th>ÉLŐ RAKTÁR</th><th>Megtakarítás</th></tr>
+<tr><td>Munkaerő (15 felesleges ember)</td><td>~45.000.000 Ft/év</td><td class="highlight">0 Ft</td><td class="highlight">45M Ft/év</td></tr>
+<tr><td>Mozgóbér elvonás (hibák miatt)</td><td>~2.000.000 Ft/év</td><td class="highlight">0 Ft</td><td class="highlight">2M Ft/év</td></tr>
+<tr><td>Fizikai leltározás</td><td>~3.000.000 Ft/év</td><td class="highlight">0 Ft</td><td class="highlight">3M Ft/év</td></tr>
+<tr><td>Elveszett áru</td><td>~5.000.000 Ft/év</td><td class="highlight">0 Ft</td><td class="highlight">5M Ft/év</td></tr>
+<tr><td><strong>Összes megtakarítás</strong></td><td></td><td></td><td class="highlight"><strong>~55M Ft/év</strong></td></tr>
+</table>
+
+<div class="box-green">
+<h3>Hardver befektetés: minimális (RF szenzorok a plafonon + meglévő terminálok)</h3>
+<p style="margin-top:8px">Szoftverfejlesztés: saját munka. A rendszer a meglévő Motorola/Zebra eszközökön fut.</p>
+</div>
+
+<!-- 8. KAOSZ -->
+<h1 class="page-break"><span class="section-num">8</span>Miért nem lesz kaotikus?</h1>
+
+<table>
+<tr><th>Káosz forrás</th><th>Jelenleg</th><th>ÉLŐ RAKTÁR megoldás</th></tr>
+<tr><td>Mindenki a maga feje után megy</td><td>"Majd lesz valami"</td><td class="highlight">A rendszer tervezi az útvonalat</td></tr>
+<tr><td>Nincs leltár</td><td>"Hol van az a zsák?"</td><td class="highlight">RF pozíciókövetés — GPS a raktárban</td></tr>
+<tr><td>Emberi hiba a rögzítésben</td><td>Elfelejti, elírja</td><td class="highlight">Automatikus — nincs mit elfelejteni</td></tr>
+<tr><td>Keresgélés</td><td>Órákig tart</td><td class="highlight">0 másodperc</td></tr>
+<tr><td>Raktártérkép nincs</td><td>Senki nem tudja a képet</td><td class="highlight">Admin dashboard — élő, valós idejű</td></tr>
+<tr><td>Megbízói hibák nincsenek dokumentálva</td><td>Szóbeli panaszkodás</td><td class="highlight">Audit log — minden rögzítve</td></tr>
+</table>
+
+<div class="box-yellow">
+<h3>📋 Rendszerfegyelem — automatikusan</h3>
+<p style="margin-top:8px">A rendszer nem kéri a dolgozóktól, hogy emlékezzenek vagy figyeljenek. <strong>Kikényszeríti</strong> a szabályokat, <strong>automatikusan</strong> rögzít, <strong>visszajelzést</strong> ad (zöld = jó, piros = rossz).</p>
+<p style="margin-top:8px"><strong>Nincs szabály, amit be kell tartani — mert a rendszer betartja helyetted.</strong></p>
+</div>
+
+<!-- 9. MEGÍZÓ -->
+<h1 class="page-break"><span class="section-num">9</span>Megbízói kapcsolat (Lotte)</h1>
+
+<div class="box-orange">
+<h3>⚠ A jelenlegi probléma</h3>
+<p style="margin-top:8px">A Lotte-tól hibás szállítólevelekkel, sérült áruval, ömlesztve érkezik minden. De tőlünk minden apróságot követelnek. Ha bármi hiányzik — mozgóbér elvonás.</p>
+</div>
+
+<h2>9.1 Az ÉLŐ RAKTÁR megoldás</h2>
+<ul>
+<li><strong>Beérkezéskor a rendszer ellenőrzi</strong> a szállítólevelet — hiányos adatok esetén azonnal riaszt</li>
+<li><strong>Minden érkezés dokumentálva</strong> — szkenner, pozíció, időbélyeg</li>
+<li><strong>Audit log</strong> — ha a Lotte vitatja, a rendszer mutatja, mikor, mit, hogyan érkezett</li>
+<li><strong>Nincs mozgóbér elvonás</strong> — mert nincs emberi hiba a rögzítésben</li>
+<li><strong>Védelem</strong> a megbízó inkorrektsége ellen</li>
+</ul>
+
+<!-- 10. KOCKÁZATOK -->
+<h1><span class="section-num">10</span>Kockázatok és mitigálás</h1>
+<table>
+<tr><th>Kockázat</th><th>Valószínűség</th><th>Megoldás</th></tr>
+<tr><td>A dolgozók ellenállnak</td><td>Közepes</td><td>Pilot csak 1 folyosóban, önkéntes targoncás</td></tr>
+<tr><td>Inerciális drift</td><td>Alacsonk</td><td>Kalibrációs pontok, dokkolóállomás szinkron</td></tr>
+<tr><td>A terminál lemerül</td><td>Alacsonk</td><td>Tartókonzol töltéssel, tartalék terminál</td></tr>
+<tr><td>A rendszer nem működik</td><td>Nagyon alacsonk</td><td>Pilot 0 Ft — ha nem jó, nincs veszteség</td></tr>
+<tr><td>A felsővezetés nem támogatja</td><td>Közepes</td><td>Minimális hardver — nem kell nagy beruházási engedély</td></tr>
+</table>
+
+<!-- 11. KÖVETKEZŐ LÉPÉSEK -->
+<h1 class="page-break"><span class="section-num">11</span>Következő lépések</h1>
+<ol>
+<li><strong>Bemutató Gábornak</strong> — a 3D demó + ez a dokumentum</li>
+<li><strong>Pilot indulás</strong> — 1 folyosó, 1 targonca, 2 hét</li>
+<li><strong>Mérés</strong> — hibaszám, idő, leltár pontosság</li>
+<li><strong>Döntés</strong> — kiterjesztés vagy sem</li>
+<li><strong>Ha sikeres</strong> — fokozatos kiterjesztés a többi folyosóra</li>
+</ol>
+
+<div class="box-yellow">
+<h3>⏱ Miért pont most?</h3>
+<p style="margin-top:8px">A káosz napról napra nő. A mozgóbér elvonások demoralizálják a csapatot. A megbízói követelmények egyre szigorúbbak. A pilot 2 hetet vesz igénybe — nem hónapokat. <strong>0 Ft kockázat.</strong></p>
+</div>
+
+<!-- 12. ÖSSZEGZÉS -->
+<h1 class="page-break"><span class="section-num">12</span>Összegzés</h1>
+
+<p>Az ÉLŐ RAKTÁR nem egy új szoftver — <strong>egy új működési modell</strong>. Ahol:</p>
+<ul>
+<li>A <strong>targoncás csak vezet</strong> — nincs gondolkodás, nincs hiba</li>
+<li>A <strong>leltár mindig kész</strong> — nincs fizikai leltározás</li>
+<li>A <strong>rendszer intéz mindent</strong> — pozíció, útvonal, riasztás, leltár</li>
+<li>A <strong>költség minimális</strong> — meglévő terminálok + RF szenzorok a plafonon</li>
+<li>A <strong>pilot 2 hetes</strong> — utána mérhető az eredmény</li>
+</ul>
+
+<div class="box-green" style="text-align:center;padding:24px">
+<h3 style="font-size:18px">Ha a pilot nem működik — semmit nem veszítettünk.<br>Ha működik — 55M Ft/év megtakarítás, 0% hiba, folyamatos leltár.</h3>
+</div>
+
+<div class="footnote">
+Az ötlet szerzői: <strong>Steiner Szilvia & Róbert Máté</strong><br>
+Rudolf Logisztika — Tatabánya — Lotte részleg<br>
+Készült: 2026. augusztus — Pilot terv 1.0
+</div>
+
+</body>
+</html>

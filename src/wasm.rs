@@ -444,3 +444,256 @@ pub fn main() {
     console_error_panic_hook::set_once();
     console::log_1(&"Microscope Memory WASM module loaded".into());
 }
+
+// ═══════════════════════════════════════════════════════
+//  COGNITIVE CLI — WASM parancsok
+// ═══════════════════════════════════════════════════════
+
+/// Virtual CLI executor — executes cognitive commands in WASM.
+///
+/// Commands: status, recall <query> [k], store <text>, stats, doctor, intent, absentia
+#[cfg(target_arch = "wasm32")]
+#[wasm_bindgen]
+pub struct HopeCli {
+    blocks: Vec<(String, String, u8, u8)>, // (text, layer, importance, depth)
+    hebbian_pairs: Vec<(u32, u32, f32)>,   // (block_a, block_b, strength)
+    audit_log: Vec<String>,
+    intent_history: Vec<String>,
+    absentia_records: Vec<String>,
+}
+
+#[cfg(target_arch = "wasm32")]
+#[wasm_bindgen]
+impl HopeCli {
+    #[wasm_bindgen(constructor)]
+    pub fn new() -> Self {
+        console::log_1(&"HOPE CLI WASM initialized".into());
+        Self {
+            blocks: Vec::new(),
+            hebbian_pairs: Vec::new(),
+            audit_log: Vec::new(),
+            intent_history: Vec::new(),
+            absentia_records: Vec::new(),
+        }
+    }
+
+    /// Execute a virtual CLI command and return JSON result
+    #[wasm_bindgen]
+    pub fn exec(&mut self, command: &str) -> String {
+        let parts: Vec<&str> = command.splitn(3, ' ').collect();
+        let cmd = parts[0].to_lowercase();
+        let args = if parts.len() > 1 { parts[1..].join(" ") } else { String::new() };
+
+        let result = match cmd.as_str() {
+            "status" => self.cmd_status(),
+            "stats" => self.cmd_stats(),
+            "recall" | "r" => self.cmd_recall(&args),
+            "store" | "s" => self.cmd_store(&args),
+            "find" | "f" => self.cmd_find(&args),
+            "doctor" => self.cmd_doctor(),
+            "intent" => self.cmd_intent(&args),
+            "absentia" => self.cmd_absentia(&args),
+            "hebbian" => self.cmd_hebbian(),
+            "audit" => self.cmd_audit(&args),
+            "genome" => self.cmd_genome(),
+            "permissions" => self.cmd_permissions(),
+            "help" | "?" => self.cmd_help(),
+            _ => format!("{{\"ok\":false,\"error\":\"Unknown command: {}\"}}", cmd),
+        };
+
+        self.audit_log.push(format!("{} → {}", command, &result[..result.len().min(100)]));
+        if self.audit_log.len() > 500 {
+            self.audit_log.drain(0..self.audit_log.len() - 500);
+        }
+
+        result
+    }
+
+    /// Load blocks from binary data (for integration with MicroscopeWasm)
+    #[wasm_bindgen]
+    pub fn load_blocks(&mut self, texts: &str) {
+        // texts format: "text1\0layer1\0importance1\0text2\0layer2\0importance2\0..."
+        let parts: Vec<&str> = texts.split('\0').collect();
+        let mut i = 0;
+        while i + 2 < parts.len() {
+            let text = parts[i].to_string();
+            let layer = parts[i + 1].to_string();
+            let importance: u8 = parts[i + 2].parse().unwrap_or(5);
+            let depth = 3; // default
+            self.blocks.push((text, layer, importance, depth));
+            i += 3;
+        }
+    }
+
+    fn cmd_status(&self) -> String {
+        format!(
+            "{{\"ok\":true,\"status\":{{\"blocks\":{},\"hebbian_pairs\":{},\"audit_entries\":{},\"intent_history\":{},\"absentia_records\":{}}}}}",
+            self.blocks.len(),
+            self.hebbian_pairs.len(),
+            self.audit_log.len(),
+            self.intent_history.len(),
+            self.absentia_records.len(),
+        )
+    }
+
+    fn cmd_stats(&self) -> String {
+        format!(
+            "{{\"ok\":true,\"stats\":{{\"blocks\":{},\"domain\":\"wasm\",\"wasm\":true,\"opfs\":false,\"hebbian_pairs\":{},\"audit_entries\":{}}}}}",
+            self.blocks.len(),
+            self.hebbian_pairs.len(),
+            self.audit_log.len(),
+        )
+    }
+
+    fn cmd_recall(&self, args: &str) -> String {
+        let parts: Vec<&str> = args.splitn(2, ' ').collect();
+        let query = parts[0].to_lowercase();
+        let k: usize = parts.get(1).and_then(|s| s.parse().ok()).unwrap_or(5);
+
+        if query.is_empty() {
+            return "{\"ok\":false,\"error\":\"Usage: recall <query> [k]\"}".to_string();
+        }
+
+        let mut scored: Vec<(usize, f32)> = self.blocks
+            .iter()
+            .enumerate()
+            .map(|(i, (text, _, _, _))| {
+                let t = text.to_lowercase();
+                let mut s = 0.0f32;
+                if t.contains(&query) { s += 3.0; }
+                for word in query.split_whitespace() {
+                    if word.len() > 2 && t.contains(word) { s += 1.0; }
+                }
+                (i, s)
+            })
+            .filter(|(_, s)| *s > 0.0)
+            .collect();
+        scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+        scored.truncate(k);
+
+        let results: Vec<String> = scored.iter().map(|(i, s)| {
+            let (text, layer, imp, _) = &self.blocks[*i];
+            format!("{{\"text\":\"{}\",\"layer\":\"{}\",\"importance\":{},\"score\":{}}}",
+                text.chars().take(200).collect::<String>().replace('"', "\\\""),
+                layer, imp, s)
+        }).collect();
+
+        format!("{{\"ok\":true,\"query\":\"{}\",\"count\":{},\"results\":[{}]}}",
+            query, results.len(), results.join(","))
+    }
+
+    fn cmd_store(&mut self, args: &str) -> String {
+        let parts: Vec<&str> = args.splitn(3, ' ').collect();
+        if parts.is_empty() || parts[0].is_empty() {
+            return "{\"ok\":false,\"error\":\"Usage: store <text> [layer] [importance]\"}".to_string();
+        }
+        let text = parts[0].to_string();
+        let layer = parts.get(1).unwrap_or(&"session").to_string();
+        let importance: u8 = parts.get(2).and_then(|s| s.parse().ok()).unwrap_or(5);
+        let depth = 3u8;
+
+        // Hebbian: associate with recent blocks
+        let new_id = self.blocks.len() as u32;
+        let text_lower = text.to_lowercase();
+        let words: Vec<&str> = text_lower.split_whitespace().filter(|w| w.len() > 3).collect();
+        for (i, (existing_text, _, _, _)) in self.blocks.iter().enumerate() {
+            let existing_lower = existing_text.to_lowercase();
+            for word in &words {
+                if existing_lower.contains(word) {
+                    self.hebbian_pairs.push((new_id, i as u32, 0.15));
+                    break;
+                }
+            }
+        }
+
+        self.blocks.push((text.clone(), layer.clone(), importance, depth));
+        format!("{{\"ok\":true,\"id\":\"m{}\",\"text\":\"{}\",\"layer\":\"{}\",\"importance\":{}}}",
+            new_id,
+            text.chars().take(100).collect::<String>().replace('"', "\\\""),
+            layer, importance)
+    }
+
+    fn cmd_find(&self, args: &str) -> String {
+        self.cmd_recall(args)
+    }
+
+    fn cmd_doctor(&self) -> String {
+        let checks = vec![
+            format!("{{\"name\":\"memory\",\"ok\":true,\"detail\":\"{} blocks\"}}", self.blocks.len()),
+            format!("{{\"name\":\"hebbian\",\"ok\":true,\"detail\":\"{} pairs\"}}", self.hebbian_pairs.len()),
+            format!("{{\"name\":\"audit\",\"ok\":true,\"detail\":\"{} entries\"}}", self.audit_log.len()),
+            format!("{{\"name\":\"wasm\",\"ok\":true,\"detail\":\"running\"}}"),
+        ];
+        format!("{{\"ok\":true,\"doctor\":{{\"healthy\":true,\"checks\":[{}]}}}}", checks.join(","))
+    }
+
+    fn cmd_intent(&mut self, args: &str) -> String {
+        let action = args.split_whitespace().next().unwrap_or("generate");
+        match action {
+            "generate" => {
+                // Simple intent based on absence
+                let has_blocks = !self.blocks.is_empty();
+                let (intent_action, strength) = if !has_blocks {
+                    ("ASK", 0.8)
+                } else {
+                    ("OBSERVE", 0.1)
+                };
+                let intent = format!(
+                    "{{\"action\":\"{}\",\"strength\":{},\"allowed\":true,\"requires_approval\":false,\"audit_steps\":3,\"rationale\":[\"WASM cognitive runtime\"]}}",
+                    intent_action, strength
+                );
+                self.intent_history.push(intent.clone());
+                format!("{{\"ok\":true,\"intent\":{}}}", intent)
+            }
+            "audit" => {
+                let entries: Vec<String> = self.intent_history.iter().rev().take(10)
+                    .map(|e| e.clone()).collect();
+                format!("{{\"ok\":true,\"audit\":[{}]}}", entries.join(","))
+            }
+            _ => "{\"ok\":false,\"error\":\"Usage: intent [generate|audit]\"}".to_string(),
+        }
+    }
+
+    fn cmd_absentia(&mut self, args: &str) -> String {
+        let action = args.split_whitespace().next().unwrap_or("status");
+        match action {
+            "status" => {
+                format!("{{\"ok\":true,\"absentia\":{{\"blocks\":{},\"hebbian_pairs\":{},\"audit_entries\":{}}}}}",
+                    self.blocks.len(), self.hebbian_pairs.len(), self.audit_log.len())
+            }
+            "scan" => {
+                // Find blocks older than 24h (simplified)
+                let count = self.blocks.len();
+                format!("{{\"ok\":true,\"scan\":{{\"block_count\":{},\"hebbian_pairs\":{},\"absence_records\":0}}}}", count, self.hebbian_pairs.len())
+            }
+            _ => "{\"ok\":false,\"error\":\"Usage: absentia [status|scan]\"}".to_string(),
+        }
+    }
+
+    fn cmd_hebbian(&self) -> String {
+        let pairs: Vec<String> = self.hebbian_pairs.iter().rev().take(20)
+            .map(|(a, b, s)| format!("{{\"from\":{},\"to\":{},\"strength\":{}}}", a, b, s))
+            .collect();
+        format!("{{\"ok\":true,\"total_pairs\":{},\"top_pairs\":[{}]}}", self.hebbian_pairs.len(), pairs.join(","))
+    }
+
+    fn cmd_audit(&self, args: &str) -> String {
+        let n: usize = args.split_whitespace().next().and_then(|s| s.parse().ok()).unwrap_or(20);
+        let entries: Vec<String> = self.audit_log.iter().rev().take(n)
+            .map(|e| format!("\"{}\"", e.replace('"', "\\\"")))
+            .collect();
+        format!("{{\"ok\":true,\"audit\":[{}]}}", entries.join(","))
+    }
+
+    fn cmd_genome(&self) -> String {
+        "{\"ok\":true,\"genome\":{\"identity\":\"HOPE\",\"mission\":\"Segíteni a felhasználónak a gondolkodásban.\",\"values\":[\"Auditálhatóság\",\"Transzparencia\",\"Biztonság\",\"Emberi kontroll\"],\"constraints\":[{\"name\":\"no_autonomous_action\",\"severity\":\"ABSOLUTE\"}]}}".to_string()
+    }
+
+    fn cmd_permissions(&self) -> String {
+        "{\"ok\":true,\"permissions\":{\"capabilities\":[\"recall\",\"store\",\"suggest\",\"ask\"],\"constraints\":[{\"name\":\"no_autonomous_action\",\"severity\":\"ABSOLUTE\"}]}}".to_string()
+    }
+
+    fn cmd_help(&self) -> String {
+        "{\"ok\":true,\"commands\":{\"Core\":[\"status\",\"stats\",\"doctor\",\"help\"],\"Memory\":[\"recall <query> [k]\",\"store <text> [layer] [importance]\",\"find <pattern>\"],\"Intent\":[\"intent generate\",\"intent audit\"],\"Absentia\":[\"absentia status\",\"absentia scan\"],\"Hebbian\":[\"hebbian\"],\"Audit\":[\"audit [n]\"],\"Genome\":[\"genome\"],\"Permissions\":[\"permissions\"]}}".to_string()
+    }
+}

@@ -4026,6 +4026,111 @@ async fn async_main() {
                 }
             }
         }
+        Cmd::Octopus { operation } => {
+            use std::process::Command;
+
+            let octopus_bin = r"C:\Users\mater\.agents\skills\octopus\bin\octopus-runtime.exe";
+
+            match operation.as_str() {
+                "full-pipeline" => {
+                    println!("{}", "OCTOPUS FULL PIPELINE".cyan().bold());
+                    println!("  Párhuzamos kognitív műveletek Octopus arm-okkal.");
+                    println!();
+
+                    // Arm 1: Absentia scan
+                    println!("  ├─ Arm 1: Absentia scan...");
+                    let output1 = Command::new(octopus_bin)
+                        .args(["run", "code-reader", &format!("{}{}", "absentia scan — ", "D:\\codex\\microscope-memory")])
+                        .output();
+                    match output1 {
+                        Ok(o) => {
+                            let stdout = String::from_utf8_lossy(&o.stdout);
+                            let stderr = String::from_utf8_lossy(&o.stderr);
+                            if o.status.success() {
+                                println!("  ├─ ✓ Absentia scan kész");
+                            } else {
+                                println!("  ├─ ⚠ Absentia scan: {}", stderr.lines().next().unwrap_or("?"));
+                            }
+                        }
+                        Err(e) => println!("  ├─ ✗ Absentia scan hiba: {}", e),
+                    }
+
+                    // Arm 2: Morphogenesis cycle
+                    println!("  ├─ Arm 2: Morphogenesis cycle...");
+                    let output2 = Command::new("D:\\codex\\microscope-memory\\target\\release\\microscope-mem.exe")
+                        .args(["morphogenesis", "run"])
+                        .env("MICROSCOPE_CONFIG", "D:\\codex\\microscope-memory\\config.toml")
+                        .output();
+                    match output2 {
+                        Ok(o) => {
+                            let stdout = String::from_utf8_lossy(&o.stdout);
+                            if o.status.success() {
+                                println!("  ├─ ✓ Morphogenesis cycle kész");
+                            } else {
+                                println!("  ├─ ⚠ Morphogenesis cycle hiba");
+                            }
+                        }
+                        Err(e) => println!("  ├─ ✗ Morphogenesis cycle hiba: {}", e),
+                    }
+
+                    // Arm 3: Intent generation
+                    println!("  └─ Arm 3: Intent generation...");
+                    let output3 = Command::new("D:\\codex\\microscope-memory\\target\\release\\microscope-mem.exe")
+                        .args(["intent", "generate"])
+                        .env("MICROSCOPE_CONFIG", "D:\\codex\\microscope-memory\\config.toml")
+                        .output();
+                    match output3 {
+                        Ok(o) => {
+                            let stdout = String::from_utf8_lossy(&o.stdout);
+                            if o.status.success() {
+                                println!("      ✓ Intent generálva");
+                                for line in stdout.lines().take(10) {
+                                    println!("        {}", line);
+                                }
+                            } else {
+                                println!("      ⚠ Intent hiba");
+                            }
+                        }
+                        Err(e) => println!("      ✗ Intent hiba: {}", e),
+                    }
+
+                    println!();
+                    println!("  {}", "OCTOPUS PIPELINE KÉSZ".green().bold());
+                }
+                "scan" => {
+                    println!("{}", "OCTOPUS SCAN".cyan().bold());
+                    let output = Command::new("D:\\codex\\microscope-memory\\target\\release\\microscope-mem.exe")
+                        .args(["absentia", "scan"])
+                        .env("MICROSCOPE_CONFIG", "D:\\codex\\microscope-memory\\config.toml")
+                        .output();
+                    match output {
+                        Ok(o) => {
+                            let stdout = String::from_utf8_lossy(&o.stdout);
+                            println!("{}", stdout);
+                        }
+                        Err(e) => eprintln!("  Hiba: {}", e),
+                    }
+                }
+                "cycle" => {
+                    println!("{}", "OCTOPUS CYCLE".cyan().bold());
+                    let output = Command::new("D:\\codex\\microscope-memory\\target\\release\\microscope-mem.exe")
+                        .args(["morphogenesis", "run"])
+                        .env("MICROSCOPE_CONFIG", "D:\\codex\\microscope-memory\\config.toml")
+                        .output();
+                    match output {
+                        Ok(o) => {
+                            let stdout = String::from_utf8_lossy(&o.stdout);
+                            println!("{}", stdout);
+                        }
+                        Err(e) => eprintln!("  Hiba: {}", e),
+                    }
+                }
+                _ => {
+                    eprintln!("  Ismeretlen művelet: {}", operation);
+                    eprintln!("  Használat: octopus [full-pipeline|scan|cycle]");
+                }
+            }
+        }
         Cmd::Intent { action } => {
             use microscope_memory::cli::IntentAction as IA;
             use microscope_memory::intent::IntentPipeline;

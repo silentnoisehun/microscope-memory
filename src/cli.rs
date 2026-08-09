@@ -379,6 +379,12 @@ pub enum Cmd {
         #[command(subcommand)]
         action: IntentAction,
     },
+    /// Octopus — párhuzamos kognitív műveletek
+    Octopus {
+        /// Művelet: full-pipeline | scan | cycle
+        #[arg(default_value = "full-pipeline")]
+        operation: String,
+    },
 }
 
 #[derive(Subcommand)]

@@ -792,3 +792,94 @@ fn test_retention_shift_remaps_state_files() {
         "spaced record must follow the block content through retention"
     );
 }
+
+// ─── Text index (② O(N) search): results must be identical to a full scan ───
+
+#[test]
+fn test_text_index_find_matches_full_scan() {
+    let (_tmp, config) = setup_test_env();
+
+    microscope_memory::store_memory(&config, "Rust borrow checker is strict", "long_term", 7)
+        .expect("store a");
+    microscope_memory::store_memory(&config, "Memory is managed by ownership", "long_term", 6)
+        .expect("store b");
+    microscope_memory::store_memory(&config, "Rusting in the rain tonight", "long_term", 5)
+        .expect("store c");
+
+    // Heavy build → text_index.bin is produced.
+    microscope_memory::build::build(&config, true, true).expect("heavy build");
+    let output_dir = Path::new(&config.paths.output_dir);
+    assert!(
+        output_dir.join("text_index.bin").exists(),
+        "heavy build must emit text_index.bin"
+    );
+
+    let indexed = {
+        let reader = microscope_memory::MicroscopeReader::open(&config).expect("open reader");
+        assert!(
+            reader.text_index.is_some(),
+            "reader must load the text index"
+        );
+        // Exact word, fragment (substring inside a longer word), and a phrase.
+        let mut out = Vec::new();
+        for q in ["rust", "rus", "Rust borrow", "memory", "zzz"] {
+            out.push((q.to_string(), reader.find_text(q, 20)));
+        }
+        out
+    };
+
+    // Force the scan path by removing the index and reopening.
+    fs::remove_file(output_dir.join("text_index.bin")).unwrap();
+    let scanned = {
+        let reader = microscope_memory::MicroscopeReader::open(&config).expect("open reader");
+        assert!(
+            reader.text_index.is_none(),
+            "removed index must not be loaded"
+        );
+        let mut out = Vec::new();
+        for q in ["rust", "rus", "Rust borrow", "memory", "zzz"] {
+            out.push((q.to_string(), reader.find_text(q, 20)));
+        }
+        out
+    };
+
+    assert_eq!(indexed.len(), scanned.len());
+    for ((q1, a), (q2, b)) in indexed.iter().zip(scanned.iter()) {
+        assert_eq!(q1, q2);
+        assert_eq!(
+            a, b,
+            "indexed and scanned find_text differ for query '{q1}'"
+        );
+    }
+}
+
+#[test]
+fn test_light_rebuild_drops_stale_text_index() {
+    let (_tmp, config) = setup_test_env();
+    microscope_memory::store_memory(&config, "Alpha entry for light rebuild", "long_term", 7)
+        .expect("store");
+    microscope_memory::build::build(&config, true, true).expect("heavy build");
+
+    let output_dir = Path::new(&config.paths.output_dir);
+    assert!(output_dir.join("text_index.bin").exists());
+
+    // Content change + light rebuild: the stale index must be dropped so it is
+    // never served against the new block layout.
+    let layers_dir = Path::new(&config.paths.layers_dir);
+    fs::write(
+        layers_dir.join("long_term.txt"),
+        "(imp=7) Beta entry after the content change",
+    )
+    .unwrap();
+    microscope_memory::build::build(&config, true, false).expect("light rebuild");
+    assert!(
+        !output_dir.join("text_index.bin").exists(),
+        "light rebuild must drop the stale text index"
+    );
+
+    let reader = microscope_memory::MicroscopeReader::open(&config).expect("open reader");
+    assert!(reader.text_index.is_none());
+    // Scan fallback still finds the new content.
+    let hits = reader.find_text("Beta entry", 10);
+    assert!(!hits.is_empty(), "scan fallback must find the new content");
+}

@@ -53,12 +53,15 @@ pub fn recall(config: &Config, query: &str, k: usize, emotion: Option<[f32; 21]>
     // █████ Attention: compute layer weights from context █████
     let output_dir_att = Path::new(&config.paths.output_dir);
     let mut attention = attention::AttentionState::load_or_init(output_dir_att);
-    let hebb_pre =
+    let mut hebb =
         hebbian::HebbianState::load_or_init(output_dir_att, reader.block_count);
     let tg_pre = thought_graph::ThoughtGraphState::load_or_init(output_dir_att);
     let pc_pre = predictive_cache::PredictiveCache::load_or_init(output_dir_att);
 
-    let emotional_energy = emotional::emotional_field(&reader, &hebb_pre)
+    // Single emotional-field scan; reused for energy and the bias warp.
+    let emotional_field = emotional::emotional_field(&reader, &hebb);
+    let emotional_energy = emotional_field
+        .as_ref()
         .map(|f| f.total_energy)
         .unwrap_or(0.0);
 
@@ -86,18 +89,14 @@ pub fn recall(config: &Config, query: &str, k: usize, emotion: Option<[f32; 21]>
     };
     let attn = attention.compute_attention(&attn_signals);
 
-    // Emotional bias warp: bend search coordinates toward emotional attractors
-    let output_dir_eb = Path::new(&config.paths.output_dir);
-    let hebb_eb =
-        hebbian::HebbianState::load_or_init(output_dir_eb, reader.block_count);
+    // Emotional bias warp: bend search coordinates toward the precomputed centroid
     let emotional_weight = config.search.emotional_bias_weight * attn.weight(4);
-    let (qx, qy, qz) = emotional::apply_emotional_bias(
+    let (qx, qy, qz) = emotional::apply_emotional_bias_from_centroid(
         qx,
         qy,
         qz,
         emotional_weight,
-        &reader,
-        &hebb_eb,
+        emotional_field.as_ref().map(|f| f.centroid),
     );
 
     let (zoom_lo, zoom_hi) = match query.len() {
@@ -118,10 +117,33 @@ pub fn recall(config: &Config, query: &str, k: usize, emotion: Option<[f32; 21]>
         Path::new(&config.paths.output_dir)
     );
 
-    for zoom in zoom_lo..=zoom_hi {
+    // Inverted text index prefilter: narrow the depth-range scan to blocks
+    // that can lexically match (token_similarity semantics), then run the
+    // exact scoring on those candidates — identical results, far fewer scans.
+    let lex_cands: Option<Vec<u32>> = reader
+        .text_index
+        .as_ref()
+        .and_then(|idx| idx.candidates_lexical(relevance_query.tokens()));
+
+    let mut ci = 0usize;
+    'zoom: for zoom in zoom_lo..=zoom_hi {
         let (start, count) = reader.depth_ranges[zoom as usize];
         let (start, count) = (start as usize, count as usize);
         for i in start..(start + count) {
+            if let Some(cands) = &lex_cands {
+                if cands.is_empty() {
+                    break 'zoom;
+                }
+                while ci < cands.len() && (cands[ci] as usize) < i {
+                    ci += 1;
+                }
+                if ci >= cands.len() {
+                    break 'zoom;
+                }
+                if (cands[ci] as usize) != i {
+                    continue;
+                }
+            }
             let text = reader.text(i);
             let lexical = relevance_query.lexical_score(text);
             if lexical > 0.0 {
@@ -240,8 +262,6 @@ pub fn recall(config: &Config, query: &str, k: usize, emotion: Option<[f32; 21]>
 
     // █████ Hebbian + Mirror: record activations & detect resonance █████
     let output_dir = Path::new(&config.paths.output_dir);
-    let mut hebb =
-        hebbian::HebbianState::load_or_init(output_dir, reader.block_count);
     let mut mirror_state = mirror::MirrorState::load_or_init(output_dir);
     let activated: Vec<(u32, f32)> = all_results
         .iter()

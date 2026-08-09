@@ -844,6 +844,20 @@ pub fn build(config: &Config, force: bool, heavy: bool) -> Result<(), String> {
             }
         }
 
+        // ═══ Inverted text index (fast find_text / recall prefilter) ═══
+        let text_index_result = (|| -> Result<(), String> {
+            let reader = MicroscopeReader::open(config)?;
+            crate::text_index::build_text_index(
+                (0..reader.block_count).map(|i| reader.text(i)),
+                reader.block_count,
+                &output_dir.join("text_index.bin"),
+            )
+        })();
+        match text_index_result {
+            Ok(()) => println!("  {} text_index.bin built", "OK".green()),
+            Err(e) => eprintln!("  {} text index build: {}", "ERR".red(), e),
+        }
+
         // ═══ Hebbian delta integration ═══
         let hebb_path = output_dir.join("activations.bin");
         if hebb_path.exists() {
@@ -883,7 +897,12 @@ pub fn build(config: &Config, force: bool, heavy: bool) -> Result<(), String> {
     } else if layers_changed {
         // Light rebuild with content change: stale positional sidecars must not
         // be served — drop them and rebuild on the next explicit `build`.
-        for name in ["embeddings.bin", "links.bin", "fingerprints.idx"] {
+        for name in [
+            "embeddings.bin",
+            "links.bin",
+            "fingerprints.idx",
+            "text_index.bin",
+        ] {
             let p = output_dir.join(name);
             if p.exists() {
                 let _ = fs::remove_file(&p);

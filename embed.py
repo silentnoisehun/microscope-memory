@@ -1,4 +1,4 @@
-﻿"""Microscope Memory embedding server — called as subprocess for batch embedding."""
+"""Microscope Memory embedding server — called as subprocess for batch embedding."""
 import json, struct, sys, os
 from sentence_transformers import SentenceTransformer
 
@@ -14,10 +14,20 @@ def main():
     for line in sys.stdin:
         line = line.strip()
         if not line:
+            # Send zero vector to keep protocol in sync
+            sys.stdout.buffer.write(struct.pack(f"<{dim}f", *([0.0] * dim)))
+            sys.stdout.buffer.flush()
             continue
-        emb = model.encode(line)
-        sys.stdout.buffer.write(struct.pack(f"<{dim}f", *emb.tolist()))
-        sys.stdout.buffer.flush()
+        try:
+            emb = model.encode(line)
+            sys.stdout.buffer.write(struct.pack(f"<{dim}f", *emb.tolist()))
+            sys.stdout.buffer.flush()
+        except Exception as e:
+            # Send zero vector on error — Rust code filters zero vectors
+            sys.stderr.write(f"embed error: {e}\n")
+            sys.stderr.flush()
+            sys.stdout.buffer.write(struct.pack(f"<{dim}f", *([0.0] * dim)))
+            sys.stdout.buffer.flush()
 
 if __name__ == "__main__":
     main()

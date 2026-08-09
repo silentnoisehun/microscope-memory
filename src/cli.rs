@@ -364,6 +364,37 @@ pub enum Cmd {
         #[command(subcommand)]
         action: EvidenceAction,
     },
+    /// Kognitív Morfogenezis — audit-napló, metrikák, gradiens állapot
+    Morphogenesis {
+        #[command(subcommand)]
+        action: MorphogenesisAction,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum MorphogenesisAction {
+    /// Audit-napló megjelenítése
+    Audit {
+        /// Hány bejegyzés (legutóbbi)
+        #[arg(default_value = "20")]
+        k: usize,
+    },
+    /// Metrikák megjelenítése
+    Metrics {
+        /// Hány bejegyzés (legutóbbi)
+        #[arg(default_value = "20")]
+        k: usize,
+    },
+    /// Aktuális gradiens állapot és fázis
+    Status,
+    /// Egy teljes kognitív morfogenezis ciklus futtatása
+    Run,
+    /// Fázis-átmenetek tesztelése különböző gradiens-súlyokkal
+    TestPhases,
+    /// Teljes integrációs állapot: audit + metrikák + fázis + gradiens
+    FullStatus,
+    /// Adversarial tesztcsomag — edge case-ek és védett állítások ellenőrzése
+    Adversarial,
 }
 
 #[derive(Subcommand)]

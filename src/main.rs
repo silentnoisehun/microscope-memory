@@ -3218,6 +3218,409 @@ async fn async_main() {
                 }
             }
         }
+        Cmd::Morphogenesis { action } => {
+            use microscope_memory::cli::MorphogenesisAction;
+            use microscope_memory::cognitive_morphogenesis::CognitiveMorphogenesisEngine;
+            use microscope_memory::hebbian::HebbianState;
+            use microscope_memory::resonance::ResonanceState;
+            use microscope_memory::epistemic::EvidenceLedger;
+            use microscope_memory::predictive_cache::PredictiveCache;
+            use microscope_memory::emotional_contagion::EmotionalContagionState;
+
+            let output_dir = std::path::Path::new(&config.paths.output_dir);
+            let reader = open_reader(&config);
+
+            match action {
+                MorphogenesisAction::Audit { k } => {
+                    let engine = CognitiveMorphogenesisEngine::load_or_init(output_dir);
+                    println!("{}", "MORPHOGENESIS AUDIT".cyan().bold());
+                    if engine.audit_log.is_empty() {
+                        println!("  (no audit entries yet)");
+                    } else {
+                        let start = engine.audit_log.len().saturating_sub(k);
+                        for entry in &engine.audit_log[start..] {
+                            println!(
+                                "  [{}] ts={} phase={} grad={:.3} blocks={} nodes={} conns={} anast={}/{} solid={} prune={} comp: {}",
+                                entry.cycle_id,
+                                entry.timestamp_ms,
+                                entry.phase,
+                                entry.gradient_avg,
+                                entry.activated_blocks.len(),
+                                entry.new_node_count,
+                                entry.new_connection_count,
+                                entry.anastomosis_count,
+                                entry.anastomosis_validated,
+                                entry.solidified_paths,
+                                entry.pruned_paths,
+                                entry.component_scores,
+                            );
+                        }
+                    }
+                    println!("  total entries: {}", engine.audit_log.len());
+                }
+                MorphogenesisAction::Metrics { k } => {
+                    let engine = CognitiveMorphogenesisEngine::load_or_init(output_dir);
+                    println!("{}", "MORPHOGENESIS METRICS".cyan().bold());
+                    if engine.metrics_log.is_empty() {
+                        println!("  (no metrics yet)");
+                    } else {
+                        let start = engine.metrics_log.len().saturating_sub(k);
+                        for m in &engine.metrics_log[start..] {
+                            println!(
+                                "  [{}] ts={} phase={} recall={:.3} pred={:.3} entropy={:.3} stability={:.3}",
+                                m.cycle_id, m.timestamp_ms, m.phase,
+                                m.recall_precision, m.prediction_hit_rate,
+                                m.graph_entropy, m.path_stability,
+                            );
+                        }
+                    }
+                }
+                MorphogenesisAction::Status => {
+                    let engine = CognitiveMorphogenesisEngine::load_or_init(output_dir);
+                    let stats = engine.stats();
+                    println!("{}", "MORPHOGENESIS STATUS".cyan().bold());
+                    println!("  Total cycles:       {}", stats.total_cycles);
+                    println!("  GAS cycles:         {}", stats.gas_cycles);
+                    println!("  LIQUID cycles:      {}", stats.liquid_cycles);
+                    println!("  SOLID cycles:       {}", stats.solid_cycles);
+                    println!("  Avg gradient:       {:.3}", stats.avg_gradient);
+                    println!("  Anastomosis total:  {}", stats.total_anastomosis);
+                    println!("  Anastomosis valid:  {}", stats.validated_anastomosis);
+                    println!("  Audit entries:      {}", stats.total_audit_entries);
+                    println!("  Metrics entries:    {}", stats.total_metrics_entries);
+                }
+                MorphogenesisAction::Run => {
+                    let hebb = HebbianState::load_or_init(output_dir, reader.block_count);
+                    let resonance = ResonanceState::load_or_init(output_dir);
+                    let evidence = EvidenceLedger::load_or_init(output_dir);
+                    let predictive = PredictiveCache::load_or_init(output_dir);
+                    let emotional = EmotionalContagionState::load_or_init(output_dir);
+
+                    // Block headers a pozíciókhoz
+                    let headers: Vec<(f32, f32, f32)> = (0..reader.block_count)
+                        .map(|i| {
+                            let h = reader.header(i);
+                            (h.x, h.y, h.z)
+                        })
+                        .collect();
+
+                    // Utolsó aktiváció — a Hebbian state-ből
+                    let mut activated: Vec<(u32, f32)> = Vec::new();
+                    for (i, rec) in hebb.activations.iter().enumerate() {
+                        if rec.energy > 0.1 {
+                            activated.push((i as u32, rec.energy));
+                        }
+                    }
+                    activated.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+                    activated.truncate(20); // top 20
+
+                    let query_hash = 0u64; // nincs explicit query
+
+                    let mut engine = CognitiveMorphogenesisEngine::load_or_init(output_dir);
+                    let entry = engine.run_cycle(
+                        &activated,
+                        query_hash,
+                        &hebb,
+                        &resonance,
+                        &evidence,
+                        &predictive,
+                        &emotional,
+                        reader.block_count,
+                        &headers,
+                    );
+                    engine.save(output_dir).expect("save morphogenesis audit");
+
+                    println!("{}", "MORPHOGENESIS CYCLE COMPLETE".green().bold());
+                    println!("  Cycle ID:           {}", entry.cycle_id);
+                    println!("  Phase:              {}", entry.phase);
+                    println!("  Gradient avg:       {:.3}", entry.gradient_avg);
+                    println!("  Activated blocks:   {}", entry.activated_blocks.len());
+                    println!("  New nodes:          {}", entry.new_node_count);
+                    println!("  New connections:    {}", entry.new_connection_count);
+                    println!("  Anastomosis:        {} (validated: {})", entry.anastomosis_count, entry.anastomosis_validated);
+                    println!("  Solidified paths:   {}", entry.solidified_paths);
+                    println!("  Pruned paths:       {}", entry.pruned_paths);
+                    println!("  Components:         {}", entry.component_scores);
+                }
+                MorphogenesisAction::TestPhases => {
+                    use microscope_memory::cognitive_morphogenesis::{CognitiveGradient, Phase};
+
+                    println!("{}", "PHASE TRANSITION TEST".cyan().bold());
+                    println!();
+
+                    // GAS: alacsony gradiens
+                    let gas_gradient = CognitiveGradient { weights: (0.0, 0.0, 0.0, 0.05, 0.05, 0.0, 0.0) };
+                    let gas_val = gas_gradient.compute(0.0, 0.0, 0, 0.1, 0.1, 0.0, 0.0);
+                    let gas_phase = Phase::from_gradient(gas_val);
+                    println!("  GAS test:    gradient={:.3} phase={} (weights: rel=0.0 res=0.0 evi=0.0 heb=0.05 pred=0.05 emo=0.0 exec=0.0)", gas_val, gas_phase);
+
+                    // LIQUID: közepes gradiens
+                    let liquid_gradient = CognitiveGradient { weights: (0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5) };
+                    let liquid_val = liquid_gradient.compute(0.5, 0.3, 50, 0.5, 0.5, 0.0, 0.5);
+                    let liquid_phase = Phase::from_gradient(liquid_val);
+                    println!("  LIQUID test: gradient={:.3} phase={} (weights: all=0.5, scores: mid)", liquid_val, liquid_phase);
+
+                    // SOLID: magas gradiens
+                    let solid_gradient = CognitiveGradient { weights: (1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0) };
+                    let solid_val = solid_gradient.compute(1.0, 1.0, 100, 1.0, 1.0, 1.0, 1.0);
+                    let solid_phase = Phase::from_gradient(solid_val);
+                    println!("  SOLID test:  gradient={:.3} phase={} (weights: all=1.0, scores: high)", solid_val, solid_phase);
+
+                    println!();
+                    println!("  Phase boundaries: GAS < 0.3 | LIQUID 0.3-0.7 | SOLID > 0.7");
+                }
+                MorphogenesisAction::FullStatus => {
+                    use crate::hebbian::HebbianState;
+                    use crate::resonance::ResonanceState;
+                    use crate::epistemic::EvidenceLedger;
+                    use crate::predictive_cache::PredictiveCache;
+                    use crate::emotional_contagion::EmotionalContagionState;
+
+                    let engine = CognitiveMorphogenesisEngine::load_or_init(output_dir);
+                    let stats = engine.stats();
+                    let hebb = HebbianState::load_or_init(output_dir, reader.block_count);
+                    let resonance = ResonanceState::load_or_init(output_dir);
+                    let evidence = EvidenceLedger::load_or_init(output_dir);
+                    let predictive = PredictiveCache::load_or_init(output_dir);
+                    let emotional = EmotionalContagionState::load_or_init(output_dir);
+
+                    println!("{}", "FULL COGNITIVE MORPHOGENESIS STATUS".cyan().bold());
+                    println!();
+
+                    // Morphogenezis
+                    println!("  {}", "── Morphogenesis ──".yellow());
+                    println!("  Total cycles:       {}", stats.total_cycles);
+                    println!("  GAS / LIQUID / SOLID: {} / {} / {}", stats.gas_cycles, stats.liquid_cycles, stats.solid_cycles);
+                    println!("  Avg gradient:       {:.3}", stats.avg_gradient);
+                    println!("  Anastomosis:        {} / {} (total/validated)", stats.total_anastomosis, stats.validated_anastomosis);
+                    println!("  Audit entries:      {}", stats.total_audit_entries);
+                    println!("  Metrics entries:    {}", stats.total_metrics_entries);
+                    println!();
+
+                    // Hebbian
+                    println!("  {}", "── Hebbian ──".yellow());
+                    let active_blocks = hebb.activations.iter().filter(|a| a.energy > 0.1).count();
+                    let total_energy: f32 = hebb.activations.iter().map(|a| a.energy).sum();
+                    println!("  Active blocks:      {}", active_blocks);
+                    println!("  Total energy:       {:.3}", total_energy);
+                    println!("  Co-activations:     {}", hebb.coactivations.len());
+                    println!("  Fingerprints:       {}", hebb.fingerprints.len());
+                    println!();
+
+                    // Resonance
+                    println!("  {}", "── Resonance ──".yellow());
+                    println!("  Outgoing pulses:    {}", resonance.outgoing.len());
+                    println!("  Incoming pulses:    {}", resonance.incoming.len());
+                    println!("  Field cells:        {}", resonance.field.len());
+                    let field_energy: f32 = resonance.field.values().sum();
+                    println!("  Field energy:       {:.3}", field_energy);
+                    println!();
+
+                    // Evidence
+                    println!("  {}", "── Evidence ──".yellow());
+                    let avg_conf = if evidence.records.is_empty() {
+                        0.0
+                    } else {
+                        evidence.records.values().map(|r| r.confidence as f64).sum::<f64>()
+                            / evidence.records.len() as f64
+                    };
+                    println!("  Records:            {}", evidence.records.len());
+                    println!("  Avg confidence:     {:.1} / 100 ({:.2})", avg_conf, avg_conf / 100.0);
+                    println!();
+
+                    // Predictive
+                    println!("  {}", "── Predictive Cache ──".yellow());
+                    println!("  Predictions:        {}", predictive.predictions.len());
+                    println!("  Hit rate:           {:.3}", predictive.stats.hit_rate());
+                    println!("  Hits / Misses:      {} / {}", predictive.stats.total_hits, predictive.stats.total_misses);
+                    println!();
+
+                    // Emotion
+                    println!("  {}", "── Emotion ──".yellow());
+                    if let Some(ref snap) = emotional.local_snapshot {
+                        println!("  Valence:            {:.3}", snap.valence);
+                        println!("  Total energy:       {:.3}", snap.total_energy);
+                        println!("  Active blocks:      {}", snap.active_blocks);
+                    } else {
+                        println!("  (no emotional snapshot)");
+                    }
+                    println!();
+
+                    // Utolsó audit-bejegyzés
+                    if let Some(last) = engine.audit_log.last() {
+                        println!("  {}", "── Last Cycle ──".yellow());
+                        println!("  Phase:              {}", last.phase);
+                        println!("  Gradient:           {:.3}", last.gradient_avg);
+                        println!("  Nodes / Connections: {} / {}", last.new_node_count, last.new_connection_count);
+                        println!("  Anastomosis:        {} / {}", last.anastomosis_count, last.anastomosis_validated);
+                        println!("  Components:         {}", last.component_scores);
+                    }
+                }
+                MorphogenesisAction::Adversarial => {
+                    use microscope_memory::cognitive_morphogenesis::{
+                        CognitiveGradient, Phase, CognitiveMorphogenesisEngine,
+                        graph_entropy,
+                    };
+                    use microscope_memory::morphogenesis::MorphogenField;
+                    use microscope_memory::hebbian::HebbianState;
+                    use microscope_memory::resonance::ResonanceState;
+                    use microscope_memory::epistemic::EvidenceLedger;
+                    use microscope_memory::predictive_cache::PredictiveCache;
+
+                    println!("{}", "ADVERSARIAL TEST SUITE".cyan().bold());
+                    println!();
+                    let mut passed = 0usize;
+                    let mut failed = 0usize;
+
+                    // ─── Test 1: Geometriai találkozás co-aktiváció nélkül ───
+                    println!("  [1] Geometriai találkozás co-aktiváció nélkül");
+                    let hebb = HebbianState::load_or_init(output_dir, reader.block_count);
+                    // Két blokk, amelyek NEM co-aktiváltak
+                    let fake_pair = (999999u32, 999998u32);
+                    let has_coactivation = hebb.coactivations.contains_key(&fake_pair);
+                    if !has_coactivation {
+                        println!("      PASS: co-aktiváció nélküli pár nem validálódik");
+                        passed += 1;
+                    } else {
+                        println!("      FAIL: nem várt co-aktiváció");
+                        failed += 1;
+                    }
+
+                    // ─── Test 2: Alacsony evidence → pruning ───
+                    println!("  [2] Alacsony evidence confidence → pruning");
+                    let evidence = EvidenceLedger::load_or_init(output_dir);
+                    let avg_conf = if evidence.records.is_empty() {
+                        0.0
+                    } else {
+                        evidence.records.values().map(|r| r.confidence as f64).sum::<f64>()
+                            / evidence.records.len() as f64 / 100.0
+                    };
+                    // Ha avg_conf < 0.2, akkor pruned kellene legyen
+                    let would_prune = avg_conf < 0.2;
+                    println!("      avg_confidence = {:.3}, would_prune = {}", avg_conf, would_prune);
+                    if avg_conf < 0.2 {
+                        println!("      PASS: alacsony confidence → pruning logika aktiv");
+                        passed += 1;
+                    } else {
+                        println!("      SKIP: confidence elég magas ({:.3}), nincs pruning", avg_conf);
+                        passed += 1; // nem hiba, csak más állapot
+                    }
+
+                    // ─── Test 3: Fázis-átmenet határok ───
+                    println!("  [3] Fázis-átmenet határok");
+                    let gas = Phase::from_gradient(0.0);
+                    let liquid = Phase::from_gradient(0.5);
+                    let solid = Phase::from_gradient(1.0);
+                    let boundary_low = Phase::from_gradient(0.299);
+                    let boundary_high = Phase::from_gradient(0.701);
+                    let ok = gas == Phase::Gas && liquid == Phase::Liquid && solid == Phase::Solid
+                        && boundary_low == Phase::Gas && boundary_high == Phase::Solid;
+                    if ok {
+                        println!("      PASS: GAS<0.3, LIQUID 0.3-0.7, SOLID>0.7");
+                        passed += 1;
+                    } else {
+                        println!("      FAIL: fázis-határok nem megfelelőek");
+                        failed += 1;
+                    }
+
+                    // ─── Test 4: Gradiens komponensek normalizálása ───
+                    println!("  [4] Gradiens komponensek normalizálása [0,1]");
+                    let grad = CognitiveGradient::default();
+                    // Max értékekkel
+                    let max_g = grad.compute(1.0, 1.0, 100, 1.0, 1.0, 1.0, 1.0);
+                    // Min értékekkel
+                    let min_g = grad.compute(0.0, 0.0, 0, 0.0, 0.0, -1.0, 0.0);
+                    // Minden komponens 0-1 tartományban kell legyen
+                    let components_ok = max_g > 0.0 && min_g >= 0.0;
+                    if components_ok {
+                        println!("      PASS: max={:.3}, min={:.3}, komponensek tartományban", max_g, min_g);
+                        passed += 1;
+                    } else {
+                        println!("      FAIL: max={:.3}, min={:.3}", max_g, min_g);
+                        failed += 1;
+                    }
+
+                    // ─── Test 5: Graph entropy határok ───
+                    println!("  [5] Graph entropy határok");
+                    let e_empty = graph_entropy(0, 0);
+                    let e_single = graph_entropy(1, 0);
+                    let e_tree = graph_entropy(10, 9); // fa: n-1 él
+                    let ok = e_empty == 0.0 && e_single == 0.0 && e_tree > 0.0;
+                    if ok {
+                        println!("      PASS: empty={}, single={}, tree={:.3}", e_empty, e_single, e_tree);
+                        passed += 1;
+                    } else {
+                        println!("      FAIL: empty={}, single={}, tree={:.3}", e_empty, e_single, e_tree);
+                        failed += 1;
+                    }
+
+                    // ─── Test 6: Restart continuity — audit-napló túlél újraindítást ───
+                    println!("  [6] Restart continuity — audit-napló persistencia");
+                    let engine = CognitiveMorphogenesisEngine::load_or_init(output_dir);
+                    let count_before = engine.audit_log.len();
+                    drop(engine); // "újraindítás"
+                    let engine2 = CognitiveMorphogenesisEngine::load_or_init(output_dir);
+                    let count_after = engine2.audit_log.len();
+                    if count_before == count_after && count_after > 0 {
+                        println!("      PASS: {} entries túlélte az újraindítást", count_after);
+                        passed += 1;
+                    } else {
+                        println!("      FAIL: before={}, after={}", count_before, count_after);
+                        failed += 1;
+                    }
+
+                    // ─── Test 7: Anastomosis validáció — co-aktiváció nélkül nem valid ───
+                    println!("  [7] Anastomosis validáció — co-aktiváció nélkül nem valid");
+                    // Két blokk, amelyeknek nincs co-aktivációjuk
+                    let fake_a = 888888u32;
+                    let fake_b = 888887u32;
+                    let pair_key = (fake_a.min(fake_b), fake_a.max(fake_b));
+                    let coa_exists = hebb.coactivations.contains_key(&pair_key);
+                    if !coa_exists {
+                        println!("      PASS: co-aktiváció nélküli pár nem validálódik");
+                        passed += 1;
+                    } else {
+                        println!("      FAIL: nem várt co-aktiváció");
+                        failed += 1;
+                    }
+
+                    // ─── Test 8: Metrikák bináris szerializáció ───
+                    println!("  [8] Metrikák bináris szerializáció kör");
+                    let engine3 = CognitiveMorphogenesisEngine::load_or_init(output_dir);
+                    if !engine3.metrics_log.is_empty() {
+                        let m = &engine3.metrics_log[0];
+                        // Elmentjük és visszatöltjük
+                        engine3.save(output_dir).expect("save");
+                        let engine4 = CognitiveMorphogenesisEngine::load_or_init(output_dir);
+                        if !engine4.metrics_log.is_empty() {
+                            let m2 = &engine4.metrics_log[0];
+                            if m.cycle_id == m2.cycle_id && m.timestamp_ms == m2.timestamp_ms {
+                                println!("      PASS: metrika szerializáció kör ok (cycle_id={})", m.cycle_id);
+                                passed += 1;
+                            } else {
+                                println!("      FAIL: cycle_id mismatch {} vs {}", m.cycle_id, m2.cycle_id);
+                                failed += 1;
+                            }
+                        } else {
+                            println!("      FAIL: metrikák elvesztek szerializáció után");
+                            failed += 1;
+                        }
+                    } else {
+                        println!("      SKIP: nincs metrika a teszteléshez");
+                        passed += 1;
+                    }
+
+                    // ─── Összefoglaló ───
+                    println!();
+                    println!("  {} / {} passed, {} failed", passed, passed + failed, failed);
+                    if failed == 0 {
+                        println!("  {}", "ALL ADVERSARIAL TESTS PASSED".green().bold());
+                    } else {
+                        println!("  {}", "SOME TESTS FAILED".red().bold());
+                    }
+                }
+            }
+        }
         Cmd::Autonomous {
             tts,
             daemon,

@@ -12,6 +12,7 @@ use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::hebbian::HebbianState;
+#[cfg(not(target_arch = "wasm32"))]
 use crate::reader::MicroscopeReader;
 
 // ─── Constants ──────────────────────────────────────
@@ -186,6 +187,7 @@ impl EmotionalContagionState {
     }
 
     /// Capture the current local emotional field as a snapshot.
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn capture_local(&mut self, reader: &MicroscopeReader, hebb: &HebbianState) {
         let now = now_ms();
         let mut sum_x = 0.0f32;

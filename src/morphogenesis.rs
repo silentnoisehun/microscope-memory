@@ -2298,6 +2298,7 @@ impl MorphogenesisEngine {
 // ─── Expresszió: Organizmus → Architecture leképezés ────────────────────────
 
 /// Organizmus kifejezése szimulálható Architecture-vé
+#[cfg(not(target_arch = "wasm32"))]
 pub fn express_as_architecture(organism: &Organism) -> crate::architecture_simulator::Architecture {
     let mut components = std::collections::HashMap::new();
 
@@ -2396,6 +2397,7 @@ pub fn express_as_architecture(organism: &Organism) -> crate::architecture_simul
 /// Ha a vagus tónus egy kritikus szint alá esik (magas stressz),
 /// a morphogenesis automatikusan új struktúrákat növeszt,
 /// hogy tehermentesítse a szűk keresztmetszeteket.
+#[cfg(not(target_arch = "wasm32"))]
 pub fn trigger_from_vagus(
     vagus_tone: &crate::vagus::VagusTone,
 

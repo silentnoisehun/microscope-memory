@@ -54,7 +54,6 @@ pub mod daydream;
 pub mod dream;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod emotion_extraction;
-#[cfg(not(target_arch = "wasm32"))]
 pub mod emotional_contagion;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod emotional_episode;
@@ -116,7 +115,6 @@ pub mod mental_sandbox;
 pub mod mental_stimulation;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod meta_supervision;
-#[cfg(not(target_arch = "wasm32"))]
 pub mod morphogenesis;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod cognitive_morphogenesis;
@@ -388,7 +386,6 @@ pub mod autonomous;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod curiosity;
 pub mod emotional_21d;
-#[cfg(not(target_arch = "wasm32"))]
 pub mod epistemic;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod inner_monologue;

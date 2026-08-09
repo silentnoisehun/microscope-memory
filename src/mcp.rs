@@ -17,6 +17,23 @@ use std::collections::{HashMap, HashSet};
 use std::io::{self, BufRead, BufReader, Read, Write};
 use std::path::Path;
 
+/// Tools that mutate memory or run side-effecting operations. Hidden from
+/// `tools/list` and rejected by `tools/call` in read-only (public demo) mode.
+const WRITE_TOOLS: &[&str] = &[
+    "memory_store",
+    "memory_build",
+    "memory_rebuild",
+    "memory_consolidate",
+    "memory_dream",
+    "memory_store_data",
+    "memory_session_context",
+    "memory_evidence_link",
+    "memory_evidence_refute",
+    "memory_autonomous",
+    "memory_resolve_loop",
+    "memory_fingerprint",
+];
+
 /// Maximum framed MCP message body (16 MiB). Prevents unbounded allocation
 /// from a malicious or broken `Content-Length` header.
 const MAX_MESSAGE_LEN: usize = 16 * 1024 * 1024; // 16 MiB
@@ -35,19 +52,20 @@ pub fn run(config: Config) {
     }
 
     // Initialize hook manager
-    let hook_config = if config.hooks.read_only {
+    let mut hook_config = if config.hooks.read_only {
         HookConfig::read_only()
     } else if config.hooks.write_enabled {
         HookConfig::full()
     } else {
         HookConfig::default()
     };
+    hook_config.min_importance = config.hooks.min_importance;
     let hook_manager = HookManager::new(hook_config);
     let mut session_started = false;
 
     eprintln!(
-        "[hooks] manager initialized (read_only={}, write_enabled={})",
-        config.hooks.read_only, config.hooks.write_enabled
+        "[hooks] manager initialized (read_only={}, write_enabled={}, enabled={}, min_importance={})",
+        config.hooks.read_only, config.hooks.write_enabled, config.hooks.enabled, config.hooks.min_importance
     );
 
     let stdin = io::stdin();
@@ -97,7 +115,7 @@ pub fn run(config: Config) {
         let response = match method {
             "initialize" => handle_initialize(&id),
             "initialized" => continue,
-            "tools/list" => handle_tools_list(&id),
+            "tools/list" => handle_tools_list(&id, &config),
             "tools/call" => handle_tools_call_with_hooks(&id, &request, &config, &hook_manager),
             "ping" => json!({ "jsonrpc": "2.0", "id": id, "result": {} }),
             "notifications/cancelled" | "notifications/initialized" => continue,
@@ -124,6 +142,21 @@ fn handle_tools_call_with_hooks(
         .and_then(|n: &Value| n.as_str())
         .unwrap_or("");
     let args = params.get("arguments").cloned().unwrap_or(json!({}));
+
+    // In read-only (public demo) mode, reject any write/mutating tool call.
+    if config.hooks.read_only && is_write_tool(tool_name) {
+        return json!({
+            "jsonrpc": "2.0",
+            "id": id,
+            "result": {
+                "content": [{ "type": "text", "text": format!(
+                    "Error: tool '{}' is disabled in read-only (public demo) mode",
+                    tool_name
+                ) }],
+                "isError": true
+            }
+        });
+    }
 
     // Run before_tool_call hook
     let before_ctx = HookContext::new(HookEvent::BeforeToolCall).with_tool(tool_name, args.clone());
@@ -369,8 +402,14 @@ fn handle_initialize(id: &Value) -> Value {
     })
 }
 
-fn handle_tools_list(id: &Value) -> Value {
-    json!({
+/// Returns `true` if a tool name is a write/mutating tool that must be hidden
+/// when the server runs in read-only (public demo) mode.
+fn is_write_tool(name: &str) -> bool {
+    WRITE_TOOLS.contains(&name)
+}
+
+fn handle_tools_list(id: &Value, config: &Config) -> Value {
+    let mut response = json!({
         "jsonrpc": "2.0",
         "id": id,
         "result": {
@@ -957,7 +996,20 @@ fn handle_tools_list(id: &Value) -> Value {
                 }
             ]
         }
-    })
+    });
+
+    // In read-only (public demo) mode, strip write/mutating tools so clients
+    // never see them in tools/list.
+    if config.hooks.read_only {
+        if let Some(tools) = response["result"]["tools"].as_array_mut() {
+            tools.retain(|t| {
+                let name = t.get("name").and_then(|n| n.as_str()).unwrap_or("");
+                !is_write_tool(name)
+            });
+        }
+    }
+
+    response
 }
 
 fn tool_status(config: &Config) -> Result<String, String> {
@@ -3895,7 +3947,7 @@ mod tests {
 
     #[test]
     fn test_public_demo_tools_list() {
-        let response = handle_tools_list(&serde_json::json!("test"));
+        let response = handle_tools_list(&serde_json::json!("test"), &test_config());
         let tools = response["result"]["tools"].as_array().unwrap();
         assert!(!tools.is_empty(), "tools/list must return tools");
         let names: Vec<&str> = tools.iter().filter_map(|t| t["name"].as_str()).collect();
@@ -3917,9 +3969,18 @@ mod tests {
     #[test]
     fn test_public_demo_tools_are_read_only() {
         // Verify that tools/list returns tools that are safe for read-only use
-        let response = handle_tools_list(&serde_json::json!("test"));
+        let response = handle_tools_list(&serde_json::json!("test"), &test_config());
         let tools = response["result"]["tools"].as_array().unwrap();
         let names: Vec<&str> = tools.iter().filter_map(|t| t["name"].as_str()).collect();
+
+        // Write/mutating tools must be hidden in read-only (public demo) mode
+        for hidden in WRITE_TOOLS.iter() {
+            assert!(
+                !names.contains(hidden),
+                "write tool '{}' must be hidden in read-only mode",
+                hidden
+            );
+        }
 
         // Read tools must be present
         assert!(

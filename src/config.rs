@@ -5,26 +5,41 @@ use std::path::Path;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct HooksConfig {
+    #[serde(default = "default_hooks_enabled")]
+    pub enabled: bool,
     pub read_only: bool,
     pub write_enabled: bool,
+    #[serde(default = "default_hooks_min_importance")]
+    pub min_importance: u8,
 }
 
 impl Default for HooksConfig {
     fn default() -> Self {
         Self {
+            enabled: default_hooks_enabled(),
             read_only: true,
             write_enabled: false,
+            min_importance: default_hooks_min_importance(),
         }
     }
 }
 
+fn default_hooks_enabled() -> bool { true }
+fn default_hooks_min_importance() -> u8 { 3 }
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Config {
+    #[serde(default)]
     pub paths: Paths,
+    #[serde(default)]
     pub index: Index,
+    #[serde(default)]
     pub search: Search,
+    #[serde(default)]
     pub memory_layers: MemoryLayers,
+    #[serde(default)]
     pub performance: Performance,
+    #[serde(default)]
     pub logging: Logging,
     #[serde(default)]
     pub embedding: Embedding,
@@ -42,14 +57,32 @@ pub struct Config {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Paths {
+    #[serde(default = "default_layers_dir")]
     pub layers_dir: String,
+    #[serde(default = "default_output_dir")]
     pub output_dir: String,
+    #[serde(default = "default_temp_dir")]
     pub temp_dir: String,
 }
 
+impl Default for Paths {
+    fn default() -> Self {
+        Self {
+            layers_dir: default_layers_dir(),
+            output_dir: default_output_dir(),
+            temp_dir: default_temp_dir(),
+        }
+    }
+}
+fn default_layers_dir() -> String { "./layers".to_string() }
+fn default_output_dir() -> String { "./output".to_string() }
+fn default_temp_dir() -> String { "./tmp".to_string() }
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Index {
+    #[serde(default = "default_index_max_depth")]
     pub max_depth: u8,
+    #[serde(default = "default_index_header_size")]
     pub header_size: usize,
     #[serde(default = "default_auto_rebuild")]
     pub auto_rebuild: bool,
@@ -69,6 +102,23 @@ pub struct Index {
     #[serde(default = "default_promote_energy_threshold")]
     pub promote_energy_threshold: f32,
 }
+
+impl Default for Index {
+    fn default() -> Self {
+        Self {
+            max_depth: default_index_max_depth(),
+            header_size: default_index_header_size(),
+            auto_rebuild: default_auto_rebuild(),
+            auto_rebuild_entries: default_auto_rebuild_entries(),
+            layer_retention_entries: default_layer_retention_entries(),
+            max_blocks: default_max_blocks(),
+            protect_min_importance: default_protect_min_importance(),
+            promote_energy_threshold: default_promote_energy_threshold(),
+        }
+    }
+}
+fn default_index_max_depth() -> u8 { 8 }
+fn default_index_header_size() -> usize { 50 }
 
 fn default_auto_rebuild() -> bool {
     true
@@ -96,8 +146,11 @@ fn default_auto_rebuild_entries() -> usize {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Search {
+    #[serde(default = "default_search_default_k")]
     pub default_k: usize,
+    #[serde(default = "default_search_zoom_weight")]
     pub zoom_weight: f32,
+    #[serde(default = "default_search_keyword_boost")]
     pub keyword_boost: f32,
     #[serde(default)]
     pub semantic_weight: f32,
@@ -121,15 +174,48 @@ pub struct Search {
     pub emotion_21d_weight: f32,
 }
 
+impl Default for Search {
+    fn default() -> Self {
+        Self {
+            default_k: default_search_default_k(),
+            zoom_weight: default_search_zoom_weight(),
+            keyword_boost: default_search_keyword_boost(),
+            semantic_weight: 0.0,
+            emotional_bias_weight: 0.0,
+            emotion_21d_weight: 0.0,
+        }
+    }
+}
+fn default_search_default_k() -> usize { 10 }
+fn default_search_zoom_weight() -> f32 { 3.0 }
+fn default_search_keyword_boost() -> f32 { 0.4 }
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct MemoryLayers {
     pub layers: Vec<String>,
 }
 
+impl Default for MemoryLayers {
+    fn default() -> Self {
+        Self {
+            layers: vec![
+                "long_term".to_string(),
+                "short_term".to_string(),
+                "session".to_string(),
+                "associative".to_string(),
+                "echo_cache".to_string(),
+            ],
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Performance {
+    #[serde(default = "default_perf_use_mmap")]
     pub use_mmap: bool,
+    #[serde(default = "default_perf_cache_size")]
     pub cache_size: usize,
+    #[serde(default = "default_perf_build_workers")]
     pub build_workers: usize,
     #[serde(default)]
     pub use_gpu: bool,
@@ -138,6 +224,22 @@ pub struct Performance {
     #[serde(default = "default_cache_ttl")]
     pub cache_ttl_secs: u64,
 }
+
+impl Default for Performance {
+    fn default() -> Self {
+        Self {
+            use_mmap: default_perf_use_mmap(),
+            cache_size: default_perf_cache_size(),
+            build_workers: default_perf_build_workers(),
+            use_gpu: false,
+            compression: false,
+            cache_ttl_secs: default_cache_ttl(),
+        }
+    }
+}
+fn default_perf_use_mmap() -> bool { true }
+fn default_perf_cache_size() -> usize { 64 }
+fn default_perf_build_workers() -> usize { 4 }
 
 fn default_cache_ttl() -> u64 {
     300
@@ -233,7 +335,17 @@ impl Default for Server {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Logging {
     pub level: String,
+    #[serde(default)]
     pub file: Option<String>,
+}
+
+impl Default for Logging {
+    fn default() -> Self {
+        Self {
+            level: "info".to_string(),
+            file: Some("microscope.log".to_string()),
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
@@ -354,51 +466,12 @@ impl Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
-            paths: Paths {
-                layers_dir: "./layers".to_string(),
-                output_dir: "./output".to_string(),
-                temp_dir: "./tmp".to_string(),
-            },
-            index: Index {
-                max_depth: 8,
-                header_size: 50,
-                auto_rebuild: default_auto_rebuild(),
-                auto_rebuild_entries: default_auto_rebuild_entries(),
-                layer_retention_entries: default_layer_retention_entries(),
-                max_blocks: default_max_blocks(),
-                protect_min_importance: default_protect_min_importance(),
-                promote_energy_threshold: default_promote_energy_threshold(),
-            },
-            search: Search {
-                default_k: 10,
-                zoom_weight: 3.0,   // boost recent memories more
-                keyword_boost: 0.4, // tuned for better recall precision
-                semantic_weight: 0.0,
-                semantic_rank_gain: default_semantic_rank_gain(),
-                emotional_bias_weight: 0.0,
-                emotion_21d_weight: 0.0,
-            },
-            memory_layers: MemoryLayers {
-                layers: vec![
-                    "long_term".to_string(),
-                    "short_term".to_string(),
-                    "session".to_string(),
-                    "associative".to_string(),
-                    "echo_cache".to_string(),
-                ],
-            },
-            performance: Performance {
-                use_mmap: true,
-                cache_size: 64,
-                build_workers: 4,
-                use_gpu: false,
-                compression: false,
-                cache_ttl_secs: default_cache_ttl(),
-            },
-            logging: Logging {
-                level: "info".to_string(),
-                file: Some("microscope.log".to_string()),
-            },
+            paths: Paths::default(),
+            index: Index::default(),
+            search: Search::default(),
+            memory_layers: MemoryLayers::default(),
+            performance: Performance::default(),
+            logging: Logging::default(),
             embedding: Embedding::default(),
             server: Server::default(),
             federation: Federation::default(),

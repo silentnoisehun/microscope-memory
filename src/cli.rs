@@ -369,6 +369,11 @@ pub enum Cmd {
         #[command(subcommand)]
         action: MorphogenesisAction,
     },
+    /// Absentia — Csend Réteg: ami NEM történt meg, ami hiányzik
+    Absentia {
+        #[command(subcommand)]
+        action: AbsentiaAction,
+    },
 }
 
 #[derive(Subcommand)]
@@ -397,6 +402,21 @@ pub enum MorphogenesisAction {
     Adversarial,
     /// Deep adversarial — célzott stressz-teszt a rendszer absztrakcióinak határain
     DeepAdversarial,
+}
+
+#[derive(Subcommand)]
+pub enum AbsentiaAction {
+    /// Absentia állapot megjelenítése
+    Status,
+    /// Hiányok szkennelése
+    Scan,
+    /// Anti-Hebbian párok megjelenítése
+    AntiHebbian {
+        #[arg(default_value = "20")]
+        k: usize,
+    },
+    /// Causal laundering gyanús párok
+    CausalLaundering,
 }
 
 #[derive(Subcommand)]

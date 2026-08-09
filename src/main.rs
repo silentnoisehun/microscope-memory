@@ -3857,6 +3857,78 @@ async fn async_main() {
                 }
             }
         }
+        Cmd::Absentia { action } => {
+            use microscope_memory::cli::AbsentiaAction;
+            use microscope_memory::absentia::AbsentiaState;
+            use microscope_memory::hebbian::HebbianState;
+            use microscope_memory::epistemic::EvidenceLedger;
+
+            let output_dir = std::path::Path::new(&config.paths.output_dir);
+            let reader = open_reader(&config);
+
+            match action {
+                AbsentiaAction::Status => {
+                    let absentia = AbsentiaState::load_or_init(output_dir);
+                    let stats = absentia.stats();
+                    println!("{}", "ABSENTIA — Csend Réteg".cyan().bold());
+                    println!("  Hiány-rekordok:     {}", stats.total_records);
+                    println!("  Anti-Hebbian párok: {}", stats.anti_hebbian_count);
+                    println!("  Negatív attractorok:{}", stats.negative_attractor_count);
+                    println!("  Átlag hiány:        {:.3}", stats.avg_absence);
+                    println!("  Átlag anti-Hebbian: {:.3}", stats.avg_anti_hebbian);
+                    println!("  Causal laundering gyanús: {}", stats.causal_laundering_suspect);
+                    if stats.last_scan_ms > 0 {
+                        println!("  Utolsó szkennelés:  {}", stats.last_scan_ms);
+                    } else {
+                        println!("  Utolsó szkennelés:  (soha)");
+                    }
+                }
+                AbsentiaAction::Scan => {
+                    let hebb = HebbianState::load_or_init(output_dir, reader.block_count);
+                    let evidence = EvidenceLedger::load_or_init(output_dir);
+                    let mut absentia = AbsentiaState::load_or_init(output_dir);
+                    absentia.scan(&hebb, &evidence, reader.block_count);
+                    absentia.save(output_dir).expect("save absentia");
+                    let stats = absentia.stats();
+                    println!("{}", "ABSENTIA SCAN COMPLETE".green().bold());
+                    println!("  Anti-Hebbian párok: {}", stats.anti_hebbian_count);
+                    println!("  Hiány-rekordok:     {}", stats.total_records);
+                    println!("  Negatív attractorok:{}", stats.negative_attractor_count);
+                    println!("  Causal laundering gyanús: {}", stats.causal_laundering_suspect);
+                }
+                AbsentiaAction::AntiHebbian { k } => {
+                    let absentia = AbsentiaState::load_or_init(output_dir);
+                    println!("{}", "ANTI-HEBBIAN PÁROK".cyan().bold());
+                    if absentia.anti_hebbian.is_empty() {
+                        println!("  (nincs anti-Hebbian pár — futtass: absentia scan)");
+                    } else {
+                        let start = absentia.anti_hebbian.len().saturating_sub(k);
+                        for p in &absentia.anti_hebbian[start..] {
+                            println!("  [{}↔{}] absence={:.3} expected={:.3} actual={:.3}",
+                                p.block_a, p.block_b, p.absence_score,
+                                p.expected_coactivation, p.actual_coactivation);
+                        }
+                    }
+                    println!("  összesen: {}", absentia.anti_hebbian.len());
+                }
+                AbsentiaAction::CausalLaundering => {
+                    let absentia = AbsentiaState::load_or_init(output_dir);
+                    println!("{}", "CAUSAL LAUNDERING GYANÚS PÁROK".red().bold());
+                    let suspects: Vec<_> = absentia.anti_hebbian.iter()
+                        .filter(|p| p.absence_score > 0.5)
+                        .collect();
+                    if suspects.is_empty() {
+                        println!("  (nincs gyanús pár)");
+                    } else {
+                        for p in &suspects {
+                            println!("  [{}↔{}] absence={:.3} — MINDKÉT BLOKK AKTÍV, DE NINCS CO-AKTIVÁCIÓ",
+                                p.block_a, p.block_b, p.absence_score);
+                        }
+                    }
+                    println!("  összesen: {} gyanús pár", suspects.len());
+                }
+            }
+        }
         Cmd::Autonomous {
             tts,
             daemon,

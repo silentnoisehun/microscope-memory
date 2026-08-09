@@ -118,6 +118,7 @@ pub mod meta_supervision;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod morphogenesis;
 pub mod cognitive_morphogenesis;
+pub mod absentia;
 pub mod multimodal;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod neuroplasticity;

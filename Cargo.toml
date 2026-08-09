@@ -122,3 +122,6 @@ codegen-units = 1
 strip = false
 
 
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = false

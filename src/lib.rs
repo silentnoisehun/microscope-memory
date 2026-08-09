@@ -65,6 +65,7 @@ pub mod eureka;
 #[cfg(not(target_arch = "wasm32"))]
 #[cfg(not(target_arch = "wasm32"))]
 pub mod narrative;
+#[cfg(not(target_arch = "wasm32"))]
 pub mod pipeline;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod reconsolidation;
@@ -117,8 +118,11 @@ pub mod mental_stimulation;
 pub mod meta_supervision;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod morphogenesis;
+#[cfg(not(target_arch = "wasm32"))]
 pub mod cognitive_morphogenesis;
+#[cfg(not(target_arch = "wasm32"))]
 pub mod absentia;
+#[cfg(not(target_arch = "wasm32"))]
 pub mod intent;
 pub mod multimodal;
 #[cfg(not(target_arch = "wasm32"))]

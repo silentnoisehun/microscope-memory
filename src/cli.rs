@@ -395,6 +395,8 @@ pub enum MorphogenesisAction {
     FullStatus,
     /// Adversarial tesztcsomag — edge case-ek és védett állítások ellenőrzése
     Adversarial,
+    /// Deep adversarial — célzott stressz-teszt a rendszer absztrakcióinak határain
+    DeepAdversarial,
 }
 
 #[derive(Subcommand)]

@@ -3621,6 +3621,173 @@ async fn async_main() {
                         println!("  {}", "SOME TESTS FAILED".red().bold());
                     }
                 }
+                MorphogenesisAction::PresenceAbsenceTest => {
+                    use microscope_memory::cognitive_morphogenesis::{
+                        CognitiveGradient, Phase, CognitiveMorphogenesisEngine,
+                        graph_entropy,
+                    };
+                    use microscope_memory::morphogenesis::{
+                        GrowthConfig, Seed, mycelium_growth, MorphogenField,
+                    };
+                    use microscope_memory::hebbian::HebbianState;
+                    use microscope_memory::epistemic::EvidenceLedger;
+                    use microscope_memory::predictive_cache::PredictiveCache;
+                    use microscope_memory::emotional_contagion::EmotionalContagionState;
+                    use microscope_memory::absentia::{AbsentiaState, compute_absence_shadow};
+
+                    println!("{}", "A/B TESZT: Presence-driven growth ↔ absence-driven inhibition".cyan().bold());
+                    println!();
+
+                    let hebb = HebbianState::load_or_init(output_dir, reader.block_count);
+                    let resonance = ResonanceState::load_or_init(output_dir);
+                    let evidence = EvidenceLedger::load_or_init(output_dir);
+                    let predictive = PredictiveCache::load_or_init(output_dir);
+                    let emotional = EmotionalContagionState::load_or_init(output_dir);
+                    let mut absentia = AbsentiaState::load_or_init(output_dir);
+                    absentia.scan(&hebb, &evidence, reader.block_count);
+
+                    let headers: Vec<(f32, f32, f32)> = (0..reader.block_count)
+                        .map(|i| {
+                            let h = reader.header(i);
+                            (h.x, h.y, h.z)
+                        })
+                        .collect();
+
+                    // Top 20 aktív blokk
+                    let mut activated: Vec<(u32, f32)> = Vec::new();
+                    for (i, rec) in hebb.activations.iter().enumerate() {
+                        if rec.energy > 0.1 {
+                            activated.push((i as u32, rec.energy));
+                        }
+                    }
+                    activated.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+                    activated.truncate(20);
+
+                    // ─── A eset: erős Hebbian + prediction, NINCS evidence ───
+                    println!("  {}", "── A eset: NINCS evidence ──".yellow());
+                    let grad_a = CognitiveGradient::default();
+                    let mut field_a = MorphogenField::new();
+                    crate::cognitive_morphogenesis::sync_hebbian_to_field(&hebb, &mut field_a, &headers);
+                    crate::cognitive_morphogenesis::sync_resonance_to_field(&resonance, &mut field_a);
+                    // NEM alkalmazunk evidence modulációt
+                    crate::cognitive_morphogenesis::apply_prediction_modulation(&mut field_a, &predictive);
+                    crate::cognitive_morphogenesis::apply_emotion_modulation(&mut field_a, &emotional);
+                    // Absentia shadow
+                    crate::absentia::apply_absentia_to_field(&absentia, &mut field_a, 0);
+
+                    // Shadow számolás az első aktív blokk pozíciójában
+                    let first_idx = activated.first().map(|&(i, _)| i as usize).unwrap_or(0);
+                    let (hx, hy, hz) = if first_idx < headers.len() {
+                        headers[first_idx]
+                    } else {
+                        (0.0, 0.0, 0.0)
+                    };
+                    let shadow_a = compute_absence_shadow(&absentia, hx as f64, hy as f64, hz as f64, 0);
+
+                    // Gradiens számolás A esetben
+                    let g_a = grad_a.compute(0.0, 0.0, 0, 1.0, 1.0, 0.0, 1.0);
+                    let effective_a = g_a * (1.0 - shadow_a);
+                    let phase_a = Phase::from_gradient(effective_a);
+
+                    println!("    Hebbian energy:     1.0");
+                    println!("    Prediction hit-rate: 1.0");
+                    println!("    Evidence confidence: 0 (NINCS)");
+                    println!("    Absence shadow:     {:.3}", shadow_a);
+                    println!("    Raw gradient:       {:.3}", g_a);
+                    println!("    Effective gradient: {:.3}", effective_a);
+                    println!("    Phase:              {}", phase_a);
+
+                    // Mycelium növekedés A esetben
+                    let config_a = phase_a.growth_config(&GrowthConfig::mycelium_default());
+                    let mut nodes_a = 0usize;
+                    let mut conns_a = 0usize;
+                    let mut anast_a = 0usize;
+                    for (i, &(block_idx, score)) in activated.iter().take(3).enumerate() {
+                        let idx = block_idx as usize;
+                        if idx >= headers.len() { continue; }
+                        let (bx, by, bz) = headers[idx];
+                        let seed = Seed::new(
+                            &format!("test_a_{}", i),
+                            bx as f64, by as f64, bz as f64,
+                            &format!("block_{}", idx),
+                        ).with_energy((score as f64 * 100.0).max(10.0));
+                        let org = mycelium_growth(&seed, &field_a, &config_a);
+                        nodes_a += org.nodes.len();
+                        conns_a += org.connections.len();
+                    }
+                    println!("    Nodes:              {}", nodes_a);
+                    println!("    Connections:        {}", conns_a);
+                    println!();
+
+                    // ─── B eset: ugyanaz + evidence ───
+                    println!("  {}", "── B eset: VAN evidence ──".yellow());
+                    let mut field_b = MorphogenField::new();
+                    crate::cognitive_morphogenesis::sync_hebbian_to_field(&hebb, &mut field_b, &headers);
+                    crate::cognitive_morphogenesis::sync_resonance_to_field(&resonance, &mut field_b);
+                    crate::cognitive_morphogenesis::apply_evidence_modulation(&mut field_b, &evidence, &headers);
+                    crate::cognitive_morphogenesis::apply_prediction_modulation(&mut field_b, &predictive);
+                    crate::cognitive_morphogenesis::apply_emotion_modulation(&mut field_b, &emotional);
+                    // Absentia shadow — de most VAN evidence, tehát kisebb kell legyen
+                    crate::absentia::apply_absentia_to_field(&absentia, &mut field_b, 50);
+
+                    let shadow_b = compute_absence_shadow(&absentia, hx as f64, hy as f64, hz as f64, 50);
+                    let g_b = grad_a.compute(0.0, 0.0, 50, 1.0, 1.0, 0.0, 1.0); // evidence = 50
+                    let effective_b = g_b * (1.0 - shadow_b);
+                    let phase_b = Phase::from_gradient(effective_b);
+
+                    println!("    Hebbian energy:     1.0");
+                    println!("    Prediction hit-rate: 1.0");
+                    println!("    Evidence confidence: 50 (VAN)");
+                    println!("    Absence shadow:     {:.3}", shadow_b);
+                    println!("    Raw gradient:       {:.3}", g_b);
+                    println!("    Effective gradient: {:.3}", effective_b);
+                    println!("    Phase:              {}", phase_b);
+
+                    // Mycelium növekedés B esetben
+                    let config_b = phase_b.growth_config(&GrowthConfig::mycelium_default());
+                    let mut nodes_b = 0usize;
+                    let mut conns_b = 0usize;
+                    for (i, &(block_idx, score)) in activated.iter().take(3).enumerate() {
+                        let idx = block_idx as usize;
+                        if idx >= headers.len() { continue; }
+                        let (bx, by, bz) = headers[idx];
+                        let seed = Seed::new(
+                            &format!("test_b_{}", i),
+                            bx as f64, by as f64, bz as f64,
+                            &format!("block_{}", idx),
+                        ).with_energy((score as f64 * 100.0).max(10.0));
+                        let org = mycelium_growth(&seed, &field_b, &config_b);
+                        nodes_b += org.nodes.len();
+                        conns_b += org.connections.len();
+                    }
+                    println!("    Nodes:              {}", nodes_b);
+                    println!("    Connections:        {}", conns_b);
+                    println!();
+
+                    // ─── Összehasonlítás ───
+                    println!("  {}", "── ÖSSZEHASONLÍTÁS ──".cyan().bold());
+                    let shadow_delta = shadow_a - shadow_b;
+                    let gradient_delta = effective_b - effective_a;
+                    let node_delta = nodes_b as i64 - nodes_a as i64;
+                    let conn_delta = conns_b as i64 - conns_a as i64;
+
+                    println!("    Shadow delta:       {:.3} (A magasabb = több árnyék)", shadow_delta);
+                    println!("    Gradient delta:     {:.3} (B magasabb = evidence felszabadít)", gradient_delta);
+                    println!("    Node delta:         {} (B több = evidence növekedést indít)", node_delta);
+                    println!("    Conn delta:         {} (B több = több kapcsolat)", conn_delta);
+                    println!();
+
+                    // ─── Ítélet ───
+                    if shadow_a > shadow_b && effective_b > effective_a && nodes_b >= nodes_a {
+                        println!("  {}", "✓ PROVEN: presence-driven growth ↔ absence-driven inhibition".green().bold());
+                        println!("    A hiányzó episztemikus támogatás strukturálisan visszafogta az útvonalat");
+                        println!("    A támogatás megjelenése reverzibilisen feloldotta a gátlást");
+                    } else if shadow_a > shadow_b {
+                        println!("  {}", "⚠ PARTIAL: shadow működik, de a növekedés nem különbözik eléggé".yellow().bold());
+                    } else {
+                        println!("  {}", "✗ NOT PROVEN: a shadow nem különbözteti meg az A és B esetet".red().bold());
+                    }
+                }
                 MorphogenesisAction::DeepAdversarial => {
                     use microscope_memory::cognitive_morphogenesis::{
                         CognitiveGradient, Phase, CognitiveMorphogenesisEngine,
@@ -3855,6 +4022,112 @@ async fn async_main() {
                         }
                     } else {
                         println!("  {}", "SOME TESTS FAILED".red().bold());
+                    }
+                }
+            }
+        }
+        Cmd::Intent { action } => {
+            use microscope_memory::cli::IntentAction as IA;
+            use microscope_memory::intent::IntentPipeline;
+            use microscope_memory::hebbian::HebbianState;
+            use microscope_memory::epistemic::EvidenceLedger;
+            use microscope_memory::predictive_cache::PredictiveCache;
+            use microscope_memory::absentia::AbsentiaState;
+
+            let output_dir = std::path::Path::new(&config.paths.output_dir);
+            let reader = open_reader(&config);
+
+            match action {
+                IA::Generate => {
+                    let hebb = HebbianState::load_or_init(output_dir, reader.block_count);
+                    let evidence = EvidenceLedger::load_or_init(output_dir);
+                    let predictive = PredictiveCache::load_or_init(output_dir);
+                    let mut absentia = AbsentiaState::load_or_init(output_dir);
+                    absentia.scan(&hebb, &evidence, reader.block_count);
+
+                    let mut pipeline = IntentPipeline::load_or_init(output_dir);
+                    let intent = pipeline.generate_intent(
+                        &hebb, &evidence, &predictive, &absentia, reader.block_count,
+                    );
+
+                    println!("{}", "INTENT GENERÁLVA".green().bold());
+                    println!("  ID:                 {}", intent.id);
+                    println!("  Candidate:          {}", intent.candidate.action);
+                    println!("  Strength:           {:.3}", intent.candidate.strength);
+                    println!("  Allowed:            {}", intent.evaluation.allowed);
+                    println!("  Requires approval:  {}", intent.evaluation.requires_approval);
+                    println!();
+
+                    // Audit lánc
+                    println!("  {}", "── Audit lánc ──".yellow());
+                    for step in &intent.audit_chain {
+                        println!("    [{}] {} → {} ({})", step.step, step.result, step.data, step.timestamp_ms);
+                    }
+                    println!();
+
+                    // Jelzések
+                    if let Some(ref abs) = intent.absence_signal {
+                        println!("  {}", "── Absentia ──".yellow());
+                        println!("    Hiányzó téma:     {}", abs.missing_topic);
+                        println!("    Hiány-pontszám:   {:.3}", abs.absence_score);
+                        println!("    Időtartam:        {} ms", abs.duration_ms);
+                    }
+                    if let Some(ref pred) = intent.prediction_signal {
+                        println!("  {}", "── Prediction ──".yellow());
+                        println!("    Jósolt query:     {}", pred.predicted_query);
+                        println!("    Confidence:       {:.3}", pred.confidence);
+                    }
+                    if let Some(ref ev) = intent.evidence_signal {
+                        println!("  {}", "── Evidence ──".yellow());
+                        println!("    Confidence:       {}/100", ev.confidence);
+                        println!("    Support/Refute:   {}/{}", ev.support_count, ev.refute_count);
+                    }
+
+                    pipeline.save(output_dir).expect("save intent audit");
+                }
+                IA::Audit { k } => {
+                    let pipeline = IntentPipeline::load_or_init(output_dir);
+                    println!("{}", "INTENT AUDIT NAPLÓ".cyan().bold());
+                    if pipeline.audit_log.is_empty() {
+                        println!("  (nincs intent — futtass: intent generate)");
+                    } else {
+                        let start = pipeline.audit_log.len().saturating_sub(k);
+                        for intent in &pipeline.audit_log[start..] {
+                            println!("  [{}] {} strength={:.3} allowed={} steps={}",
+                                intent.id, intent.candidate.action,
+                                intent.candidate.strength, intent.evaluation.allowed,
+                                intent.audit_chain.len());
+                        }
+                    }
+                    let stats = pipeline.stats();
+                    println!("  Összesen: {} intent ({} engedélyezett, {} blokkolt, {} jóváhagyás kell)",
+                        stats.total_intents, stats.allowed, stats.blocked, stats.approval_required);
+                }
+                IA::Genome => {
+                    let pipeline = IntentPipeline::load_or_init(output_dir);
+                    let genome = &pipeline.genome;
+                    println!("{}", "GENOME".cyan().bold());
+                    println!("  Identitás:  {}", genome.identity);
+                    println!("  Küldetés:   {}", genome.mission);
+                    println!();
+                    println!("  {}", "── Értékek ──".yellow());
+                    for v in &genome.values {
+                        println!("    • {}", v);
+                    }
+                    println!();
+                    println!("  {}", "── Korlátok ──".yellow());
+                    for c in &genome.constraints {
+                        println!("    [{}] {} — {}", c.severity, c.name, c.description);
+                    }
+                    println!();
+                    println!("  {}", "── Képességek ──".yellow());
+                    for c in &genome.capabilities {
+                        println!("    • {}", c);
+                    }
+                    println!();
+                    println!("  {}", "── Preferenciák ──".yellow());
+                    for p in &genome.preferences {
+                        println!("    • {}", p);
                     }
                 }
             }

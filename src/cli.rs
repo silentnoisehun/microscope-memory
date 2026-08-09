@@ -374,6 +374,24 @@ pub enum Cmd {
         #[command(subcommand)]
         action: AbsentiaAction,
     },
+    /// Intent Pipeline — auditálható szándék-generálás
+    Intent {
+        #[command(subcommand)]
+        action: IntentAction,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum IntentAction {
+    /// Intent generálása a jelenlegi állapotból
+    Generate,
+    /// Intent audit-napló megjelenítése
+    Audit {
+        #[arg(default_value = "10")]
+        k: usize,
+    },
+    /// Genome megjelenítése
+    Genome,
 }
 
 #[derive(Subcommand)]
@@ -402,6 +420,8 @@ pub enum MorphogenesisAction {
     Adversarial,
     /// Deep adversarial — célzott stressz-teszt a rendszer absztrakcióinak határain
     DeepAdversarial,
+    /// A/B teszt: presence-driven growth ↔ absence-driven inhibition
+    PresenceAbsenceTest,
 }
 
 #[derive(Subcommand)]

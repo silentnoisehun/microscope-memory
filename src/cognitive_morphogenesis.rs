@@ -18,6 +18,7 @@ use crate::morphogenesis::{
     GrowthConfig, MorphogenField, Seed, mycelium_growth,
     MorphNode, MorphConnection,
 };
+use crate::absentia::AbsentiaState;
 
 
 // ─── Helpers ────────────────────────────────────────
@@ -340,6 +341,7 @@ impl CognitiveMorphogenesisEngine {
         emotional_state: &EmotionalContagionState,
         block_count: usize,
         headers: &[(f32, f32, f32)],
+        absentia: &AbsentiaState,
     ) -> MorphogenesisAuditEntry {
         let ts = now_ms();
         let cid = cycle_id();
@@ -360,6 +362,8 @@ impl CognitiveMorphogenesisEngine {
         apply_evidence_modulation(&mut field, evidence_ledger, headers);
         apply_prediction_modulation(&mut field, predictive_cache);
         apply_emotion_modulation(&mut field, emotional_state);
+        // Absentia shadow term: effective_gradient = positive_gradient * (1 - absence_shadow)
+        crate::absentia::apply_absentia_to_field(absentia, &mut field);
 
         // Globális komponens-értékek (cikluson kívül)
         let pred_hr = predictive_cache.stats.hit_rate();

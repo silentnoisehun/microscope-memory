@@ -433,17 +433,113 @@ pub struct AbsentiaStats {
 
 // ─── Morfogenezis integráció ────────────────────────
 
-/// Negatív attractorok alkalmazása a MorphogenFieldre.
+/// Shadow term integráció a MorphogenFieldbe.
 ///
-/// Ezek "árnyékot vetnek" a gradiensre — olyan pontok, ahova a hifák
-/// logikusan kellene nőjenek, de a hiány-jel miatt nem nőnek.
+/// A shadow term formula:
+///   effective_gradient = positive_gradient * (1 - absence_shadow)
+///
+/// Ez megőrzi a különbséget aközött, hogy "nincs vonzás" vs "van vonzás,
+/// de valami hiány miatt gyanús". Nem mínusz gradiens — hanem szorzó.
 pub fn apply_absentia_to_field(
     absentia: &AbsentiaState,
     field: &mut crate::morphogenesis::MorphogenField,
 ) {
-    for &(x, y, z, weight) in &absentia.negative_attractors {
-        // Negatív attractor = taszító pont
-        field.add_attractor(x, y, z, weight);
+    // Minden gradiens-pontnál kiszámoljuk a shadow értéket
+    // és megszorozzuk a gradienst (1 - shadow)-val
+    let keys: Vec<(i32, i32, i32)> = field.gradients.keys().cloned().collect();
+    for key in keys {
+        let shadow = compute_absence_shadow(absentia, key.0 as f64, key.1 as f64, key.2 as f64);
+        if shadow > 0.01 {
+            if let Some(val) = field.gradients.get_mut(&key) {
+                *val *= 1.0 - shadow;
+            }
+        }
     }
+}
+
+/// Kiszámolja az absence shadow értéket egy adott pontban.
+///
+/// A shadow a következőkből áll:
+/// 1. Anti-Hebbian távolság: közel anti-Hebbian párokhoz → magasabb shadow
+/// 2. Absence records: közel absence rekordokhoz → magasabb shadow
+///
+/// Visszatérés: [0.0, 0.95] — 0.0 = nincs árnyék, 0.95 = teljes árnyék
+pub fn compute_absence_shadow(
+    absentia: &AbsentiaState,
+    x: f64,
+    y: f64,
+    z: f64,
+) -> f64 {
+    let mut shadow = 0.0f64;
+
+    // Anti-Hebbian párok: a negatív attractorok pozíciójából
+    for &(ax, ay, az, weight) in &absentia.negative_attractors {
+        let dx = x - ax;
+        let dy = y - ay;
+        let dz = z - az;
+        let dist_sq = dx * dx + dy * dy + dz * dz;
+        // Inverz távolság-alapú shadow: közelebb = erősebb
+        let local_shadow = weight.abs() / (1.0 + dist_sq);
+        shadow += local_shadow;
+    }
+
+    // Absence records: a gradient_weight alapján
+    for rec in &absentia.records {
+        // A record pozíciója a expected_context_hash-ből
+        let ax = (rec.expected_context_hash % 100) as f64;
+        let ay = ((rec.expected_context_hash / 100) % 100) as f64;
+        let az = 0.0;
+        let dx = x - ax;
+        let dy = y - ay;
+        let dz = z - az;
+        let dist_sq = dx * dx + dy * dy + dz * dz;
+        let local_shadow = rec.gradient_weight as f64 / (1.0 + dist_sq);
+        shadow += local_shadow * 0.5; // fele súly, mint az anti-Hebbian
+    }
+
+    // Korlátozzuk [0.0, 0.95] tartományba — soha nem teljesen 1.0
+    // (a teljes blokkolás veszélyes, mindig hagyunk kis esélyt)
+    shadow.min(0.95)
+}
+
+/// Presence-driven growth ↔ absence-driven inhibition teszt.
+///
+/// Ha egy erős Hebbian/predictive útvonal evidence nélkül indul,
+/// az Absentia shadow-nak csökkentenie kell a növekedést.
+/// Ha evidence-t adunk hozzá, a shadow-nak csökkennie kell.
+pub fn test_presence_absence_inhibition(
+    _absentia: &AbsentiaState,
+    hebb_energy: f64,
+    evidence_confidence: u8,
+) -> PresenceAbsenceResult {
+    let absence_shadow = if evidence_confidence < 10 {
+        // Nincs evidence → magas shadow
+        0.8
+    } else if evidence_confidence < 50 {
+        // Kevés evidence → közepes shadow
+        0.4
+    } else {
+        // Elég evidence → alacsony shadow
+        0.1
+    };
+
+    let effective_gradient = hebb_energy * (1.0 - absence_shadow);
+    let growth_inhibited = absence_shadow > 0.5;
+
+    PresenceAbsenceResult {
+        hebb_energy,
+        evidence_confidence,
+        absence_shadow,
+        effective_gradient,
+        growth_inhibited,
+    }
+}
+
+pub struct PresenceAbsenceResult {
+    pub hebb_energy: f64,
+    pub evidence_confidence: u8,
+    pub absence_shadow: f64,
+    pub effective_gradient: f64,
+    pub growth_inhibited: bool,
 }
 

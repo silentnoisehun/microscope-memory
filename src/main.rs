@@ -3295,6 +3295,7 @@ async fn async_main() {
                     let evidence = EvidenceLedger::load_or_init(output_dir);
                     let predictive = PredictiveCache::load_or_init(output_dir);
                     let emotional = EmotionalContagionState::load_or_init(output_dir);
+                    let absentia = microscope_memory::absentia::AbsentiaState::load_or_init(output_dir);
 
                     // Block headers a pozíciókhoz
                     let headers: Vec<(f32, f32, f32)> = (0..reader.block_count)
@@ -3327,6 +3328,7 @@ async fn async_main() {
                         &emotional,
                         reader.block_count,
                         &headers,
+                        &absentia,
                     );
                     engine.save(output_dir).expect("save morphogenesis audit");
 

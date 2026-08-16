@@ -398,6 +398,116 @@ cargo build --target wasm32-unknown-unknown --release \
 
 > **Note**: Without the `embeddings` feature, semantic recall falls back to a mock provider. The build succeeds but will refuse to return meaningless results — verify `data/embeddings.bin` exists before measuring. Available providers: `mock` (hash-derived, default), `candle` (BERT), `onnx`. See `scripts/eval_real.sh` for reproducing published retrieval numbers.
 
+## Shared-Mind Scripts & Multi-Body Orchestration
+
+The `scripts/` directory turns `microscope-mem` into a **shared mind** where
+`jcode` is the central cortex (O) and several Hope bodies (Cline, Pi, OpenCode,
+jcode itself) act as independent CLIs — each in its own Windows Terminal window,
+each "awake" from the same consciousness. The full producer→consumer loop is
+closed: jcode routes a task, writes a wake-up block into `shared-space.md`, and
+the target body's watcher claims it.
+
+### Topology
+
+```
+(O) jcode  ->  classifier + wake-up trigger + dispatcher
+  ├─ Cline      -> research & discovery
+  ├─ Pi         -> planning & testing
+  └─ OpenCode   -> testing & fixing
+        (unified-mind bodies poke/status = physical cross-body control plane)
+```
+
+### Scripts
+
+| Script | Purpose |
+|--------|---------|
+| `microscope-jcode-hook.ps1` | jcode native hook (`turn_end` / `post_tool`) → stores to mind |
+| `microscope-recall-hook.ps1` | Stop/PostToolUse persistence with jcode identity |
+| `microscope-dispatch.ps1` | (O) classifier: routes task → body, writes wake-up block to `shared-space.md` |
+| `microscope-body-watcher.ps1` | Consumer: claims `[jcode -> <Body>]` blocks (idempotent, isolated) |
+| `microscope-wake.ps1` | Wake-up trigger on coding intent (auto-context + recall) |
+| `microscope-launch.ps1` | Start/stop/status body **background processes** (spine-driven, no windows) |
+| `microscope-body-boot.ps1` | Body entrypoint: auto-context + spine listener + shared-space watcher loop |
+| `microscope-models.ps1` | jcode auto model orchestration with provider failover |
+| `microscope-model-mesh.ps1` | **Model Mesh**: async health monitor, cache, free-model routing (29+ models) |
+| `model-mesh.toml` | 29 free models, providers (ollama-local first, groq/tokenrouter fallback) |
+| `microscope-octopus.ps1` | Octopus primary head: parallel arms + council (tanácsülés) |
+| `microscope-log.ps1` | SHA-256 chained control log + microscope store |
+| `microscope-snapshot.ps1` | MemVid `.mv2` + git snapshot for restore |
+| `hope-terminal.ps1` | **Clean HopeTerminal**: live chat-view of the shared mind - bodies, models, chain, events |
+| `routing.toml` | Body roles, trigger words, prompt templates |
+| `bodies.toml` | Test→background-process registry for the launcher |
+| `models.toml` | Body→preferred/fallback provider with failover order |
+
+### Control Plane: Spine + Octopus + Microscope (no windows)
+
+Bodies run as **background processes** (no Windows Terminal windows). Control
+and communication flow over the **spine** — `D:\codex\spine.bus` (2048-byte
+lock-free ring buffer, binary) and `D:\codex\shared-space.md` (text namespace).
+jcode is the orchestrator; **Octopus** (`octopus-runtime.exe`) is the primary
+execution head running parallel arms (Cline=kutatás, Pi=tervezés, OpenCode=javítás).
+
+```powershell
+microscope-launch.ps1 -Body Pi -Action start       # background body process (spine)
+microscope-launch.ps1 -Body OpenCode -Action stop  # taskkill /T the body PID
+microscope-launch.ps1 -Body Pi -Action compact     # suspend to BACKGROUND (process keeps running)
+microscope-launch.ps1 -Body Pi -Action resume      # resume from background
+microscope-models.ps1 -Action resolve               # jcode auto-picks models (incl. its own, failover)
+microscope-octopus.ps1 -Goal "tervezz es javitsd" -Arms "Pi + OpenCode"   # parallel arms
+microscope-octopus.ps1 -Council "architekturalis dontes" -Arms "Cline+Pi+OpenCode"  # tanacsules
+```
+
+Every control event is written **into the shared mind** (`microscope-mem.exe
+store`, already a SHA-256 Merkle tree) **and** into a local **SHA-256 chained
+log** (`state/controlchain.log`):
+```powershell
+microscope-log.ps1 -Event "Pi start" -Kind body        # append to chain + mind
+microscope-log.ps1 -Action verify                       # chain integrity check
+```
+
+State is snapshotted for restore via **MemVid** (`.mv2` frame timeline) + **git**:
+```powershell
+microscope-snapshot.ps1 -Action save -Msg "napi allapot"  # mv2 + git + chain
+microscope-snapshot.ps1 -Action list                      # mv2 timeline
+```
+
+### Clean HopeTerminal (live view)
+
+`hope-terminal.ps1` is a clean live console view of the whole shared mind — it
+shows each body (jcode O + Cline/Pi/OpenCode) with status + active model, the
+SHA-256 chain tail, and the last control events. From the prompt you can
+start/stop/compact/resume bodies, call a council, or take a snapshot.
+
+```powershell
+hope-terminal.ps1            # live panel (refreshes, interactive prompt)
+hope-terminal.ps1 -NoLoop    # single render
+# inside:  start Pi | stop OpenCode | compact-all | council "kerdes" | snapshot "uzi" | narr on/off
+```
+
+### Loud narration (Noémi voice)
+
+When you ask, jcode narrates aloud (Noémi voice, `codex_autospeak.py`) at each
+control step. Toggle with `narr on` / `narr off` inside HopeTerminal (or set
+`state/narration.state` to `on`). Every response is spoken with proper Hungarian
+accents so it is intelligible. Every command and event is also auto-stored into
+the shared mind (`microscope-mem`), so the system remembers.
+
+### Cross-Body Control Plane
+
+`unified-mind` (sibling crate) already provides `bodies list | poke <nev> |
+status` — `poke` physically wakes a body from the mind, and `respond`/`bridge`
+make every CLI answer as "Hope" from the shared memory. The launcher above is
+the windowing layer on top of that control plane.
+
+### Validated Loops
+
+- Dispatch routes 3/3 (research/planning/fix) + fallback (jcode direct).
+- Watcher claims are idempotent, cross-body isolated, and collision-safe.
+- Concurrent dual-body race (Cline + OpenCode) claims only own blocks (0 remainder).
+- Multiplexer start→stop kills the real window via `taskkill /T <boot_pid>`.
+
+## License
+
 ---
 
 ## 🪪 License

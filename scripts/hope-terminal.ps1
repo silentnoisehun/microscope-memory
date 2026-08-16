@@ -79,13 +79,11 @@ function Get-AllData {
 
     $meshStats = @{ total=0; healthy=0; free=0; providers=@{} }
     if ($mesh.registry) {
-        # registry lehet array vagy hashtable - kezeljuk mindkét esetet
-        $regItems = @()
-        if ($mesh.registry -is [System.Collections.IEnumerable] -and -not ($mesh.registry -is [string])) {
-            $regItems = @($mesh.registry)
-        } else {
-            $regItems = $mesh.registry.psobject.Properties | ForEach-Object { $_.Value }
-        }
+        # registry hashtable: kulcsok provider::model, ertekek modell objektumok
+        $regItems = @($mesh.registry.psobject.Properties | ForEach-Object {
+            $v = $_.Value
+            if ($v -is [hashtable]) { $v } else { $v }
+        })
         foreach ($m in $regItems) {
             if (-not $m) { continue }
             $meshStats.total++
@@ -144,12 +142,7 @@ function Render {
 
         $meshNote = ""
         if ($d.mesh.registry) {
-            $regItems = @()
-            if ($d.mesh.registry -is [System.Collections.IEnumerable] -and -not ($d.mesh.registry -is [string])) {
-                $regItems = @($d.mesh.registry)
-            } else {
-                $regItems = $d.mesh.registry.psobject.Properties | ForEach-Object { $_.Value }
-            }
+            $regItems = @($d.mesh.registry.psobject.Properties | ForEach-Object { $_.Value })
             $cands = $regItems | Where-Object {
                 $_.healthy -and [double]$_.cost_per_1k -eq 0
             } | Sort-Object priority | Select-Object -First 1

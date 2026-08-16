@@ -481,7 +481,23 @@ start/stop/compact/resume bodies, call a council, or take a snapshot.
 ```powershell
 hope-terminal.ps1            # live panel (refreshes, interactive prompt)
 hope-terminal.ps1 -NoLoop    # single render
-# inside:  start Pi | stop OpenCode | compact-all | council "kerdes" | snapshot "uzi" | narr on/off
+# inside:  start [nev] | stop [nev] | compact [nev] | resume [nev] | compact-all | route [test] [kepesség] | health | self-manage | monitor | council [kerdes] | snapshot [uzi] | narr on/off | status | help | exit
+```
+
+`HopeTerminal` is also available on `PATH` (`C:\Users\mater\bin`) — run `HopeTerminal -NoLoop` from any directory.
+
+### One-Command Bootstrap
+
+`hope-bootstrap.ps1` initializes the entire shared mind in one shot:
+- Starts the Model Mesh async health monitor (background job)
+- Creates the `spine.bus` ring buffer (2048 bytes)
+- Ensures `shared-space.md` exists
+- Launches HopeTerminal
+
+```powershell
+hope-bootstrap.ps1              # full init + terminal
+hope-bootstrap.ps1 -NoTerminal  # mesh + spine only
+hope-bootstrap.ps1 -Force       # restart everything (kills old processes/jobs)
 ```
 
 ### Loud narration (Noémi voice)

@@ -6,7 +6,7 @@
 
 [![Rust](https://img.shields.io/badge/language-Rust-orange.svg)](https://www.rust-lang.org)
 [![License: MIT](https://img.shields.io/badge/Limit-MIT-blue.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/Tests-396+16%20passing-brightgreen.svg)](#-testing)
+[![Tests](https://img.shields.io/badge/Tests-413%20passing-brightgreen.svg)](#-testing)
 [![Blocks](https://img.shields.io/badge/Blocks-1.28M-purple.svg)](#-statistics)
 [![WASM](https://img.shields.io/badge/WASM-151%20KB-blueviolet.svg)](#-wasm)
 
@@ -16,33 +16,40 @@
 
 ## What It Is
 
-A living, self-organizing memory architecture with 13 layers, 9 depths, and 1.28 million blocks. Not a database — a cognitive engine that learns, dreams, and remembers.
+A living, self-organizing memory architecture with 13 layers, 9 depths, and 1.28 million blocks. Not a database â€” a cognitive engine that learns, dreams, and remembers.
 
 ### Core Capabilities
 
-- **Hebbian Learning** — co-activation strengthens associations
-- **Epistemic Layer** — evidence tracking with confidence, refutation, and promotion gates
-- **Absentia (Silence Layer)** — detects what's missing, not just what's present
-- **Cognitive Morphogenesis** — mycelium growth through cognitive gradient space
-- **Intent Pipeline** — auditatable intent generation from genome + memory + absence
-- **Predictive Cache** — anticipates what you'll need next
-- **Emotional Contagion** — emotional state influences memory dynamics
-- **Reconsolidation** — every recall transforms the memory (like a real brain)
+- **Hebbian Learning** â€” co-activation strengthens associations
+- **Epistemic Layer** â€” evidence tracking with confidence, refutation, and promotion gates
+- **Absentia (Silence Layer)** â€” detects what's missing, not just what's present
+- **Cognitive Morphogenesis** â€” mycelium growth through cognitive gradient space
+- **Intent Pipeline** â€” auditatable intent generation from genome + memory + absence
+- **Predictive Cache** â€” anticipates what you'll need next
+- **Emotional Contagion** â€” emotional state influences memory dynamics
+- **Reconsolidation** â€” every recall transforms the memory (like a real brain)
 
 ## Statistics
 
 | Metric | Value |
 |--------|-------|
-| Blocks | 1,285,288 |
+| Blocks (demo corpus) | 1,285,288 |
+| Blocks (benchmark corpus) | 28,679 |
 | Depths | 9 (D0-D8) |
 | Layers | 13 |
 | Data size | 284.7 MB |
 | Rust files | 97 |
-| Lines of code | 52,149 |
-| Tests | 396 + 16 hooks |
+| Lines of code (`src/**/*.rs`) | 54,053 |
+| Tests | 413 library + 16 hooks |
 | Build time | ~2m 30s |
 | Binary size | ~3.0 MB |
 | WASM size | 151.6 KB |
+
+> **Two different corpora.** The *demo corpus* is the 1.28 M-block index built
+> from `layers/` and used for the block-distribution table below. The
+> *benchmark corpus* is a separate 28,679-block index used for the latency
+> numbers in [BENCHMARKS.md](BENCHMARKS.md). They are not interchangeable:
+> latency figures refer to the benchmark corpus unless stated otherwise.
 
 ### Block Distribution
 
@@ -65,9 +72,9 @@ A living, self-organizing memory architecture with 13 layers, 9 depths, and 1.28
 | Module | File | Lines | Purpose |
 |--------|------|-------|---------|
 | Epistemic | `epistemic.rs` | 1,241 | Evidence tracking, confidence, promotion gates |
-| Absentia | `absentia.rs` | 498 | Silence layer — detects what's missing |
+| Absentia | `absentia.rs` | 498 | Silence layer â€” detects what's missing |
 | Intent | `intent.rs` | 461 | Auditatable intent generation |
-| Cognitive Morphogenesis | `cognitive_morphogenesis.rs` | 826 | Integration engine — 7-component gradient |
+| Cognitive Morphogenesis | `cognitive_morphogenesis.rs` | 826 | Integration engine â€” 7-component gradient |
 | Morphogenesis | `morphogenesis.rs` | 2,200 | Biological growth algorithms (mycelium, capillary, slime mold) |
 | Hebbian | `hebbian.rs` | 754 | Co-activation learning |
 | Resonance | `resonance.rs` | 776 | Pulse-based federation protocol |
@@ -107,7 +114,7 @@ The shadow term prevents growth toward areas with weak evidence, without blockin
 
 ### Unit Tests
 ```bash
-cargo test                    # All tests (396 passing)
+cargo test                    # All tests (413 passing)
 cargo test --lib              # Library tests only
 cargo test --test integration # Integration tests only
 ```
@@ -189,7 +196,7 @@ class MicroscopeWasm {
 }
 
 class HopeCli {
-  exec(command: string): string  // Virtual CLI — same commands as native
+  exec(command: string): string  // Virtual CLI â€” same commands as native
 }
 ```
 

@@ -200,13 +200,18 @@ pub struct RecallQuery {
     pub memory_scope: Option<String>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Clone)]
 pub struct MemoryResponse {
     pub text: String,
     pub depth: u8,
     pub layer: String,
     pub distance: f32,
     pub memory_scope: String,
+    /// Every depth this same fact was found at, after content deduplication.
+    /// A single fact stored across D3/D4/D5 is reported once, with all depths
+    /// listed here instead of being repeated as separate hits.
+    #[serde(default)]
+    pub dedup_depths: Vec<u8>,
 }
 
 #[derive(Deserialize)]
@@ -554,13 +559,157 @@ async fn recall_request_handler(
             layer,
             distance: res.dist_sq.sqrt(),
             memory_scope: "active".to_string(),
+            dedup_depths: Vec::new(),
         });
         if response.len() >= k {
             break;
         }
     }
 
+    // Apply the same content deduplication as recall: the same fact stored at
+    // several depths must not consume every slot of the top-k.
+    let response = dedup_by_text(response, k);
+
     Ok(Json(response))
+}
+
+/// Collapse results carrying the same text into a single hit.
+///
+/// The nearest copy becomes the representative; every other depth it was found
+/// at is recorded in `dedup_depths` so the caller can still see that the fact
+/// lives on more than one level.
+fn dedup_by_text(items: Vec<MemoryResponse>, k: usize) -> Vec<MemoryResponse> {
+    let mut grouped: std::collections::HashMap<String, MemoryResponse> =
+        std::collections::HashMap::new();
+    let mut order: Vec<String> = Vec::new();
+
+    for mut item in items {
+        let key = normalise_for_dedup(&item.text);
+        if key.is_empty() {
+            continue;
+        }
+        match grouped.get_mut(&key) {
+            Some(existing) => {
+                // Merge the depths seen so far, then let the nearest copy take
+                // over as the representative while keeping the full set.
+                let mut depths = std::mem::take(&mut existing.dedup_depths);
+                depths.push(existing.depth);
+                depths.push(item.depth);
+                if item.distance < existing.distance {
+                    item.dedup_depths = depths;
+                    *existing = item;
+                } else {
+                    existing.dedup_depths = depths;
+                }
+            }
+            None => {
+                order.push(key.clone());
+                grouped.insert(key, item);
+            }
+        }
+    }
+
+    let mut out: Vec<MemoryResponse> = order
+        .iter()
+        .filter_map(|key| grouped.get(key).cloned())
+        .collect();
+    for item in &mut out {
+        item.dedup_depths.push(item.depth);
+        item.dedup_depths.sort_unstable();
+        item.dedup_depths.dedup();
+    }
+    out.sort_by(|a, b| a.distance.total_cmp(&b.distance));
+    out.truncate(k);
+    out
+}
+
+/// Normalise text so the same fact collapses to one key across depths.
+///
+/// Casing and whitespace runs are ignored; punctuation is kept, because
+/// "no nut allergy" and "nut allergy" are different facts.
+fn normalise_for_dedup(text: &str) -> String {
+    text.split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .to_lowercase()
+}
+
+#[cfg(test)]
+mod dedup_tests {
+    use super::{dedup_by_text, normalise_for_dedup, MemoryResponse};
+
+    fn item(text: &str, depth: u8, distance: f32) -> MemoryResponse {
+        MemoryResponse {
+            text: text.to_string(),
+            depth,
+            layer: "long_term".to_string(),
+            distance,
+            memory_scope: "shared".to_string(),
+            dedup_depths: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn same_fact_at_three_depths_returns_once() {
+        let items = vec![
+            item("The user has a pine nut allergy", 3, 0.10),
+            item("The user has a pine nut allergy", 4, 0.30),
+            item("The user has a pine nut allergy", 5, 0.50),
+        ];
+        let out = dedup_by_text(items, 5);
+        assert_eq!(out.len(), 1, "expected 1 hit, got {}", out.len());
+        assert_eq!(out[0].dedup_depths, vec![3, 4, 5]);
+    }
+
+    #[test]
+    fn dedup_frees_top_k_for_other_facts() {
+        // Three copies of one fact must not fill a top-3 with a single answer.
+        let items = vec![
+            item("pine nut allergy", 3, 0.10),
+            item("pine nut allergy", 4, 0.11),
+            item("pine nut allergy", 5, 0.12),
+            item("lives in Budapest", 3, 0.20),
+            item("prefers short check-ins", 4, 0.30),
+        ];
+        let out = dedup_by_text(items, 3);
+        assert_eq!(out.len(), 3, "top-3 must hold 3 distinct facts");
+    }
+
+    #[test]
+    fn nearest_copy_becomes_representative() {
+        let items = vec![
+            item("pine nut allergy", 5, 0.90),
+            item("pine nut allergy", 3, 0.10),
+        ];
+        let out = dedup_by_text(items, 5);
+        assert_eq!(out[0].depth, 3, "nearest copy should represent the fact");
+        assert_eq!(out[0].dedup_depths, vec![3, 5]);
+    }
+
+    #[test]
+    fn different_facts_are_not_merged() {
+        let items = vec![
+            item("has a nut allergy", 3, 0.1),
+            item("has no nut allergy", 4, 0.2),
+        ];
+        let out = dedup_by_text(items, 5);
+        assert_eq!(out.len(), 2, "negation must not be collapsed away");
+    }
+
+    #[test]
+    fn whitespace_and_case_variants_collapse() {
+        let items = vec![
+            item("Pine  Nut Allergy", 3, 0.1),
+            item("pine nut allergy", 4, 0.2),
+        ];
+        assert_eq!(dedup_by_text(items, 5).len(), 1);
+    }
+
+    #[test]
+    fn normalisation_is_stable() {
+        assert_eq!(normalise_for_dedup("  A  B  "), "a b");
+        assert_eq!(normalise_for_dedup("\n\tx\n\n"), "x");
+    }
 }
 
 fn recall_internal(
@@ -609,6 +758,7 @@ fn recall_internal(
                 "shared"
             }
             .to_string(),
+            dedup_depths: Vec::new(),
         });
     }
 
@@ -645,10 +795,13 @@ fn recall_internal(
                 "shared"
             }
             .to_string(),
+            dedup_depths: Vec::new(),
         });
     }
 
-    Ok(response)
+    // Deduplicate on text and apply the k limit to distinct facts, so one fact
+    // stored at several depths cannot occupy the whole top-k.
+    Ok(dedup_by_text(response, k))
 }
 
 async fn get_status(

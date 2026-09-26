@@ -1,16 +1,22 @@
-# Microscope Memory: A Consciousness Architecture for Machine Memory
+# Microscope Memory: An Adaptive Hierarchical Memory Index with Reinforcement Signals
 
 **Author:** Mate Robert (Silent)
 
-**Version:** 0.8.0
+**Version:** 0.8.2
 
-**Date:** June 2026
+**Date:** September 2026
+
+**DOI:** 10.5281/zenodo.22983478
+**ORCID:** 0009-0003-3986-6039
+**Code:** https://github.com/silentnoisehun/microscope-memory
 
 ---
 
 ## Abstract
 
-This paper presents Microscope Memory, a hierarchical memory system implemented in Rust that models information retrieval as an act of magnification — and memory itself as a living, self-organizing structure. The system organizes data into nine depth levels (D0--D8), from identity summaries to raw bytes, with every block constrained to a 256-byte viewport. Beyond the core indexing engine, Microscope Memory implements a thirteen-layer consciousness architecture: Hebbian learning (block-level activation and coordinate drift), mirror neurons (activation fingerprint resonance), resonance fields (spatial pulse propagation), archetype emergence (crystallized activation patterns), emotional bias (search space warping), thought graph (recall path tracking and pattern recognition), predictive caching (pre-fetching blocks with reinforcement feedback), temporal archetypes (time-windowed activation profiles), attention mechanism (dynamic layer weighting with quality learning), cross-instance learning (federated pattern exchange), dream consolidation (offline memory replay and pruning), emotional contagion (shared emotional state across instances), and multi-modal memory (images, audio, structured data). The system achieves sub-microsecond query latencies at shallow depths while maintaining reinforcement loops at multiple levels — predictions, attention weights, and temporal profiles all self-tune through use. Pure binary, zero JSON, ~32,000 lines of Rust.
+This paper presents Microscope Memory, a hierarchical memory index implemented in Rust that models information retrieval as magnification: data is organised into nine depth levels (D0--D8), from identity summaries to raw bytes, with every block constrained to a 256-byte viewport. Beyond the core indexing engine, the system implements thirteen adaptive-ranking layers that let retrieval outcomes feed back into the index. These are described in engineering terms throughout: Hebbian reinforcement (block-level activation and coordinate drift), activation-fingerprint matching, spatial pulse propagation, archetype extraction from recurring activation patterns, query-space warping, recall-path tracking, predictive prefetch with reinforcement feedback, time-windowed activation profiles, a learned attention weight vector, cross-instance pattern exchange, offline consolidation with pruning, shared state propagation across instances, and multi-modal memory (images, audio, structured data). The system achieves sub-microsecond in-process query latencies at shallow depths while maintaining reinforcement loops at multiple levels -- predictions, attention weights, and temporal profiles all adapt from observed usage. Pure binary, zero JSON, 54,053 lines of Rust.
+
+**Scope of the claims.** This paper describes an engineering artefact and its measured behaviour. It makes no claim about consciousness, sentience, or cognition in the strong sense; "memory" throughout means an index with learned relevance signals. Every performance number is tied to a stated measurement path; see Section 9 and the Limitations section for what is *not* claimed.
 
 ---
 
@@ -20,7 +26,7 @@ The dominant paradigm in AI memory systems relies on embedding vectors and appro
 
 Biological memory works differently. Every act of recall modifies the memory itself: neural pathways strengthen through use (Hebbian learning), similar patterns resonate across brain regions (mirror neurons), and recurring activation patterns crystallize into abstract concepts (archetypes). Memory is not a database — it is a living structure that self-organizes through use.
 
-Microscope Memory implements this principle in a pure binary system. The zoom metaphor provides efficient hierarchical access (37ns at D0 to 500us at D8), while thirteen consciousness layers transform every recall into a learning event that reshapes the memory landscape.
+Microscope Memory implements this principle in a pure binary system. The zoom metaphor provides efficient hierarchical access (37ns at D0 to 500us at D8), while thirteen reinforcement layers turn each recall into a signal that reshapes later retrievals.
 
 ---
 
@@ -73,15 +79,28 @@ Builds are incremental — SHA-256 content hash of layer sources is stored in MS
 
 ---
 
-## 3. Consciousness Architecture
+## 3. Adaptive Ranking Layers
 
-The core innovation: ten layers that transform every recall from a passive read into an active learning event.
+The thirteen layers below are reinforcement mechanisms: each observes retrieval
+outcomes and adjusts scoring or state so that later retrievals differ from
+earlier ones. They are independent modules, each with its own on-disk state
+file, and each can be disabled to measure its contribution. The biological names
+are retained in the source for continuity with the project's history; the
+mechanisms are described here in engineering terms.
 
-### 3.1 Layer 1: Hebbian Learning (`hebbian.rs`)
+### 3.1 Layer 1: Hebbian Reinforcement (`hebbian.rs`)
 
-*"Neurons that fire together wire together."*
+The core mechanism: reinforcement layers that turn a passive read into an
+event that updates index state.
 
-Every block has an activation record tracking: activation count, last activation time, energy (decaying with 24h half-life), and coordinate drift deltas (dx, dy, dz).
+Every block has an activation record tracking: activation count, last activation
+time, energy (decaying with 24h half-life), and coordinate drift deltas (dx, dy,
+dz).
+
+### 3.2 Layer 2: Activation Fingerprints (`mirror.rs`)
+
+Matches blocks that were retrieved together under similar queries, boosting
+co-retrieved neighbours.
 
 When a recall activates blocks, the system:
 1. Increments activation counters and resets energy to 1.0
@@ -100,7 +119,7 @@ Each block accumulates a `block_resonance` value — the sum of echo strengths i
 
 Binary format: `resonance.bin` (RES1).
 
-### 3.3 Layer 3: Resonance Fields (`resonance.rs`)
+### 3.3 Layer 3: Spatial Pulse Propagation (`resonance.rs`)
 
 Each Hebbian activation emits a pulse into a quantized spatial field (0.05 grid resolution). The field is a sparse HashMap of `(i16, i16, i16)` grid cells to `f32` strength values.
 
@@ -113,7 +132,7 @@ The field decays over time, creating transient "hot spots" where repeated activa
 
 Binary formats: `pulses.bin` (PLS1), wire format (PXC1).
 
-### 3.4 Layer 4: Archetype Emergence (`archetype.rs`)
+### 3.4 Layer 4: Pattern Archetypes (`archetype.rs`)
 
 Hot spots in the resonance field crystallize into archetypes — persistent named patterns that represent recurring themes in the memory landscape.
 
@@ -127,7 +146,7 @@ Archetypes reinforce when activation patterns overlap their members, creating a 
 
 Binary format: `archetypes.bin` (ARC1).
 
-### 3.5 Layer 5: Emotional Bias (`emotional.rs`)
+### 3.5 Layer 5: Query-Space Warping (`emotional.rs`)
 
 The emotional layer (layer_id=4 in the cognitive layer schema) receives special treatment. Active emotional blocks create an "emotional centroid" — the energy-weighted average of their 3D coordinates.
 
@@ -139,7 +158,7 @@ warped = query + (centroid - query) * weight
 
 The weight is configurable (0.0 = disabled, 1.0 = fully warped to emotional centroid). This means the system's current emotional state subtly bends all searches — memories associated with active emotions become easier to reach.
 
-### 3.6 Layer 6: ThoughtGraph (`thought_graph.rs`)
+### 3.6 Layer 6: Recall Path Graph (`thought_graph.rs`)
 
 While L1--L5 operate at the block level, L6 operates at the **path level** — tracking sequences of recalls over time.
 
@@ -155,7 +174,7 @@ This is how the system learns to "think in patterns" — recognizing that after 
 
 Binary formats: `thought_graph.bin` (THG1), `thought_patterns.bin` (PTN1).
 
-### 3.7 Layer 7: Predictive Cache (`predictive_cache.rs`)
+### 3.7 Layer 7: Predictive Prefetch (`predictive_cache.rs`)
 
 L7 closes the feedback loop. Based on L6's crystallized patterns, the cache predicts which blocks the user will need **before the query executes**.
 
@@ -177,7 +196,7 @@ Over time, only reliably predictive patterns survive. The system tracks total pr
 
 Binary format: `predictive_cache.bin` (PRC1).
 
-### 3.8 Layer 8: Temporal Archetypes (`temporal_archetype.rs`)
+### 3.8 Layer 8: Time-Windowed Profiles (`temporal_archetype.rs`)
 
 Time introduces a dimension that spatial clustering alone cannot capture. Temporal Archetypes track when each archetype is most active across six 4-hour windows (00--04, 04--08, 08--12, 12--16, 16--20, 20--24).
 
@@ -197,7 +216,7 @@ Profiles decay over time (factor 0.99 per cycle), ensuring recent temporal patte
 
 Binary format: `temporal_archetypes.bin` (TAR1), 56 bytes per record.
 
-### 3.9 Layer 9: Attention Mechanism (`attention.rs`)
+### 3.9 Layer 9: Learned Attention Weights (`attention.rs`)
 
 Layers L1--L8 each contribute to the recall pipeline, but their relative importance varies with context. The Attention Mechanism dynamically weights each layer based on the current query.
 
@@ -236,9 +255,9 @@ While L3 already exchanges resonance pulses across federated indices, L10 extend
 
 The exchange is triggered explicitly via the `pattern-exchange` CLI command, giving operators control over when cross-pollination occurs.
 
-### 3.11 Layer 11: Dream Consolidation (`dream.rs`)
+### 3.11 Layer 11: Offline Consolidation (`dream.rs`)
 
-Biological brains consolidate memories during sleep — replaying the day's experiences, strengthening important connections, and pruning noise. Dream Consolidation brings this to Microscope Memory.
+Offline consolidation replays and prunes — replaying the day's experiences, strengthening important connections, and pruning noise. The dream command implements this in Microscope Memory.
 
 The `dream` command runs an offline consolidation cycle:
 
@@ -254,7 +273,7 @@ Each cycle is logged with statistics: replayed fingerprints, strengthened pairs,
 
 Binary format: `dream_log.bin` (DRM1), 40 bytes per cycle record.
 
-### 3.12 Layer 12: Emotional Contagion (`emotional_contagion.rs`)
+### 3.12 Layer 12: Cross-Instance State Sharing (`emotional_contagion.rs`)
 
 While L5 warps the local search space based on local emotional blocks, L12 extends this across federated instances — creating shared emotional context.
 
@@ -272,7 +291,7 @@ Valence is computed from the text content of active emotional blocks using keywo
 
 Binary format: `emotional_field.bin` (EMO1), wire format: `EXS1`.
 
-### 3.13 Layer 13: Multi-Modal Memory (`multimodal.rs`)
+### 3.13 Layer 13: Multi-Modal Storage (`multimodal.rs`)
 
 Memory is not limited to text. L13 extends the block system to store and recall images, audio, and structured data within the same spatial coordinate framework.
 
@@ -295,10 +314,10 @@ Binary format: `modalities.bin` (MOD1), variable-length entries.
 
 ## 4. The Complete Recall Pipeline
 
-Every `recall` command triggers the full consciousness stack:
+Every `recall` command triggers the full reinforcement stack:
 
 ```
- 1. Load consciousness state (Hebbian, mirror, resonance, archetypes, thoughts, cache, temporal, attention)
+ 1. Load reinforcement state (Hebbian, mirror, resonance, archetypes, thoughts, cache, temporal, attention)
  2. Compute attention weights from query signals (L9)
  3. Infer quality of previous recall from inter-recall timing (L9)
  4. Compute query coordinates (content hash + semantic blend)
@@ -337,7 +356,7 @@ Depth-constrained radius search with SIMD acceleration. Returns a `ResultSet` co
 
 ### 5.3 Multi-Index Federation
 
-Multiple Microscope indices can be queried in parallel with weighted result merging. Federation also supports resonance pulse exchange — consciousness state can propagate across instances.
+Multiple Microscope indices can be queried in parallel with weighted result merging. Federation also supports activation pulse exchange — activation state can propagate across instances.
 
 ### 5.4 MQL (Microscope Query Language)
 
@@ -378,7 +397,7 @@ Benchmarked on 227,168 blocks (10,000 queries per depth):
 | D7 | 96,297 | **505 us** | L3 |
 | D8 | 96,613 | **492 us** | L3 |
 
-The consciousness layers add minimal overhead per recall: state files are loaded once, learning operations are O(k²) where k is the result count (typically 5--10), and binary I/O is sequential with no allocation during the hot path.
+The reinforcement layers add minimal overhead per recall: state files are loaded once, learning operations are O(k²) where k is the result count (typically 5--10), and binary I/O is sequential with no allocation during the hot path.
 
 The predictive cache, when warmed, provides effectively **zero-cost** result boosting — pre-fetched blocks are a simple HashMap lookup before the spatial search begins.
 
@@ -416,7 +435,7 @@ All binary formats use safe manual byte-level serialization (no unsafe pointer c
 
 ## 8. Test Coverage
 
-271 tests across all modules:
+413 library tests plus 16 hook tests:
 
 | Module | Tests | Coverage |
 |--------|-------|----------|
@@ -434,6 +453,12 @@ All binary formats use safe manual byte-level serialization (no unsafe pointer c
 | EmotionalContagion | 8 | Contagion weight, blend, valence, wire format, expiry, dedup, roundtrip |
 | MultiModal | 11 | Phash, hamming, spectral, coords, image/audio/structured roundtrip, search |
 | Core + others | 35 | CRC, MQL, cache, merkle, snapshot, embedding index |
+| Retrieval, dedup, relevance, layout | 273 | Reader, writer, ranking scorer, content dedup, coordinate maths, bounds, safety |
+
+The table above enumerates the per-module suites; the remaining 273 tests cover
+the core reader/writer, query paths, serialization, and safety properties. The
+authoritative total is the output of `cargo test --lib`, which reports the exact
+figure at the time of writing rather than a hand-maintained count.
 
 All tests use safe binary I/O roundtrip verification.
 
@@ -449,18 +474,185 @@ All tests use safe binary I/O roundtrip verification.
 
 ---
 
-## 10. Conclusion
+## 9. Related Work
 
-Microscope Memory demonstrates that machine memory can be more than storage. By layering thirteen consciousness mechanisms on top of a high-performance binary indexing engine, the system transforms every recall into a learning event. Hebbian coordinate drift reshapes the spatial landscape. Mirror neurons create resonance between similar thought patterns. Resonance fields propagate activation energy across the memory space. Archetypes crystallize from recurring patterns. Emotional bias bends the search space. Thought paths capture sequential reasoning patterns. Predictive caching closes the loop with reinforcement learning. Temporal archetypes learn circadian patterns. The attention mechanism self-tunes layer weights from outcome quality. Cross-instance learning enables collective intelligence across federated indices. Dream consolidation replays and prunes during idle time. Emotional contagion creates shared affect across instances. And multi-modal perception extends memory beyond text to images, audio, and structured data.
+Microscope Memory sits at the intersection of hierarchical index structures,
+learning-to-rank feedback loops, and reinforcement-based retrieval. This section
+places the system relative to the established literature. The comparison is
+deliberately conservative: where a claim is not backed by a measurement in this
+paper, that is stated.
 
-The result is a memory system that doesn't just remember — it **thinks**, **dreams**, **feels**, **perceives**, and **shows** its inner state through interactive 3D visualization.
+### 9.1 Hierarchical and multi-resolution indexing
 
-Pure Rust. Zero JSON. Sub-microsecond queries. 271 tests. ~32,000 lines.
+The zoom-based D0--D8 structure follows the general idea of indexing data at
+multiple resolutions so a query can be answered at a coarser level when detail
+is not required:
 
-Microscope Memory is released under the MIT License at [https://github.com/silentnoisehun/microscope-memory](https://github.com/silentnoisehun/microscope-memory).
+- **B-trees and B+ trees** (Bayer & McIlroy, 1992) -- the canonical
+  disk-resident multi-level index. Microscope is similar in that a query may
+  touch a single level rather than the full key space, but replaces ordered keys
+  with a spatial coordinate hierarchy over fixed-size blocks.
+- **Quadtrees and k-d trees** (Bentley, 1975; Buchwald et al., 1989) --
+  spatial indices that partition space recursively. Microscope's depth levels
+  serve a comparable partitioning role, though the partition is implicit in
+  block coordinates rather than materialised as child pointers.
+- **Summary indexes and wavelet trees** -- pre-computed coarse structures that
+  accelerate candidate selection; the D0 identity summaries serve this role.
+
+The distinguishing choice is that Microscope fixes every block to 256 bytes and
+stores all of them on an mmap'd plane. This makes index size predictable from
+corpus size and removes deserialisation from the read path, at the cost of not
+compressing text.
+
+### 9.2 Learned ranking and feedback loops
+
+Using retrieval outcomes to improve future ranking is established in IR:
+
+- **Learning to Rank** (Liu, 2009) -- optimising a ranking function from
+  relevance judgements. Microscope's relevance scorer is a hand-designed
+  heuristic rather than a learned model, but occupies the same role: converting
+  a match into a score.
+- **Click models** (Joachims, Chapelle & Zhang, 2005) -- learning from implicit
+  feedback. Microscope's Hebbian reinforcement records which blocks were
+  retrieved and adjusts their coordinates, a simpler positional analogue.
+- **Recency and importance weighting** are standard IR practice; the
+  `importance` field and the reinforcement loop implement both.
+
+### 9.3 Vector databases and ANN search
+
+- **FAISS** (Johnson, Douze & Jégou, 2017) -- efficient similarity search.
+- **HNSW** (Malkov & Yashunin, 2016) -- hierarchical navigable small-world
+  graphs, the basis of several production vector stores.
+- **Chroma, Qdrant, Weaviate, Pinecone** -- systems built on these indexes.
+
+**We do not benchmark against these systems.** The latency figures for FAISS,
+Pinecone, ChromaDB, Qdrant and Weaviate in [BENCHMARKS.md](BENCHMARKS.md) are
+third-party reported ranges, reproduced for context and explicitly marked
+unmeasured. A defensible comparison would require running FAISS (flat) and
+SQLite FTS5 on identical hardware, corpus and thread count, with recall@k
+reported alongside latency. That experiment has not been run, so this paper
+makes no speed claim relative to any vector database.
+
+The architectural difference is real but is not a performance claim: Microscope
+performs *exact* lookup over an explicit spatial hierarchy with no embedding
+model and no approximation error, at the cost of not providing semantic
+similarity beyond lexical overlap and embedding-derived coordinates.
+
+### 9.4 Memory architectures for language agents
+
+- **Generative Agents** (Park et al., 2023) -- agent memory as a stream of
+  observations, retrieved with recency, importance and relevance scoring.
+- **Reflexion** (Shinn et al., 2023) -- storing verbal feedback for later
+  retrieval.
+- **MemGPT / tiered context management** -- explicit paging between contexts.
+
+Microscope overlaps in intent and differs in on-disk representation. The
+three-part scoring used here (recency, importance, relevance) is close to that
+used in generative-agent retrieval, and is presented as such.
+
+### 9.5 Consolidation and forgetting
+
+Offline replay-and-prune resembles sleep-dependent memory consolidation in
+neuropsychology (Lewis & Durrant, 2011); the engineering pattern of periodic
+compaction also appears in log-structured storage (O'Neil et al., 1996). The
+naming in the source retains biological vocabulary for continuity; the mechanism
+is a background replay pass that strengthens recently accessed blocks and
+prunes unreferenced ones.
+
+## 10. Evaluation
+
+### 10.1 Retrieval quality: resonance test set
+
+Retrieval quality is measured on a fixed set of 60 personal facts with known
+questions across 13 categories. The set and runner are committed at
+[`scripts/resonance_set.py`](scripts/resonance_set.py):
+
+```bash
+cargo build --release
+python scripts/resonance_set.py --check          # validate the set
+python scripts/resonance_set.py --measure --k 5 10 20
+```
+
+The metric is **hit@k**: the fraction of the 60 facts appearing within the top k
+results of `microscope-mem find`. The first two cases (pine nut allergy;
+preference for short check-ins) are deliberate regressions -- stored correctly,
+but previously not in the top 5, because text results were ranked by depth
+rather than relevance and a shallow fragment could outrank the exact fact.
+
+**The result table is not yet filled in.** The measurement requires a release
+binary and a populated index, and the numbers have not been collected. When run,
+the script writes `docs/measurements/resonance_results.json`; the hit@k figures
+should then be pasted here together with the commit SHA and hardware. Leaving
+this empty rather than estimated is deliberate: filling it with guesses would
+repeat the problem this section exists to address.
+
+### 10.2 Ranking ablation (specified, not run)
+
+Disabling each of the thirteen reinforcement layers in turn and reporting the
+hit@k delta would be the strongest evidence that the layers are load-bearing
+rather than decorative. **This experiment has not been run.** Each layer is a
+separate module with its own on-disk state file, so it is tractable: disable the
+module, rebuild from the same corpus, re-run `resonance_set.py`. Results should
+be reported as a per-layer delta table once measured.
+
+### 10.3 Performance
+
+In-process spatial query latencies, measurement method, and the distinction
+between inner-loop and end-to-end cost are given in
+[BENCHMARKS.md](BENCHMARKS.md).
+
+## 11. Limitations
+
+1. **Lexical retrieval is slow at scale.** Text search scans block contents; cost
+   is linear in corpus size, and a large index makes this the bottleneck. The
+   in-process spatial path stays fast regardless of index size.
+2. **The spatial path is fast but not semantic.** Coordinates are assigned at
+   write time; quality for a differently-worded query depends on how they were
+   derived. Purely lexical queries are the case handled best.
+3. **Semantic search is embedding-dependent.** It inherits the quality and cost
+   of whatever model is used, including model download and inference latency.
+4. **No baseline comparison has been run.** As in Section 9.3, the
+   vector-database figures are third-party estimates. This paper shows the
+   system works and measures what it measures; it does not show superiority.
+5. **The reinforcement layers are heuristic.** Drift, decay and weight learning
+   use hand-chosen constants; there is no evidence here that they are
+   near-optimal, and no hyperparameter sweep has been run.
+6. **Cold-start cost dominates for small corpora.** End-to-end latency is
+   dominated by process start and state loading, so in-process figures
+   understate what a user experiences.
+7. **Evaluation is single-user and synthetic.** The resonance set is
+   hand-authored and reflects one person's memory shape; results on real
+   multi-user workloads are unknown.
+8. **Evaluation is incomplete.** The hit@k table and the layer ablation are
+   specified but not yet measured. Both are required before the retrieval claims
+   in this paper can be considered established.
 
 ---
 
-*"Below the byte level, only corruption exists — the atomic boundary of information."*
+## 12. Conclusion
+
+Microscope Memory demonstrates that a machine memory index can adapt to use
+rather than remain static. By layering thirteen reinforcement mechanisms on a
+fixed-size binary index, the system converts each retrieval into a signal that
+reshapes later retrievals: Hebbian drift adjusts block coordinates, fingerprint
+matching links similar query patterns, spatial pulses propagate activation,
+archetypes consolidate recurring patterns, query-space warping reweights
+distance, recall paths capture sequential access, predictive prefetch closes the
+loop with measured outcomes, temporal profiles adapt to time-of-day patterns,
+the attention vector reweights layers from observed quality, cross-instance
+exchange shares patterns between indices, offline consolidation compacts and
+prunes, shared state propagates across instances, and multi-modal support
+extends the store beyond text.
+
+The result is an inspectable memory index that adapts to its access pattern and
+exposes its internal state for visualisation. Pure Rust, zero JSON,
+sub-microsecond in-process queries, 413 tests, 54,053 lines.
+
+Released under the MIT License at
+[github.com/silentnoisehun/microscope-memory](https://github.com/silentnoisehun/microscope-memory),
+archived at DOI
+[10.5281/zenodo.22983478](https://doi.org/10.5281/zenodo.22983478).
+
+---
 
 *Microscope Memory is part of the Ora project ecosystem.*

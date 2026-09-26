@@ -506,6 +506,95 @@ impl MicroscopeReader {
         results
     }
 
+    /// Text search ranked by relevance rather than by depth.
+    ///
+    /// The previous behaviour sorted by `depth` and truncated, so a shallow
+    /// noise fragment always outranked the exact fact the user asked for. This
+    /// scores each match on (a) how precisely it matches the query, (b) the
+    /// block's recorded importance, and (c) specificity (a short block that is
+    /// mostly the query is a stronger hit than a long block that merely
+    /// contains it), then drops near-tied noise via a relative score floor.
+    pub fn find_text_ranked(&self, query: &str, k: usize) -> Vec<(u8, usize, f32)> {
+        let q = query.to_lowercase();
+        let q_terms: Vec<&str> = q.split_whitespace().filter(|t| t.len() > 1).collect();
+        let mut scored: Vec<(u8, usize, f32)> = (0..self.block_count)
+            .into_par_iter()
+            .filter_map(|i| {
+                let h = unsafe { self.header_unchecked(i) };
+                let text = self.text(i);
+                let low = text.to_lowercase();
+                if !low.contains(&q) {
+                    return None;
+                }
+                Some((
+                    h.depth,
+                    i,
+                    relevance_score(&q, &q_terms, &low, h.importance),
+                ))
+            })
+            .collect();
+
+        if scored.is_empty() {
+            return Vec::new();
+        }
+        // Drop near-ties against the best hit: this is the noise filter.
+        let best = scored
+            .iter()
+            .map(|&(_, _, s)| s)
+            .fold(f32::MIN, f32::max);
+        let floor = best * 0.45;
+        scored.retain(|&(_, _, s)| s >= floor);
+
+        scored.sort_by(|a, b| {
+            b.2.partial_cmp(&a.2)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| a.0.cmp(&b.0))
+        });
+        scored.truncate(k);
+        scored
+    }
+
+    /// Ranked text search across the main index and the hot append log.
+    pub fn find_text_all_ranked(
+        &self,
+        config: &Config,
+        query: &str,
+        k: usize,
+    ) -> Vec<(u8, usize, bool, f32)> {
+        let q = query.to_lowercase();
+        let q_terms: Vec<&str> = q.split_whitespace().filter(|t| t.len() > 1).collect();
+
+        let mut main: Vec<(u8, usize, f32)> = self
+            .find_text_ranked(query, k)
+            .into_iter()
+            .map(|(d, i, s)| (d, i, s))
+            .collect();
+
+        let append_path = Path::new(&config.paths.output_dir).join("append.bin");
+        let appended = read_append_log(&append_path);
+        for (idx, entry) in appended.iter().enumerate() {
+            let low = entry.text.to_lowercase();
+            if low.contains(&q) {
+                let s = relevance_score(&q, &q_terms, &low, entry.importance);
+                main.push((entry.depth, idx + 1_000_000, s));
+            }
+        }
+
+        if main.is_empty() {
+            return Vec::new();
+        }
+        let best = main.iter().map(|&(_, _, s)| s).fold(f32::MIN, f32::max);
+        let floor = best * 0.45;
+        main.retain(|&(_, _, s)| s >= floor);
+        main.sort_by(|a, b| {
+            b.2.partial_cmp(&a.2)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| a.0.cmp(&b.0))
+        });
+        main.truncate(k);
+        main.into_iter().map(|(d, i, s)| (d, i, i < 1_000_000, s)).collect()
+    }
+
     /// Text search across both the immutable main index and the hot append log.
     /// Append entries use virtual indices starting at 1_000_000.
     pub fn find_text_all(&self, config: &Config, query: &str, k: usize) -> Vec<(u8, usize, bool)> {
@@ -531,11 +620,20 @@ impl MicroscopeReader {
         results
     }
 
-    pub fn print_result(&self, i: usize, dist: f32) {
+    /// Print one result. The full block text is shown: a 256-byte block fits on
+    /// one line, and truncating at 70 characters could hide the very fact the
+    /// user searched for. `preview_limit` can still cap it for narrow terminals.
+    pub fn print_result_with_limit(&self, i: usize, dist: f32, preview_limit: Option<usize>) {
         let h = self.header(i);
         let text = self.text(i);
         let layer = LAYER_NAMES.get(h.layer_id as usize).unwrap_or(&"?");
-        let preview: String = text.chars().take(70).filter(|&c| c != '\n').collect();
+        let full: String = text.chars().filter(|&c| c != '\n').collect();
+        let preview = match preview_limit {
+            Some(n) if n > 0 && full.chars().count() > n => {
+                format!("{}…", full.chars().take(n).collect::<String>())
+            }
+            _ => full,
+        };
         println!(
             "  {} {} {} {}",
             format!("D{}", h.depth).cyan(),
@@ -543,6 +641,10 @@ impl MicroscopeReader {
             format!("[{}/{}]", layer, layer_color(h.layer_id)).green(),
             preview
         );
+    }
+
+    pub fn print_result(&self, i: usize, dist: f32) {
+        self.print_result_with_limit(i, dist, None)
     }
 }
 
@@ -1825,3 +1927,90 @@ mod tests {
         assert!(result.is_err(), "out-of-bounds header read must panic");
     }
 }
+
+/// Score how well a block answers a text query.
+///
+/// The old ranking used depth alone, so a shallow fragment of noise always
+/// came before the exact fact the user asked for. This combines three signals:
+///
+/// * **Phrase precision** — the whole query appearing verbatim is the strongest
+///   signal; every query term appearing separately is weaker.
+/// * **Importance** — the block's recorded importance (0-10), lightly weighted.
+/// * **Specificity** — a short block that is mostly the query beats a long block
+///   that merely mentions it somewhere.
+pub fn relevance_score(
+    query: &str,
+    query_terms: &[&str],
+    text_lower: &str,
+    importance: u8,
+) -> f32 {
+    if text_lower.is_empty() {
+        return 0.0;
+    }
+
+    let phrase = if text_lower.contains(query) {
+        1.0
+    } else if query_terms.is_empty() {
+        0.5
+    } else {
+        let hits = query_terms
+            .iter()
+            .filter(|t| text_lower.contains(**t))
+            .count();
+        hits as f32 / query_terms.len() as f32 * 0.7
+    };
+
+    let imp = (importance.min(10) as f32) / 10.0 * 0.15;
+    let len = text_lower.chars().count() as f32;
+    let spec = (query.chars().count() as f32 / len.max(1.0)).min(1.0);
+
+    phrase * 0.65 + imp + spec * 0.20
+}
+
+#[cfg(test)]
+mod relevance_tests {
+    use super::relevance_score;
+
+    fn score(query: &str, text: &str, importance: u8) -> f32 {
+        let q = query.to_lowercase();
+        let terms: Vec<&str> = q.split_whitespace().filter(|t| t.len() > 1).collect();
+        relevance_score(&q, &terms, &text.to_lowercase(), importance)
+    }
+
+    #[test]
+    fn exact_phrase_beats_incidental_mention() {
+        let exact = score("di oallergia", "A felhasznalonak di oallergiaja van", 5);
+        let noisy = score(
+            "di oallergia",
+            "Ez egy hosszu, teljesen mas tartalmu blokk, amelyik veletlenul szot emlit arról, hogy a felhasznalo tegnap elment egy orvoshoz, es kozben sok mas dolog is tortent.",
+            5,
+        );
+        assert!(exact > noisy, "exact {exact} should beat noisy {noisy}");
+    }
+
+    #[test]
+    fn importance_breaks_ties() {
+        let important = score("allergy", "dioallergia", 9);
+        let trivial = score("allergy", "dioallergia", 1);
+        assert!(important > trivial);
+    }
+
+    #[test]
+    fn short_block_outranks_long_block_with_same_term() {
+        let short = score("allergy", "dioallergia", 5);
+        let long = score(
+            "allergy",
+            "dioallergia, tovabba sok mas irrelevans informacio, ami hosszabbava teszi ezt a blokkot es elnyomja a relevanciat",
+            5,
+        );
+        assert!(short > long, "short {short} should beat long {long}");
+    }
+
+    #[test]
+    fn full_phrase_beats_partial_term_match() {
+        let full = score("pine nut allergy", "The user has a pine nut allergy.", 5);
+        let partial = score("pine nut allergy", "The user mentioned pine once.", 5);
+        assert!(full > partial);
+    }
+}
+

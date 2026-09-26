@@ -1498,18 +1498,21 @@ async fn async_main() {
         }
         Cmd::Find { query, k } => {
             let r = open_reader(&config);
-            println!("{} '{}':", "FIND".cyan().bold(), query);
+            // Results go to stdout; diagnostics go to stderr so that
+            // `microscope-mem find ... | ...` stays machine-readable.
+            eprintln!("{} '{}':", "FIND".cyan().bold(), query);
             let append_path = Path::new(&config.paths.output_dir).join("append.bin");
             let appended = read_append_log(&append_path);
-            let res = r.find_text_all(&config, &query, k);
+            // Ranked by relevance rather than by depth.
+            let res = r.find_text_all_ranked(&config, &query, k);
             if res.is_empty() {
                 println!("  (none)");
             }
-            for (_d, i, is_main) in res {
+            for (_d, i, is_main, score) in res {
                 if is_main {
-                    r.print_result(i, 0.0);
+                    r.print_result(i, score.sqrt());
                 } else {
-                    print_append_result(&appended, i, 0.0);
+                    print_append_result(&appended, i, score.sqrt());
                 }
             }
         }

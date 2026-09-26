@@ -264,10 +264,74 @@ pub fn format_episode(ep: &NarrativeEpisode) -> String {
     )
 }
 
+/// Render an age string relative to now.
+///
+/// `ts_ms` is an absolute epoch timestamp, so it must be subtracted from the
+/// current time; otherwise a memory written moments ago reports an age equal
+/// to the whole Unix epoch in days. A zero timestamp means "no timestamp
+/// recorded", which is unknown age, not zero age.
 fn chrono_str(ts_ms: u64) -> String {
-    let secs = ts_ms / 1000;
+    if ts_ms == 0 {
+        return "unknown date".to_string();
+    }
+    let now_ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(ts_ms);
+    if ts_ms > now_ms {
+        // Clock skew or a timestamp from the future: report it plainly instead
+        // of wrapping around into a huge unsigned age.
+        return "in the future".to_string();
+    }
+    let secs = (now_ms - ts_ms) / 1000;
     let days = secs / 86400;
     let hours = (secs % 86400) / 3600;
     let mins = (secs % 3600) / 60;
-    format!("{}d {}h {}m ago", days, hours, mins)
+    if days > 0 {
+        format!("{}d {}h {}m ago", days, hours, mins)
+    } else if hours > 0 {
+        format!("{}h {}m ago", hours, mins)
+    } else {
+        format!("{}m ago", mins)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::chrono_str;
+
+    #[test]
+    fn zero_timestamp_is_unknown_not_zero_days() {
+        assert_eq!(chrono_str(0), "unknown date");
+    }
+
+    #[test]
+    fn fresh_memory_does_not_report_tens_of_thousands_of_days() {
+        let now_ms = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64;
+        let s = chrono_str(now_ms);
+        // A just-written memory must be minutes old, never ~20722 days.
+        assert!(!s.contains('d'), "fresh memory reported days: {s}");
+    }
+
+    #[test]
+    fn one_day_old_reports_one_day() {
+        let now_ms = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64;
+        let s = chrono_str(now_ms - 86_400_000);
+        assert!(s.starts_with('1'), "expected 1d, got {s}");
+    }
+
+    #[test]
+    fn future_timestamp_does_not_wrap() {
+        let now_ms = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64;
+        assert_eq!(chrono_str(now_ms + 86_400_000), "in the future");
+    }
 }

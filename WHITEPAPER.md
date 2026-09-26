@@ -525,18 +525,36 @@ Using retrieval outcomes to improve future ranking is established in IR:
   graphs, the basis of several production vector stores.
 - **Chroma, Qdrant, Weaviate, Pinecone** -- systems built on these indexes.
 
-**We do not benchmark against these systems.** The latency figures for FAISS,
-Pinecone, ChromaDB, Qdrant and Weaviate in [BENCHMARKS.md](BENCHMARKS.md) are
-third-party reported ranges, reproduced for context and explicitly marked
-unmeasured. A defensible comparison would require running FAISS (flat) and
-SQLite FTS5 on identical hardware, corpus and thread count, with recall@k
-reported alongside latency. That experiment has not been run, so this paper
-makes no speed claim relative to any vector database.
+**A controlled comparison has been run**, and its result is not favourable to
+this system. On a 60-fact corpus with 60 questions, all systems on the same
+machine ([scripts/compare_baselines.py](scripts/compare_baselines.py)):
 
-The architectural difference is real but is not a performance claim: Microscope
-performs *exact* lookup over an explicit spatial hierarchy with no embedding
-model and no approximation error, at the cost of not providing semantic
-similarity beyond lexical overlap and embedding-derived coordinates.
+| System | p50 ms | R@1 | R@5 | R@10 |
+|--------|--------|-----|-----|------|
+| **Microscope** (`recall`, end-to-end) | 73.34 | 48.3% | 60.0% | 60.0% |
+| FAISS `IndexFlatIP` (d=3) | 0.0061 | 1.7% | 5.0% | 11.7% |
+| FAISS `IndexFlatIP` (d=256, BoW) | 0.0045 | 21.7% | 31.7% | 33.3% |
+| FAISS `IndexHNSWFlat` (d=256, BoW) | 0.0093 | 18.3% | 28.3% | 38.3% |
+| **SQLite FTS5** (BM25) | 0.0311 | **53.3%** | 60.0% | **63.3%** |
+
+**SQLite FTS5 matches or beats Microscope on every recall metric measured here
+and is about 2,400x faster at p50.** The measurement asymmetry favours the
+baselines (their timings exclude index build; Microscope's include process
+start-up), so the gap is conservative. Full discussion, including why 60 facts
+is not a scale test, is in [BENCHMARKS.md](BENCHMARKS.md).
+
+One result cuts the other way and is worth stating: FAISS fed Microscope's *own*
+3-D coordinates scores 1.7% at R@1, against Microscope's 48.3% on the same
+vectors. The hierarchical depth structure and the reinforcement layers are
+therefore doing the retrieval work; the raw coordinate distance is not
+sufficient. That is evidence against the claim that the system is merely
+spatial k-NN.
+
+The architectural difference remains real: Microscope performs *exact* lookup
+over an explicit spatial hierarchy with no embedding model, at the cost of
+providing no semantic similarity beyond hash-derived coordinates. Whether that
+trade suits a given workload is exactly what this table shows has **not** been
+demonstrated in Microscope's favour.
 
 ### 9.4 Memory architectures for language agents
 
@@ -614,14 +632,48 @@ reason hit@5 is 60% rather than higher.
 Raw results, including the full miss list, are written to
 [`docs/measurements/resonance_results.json`](docs/measurements/resonance_results.json).
 
-### 10.2 Ranking ablation (specified, not run)
+### 10.2 Layer ablation — run; three layers contribute nothing measurable
 
-Disabling each of the thirteen reinforcement layers in turn and reporting the
-hit@k delta would be the strongest evidence that the layers are load-bearing
-rather than decorative. **This experiment has not been run.** Each layer is a
-separate module with its own on-disk state file, so it is tractable: disable the
-module, rebuild from the same corpus, re-run `resonance_set.py`. Results should
-be reported as a per-layer delta table once measured.
+Three of the thirteen reinforcement layers were disabled one at a time, the
+index was rebuilt from the same corpus, and hit@5 was re-measured. The layers
+are code modules with no configuration switch, so each variant was produced by a
+temporary source patch that makes the layer's entry point a no-op, followed by a
+release rebuild ([scripts/ablation.sh](scripts/ablation.sh)).
+
+| Variant | hit@5 | Δ |
+|---------|-------|---|
+| Baseline (all layers enabled) | 36/60 (60.0%) | — |
+| `hebbian` disabled | 36/60 (60.0%) | 0.0 |
+| `mirror` disabled | 36/60 (60.0%) | 0.0 |
+| `attention` disabled | 36/60 (60.0%) | 0.0 |
+
+**No measurable effect.** The patch was verified to compile and the marker was
+confirmed present in the source before each measurement, so these are not
+silent no-ops.
+
+Two readings are possible, and this paper does not choose between them without
+further evidence:
+
+1. **These layers are not load-bearing for this workload.** On a 60-fact index
+   with `mock` coordinates there is very little for reinforcement to learn: each
+   fact is stored once, retrieved once, and there is no co-activation structure
+   to exploit. A layer that reweights a 60-element result set may simply not
+   move the metric.
+2. **The evaluation cannot resolve the effect.** With 60 cases, hit@5 changes in
+   units of 1.7 percentage points, and the metric is coarse enough that a real
+   but small effect could be invisible. A larger corpus with many co-occurring
+   queries would be needed.
+
+The remaining ten layers were not ablated; each ablation costs a full release
+rebuild (~2.5 min) plus an index rebuild and a measurement.
+
+**The honest summary is that the claim "the thirteen layers are necessary" is
+not supported by this evidence.** What is supported: the system reaches 60%
+hit@5 with the layers enabled, and three of them can be removed without
+changing that number. The FAISS d=3 result in Section 9.3 points the same way --
+the spatial coordinates alone score 1.7% at R@1 while the full system scores
+48.3%, so *something* beyond raw distance matters, but this ablation cannot say
+which layer it is.
 
 ### 10.3 Performance
 
@@ -639,9 +691,13 @@ between inner-loop and end-to-end cost are given in
    derived. Purely lexical queries are the case handled best.
 3. **Semantic search is embedding-dependent.** It inherits the quality and cost
    of whatever model is used, including model download and inference latency.
-4. **No baseline comparison has been run.** As in Section 9.3, the
-   vector-database figures are third-party estimates. This paper shows the
-   system works and measures what it measures; it does not show superiority.
+4. **The measured baseline comparison is unfavourable.** SQLite FTS5 matches or
+   beats Microscope on every recall metric tested (R@1 53.3% vs 48.3%, R@5 tied
+   at 60.0%, R@10 63.3% vs 60.0%) and is roughly 2,400x faster at p50. On this
+   workload there is no demonstrated advantage to the spatial index. The
+   60-fact corpus is not a scale test, and a scale test plus a real embedding
+   baseline would be needed before either system could be called superior, but
+   the current evidence does not support a performance claim.
 5. **The reinforcement layers are heuristic.** Drift, decay and weight learning
    use hand-chosen constants; there is no evidence here that they are
    near-optimal, and no hyperparameter sweep has been run.
@@ -657,32 +713,44 @@ between inner-loop and end-to-end cost are given in
    set, and a paraphrase with no lexical overlap ("how does the user like
    check-ins" vs. a stored preference) is not retrieved at all. The spatial path
    helps, but it does not substitute for semantic matching.
-9. **The layer ablation has not been run.** Section 10.2 specifies it; the
-   per-layer contribution is therefore unquantified, and it remains possible
-   that some reinforcement layers contribute little. The retrieval claims here
-   should be read as "the system returns relevant results 60% of the time on a
-   60-fact set", not as evidence that each layer is necessary.
+9. **The layer ablation does not support the thirteen-layer claim.** Disabling
+   `hebbian`, `mirror` or `attention` leaves hit@5 unchanged at 60.0%
+   (Section 10.2). The patches were verified to compile, so this is a real null
+   result rather than a broken experiment. It is consistent with a workload too
+   small for reinforcement to matter, but it does mean this paper cannot claim
+   that the layers are necessary for the retrieval behaviour it reports.
 
 ---
 
 ## 12. Conclusion
 
-Microscope Memory demonstrates that a machine memory index can adapt to use
-rather than remain static. By layering thirteen reinforcement mechanisms on a
-fixed-size binary index, the system converts each retrieval into a signal that
-reshapes later retrievals: Hebbian drift adjusts block coordinates, fingerprint
-matching links similar query patterns, spatial pulses propagate activation,
-archetypes consolidate recurring patterns, query-space warping reweights
-distance, recall paths capture sequential access, predictive prefetch closes the
-loop with measured outcomes, temporal profiles adapt to time-of-day patterns,
-the attention vector reweights layers from observed quality, cross-instance
-exchange shares patterns between indices, offline consolidation compacts and
-prunes, shared state propagates across instances, and multi-modal support
-extends the store beyond text.
+Microscope Memory implements a hierarchical memory index in which every block
+occupies a fixed 256-byte viewport across nine depth levels, D0--D8, and in which
+retrieval outcomes are fed back into scoring state. Thirteen such feedback
+mechanisms are implemented: Hebbian drift, activation-fingerprint matching,
+spatial pulse propagation, pattern archetypes, query-space warping, recall-path
+tracking, predictive prefetch, time-windowed profiles, learned attention weights,
+cross-instance exchange, offline consolidation, shared state propagation, and
+multi-modal storage.
 
-The result is an inspectable memory index that adapts to its access pattern and
-exposes its internal state for visualisation. Pure Rust, zero JSON,
-sub-microsecond in-process queries, 413 tests, 54,053 lines.
+**The evidence assembled here does not establish that these thirteen mechanisms
+are necessary, or that the index outperforms simpler alternatives.** On a
+60-fact corpus, hit@5 is 60%; SQLite FTS5 matches it at R@5, exceeds it at R@1
+and R@10, and does so about 2,400x faster (Section 9.3). Disabling the Hebbian,
+fingerprint or attention layer changes hit@5 by 0.0 (Section 10.2). The
+in-process spatial query is genuinely fast, but that is the inner loop, not the
+user-visible operation (Section 6).
+
+What the work does establish is a reproducible characterisation of the system:
+a fixed-size binary index whose read path is allocation-free and whose
+end-to-end cost is dominated by process start-up rather than query; a set of
+feedback mechanisms that are wired into the recall pipeline but whose effect is
+not yet demonstrated at the scale this paper evaluates; and a measurement
+harness, committed to the repository, that produces these numbers on demand.
+
+The result is an inspectable memory index with an exposed internal state, and an
+evaluation that is designed to be run by a reader rather than taken on trust.
+Pure Rust, zero JSON, 413 tests, 54,053 lines.
 
 Released under the MIT License at
 [github.com/silentnoisehun/microscope-memory](https://github.com/silentnoisehun/microscope-memory),

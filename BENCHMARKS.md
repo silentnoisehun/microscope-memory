@@ -60,65 +60,35 @@ operation.
 |------|------|
 | 4D soft (all 28679 blocks) | 380 µs/query |
 
-## Comparison with lexical and vector baselines — MEASURED
+## Comparison with lexical and vector baselines — NOT YET VALIDLY MEASURED
 
-Run by [`scripts/compare_baselines.py`](scripts/compare_baselines.py), which
-places all systems on the same machine, the same 60-fact corpus and the same 60
-questions, and reports **latency and recall together**. Reporting latency alone
-would be meaningless, since a system that returns nothing is very fast.
+> **Warning: the numbers previously published in this section have been
+> removed.** They were produced with `embedding.provider = "mock"` and
+> `semantic_weight = 0.0` -- the shipped default, documented in
+> `config.example.toml` as disabling semantic ranking in `recall` -- and against
+> a 60-fact index (4,853 blocks) two orders of magnitude smaller than the real
+> 695,868-block corpus. Under those settings the system reduces to
+> nearest-neighbour over text hashes. Conclusions drawn from that configuration
+> describe the configuration, not the architecture, and have been withdrawn.
 
-**Run:** commit `e76153f`, Windows 11, AMD Ryzen 5 7535HS (6C/12T), 15.2 GB RAM,
-Python 3.14.4, FAISS-CPU 1.14.2, SQLite 3.50.4 (FTS5). FAISS pinned to a single
-thread to match one CLI process.
+The harness is committed so a reader can run the comparison correctly:
 
-| System | p50 ms | p95 ms | p99 ms | R@1 | R@5 | R@10 |
-|--------|--------|--------|--------|-----|-----|------|
-| **Microscope** (`recall`, end-to-end process) | 73.34 | 168.64 | 198.79 | 48.3% | 60.0% | 60.0% |
-| FAISS `IndexFlatIP` (d=3, Microscope's own coords) | 0.0061 | 0.0138 | 0.0267 | 1.7% | 5.0% | 11.7% |
-| FAISS `IndexFlatIP` (d=256, bag-of-words) | 0.0045 | 0.0057 | 0.0084 | 21.7% | 31.7% | 33.3% |
-| FAISS `IndexHNSWFlat` (d=256, bag-of-words) | 0.0093 | 0.0119 | 0.0213 | 18.3% | 28.3% | 38.3% |
-| **SQLite FTS5** (BM25) | 0.0311 | 0.1003 | 0.1156 | **53.3%** | 60.0% | **63.3%** |
+```bash
+# required: a real embedding provider, and semantic_weight > 0
+python scripts/build_real_index.sh        # 695,868 blocks from layers/
+python scripts/compare_scale.py           # same corpus, same queries, recall@k
+```
 
-### What this shows, and what it does not
+`scripts/compare_scale.py` reports p50/p95/p99 latency together with hit@k, and
+covers a 60-fact and a 695k-block index so the two can be compared directly.
+A valid comparison additionally requires a real embedding provider (candle/BERT
+or ONNX), since a bag-of-words or hash representation understates what a
+production vector store achieves and is not a fair proxy for the semantic path.
 
-**SQLite FTS5 is better than Microscope on this corpus at R@1 and R@10, and
-ties at R@5, while being roughly 2,400x faster at p50.** That is the honest
-result and it is stated as such. Microscope's advantage here is not retrieval
-quality; it does not have one on this workload.
+Until that run exists, the only measured latency figures in this document are
+the in-process spatial query above, and no claim is made about relative
+retrieval quality or speed against any other system.
 
-The asymmetry in the measurement is deliberately left visible: FAISS and FTS5
-timings are **query-only** and exclude index build, while Microscope's figure
-is an **end-to-end process invocation** including interpreter start, config load
-and state load. That asymmetry works *against* Microscope, so the comparison is
-conservative -- correcting it would widen the gap, not close it.
-
-Three caveats bound what can be concluded:
-
-1. **60 facts is not a scale test.** Flat exact search over 60 vectors is
-   trivially fast and trivially accurate. At the 1.28 M-block corpus the FAISS
-   flat scan would have to touch 1.28 M vectors per query and would not
-   remain sub-millisecond. This table therefore does **not** establish that
-   FTS5 or FAISS wins at scale; it establishes that at small scale, a
-   specialised B-tree beats a spatial index on both axes measured here.
-2. **The FAISS d=3 row is not a fair representation of Microscope.** It feeds
-   FAISS the same hash-derived 3-D coordinates and scores 1.7% at R@1, far
-   below Microscope's own 48.3%. The spatial path clearly does more than nearest
-   neighbour on those vectors, which is itself an interesting result: the
-   hierarchical depth structure and the reinforcement layers carry the
-   retrieval, not the raw coordinate distance. A claim that "Microscope is just
-   spatial k-NN" is not supported by this measurement.
-3. **The bag-of-words FAISS rows are a weak baseline, not a serious one.** 256
-   hashed tokens is not a learned embedding. A real embedding model would
-   change those numbers substantially, most likely upward. No such model is
-   included here, so these rows understate what a production vector store
-   achieves.
-
-**Conclusion.** On the workload measured, the spatial index does not outperform
-a general-purpose lexical index, and does not outperform a 60-vector exhaustive
-search in latency. The case for the architecture rests on the hierarchical
-depth structure and the reinforcement layers -- which this table suggests are
-doing the work -- and would need a scale test at 10^5--10^6 blocks, with a real
-embedding baseline, before any performance claim could be made.
 
 
 ## Integrity

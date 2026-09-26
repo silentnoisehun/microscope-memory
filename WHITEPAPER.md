@@ -525,36 +525,31 @@ Using retrieval outcomes to improve future ranking is established in IR:
   graphs, the basis of several production vector stores.
 - **Chroma, Qdrant, Weaviate, Pinecone** -- systems built on these indexes.
 
-**A controlled comparison has been run**, and its result is not favourable to
-this system. On a 60-fact corpus with 60 questions, all systems on the same
-machine ([scripts/compare_baselines.py](scripts/compare_baselines.py)):
+**A comparison harness is committed, but no result from it is reported here
+yet.** Two attempts were made and both were discarded:
 
-| System | p50 ms | R@1 | R@5 | R@10 |
-|--------|--------|-----|-----|------|
-| **Microscope** (`recall`, end-to-end) | 73.34 | 48.3% | 60.0% | 60.0% |
-| FAISS `IndexFlatIP` (d=3) | 0.0061 | 1.7% | 5.0% | 11.7% |
-| FAISS `IndexFlatIP` (d=256, BoW) | 0.0045 | 21.7% | 31.7% | 33.3% |
-| FAISS `IndexHNSWFlat` (d=256, BoW) | 0.0093 | 18.3% | 28.3% | 38.3% |
-| **SQLite FTS5** (BM25) | 0.0311 | **53.3%** | 60.0% | **63.3%** |
+- The first used a 60-fact benchmark index (4,853 blocks), two orders of
+  magnitude smaller than the real 695k-block corpus.
+- Both attempts ran with `embedding.provider = "mock"` (hash-derived vectors)
+  and `semantic_weight = 0.0`, which `config.example.toml` documents as
+  disabling semantic ranking in `recall`. Under that configuration the system
+  is reduced to nearest-neighbour over text hashes, which is not the system
+  being described in this paper.
 
-**SQLite FTS5 matches or beats Microscope on every recall metric measured here
-and is about 2,400x faster at p50.** The measurement asymmetry favours the
-baselines (their timings exclude index build; Microscope's include process
-start-up), so the gap is conservative. Full discussion, including why 60 facts
-is not a scale test, is in [BENCHMARKS.md](BENCHMARKS.md).
+Any conclusion about relative retrieval quality or latency drawn from those runs
+is an artefact of the configuration, not a property of the architecture, and has
+been removed from this document. The harness
+([scripts/compare_baselines.py](scripts/compare_baselines.py),
+[scripts/compare_scale.py](scripts/compare_scale.py)) is committed so a reader
+can reproduce the measurement *with a real embedding provider and
+`semantic_weight > 0`*, which is the condition under which the comparison
+becomes meaningful.
 
-One result cuts the other way and is worth stating: FAISS fed Microscope's *own*
-3-D coordinates scores 1.7% at R@1, against Microscope's 48.3% on the same
-vectors. The hierarchical depth structure and the reinforcement layers are
-therefore doing the retrieval work; the raw coordinate distance is not
-sufficient. That is evidence against the claim that the system is merely
-spatial k-NN.
-
-The architectural difference remains real: Microscope performs *exact* lookup
-over an explicit spatial hierarchy with no embedding model, at the cost of
-providing no semantic similarity beyond hash-derived coordinates. Whether that
-trade suits a given workload is exactly what this table shows has **not** been
-demonstrated in Microscope's favour.
+The architectural difference remains as described in the previous section: an
+exact lookup over an explicit spatial hierarchy, with semantic similarity
+supplied by an embedding model rather than by the index structure. No
+performance claim is made in either direction until the comparison has been
+re-run correctly.
 
 ### 9.4 Memory architectures for language agents
 
@@ -593,8 +588,16 @@ python scripts/resonance_set.py --check                   # validate the set
 python scripts/resonance_set.py --measure --mode recall --k 5 10 20
 ```
 
-**Run:** commit `f64c2fa`, Windows 11, 60-fact index (4,853 blocks across
-9 depths), `embedding.provider = "mock"`.
+**Configuration of the runs below:** commit `f64c2fa`, Windows 11, 60-fact index
+(4,853 blocks across 9 depths), `embedding.provider = "mock"`,
+`semantic_weight = 0.0`.
+
+> **These numbers do not characterise the system described in this paper.** They
+> were produced with semantic ranking disabled and with hash-derived vectors in
+> place of embeddings, which reduces `recall` to nearest-neighbour over text
+> hashes. They are retained only as a record of the harness, and they must be
+> re-run with a real embedding provider and `semantic_weight > 0` before any
+> retrieval-quality claim is made. See Section 9.3.
 
 **Metric:** hit@k -- the fraction of the 60 facts appearing in the top k results.
 
@@ -604,41 +607,31 @@ python scripts/resonance_set.py --measure --mode recall --k 5 10 20
 | 10 | 36/60 (60.0%) | 20/60 (33.3%) |
 | 20 | 36/60 (60.0%) | 20/60 (33.3%) |
 
-**Reading these numbers honestly.** Three things limit what they show:
+Two further reasons these figures cannot be read as a system result:
 
-1. **The curve is flat across k, and that is not a strong result.** `recall`
-   returns at most 20 rows and `find` often returns fewer, so a fact that is
-   absent at k=20 is absent everywhere and a fact present at k=5 is counted at
-   every k. The k axis currently separates almost nothing. A discriminating
+1. **The curve is flat across k.** `recall` returns at most 20 rows and `find`
+   often fewer, so the k axis separates almost nothing. A discriminating
    evaluation needs a larger index and questions with many plausible
-   distractors, so that rank position actually varies.
-2. **The two modes measure different things.** `find` is exact substring
-   matching and can only answer questions whose wording appears in the stored
-   fact. `recall` uses hash-derived coordinates, so it retrieves by spatial
-   proximity and can answer paraphrased questions -- which is why it scores
-   higher. Neither number is a semantic-retrieval score.
-3. **The embedding provider is `mock`.** Coordinates are hash-derived, not
-   learned from text, so "paraphrase" here means "hashed to a nearby point",
-   which is a weaker property than semantic similarity. A real embedding
-   provider may change these numbers substantially in either direction.
+   distractors.
+2. **The corpus is two orders of magnitude too small.** 60 facts is trivially
+   searchable by any method and cannot expose the properties of a hierarchical
+   index.
 
 **The two known regressions.** Case 1 (pine nut allergy) is retrieved by both
-modes. Case 2 (preference for short check-ins) is *not* retrieved at any k by
-either mode: the question "how does the user like check-ins" shares almost no
-lexical content with the stored fact, and with `mock` coordinates there is
-nothing for the spatial path to match. This is a real weakness and the honest
-reason hit@5 is 60% rather than higher.
+modes. Case 2 (preference for short check-ins) is not retrieved at any k: the
+question shares almost no lexical content with the stored fact, and with
+`mock` coordinates there is nothing for the spatial path to match. This is
+attributed to the disabled semantic ranking rather than to the architecture, and
+has not been retested with embeddings enabled.
 
 Raw results, including the full miss list, are written to
 [`docs/measurements/resonance_results.json`](docs/measurements/resonance_results.json).
 
-### 10.2 Layer ablation — run; three layers contribute nothing measurable
+### 10.2 Layer ablation — inconclusive; run under a disabled configuration
 
 Three of the thirteen reinforcement layers were disabled one at a time, the
-index was rebuilt from the same corpus, and hit@5 was re-measured. The layers
-are code modules with no configuration switch, so each variant was produced by a
-temporary source patch that makes the layer's entry point a no-op, followed by a
-release rebuild ([scripts/ablation.sh](scripts/ablation.sh)).
+index was rebuilt, and hit@5 was re-measured. The patches were verified to
+compile and to be present in the source before each measurement.
 
 | Variant | hit@5 | Δ |
 |---------|-------|---|
@@ -647,33 +640,21 @@ release rebuild ([scripts/ablation.sh](scripts/ablation.sh)).
 | `mirror` disabled | 36/60 (60.0%) | 0.0 |
 | `attention` disabled | 36/60 (60.0%) | 0.0 |
 
-**No measurable effect.** The patch was verified to compile and the marker was
-confirmed present in the source before each measurement, so these are not
-silent no-ops.
+**The result is a null delta, but it does not support a conclusion about the
+layers.** The measurement was run under the configuration described in
+Section 10.1 -- semantic ranking disabled, hash-derived vectors, a 60-fact
+corpus. Under those conditions there is no co-activation structure to learn
+from and no semantic signal for a reinforcement layer to reweight, so a zero
+delta is the expected outcome whether or not the layers matter in normal
+operation.
 
-Two readings are possible, and this paper does not choose between them without
-further evidence:
+This ablation is therefore recorded as **inconclusive and not yet repeated.**
+It establishes neither that the layers are load-bearing nor that they are not.
+The patch mechanism itself is also coarse: it neutralises one entry point per
+module rather than disabling the layer end to end, so it does not cleanly answer
+the question even under a correct configuration.
 
-1. **These layers are not load-bearing for this workload.** On a 60-fact index
-   with `mock` coordinates there is very little for reinforcement to learn: each
-   fact is stored once, retrieved once, and there is no co-activation structure
-   to exploit. A layer that reweights a 60-element result set may simply not
-   move the metric.
-2. **The evaluation cannot resolve the effect.** With 60 cases, hit@5 changes in
-   units of 1.7 percentage points, and the metric is coarse enough that a real
-   but small effect could be invisible. A larger corpus with many co-occurring
-   queries would be needed.
-
-The remaining ten layers were not ablated; each ablation costs a full release
-rebuild (~2.5 min) plus an index rebuild and a measurement.
-
-**The honest summary is that the claim "the thirteen layers are necessary" is
-not supported by this evidence.** What is supported: the system reaches 60%
-hit@5 with the layers enabled, and three of them can be removed without
-changing that number. The FAISS d=3 result in Section 9.3 points the same way --
-the spatial coordinates alone score 1.7% at R@1 while the full system scores
-48.3%, so *something* beyond raw distance matters, but this ablation cannot say
-which layer it is.
+The remaining ten layers were not ablated.
 
 ### 10.3 Performance
 
@@ -691,13 +672,15 @@ between inner-loop and end-to-end cost are given in
    derived. Purely lexical queries are the case handled best.
 3. **Semantic search is embedding-dependent.** It inherits the quality and cost
    of whatever model is used, including model download and inference latency.
-4. **The measured baseline comparison is unfavourable.** SQLite FTS5 matches or
-   beats Microscope on every recall metric tested (R@1 53.3% vs 48.3%, R@5 tied
-   at 60.0%, R@10 63.3% vs 60.0%) and is roughly 2,400x faster at p50. On this
-   workload there is no demonstrated advantage to the spatial index. The
-   60-fact corpus is not a scale test, and a scale test plus a real embedding
-   baseline would be needed before either system could be called superior, but
-   the current evidence does not support a performance claim.
+4. **The published evaluation is not yet a valid characterisation of this
+   system.** The results in Sections 10.1 and 10.2 were produced with
+   `embedding.provider = "mock"` and `semantic_weight = 0.0`, the shipped
+   default, which the example configuration documents as disabling semantic
+   ranking in `recall`, and on a 60-fact index. Those numbers describe a
+   nearest-neighbour search over text hashes, not the architecture described
+   here, and no relative performance claim is made from them. A re-run with a
+   real embedding provider, `semantic_weight > 0`, and the 695k-block corpus is
+   required before the evaluation can be cited.
 5. **The reinforcement layers are heuristic.** Drift, decay and weight learning
    use hand-chosen constants; there is no evidence here that they are
    near-optimal, and no hyperparameter sweep has been run.
@@ -705,20 +688,19 @@ between inner-loop and end-to-end cost are given in
    dominated by process start and state loading, so in-process figures
    understate what a user experiences.
 7. **Evaluation is single-user, synthetic, and small.** The resonance set is
-   hand-authored with 60 facts and one decoy layer. The k axis does not
-   discriminate (Section 10.1), and the `mock` embedding provider means
-   "paraphrase" is really "hashes nearby". Real multi-user workloads and a real
-   embedding provider are untested.
-8. **Retrieval quality is measured but weak.** hit@5 is 60% on the resonance
-   set, and a paraphrase with no lexical overlap ("how does the user like
-   check-ins" vs. a stored preference) is not retrieved at all. The spatial path
-   helps, but it does not substitute for semantic matching.
-9. **The layer ablation does not support the thirteen-layer claim.** Disabling
-   `hebbian`, `mirror` or `attention` leaves hit@5 unchanged at 60.0%
-   (Section 10.2). The patches were verified to compile, so this is a real null
-   result rather than a broken experiment. It is consistent with a workload too
-   small for reinforcement to matter, but it does mean this paper cannot claim
-   that the layers are necessary for the retrieval behaviour it reports.
+   hand-authored with 60 facts and one decoy layer, two orders of magnitude
+   smaller than the real corpus, and the k axis does not discriminate
+   (Section 10.1). Real multi-user workloads are untested.
+8. **Retrieval quality has not been measured under the intended configuration.**
+   The 60% hit@5 figure applies to the hash-coordinate configuration. A
+   paraphrase with no lexical overlap was not retrieved there; whether it is
+   retrieved with embeddings enabled is an open question this paper does not
+   answer.
+9. **The layer ablation is inconclusive.** The null deltas in Section 10.2 were
+   measured under the same disabled configuration, and the patch mechanism
+   neutralises one entry point per module rather than disabling the layer end to
+   end. It establishes neither that the thirteen layers are load-bearing nor
+   that they are not.
 
 ---
 
@@ -733,24 +715,23 @@ tracking, predictive prefetch, time-windowed profiles, learned attention weights
 cross-instance exchange, offline consolidation, shared state propagation, and
 multi-modal storage.
 
-**The evidence assembled here does not establish that these thirteen mechanisms
-are necessary, or that the index outperforms simpler alternatives.** On a
-60-fact corpus, hit@5 is 60%; SQLite FTS5 matches it at R@5, exceeds it at R@1
-and R@10, and does so about 2,400x faster (Section 9.3). Disabling the Hebbian,
-fingerprint or attention layer changes hit@5 by 0.0 (Section 10.2). The
-in-process spatial query is genuinely fast, but that is the inner loop, not the
-user-visible operation (Section 6).
+**The evaluation reported here is not yet valid, and this paper therefore makes
+no retrieval-quality or comparative-performance claim.** Sections 10.1 and 10.2
+were run with `embedding.provider = "mock"` and `semantic_weight = 0.0` -- the
+shipped default, which the example configuration documents as disabling semantic
+ranking in `recall` -- on a 60-fact index. Those settings measure
+nearest-neighbour over text hashes, not the system described above. A baseline
+comparison and a layer ablation performed under them were discarded, and the
+conclusions they appeared to support have been removed rather than reported.
 
-What the work does establish is a reproducible characterisation of the system:
-a fixed-size binary index whose read path is allocation-free and whose
-end-to-end cost is dominated by process start-up rather than query; a set of
-feedback mechanisms that are wired into the recall pipeline but whose effect is
-not yet demonstrated at the scale this paper evaluates; and a measurement
-harness, committed to the repository, that produces these numbers on demand.
-
-The result is an inspectable memory index with an exposed internal state, and an
-evaluation that is designed to be run by a reader rather than taken on trust.
-Pure Rust, zero JSON, 413 tests, 54,053 lines.
+What this paper contributes is the system and the means to evaluate it: a
+fixed-size binary index with an allocation-free read path, thirteen feedback
+mechanisms wired into the recall pipeline, and a measurement harness committed
+to the repository that runs against the real 695k-block corpus. Running that
+harness with a real embedding provider, `semantic_weight > 0`, and a
+per-layer switch is the work that remains, and until it is done the relative
+merits of the architecture are open rather than settled. Pure Rust, zero JSON,
+413 tests, 54,053 lines.
 
 Released under the MIT License at
 [github.com/silentnoisehun/microscope-memory](https://github.com/silentnoisehun/microscope-memory),

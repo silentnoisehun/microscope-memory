@@ -119,3 +119,6 @@ bench_tmp/
 bench_config.toml
 *.log
 *.bak
+real_output/
+real_tmp/
+real_config.toml

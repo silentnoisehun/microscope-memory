@@ -1,0 +1,39 @@
+{
+  "corpus_lines": 6574,
+  "queries": 10,
+  "k_values": [
+    1,
+    5,
+    10
+  ],
+  "microscope": {
+    "system": "microscope (recall, end-to-end)",
+    "latency": {
+      "p50_ms": 88.741,
+      "p95_ms": 204.381,
+      "p99_ms": 204.381,
+      "mean_ms": 102.408
+    },
+    "hit": {
+      "1": 1,
+      "5": 3,
+      "10": 4
+    }
+  },
+  "fts5": {
+    "system": "sqlite fts5 (bm25)",
+    "index_build_ms": 38.3,
+    "documents": 6574,
+    "latency": {
+      "p50_ms": 0.075,
+      "p95_ms": 0.799,
+      "p99_ms": 0.799,
+      "mean_ms": 0.185
+    },
+    "hit": {
+      "1": 1,
+      "5": 3,
+      "10": 3
+    }
+  }
+}

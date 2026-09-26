@@ -564,27 +564,55 @@ prunes unreferenced ones.
 ### 10.1 Retrieval quality: resonance test set
 
 Retrieval quality is measured on a fixed set of 60 personal facts with known
-questions across 13 categories. The set and runner are committed at
-[`scripts/resonance_set.py`](scripts/resonance_set.py):
+questions across 13 categories. The set and the index builder are committed at
+[`scripts/resonance_set.py`](scripts/resonance_set.py) and
+[`scripts/build_bench_index.py`](scripts/build_bench_index.py):
 
 ```bash
 cargo build --release
-python scripts/resonance_set.py --check          # validate the set
-python scripts/resonance_set.py --measure --k 5 10 20
+python scripts/build_bench_index.py                       # 60 facts -> index
+python scripts/resonance_set.py --check                   # validate the set
+python scripts/resonance_set.py --measure --mode recall --k 5 10 20
 ```
 
-The metric is **hit@k**: the fraction of the 60 facts appearing within the top k
-results of `microscope-mem find`. The first two cases (pine nut allergy;
-preference for short check-ins) are deliberate regressions -- stored correctly,
-but previously not in the top 5, because text results were ranked by depth
-rather than relevance and a shallow fragment could outrank the exact fact.
+**Run:** commit `f64c2fa`, Windows 11, 60-fact index (4,853 blocks across
+9 depths), `embedding.provider = "mock"`.
 
-**The result table is not yet filled in.** The measurement requires a release
-binary and a populated index, and the numbers have not been collected. When run,
-the script writes `docs/measurements/resonance_results.json`; the hit@k figures
-should then be pasted here together with the commit SHA and hardware. Leaving
-this empty rather than estimated is deliberate: filling it with guesses would
-repeat the problem this section exists to address.
+**Metric:** hit@k -- the fraction of the 60 facts appearing in the top k results.
+
+| k | `recall` (spatial + heuristic) | `find` (literal substring) |
+|---|-------------------------------|------------------------------|
+| 5  | 36/60 (60.0%) | 20/60 (33.3%) |
+| 10 | 36/60 (60.0%) | 20/60 (33.3%) |
+| 20 | 36/60 (60.0%) | 20/60 (33.3%) |
+
+**Reading these numbers honestly.** Three things limit what they show:
+
+1. **The curve is flat across k, and that is not a strong result.** `recall`
+   returns at most 20 rows and `find` often returns fewer, so a fact that is
+   absent at k=20 is absent everywhere and a fact present at k=5 is counted at
+   every k. The k axis currently separates almost nothing. A discriminating
+   evaluation needs a larger index and questions with many plausible
+   distractors, so that rank position actually varies.
+2. **The two modes measure different things.** `find` is exact substring
+   matching and can only answer questions whose wording appears in the stored
+   fact. `recall` uses hash-derived coordinates, so it retrieves by spatial
+   proximity and can answer paraphrased questions -- which is why it scores
+   higher. Neither number is a semantic-retrieval score.
+3. **The embedding provider is `mock`.** Coordinates are hash-derived, not
+   learned from text, so "paraphrase" here means "hashed to a nearby point",
+   which is a weaker property than semantic similarity. A real embedding
+   provider may change these numbers substantially in either direction.
+
+**The two known regressions.** Case 1 (pine nut allergy) is retrieved by both
+modes. Case 2 (preference for short check-ins) is *not* retrieved at any k by
+either mode: the question "how does the user like check-ins" shares almost no
+lexical content with the stored fact, and with `mock` coordinates there is
+nothing for the spatial path to match. This is a real weakness and the honest
+reason hit@5 is 60% rather than higher.
+
+Raw results, including the full miss list, are written to
+[`docs/measurements/resonance_results.json`](docs/measurements/resonance_results.json).
 
 ### 10.2 Ranking ablation (specified, not run)
 
@@ -620,12 +648,20 @@ between inner-loop and end-to-end cost are given in
 6. **Cold-start cost dominates for small corpora.** End-to-end latency is
    dominated by process start and state loading, so in-process figures
    understate what a user experiences.
-7. **Evaluation is single-user and synthetic.** The resonance set is
-   hand-authored and reflects one person's memory shape; results on real
-   multi-user workloads are unknown.
-8. **Evaluation is incomplete.** The hit@k table and the layer ablation are
-   specified but not yet measured. Both are required before the retrieval claims
-   in this paper can be considered established.
+7. **Evaluation is single-user, synthetic, and small.** The resonance set is
+   hand-authored with 60 facts and one decoy layer. The k axis does not
+   discriminate (Section 10.1), and the `mock` embedding provider means
+   "paraphrase" is really "hashes nearby". Real multi-user workloads and a real
+   embedding provider are untested.
+8. **Retrieval quality is measured but weak.** hit@5 is 60% on the resonance
+   set, and a paraphrase with no lexical overlap ("how does the user like
+   check-ins" vs. a stored preference) is not retrieved at all. The spatial path
+   helps, but it does not substitute for semantic matching.
+9. **The layer ablation has not been run.** Section 10.2 specifies it; the
+   per-layer contribution is therefore unquantified, and it remains possible
+   that some reinforcement layers contribute little. The retrieval claims here
+   should be read as "the system returns relevant results 60% of the time on a
+   60-fact set", not as evidence that each layer is necessary.
 
 ---
 

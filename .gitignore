@@ -111,3 +111,10 @@ orchestrator/Cargo.lock
 mermaid_app/
 modules/
 styles/
+
+# resonance benchmark artefacts
+bench_output/
+bench_layers/
+bench_tmp/
+bench_config.toml
+*.log

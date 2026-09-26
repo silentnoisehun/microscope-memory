@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """Resonance test set: 60 personal facts with known questions.
 
 Measures hit@k: how many of the 60 known facts appear in the top k results of
@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 from dataclasses import dataclass, asdict
@@ -130,11 +131,30 @@ def validate() -> int:
     return 0
 
 
-def run_find(binary: str, config: Path, question: str, k: int) -> str:
-    """Return stdout of a single `find` invocation, or '' on failure."""
-    cmd = [binary, "--config", str(config), "find", question, str(k)]
+def _env_for(config: Path) -> dict:
+    """Environment for a child process.
+
+    The config path must be absolute. Inside the config, `layers_dir` and
+    `output_dir` are resolved relative to the *current working directory* of
+    the binary, so the caller must run from the repository root for the
+    relative paths in bench_config.toml to resolve correctly.
+    """
+    return dict(os.environ, MICROSCOPE_CONFIG=str(Path(config).resolve()))
+
+
+def run_recall(binary: str, config: Path, question: str, k: int) -> str:
+    """Return stdout of a single `recall` invocation, or '' on failure.
+
+    `recall` is the natural-language entry point and is what the resonance set
+    is designed to exercise. `find` is a literal substring search and cannot
+    answer a paraphrased question.
+    """
+    env = _env_for(config)
+    cmd = [binary, "recall", question, str(k)]
     try:
-        out = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+        out = subprocess.run(
+            cmd, capture_output=True, text=True, timeout=120, env=env
+        )
     except FileNotFoundError:
         print(f"error: binary not found: {binary}", file=sys.stderr)
         sys.exit(1)
@@ -144,17 +164,50 @@ def run_find(binary: str, config: Path, question: str, k: int) -> str:
 
 
 def result_lines(stdout: str) -> list[str]:
-    """Extract the result rows (those starting with a depth marker)."""
-    return [ln for ln in stdout.splitlines() if ln.strip().startswith("D")]
+    """Extract the result rows.
+
+    A row looks like:
+        "  D5 L2=0.96177 [long_term/blue] The user plays chess online."
+    but a row can span several lines when a block contains newlines, so rows are
+    identified by their depth marker and the text between markers is joined.
+    """
+    lines = [ln.rstrip() for ln in stdout.splitlines()]
+    rows: list[str] = []
+    for ln in lines:
+        # Compare case-insensitively: the caller lowercases stdout before
+        # calling this, so the depth marker arrives as 'd5', not 'D5'.
+        if ln.lstrip()[:1].lower() == "d" and ln.lstrip()[1:2].isdigit():
+            rows.append(ln.strip())
+        elif rows and ln.strip():
+            # continuation of the previous multi-line block
+            rows[-1] += " " + ln.strip()
+    return rows
 
 
-def measure(binary: str, config: Path, ks: list[int]) -> int:
+def run_find(binary: str, config: Path, question: str, k: int) -> str:
+    """Return stdout of a single literal `find` invocation, or '' on failure."""
+    env = _env_for(config)
+    cmd = [binary, "find", question, str(k)]
+    try:
+        out = subprocess.run(
+            cmd, capture_output=True, text=True, timeout=120, env=env
+        )
+    except FileNotFoundError:
+        print(f"error: binary not found: {binary}", file=sys.stderr)
+        sys.exit(1)
+    except subprocess.TimeoutExpired:
+        return ""
+    return out.stdout
+
+
+def measure(binary: str, config: Path, ks: list[int], mode: str = "recall") -> int:
+    runner = run_recall if mode == "recall" else run_find
     results = {k: 0 for k in ks}
     misses: list[Case] = []
     top = max(ks)
 
     for c in CASES:
-        out = run_find(binary, config, c.question, top).lower()
+        out = runner(binary, config, c.question, top).lower()
         lines = result_lines(out)
         for k in ks:
             window = "\n".join(lines[:k])
@@ -163,7 +216,7 @@ def measure(binary: str, config: Path, ks: list[int]) -> int:
             elif k == top:
                 misses.append(c)
 
-    print(f"\nResonance over {len(CASES)} cases")
+    print(f"\nResonance over {len(CASES)} cases  (mode: {mode})")
     print("-" * 46)
     for k in sorted(results):
         hit = results[k]
@@ -201,19 +254,41 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--check", action="store_true", help="validate the test set")
     ap.add_argument("--measure", action="store_true", help="run hit@k against an index")
-    ap.add_argument("--binary", default="target/release/microscope-mem")
+    ap.add_argument("--binary", default="")
     ap.add_argument("--config", default="test_config.toml")
+    ap.add_argument("--mode", choices=["recall", "find"], default="recall",
+                    help="recall = natural-language entry point; find = literal substring search")
     ap.add_argument("--k", type=int, nargs="+", default=[5])
     a = ap.parse_args()
 
     if a.check or not a.measure:
         return validate()
-    if not Path(a.binary).exists():
-        print(f"error: {a.binary} not found; run: cargo build --release", file=sys.stderr)
-        return 1
-    return measure(a.binary, Path(a.config), a.k)
+
+    # Resolve the binary: explicit flag, then the release build (with .exe on
+    # Windows), then the debug build.
+    if a.binary:
+        binary = Path(a.binary)
+    else:
+        root = Path(__file__).resolve().parent.parent
+        cands = [
+            root / "target/release/microscope-mem",
+            root / "target/release/microscope-mem.exe",
+            root / "target/debug/microscope-mem",
+            root / "target/debug/microscope-mem.exe",
+        ]
+        found = next((c for c in cands if c.exists()), None)
+        if found is None:
+            print(
+                "error: no microscope-mem binary found; run: cargo build --release",
+                file=sys.stderr,
+            )
+            return 1
+        binary = found
+
+    return measure(str(binary), Path(a.config), a.k, a.mode)
 
 
 if __name__ == "__main__":
     sys.exit(main())
+
 

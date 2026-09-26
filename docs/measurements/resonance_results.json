@@ -1,0 +1,239 @@
+{
+  "cases": 60,
+  "hit_at_k": {
+    "5": 36,
+    "10": 36,
+    "20": 36
+  },
+  "hit_rate": {
+    "5": 60.0,
+    "10": 60.0,
+    "20": 60.0
+  },
+  "missed": [
+    {
+      "id": 10,
+      "fact": "The user was born in 1985.",
+      "question": "birth year",
+      "match": [
+        "1985"
+      ],
+      "category": "personal"
+    },
+    {
+      "id": 12,
+      "fact": "The user is vegetarian.",
+      "question": "diet",
+      "match": [
+        "vegetarian"
+      ],
+      "category": "health"
+    },
+    {
+      "id": 13,
+      "fact": "The user plays the piano.",
+      "question": "hobby instrument",
+      "match": [
+        "piano"
+      ],
+      "category": "hobby"
+    },
+    {
+      "id": 14,
+      "fact": "The user runs every morning.",
+      "question": "running habit",
+      "match": [
+        "every morning",
+        "runs"
+      ],
+      "category": "habit"
+    },
+    {
+      "id": 16,
+      "fact": "The user does not drink coffee.",
+      "question": "coffee",
+      "match": [
+        "not drink coffee",
+        "does not drink coffee"
+      ],
+      "category": "preference"
+    },
+    {
+      "id": 20,
+      "fact": "The user uses a standing desk.",
+      "question": "desk",
+      "match": [
+        "standing desk"
+      ],
+      "category": "workspace"
+    },
+    {
+      "id": 23,
+      "fact": "The user reads science fiction.",
+      "question": "reading genre",
+      "match": [
+        "science fiction"
+      ],
+      "category": "hobby"
+    },
+    {
+      "id": 24,
+      "fact": "The user commutes by bicycle.",
+      "question": "commute",
+      "match": [
+        "bicycle",
+        "commutes by"
+      ],
+      "category": "habit"
+    },
+    {
+      "id": 26,
+      "fact": "The user has a mathematics degree.",
+      "question": "degree",
+      "match": [
+        "mathematics"
+      ],
+      "category": "education"
+    },
+    {
+      "id": 27,
+      "fact": "The user does not smoke.",
+      "question": "smoking",
+      "match": [
+        "not smoke",
+        "does not smoke"
+      ],
+      "category": "health"
+    },
+    {
+      "id": 32,
+      "fact": "The user has a shoulder injury on the left side.",
+      "question": "injury",
+      "match": [
+        "shoulder",
+        "left"
+      ],
+      "category": "health"
+    },
+    {
+      "id": 36,
+      "fact": "The user keeps a journal.",
+      "question": "journal",
+      "match": [
+        "journal"
+      ],
+      "category": "habit"
+    },
+    {
+      "id": 38,
+      "fact": "The user plays chess online.",
+      "question": "chess",
+      "match": [
+        "chess"
+      ],
+      "category": "hobby"
+    },
+    {
+      "id": 41,
+      "fact": "The user has a garden.",
+      "question": "garden",
+      "match": [
+        "garden"
+      ],
+      "category": "property"
+    },
+    {
+      "id": 42,
+      "fact": "The user speaks basic Japanese.",
+      "question": "japanese",
+      "match": [
+        "japanese"
+      ],
+      "category": "personal"
+    },
+    {
+      "id": 43,
+      "fact": "The user is a morning person.",
+      "question": "chronotype",
+      "match": [
+        "morning person"
+      ],
+      "category": "personal"
+    },
+    {
+      "id": 46,
+      "fact": "The user has studied architecture.",
+      "question": "past study",
+      "match": [
+        "architecture"
+      ],
+      "category": "education"
+    },
+    {
+      "id": 50,
+      "fact": "The user collects vinyl records.",
+      "question": "vinyl",
+      "match": [
+        "vinyl"
+      ],
+      "category": "hobby"
+    },
+    {
+      "id": 52,
+      "fact": "The user works best in silence.",
+      "question": "work environment",
+      "match": [
+        "silence",
+        "works best in"
+      ],
+      "category": "preference"
+    },
+    {
+      "id": 53,
+      "fact": "The user has a passport expiring next year.",
+      "question": "passport",
+      "match": [
+        "passport"
+      ],
+      "category": "personal"
+    },
+    {
+      "id": 55,
+      "fact": "The user owns a bicycle.",
+      "question": "bicycle",
+      "match": [
+        "bicycle"
+      ],
+      "category": "property"
+    },
+    {
+      "id": 56,
+      "fact": "The user is learning to play the guitar.",
+      "question": "guitar",
+      "match": [
+        "guitar"
+      ],
+      "category": "hobby"
+    },
+    {
+      "id": 58,
+      "fact": "The user does not have a driver's licence.",
+      "question": "driving licence",
+      "match": [
+        "not have a driver",
+        "does not have a driver"
+      ],
+      "category": "personal"
+    },
+    {
+      "id": 60,
+      "fact": "The user has a subscription to a science magazine.",
+      "question": "magazine",
+      "match": [
+        "magazine",
+        "subscription"
+      ],
+      "category": "hobby"
+    }
+  ]
+}

@@ -494,7 +494,12 @@ pub struct CandleEmbeddingProvider {
 #[cfg(feature = "embeddings")]
 impl CandleEmbeddingProvider {
     pub fn new(model_id: &str) -> Result<Self, EmbeddingError> {
-        Self::with_config(model_id, None, 768, false)
+        // 0 means "derive from the model's own config.json (hidden_size)".
+        // Hardcoding 768 made every non-BERT-large model fail: the embedding
+        // index rejects any vector whose length differs from `dim`, so a
+        // 384-dim model such as all-MiniLM-L6-v2 stored zero vectors while the
+        // build still reported success.
+        Self::with_config(model_id, None, 0, false)
     }
 
     /// Create with explicit BERT config (for non-standard models like bge-small).
@@ -559,7 +564,36 @@ impl CandleEmbeddingProvider {
             serde_json::from_str(&config_str)
                 .map_err(|e| EmbeddingError::ApiError(format!("config parse: {}", e)))?
         };
-        let dim = dim_override;
+        // Derive the embedding width from the model's own config.json.
+        // `candle_transformers`' Config keeps hidden_size private, and
+        // hardcoding a width breaks every model that is not BERT-large: the
+        // embedding index rejects vectors whose length differs from `dim`, so
+        // a 384-dim model (all-MiniLM-L6-v2) stored zero vectors and the build
+        // still reported success.
+        let declared_dim: usize = if dim_override > 0 {
+            dim_override
+        } else {
+            // Re-read the raw JSON: the typed Config does not expose hidden_size.
+            let raw = repo
+                .get("config.json")
+                .ok()
+                .and_then(|p| std::fs::read_to_string(&p).ok())
+                .and_then(|s| serde_json::from_str::<serde_json::Value>(&s).ok())
+                .and_then(|v| v.get("hidden_size").and_then(|h| h.as_u64()))
+                .ok_or_else(|| {
+                    EmbeddingError::ApiError(
+                        "cannot determine embedding dimension: config.json has no \
+                         hidden_size, and no dim override was given"
+                            .into(),
+                    )
+                })?;
+            raw as usize
+        };
+        if declared_dim == 0 {
+            return Err(EmbeddingError::ApiError(
+                "embedding dimension resolved to 0".into(),
+            ));
+        }
 
         let model = candle_transformers::models::bert::BertModel::load(vb, &config)
             .map_err(|e| EmbeddingError::ApiError(format!("model load: {}", e)))?;
@@ -567,7 +601,7 @@ impl CandleEmbeddingProvider {
         Ok(Self {
             model,
             tokenizer,
-            dim,
+            dim: declared_dim,
             device,
         })
     }

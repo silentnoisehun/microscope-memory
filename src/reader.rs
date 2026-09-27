@@ -537,14 +537,11 @@ impl MicroscopeReader {
         if scored.is_empty() {
             return Vec::new();
         }
-        // Drop near-ties against the best hit: this is the noise filter.
-        let best = scored
-            .iter()
-            .map(|&(_, _, s)| s)
-            .fold(f32::MIN, f32::max);
-        let floor = best * 0.45;
-        scored.retain(|&(_, _, s)| s >= floor);
-
+        // Rank by score, then apply the k limit. There is deliberately NO
+        // relative score floor here: an earlier version dropped everything
+        // below 45% of the best hit, which also removed legitimate partial
+        // matches -- the exact situation a relevance ranking is meant to fix.
+        // Recall must not shrink; only the order may change.
         scored.sort_by(|a, b| {
             b.2.partial_cmp(&a.2)
                 .unwrap_or(std::cmp::Ordering::Equal)
@@ -583,9 +580,8 @@ impl MicroscopeReader {
         if main.is_empty() {
             return Vec::new();
         }
-        let best = main.iter().map(|&(_, _, s)| s).fold(f32::MIN, f32::max);
-        let floor = best * 0.45;
-        main.retain(|&(_, _, s)| s >= floor);
+        // Sort only. No relative score floor: dropping low-scoring matches
+        // shrinks recall, which is the opposite of what ranking should do.
         main.sort_by(|a, b| {
             b.2.partial_cmp(&a.2)
                 .unwrap_or(std::cmp::Ordering::Equal)

@@ -155,7 +155,9 @@ pub fn build_embedding_index(
     );
 
     let mut block_ids: Vec<u32> = Vec::with_capacity(qualifying.len());
-    let mut vectors: Vec<f32> = Vec::new();
+    let mut vectors: Vec<f32> = Vec::with_capacity(qualifying.len() * dim);
+    let mut failures = 0usize;
+    let mut first_error: Option<String> = None;
 
     for (n, &i) in qualifying.iter().enumerate() {
         let text = reader.text(i);
@@ -164,14 +166,56 @@ pub fn build_embedding_index(
                 block_ids.push(i as u32);
                 vectors.extend_from_slice(&emb);
             }
-            _ => {} // failed or zero embedding → omit (equivalent to current
-                    // NaN/zero filtering in search)
+            Ok(emb) => {
+                // Length mismatch or all-zero vector: record it instead of
+                // silently dropping, so a dimension bug cannot look like a
+                // successful build.
+                failures += 1;
+                if first_error.is_none() {
+                    first_error = Some(format!(
+                        "block {} produced {} dims, expected {} ({})",
+                        i,
+                        emb.len(),
+                        dim,
+                        if emb.iter().all(|&v| v == 0.0) {
+                            "all-zero vector"
+                        } else {
+                            "length mismatch"
+                        }
+                    ));
+                }
+            }
+            Err(e) => {
+                failures += 1;
+                if first_error.is_none() {
+                    first_error = Some(format!("block {}: {}", i, e));
+                }
+            }
         }
         if n.is_multiple_of(1000) {
             eprint!("\r  Embedded {}/{}", n, qualifying.len());
         }
     }
     eprintln!("\r  Embedded {}/{}", qualifying.len(), qualifying.len());
+
+    // A build that stored nothing is a failure, not a success.
+    if qualifying.is_empty() {
+        return Err("no blocks qualified for embedding".into());
+    }
+    if block_ids.is_empty() {
+        return Err(format!(
+            "all {} blocks failed to embed; first failure: {}",
+            qualifying.len(),
+            first_error.unwrap_or_else(|| "unknown".into())
+        ));
+    }
+    if failures > 0 {
+        eprintln!(
+            "  WARN: {} of {} blocks were skipped",
+            failures,
+            qualifying.len()
+        );
+    }
 
     let mut buf = Vec::with_capacity(HEADER_SIZE + block_ids.len() * 4 + vectors.len() * 4);
     buf.extend_from_slice(&(block_ids.len() as u32).to_le_bytes());

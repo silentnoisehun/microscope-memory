@@ -40,7 +40,7 @@ Three primary binary files with no serialization overhead:
 - **`data.bin`** — Raw UTF-8 text content, referenced by offset and length from headers.
 - **`meta.bin`** — Index metadata (MSC3 format): magic, version, block count, depth ranges, Merkle root, layers hash.
 
-Supporting files: `merkle.bin` (SHA-256 tree), `embeddings.bin` (mmap'd vectors), `append.bin` (hot memory log).
+Supporting files: `merkle.bin` (SHA-256 tree), `embeddings.bin` (mmap'd vectors), `append.bin` (hot memory log), `append_embeddings.bin` (vectors for entries still in the append log, keyed by position).
 
 ### 2.2 Depth Hierarchy (D0--D8)
 
@@ -413,6 +413,7 @@ The predictive cache, when warmed, provides effectively **zero-cost** result boo
 | `merkle.bin` | — | SHA-256 Merkle tree |
 | `embeddings.bin` | — | Pre-computed embedding vectors |
 | `append.bin` | APv2 | Hot memory append log |
+| `append_embeddings.bin` | AEM1 | Vectors of append-log entries, by position |
 | `activations.bin` | HEB1 | Hebbian activation records |
 | `coactivations.bin` | COA1 | Co-activation pairs |
 | `fingerprints.idx` | FGP1 | Structural fingerprints |
@@ -870,9 +871,18 @@ the distinction between inner-loop and end-to-end cost are also in
 7. **Cold-start cost dominates for small corpora.** End-to-end latency is
    dominated by process start, state loading and the query embedding, so
    in-process figures understate what a user experiences.
-8. **Fresh entries never receive a vector.** The append log is not embedded, so
-   the most recent memories are invisible to the semantic path until the next
-   full rebuild. This is a known gap, not a measured result.
+8. **Fresh entries are embedded at store time, and that has a cost.** The
+   append log used to be invisible to the semantic path until the next full
+   rebuild. It no longer is: `store` embeds the text once, under the same
+   quality gate the index build uses, and records the vector in
+   `append_embeddings.bin` keyed by its position in the log. Measured on a
+   scratch index: a paraphrase query sharing no token with a freshly stored
+   memory returns that memory at rank 1, and with the sidecar deleted the same
+   query does not return it at all. The costs are real and unmeasured at
+   scale — a CLI `store` now pays a model load (201 ms wall against ~30 ms
+   before, while an MCP server loads the model once), the sidecar is discarded
+   at the next rebuild, where the entries are re-embedded as main blocks, and
+   how this behaves with thousands of pending entries is untested.
 9. **The layer ablation is inconclusive.** The null deltas in Section 10.2 were
    measured with the semantic path disconnected, and the patch mechanism
    neutralises one entry point per module rather than disabling the layer end to

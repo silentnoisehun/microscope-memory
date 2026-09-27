@@ -94,6 +94,54 @@ fn test_find_includes_pending_append_entries() {
 }
 
 #[test]
+fn test_pending_memory_gets_a_vector_and_rebuild_clears_it() {
+    use microscope_memory::embedding_index::{AppendEmbeddings, APPEND_EMBEDDINGS_FILE};
+
+    let (_tmp, mut config) = setup_test_env();
+    config.index.auto_rebuild = false; // keep the entry pending
+    config.embedding.provider = "mock".to_string();
+    config.embedding.dim = 64;
+    microscope_memory::build::build(&config, true, true).unwrap();
+
+    let output_dir = Path::new(&config.paths.output_dir);
+    let sidecar = output_dir.join(APPEND_EMBEDDINGS_FILE);
+
+    // A stored memory that shares no token with a future paraphrase query must
+    // still be reachable: the vector is written at store time, not at rebuild.
+    microscope_memory::store_memory(
+        &config,
+        "The user keeps a vintage bicycle in the hallway.",
+        "long_term",
+        5,
+    )
+    .expect("store");
+
+    assert!(sidecar.exists(), "store should embed the pending memory");
+    let side = AppendEmbeddings::open(&sidecar, 64).expect("sidecar opens");
+    assert_eq!(side.entries.len(), 1);
+    assert_eq!(side.entries[0].0, 0, "recorded under the append index");
+    assert_eq!(side.entries[0].1.len(), 64);
+
+    // The same gate the index build uses: a fragment gets no vector, so the
+    // crowding the gate removes cannot re-enter through the store path.
+    microscope_memory::store_memory(&config, "ok", "long_term", 5).expect("store fragment");
+    let side = AppendEmbeddings::open(&sidecar, 64).expect("sidecar still opens");
+    assert_eq!(
+        side.entries.len(),
+        1,
+        "a text under the character floor must not be embedded"
+    );
+
+    // Rebuild consolidates the entry into the main index, which is embedded by
+    // the build; the sidecar is keyed by append position and must not outlive it.
+    microscope_memory::build::rebuild_pending(&config, false, false).expect("rebuild");
+    assert!(
+        !sidecar.exists(),
+        "sidecar must not survive the append log it was keyed to"
+    );
+}
+
+#[test]
 fn test_auto_rebuild_after_configured_threshold() {
     let (_tmp, mut config) = setup_test_env();
     config.index.auto_rebuild = true;

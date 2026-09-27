@@ -1167,6 +1167,10 @@ fn tool_recall(config: &Config, args: &Value) -> Result<String, String> {
     // the embedding index unreachable from the agent-facing tool.
     let mut semantic_hits: std::collections::HashMap<usize, f32> =
         std::collections::HashMap::new();
+    // Vectors of memories still in the append log, keyed by append position;
+    // see the equivalent block in main::recall.
+    let mut appended_sem: std::collections::HashMap<usize, f32> =
+        std::collections::HashMap::new();
     {
         use crate::embedding_index::EmbeddingIndex;
         use crate::embeddings::EmbeddingProvider;
@@ -1180,6 +1184,14 @@ fn tool_recall(config: &Config, args: &Value) -> Result<String, String> {
                     for (sim, block_idx) in eidx.search(&qe, (k * 8).max(64)) {
                         if block_idx < reader.block_count {
                             semantic_hits.insert(block_idx, sim);
+                        }
+                    }
+                    if let Some(side) = crate::embedding_index::AppendEmbeddings::open(
+                        &output_dir.join(crate::embedding_index::APPEND_EMBEDDINGS_FILE),
+                        eidx.dim(),
+                    ) {
+                        for (sim, ai) in side.search(&qe, (k * 8).max(64)) {
+                            appended_sem.insert(ai as usize, sim);
                         }
                     }
                 }
@@ -1253,13 +1265,17 @@ fn tool_recall(config: &Config, args: &Value) -> Result<String, String> {
             .as_ref()
             .map(|qe| crate::emotional_similarity(qe, &entry.emotion) * emotional_recall_weight)
             .unwrap_or(0.0);
-        if dist < 0.1 || lexical > 0.0 || emo_boost > 0.0 {
-            let base = crate::relevance::rank_distance_from_score(
+        if dist < 0.1 || lexical > 0.0 || emo_boost > 0.0 || appended_sem.contains_key(&ai) {
+            let mut base = crate::relevance::rank_distance_from_score(
                 lexical,
                 dist,
                 config.search.keyword_boost,
                 entry.importance,
             );
+            if let Some(sim) = appended_sem.get(&ai) {
+                let w = config.search.semantic_weight.clamp(0.0, 1.0);
+                base -= *sim * w;
+            }
             let combined = crate::relevance::apply_boost(base, emo_boost);
             all_results.push((combined, ai + 1_000_000, false));
         }

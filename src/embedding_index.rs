@@ -176,6 +176,177 @@ impl EmbeddingIndex {
     }
 }
 
+/// Minimum text length, in characters, for a block to be embedded. Overridable
+/// with `MICROSCOPE_MIN_EMBED_CHARS`; 24 is the measured floor, not a guess --
+/// at 17 the 17..23 character band re-introduces the crowding the gate exists
+/// to remove and hit@10 fell 81.7% -> 78.3%.
+pub fn min_embed_chars() -> usize {
+    std::env::var("MICROSCOPE_MIN_EMBED_CHARS")
+        .ok()
+        .and_then(|v| v.parse::<usize>().ok())
+        .unwrap_or(24)
+}
+
+/// Why a text is not worth embedding. Deliberately about what the text *is*,
+/// never about how it scores: a cosine-threshold dedup would merge
+/// contradictory facts -- of 40,000 sampled high-cosine pairs, 1,666 differ in
+/// numbers and 245 differ in negation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EmbedVerdict {
+    Keep,
+    /// Below the character floor.
+    Short,
+    /// The reader's sentinel for bytes it could not decode.
+    Unencodable,
+    /// UTF-8 bytes shown as cp1252 characters.
+    Mojibake,
+}
+
+/// The embedding quality gate, shared by the index build and the store path so
+/// a freshly stored memory is admitted under exactly the policy that built the
+/// index -- a second, looser admission rule would re-introduce what this
+/// removes.
+pub fn quality_gate(text: &str, min_chars: usize) -> EmbedVerdict {
+    // `text()` returns these sentinels for bytes it could not decode, so the
+    // block carries no retrievable content at all.
+    if text == "<bin>" || text == "[out of bounds]" {
+        return EmbedVerdict::Unencodable;
+    }
+    let total = text.chars().count();
+    if total < min_chars {
+        return EmbedVerdict::Short;
+    }
+    // Mojibake: if more than a quarter of the characters sit in the
+    // U+0080..U+02FF band, this is not natural language.
+    let suspicious = text
+        .chars()
+        .filter(|c| ('\u{80}'..='\u{2ff}').contains(c))
+        .count();
+    if total > 0 && suspicious * 4 > total {
+        return EmbedVerdict::Mojibake;
+    }
+    EmbedVerdict::Keep
+}
+
+/// Sidecar holding vectors for memories that are still in the append log.
+///
+/// A stored memory is invisible to the semantic path until the next full
+/// rebuild: `embeddings.bin` is built from the consolidated index, and the
+/// append log is addressed by position (`1_000_000 + ai`). This closes that
+/// gap -- the store path embeds the text once and records the vector under its
+/// append index, and recall scores it next to the main index.
+///
+/// Layout:
+///   [4 bytes "AEM1"][u32 dim][u32 record_count]
+///   [u32 append_index][f32 x dim] x record_count
+///
+/// Two properties keep it from desynchronising into wrong answers. It is
+/// removed wherever `append.bin` is removed (rebuild, doctor repair), and a
+/// record whose append index no longer exists is simply never looked up, so an
+/// external edit of the log cannot resurrect a vector for a different memory.
+pub const APPEND_EMBEDDINGS_FILE: &str = "append_embeddings.bin";
+const APPEND_EMBEDDINGS_MAGIC: &[u8; 4] = b"AEM1";
+const APPEND_EMBEDDINGS_HEADER: usize = 12;
+
+pub struct AppendEmbeddings {
+    pub dim: usize,
+    /// (append index, vector), in write order.
+    pub entries: Vec<(u32, Vec<f32>)>,
+}
+
+impl AppendEmbeddings {
+    pub fn new(dim: usize) -> Self {
+        AppendEmbeddings {
+            dim,
+            entries: Vec::new(),
+        }
+    }
+
+    /// Open an existing sidecar, or None when it is absent, malformed, or was
+    /// written at a different vector width. A width mismatch is ignored rather
+    /// than coerced: scoring 384-dim vectors against a 768-dim query is not a
+    /// degraded answer, it is a wrong one.
+    pub fn open(path: &Path, dim: usize) -> Option<Self> {
+        let data = fs::read(path).ok()?;
+        if data.len() < APPEND_EMBEDDINGS_HEADER || &data[0..4] != APPEND_EMBEDDINGS_MAGIC {
+            return None;
+        }
+        let file_dim = u32::from_le_bytes(data[4..8].try_into().ok()?) as usize;
+        if dim == 0 || file_dim != dim {
+            return None;
+        }
+        let count = u32::from_le_bytes(data[8..12].try_into().ok()?) as usize;
+        let stride = 4 + dim * 4;
+        let mut entries = Vec::with_capacity(count.min(65_536));
+        for i in 0..count {
+            let off = APPEND_EMBEDDINGS_HEADER + i * stride;
+            if off + stride > data.len() {
+                // A crash can leave a partial tail; keep the valid prefix.
+                break;
+            }
+            let index = u32::from_le_bytes(data[off..off + 4].try_into().ok()?);
+            let mut v = Vec::with_capacity(dim);
+            for j in 0..dim {
+                let p = off + 4 + j * 4;
+                v.push(f32::from_le_bytes(data[p..p + 4].try_into().ok()?));
+            }
+            entries.push((index, v));
+        }
+        Some(AppendEmbeddings { dim, entries })
+    }
+
+    pub fn push(&mut self, append_index: u32, vector: Vec<f32>) {
+        self.entries.push((append_index, vector));
+    }
+}
+
+impl AppendEmbeddings {
+    /// Write atomically (temp file + rename), like the main index.
+    pub fn save(&self, path: &Path) -> Result<(), String> {
+        let stride = 4 + self.dim * 4;
+        let mut buf = Vec::with_capacity(APPEND_EMBEDDINGS_HEADER + self.entries.len() * stride);
+        buf.extend_from_slice(APPEND_EMBEDDINGS_MAGIC);
+        buf.extend_from_slice(&(self.dim as u32).to_le_bytes());
+        buf.extend_from_slice(&(self.entries.len() as u32).to_le_bytes());
+        for (index, v) in &self.entries {
+            if v.len() != self.dim {
+                return Err(format!(
+                    "append embedding width {} does not match header dim {}",
+                    v.len(),
+                    self.dim
+                ));
+            }
+            buf.extend_from_slice(&index.to_le_bytes());
+            for f in v {
+                buf.extend_from_slice(&f.to_le_bytes());
+            }
+        }
+        let tmp = path.with_extension("bin.tmp");
+        fs::write(&tmp, &buf).map_err(|e| format!("write {}: {}", APPEND_EMBEDDINGS_FILE, e))?;
+        fs::rename(&tmp, path).map_err(|e| format!("rename {}: {}", APPEND_EMBEDDINGS_FILE, e))?;
+        Ok(())
+    }
+
+    /// Top-k by cosine as (similarity, append index), with the same 0.3 floor
+    /// the main index uses so the two candidate sources stay comparable.
+    pub fn search(&self, query_emb: &[f32], k: usize) -> Vec<(f32, u32)> {
+        if query_emb.len() != self.dim {
+            return vec![];
+        }
+        let mut out: Vec<(f32, u32)> = self
+            .entries
+            .iter()
+            .filter_map(|(i, v)| {
+                let sim = cosine_similarity_simd(query_emb, v);
+                (sim > 0.3).then_some((sim, *i))
+            })
+            .collect();
+        out.sort_by(|a, b| b.0.total_cmp(&a.0));
+        out.truncate(k);
+        out
+    }
+}
+
 /// Build a sparse embedding index file from a provider and reader.
 /// Only blocks at depth 0..=max_depth with non-trivial text get embedded;
 /// failed or zero embeddings are omitted (search treats them as absent).
@@ -189,24 +360,9 @@ pub fn build_embedding_index(
     let total_blocks = reader.block_count;
 
     // Pass 1: count blocks that qualify (depth <= max_depth, text worth embedding).
-    //
-    // The previous gate was `text.len() >= 3`, which let through everything a
-    // 3-character fragment can be. Measured on the committed D5 index with
-    // `examples/corpus_diag.rs`: 36,136 of 46,565 embedded blocks (78%) were at
-    // most 16 characters, including 5,655 whose text is the reader's "<bin>"
-    // fallback for non-UTF-8 bytes and ~6,000 mojibake fragments (UTF-8 decoded
-    // as cp1252). Those cluster together -- mean D5->D5 cosine 0.9816, above
-    // what any real answer reaches against a query -- so they occupy the whole
-    // result list. Mean rank of a correct answer was 6,209 of 46,565.
-    //
-    // Two separate filters, deliberately not a similarity filter. A
-    // cosine-threshold dedup would merge contradictory facts: of 40,000 sampled
-    // high-cosine pairs, 1,666 differ in numbers and 245 differ in negation.
-    // Filtering on what the text *is* rather than how it scores cannot do that.
-    let min_chars = std::env::var("MICROSCOPE_MIN_EMBED_CHARS")
-        .ok()
-        .and_then(|v| v.parse::<usize>().ok())
-        .unwrap_or(24);
+    // The rule itself is `quality_gate`, shared with the store path; its
+    // rationale and the measurements behind it are documented there.
+    let min_chars = min_embed_chars();
     let mut skipped_short = 0usize;
     let mut skipped_unencodable = 0usize;
     let mut skipped_mojibake = 0usize;
@@ -216,26 +372,12 @@ pub fn build_embedding_index(
         if h.depth > max_depth {
             continue;
         }
-        let text = reader.text(i);
-        // `text()` returns these sentinels for bytes it could not decode, so the
-        // block carries no retrievable content at all.
-        if text == "<bin>" || text == "[out of bounds]" {
-            skipped_unencodable += 1;
-            continue;
+        match quality_gate(reader.text(i), min_chars) {
+            EmbedVerdict::Keep => qualifying.push(i),
+            EmbedVerdict::Short => skipped_short += 1,
+            EmbedVerdict::Unencodable => skipped_unencodable += 1,
+            EmbedVerdict::Mojibake => skipped_mojibake += 1,
         }
-        if text.chars().count() < min_chars {
-            skipped_short += 1;
-            continue;
-        }
-        // Mojibake: UTF-8 bytes shown as cp1252 characters. If a sizeable share
-        // of the text is in the U+0080..U+00FF band it is not natural language.
-        let total = text.chars().count();
-        let suspicious = text.chars().filter(|c| ('\u{80}'..='\u{2ff}').contains(c)).count();
-        if total > 0 && suspicious * 4 > total {
-            skipped_mojibake += 1;
-            continue;
-        }
-        qualifying.push(i);
     }
     if skipped_short + skipped_unencodable + skipped_mojibake > 0 {
         println!(
@@ -343,6 +485,101 @@ pub fn build_embedding_index(
 mod tests {
     use super::*;
     use std::io::Write;
+
+    #[test]
+    fn quality_gate_admits_only_retrievable_text() {
+        // A real memory, well above the floor, no mojibake band.
+        assert_eq!(
+            quality_gate("The user has a pine nut allergy.", 24),
+            EmbedVerdict::Keep
+        );
+        // Accented natural language is not mojibake: one character in the band
+        // out of 37 must not disqualify the text.
+        assert_eq!(
+            quality_gate("The user drinks café lattes every morning.", 24),
+            EmbedVerdict::Keep
+        );
+        // Below the character floor: the fragments that used to crowd the index.
+        assert_eq!(quality_gate("LLM", 24), EmbedVerdict::Short);
+        assert_eq!(
+            quality_gate("The user is vegetarian.", 24),
+            EmbedVerdict::Short,
+            "23 characters is under the measured 24 floor"
+        );
+        // The reader's sentinels for undecodable bytes carry no content at all.
+        assert_eq!(quality_gate("<bin>", 24), EmbedVerdict::Unencodable);
+        assert_eq!(
+            quality_gate("[out of bounds]", 24),
+            EmbedVerdict::Unencodable
+        );
+        // Mojibake: long enough to clear the floor, every character in the band.
+        assert_eq!(
+            quality_gate("đź§đź§đź§đź§đź§đź§đź§đź§", 24),
+            EmbedVerdict::Mojibake
+        );
+        // The floor is a parameter, not a constant baked into the rule.
+        assert_eq!(
+            quality_gate("The user is vegetarian.", 20),
+            EmbedVerdict::Keep,
+            "MICROSCOPE_MIN_EMBED_CHARS=20 would admit a 23-character fact"
+        );
+    }
+
+    #[test]
+    fn min_embed_chars_default_is_the_measured_floor() {
+        if std::env::var_os("MICROSCOPE_MIN_EMBED_CHARS").is_none() {
+            assert_eq!(min_embed_chars(), 24);
+        }
+    }
+
+    #[test]
+    fn append_embeddings_roundtrip_and_guards() {
+        let dir = std::env::temp_dir().join("mscope_append_emb_test");
+        let _ = fs::create_dir_all(&dir);
+        let path = dir.join(APPEND_EMBEDDINGS_FILE);
+
+        let mut side = AppendEmbeddings::new(4);
+        side.push(0, vec![1.0, 0.0, 0.0, 0.0]);
+        side.push(1, vec![0.0, 1.0, 0.0, 0.0]);
+        side.push(7, vec![0.0, 0.0, 0.0, 1.0]);
+        side.save(&path).expect("save");
+
+        let opened = AppendEmbeddings::open(&path, 4).expect("open");
+        assert_eq!(opened.dim, 4);
+        assert_eq!(opened.entries.len(), 3);
+        assert_eq!(opened.entries[2].0, 7, "append index survives the round trip");
+
+        // A query equal to the first stored vector ranks it first.
+        let hits = opened.search(&[1.0, 0.0, 0.0, 0.0], 10);
+        assert_eq!(hits[0].1, 0);
+        assert!(hits[0].0 > 0.99, "identical vectors must score ~1.0");
+        assert!(hits.iter().all(|&(sim, _)| sim > 0.3), "0.3 floor applies");
+
+        // A width mismatch must be ignored, not coerced: scoring 4-dim vectors
+        // against an 8-dim query would be a wrong answer, not a degraded one.
+        assert!(AppendEmbeddings::open(&path, 8).is_none());
+        // A foreign file is not a sidecar.
+        let junk = dir.join("junk.bin");
+        fs::write(&junk, b"NOPE\x04\x00\x00\x00\x00\x00\x00\x00").unwrap();
+        assert!(AppendEmbeddings::open(&junk, 4).is_none());
+
+        // A crash mid-write leaves a partial tail; the valid prefix must load.
+        let mut data = fs::read(&path).unwrap();
+        data.extend_from_slice(&[0xAB, 0xCD, 0xEF]);
+        fs::write(&path, &data).unwrap();
+        let partial = AppendEmbeddings::open(&path, 4).expect("valid prefix survives");
+        assert_eq!(partial.entries.len(), 3);
+
+        // A record of the wrong width is refused at save time, not on read.
+        let mut bad = AppendEmbeddings::new(4);
+        bad.push(0, vec![1.0, 0.0]);
+        assert!(bad.save(&path).is_err());
+
+        // A width-mismatched query never scores.
+        assert!(partial.search(&[1.0, 0.0], 10).is_empty());
+
+        let _ = fs::remove_dir_all(&dir);
+    }
 
     #[test]
     fn test_embedding_index_sparse_roundtrip() {

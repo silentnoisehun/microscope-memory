@@ -160,6 +160,19 @@ pub fn run_doctor(config: &Config, fix: bool) -> Result<(), String> {
                         .open(&append_path)
                         .map_err(|e| e.to_string())?;
                     f.set_len(valid_pos as u64).map_err(|e| e.to_string())?;
+                    // Append vectors are keyed by position in the log we just
+                    // truncated, so they must go with the tail that was lost --
+                    // otherwise a vector would answer for a different memory.
+                    let sidecar =
+                        output_dir.join(crate::embedding_index::APPEND_EMBEDDINGS_FILE);
+                    if sidecar.exists() {
+                        fs::remove_file(&sidecar).map_err(|e| e.to_string())?;
+                        println!(
+                            "  [{}] Removed {} (its positions no longer exist).",
+                            "DONE".green(),
+                            crate::embedding_index::APPEND_EMBEDDINGS_FILE
+                        );
+                    }
                     println!("  [{}] Truncation successful.", "DONE".green());
                 } else {
                     println!(

@@ -1470,6 +1470,71 @@ pub fn store_memory_temporary(
 
 /// Variant of `store_memory` that also writes to the timeline log and,
 /// optionally, marks the entry as an open loop (status="open").
+/// Embed one freshly stored memory and record it in the append-embeddings
+/// sidecar under its append index, so the semantic path can reach it before the
+/// next rebuild. Best effort by design: the memory is already durably in the
+/// append log, and a provider that will not load or a write failure must never
+/// turn a successful store into an error.
+///
+/// Admission uses the same `quality_gate` as the index build, so a fresh memory
+/// cannot slip in under a looser rule than the one that built the index -- that
+/// is how the 17..23 character crowding would come straight back.
+fn embed_appended_entry(config: &Config, text: &str) {
+    use crate::embedding_index::{
+        min_embed_chars, quality_gate, AppendEmbeddings, EmbedVerdict, APPEND_EMBEDDINGS_FILE,
+    };
+
+    // A provider whose cargo feature is not compiled in would fail on every
+    // store; skip quietly rather than warn once per memory.
+    let feature_missing = match config.embedding.provider.as_str() {
+        "candle" => !cfg!(feature = "embeddings"),
+        "onnx" => !cfg!(feature = "onnx"),
+        "python" => !cfg!(feature = "python"),
+        _ => false,
+    };
+    if feature_missing {
+        return;
+    }
+
+    let dim = config.embedding.dim;
+    if dim == 0 || quality_gate(text, min_embed_chars()) != EmbedVerdict::Keep {
+        return;
+    }
+
+    let output_dir = Path::new(&config.paths.output_dir);
+    // The entry just written is the last one. The log is append-only and the
+    // caller still holds the file lock, so this position is stable.
+    let append_index = read_append_log(&output_dir.join("append.bin"))
+        .len()
+        .saturating_sub(1);
+
+    let provider = crate::embeddings::provider_from_config(&config.embedding, dim);
+    match provider.embed(text) {
+        Ok(v) if v.len() == dim => {
+            let path = output_dir.join(APPEND_EMBEDDINGS_FILE);
+            let mut sidecar =
+                AppendEmbeddings::open(&path, dim).unwrap_or_else(|| AppendEmbeddings::new(dim));
+            // One vector per append index: if a repaired log puts a different
+            // memory at a position, the newer vector replaces the stale one.
+            sidecar.entries.retain(|(i, _)| *i as usize != append_index);
+            sidecar.push(append_index as u32, v);
+            if let Err(e) = sidecar.save(&path) {
+                eprintln!("  {} append embedding sidecar: {}", "WARN".yellow(), e);
+            }
+        }
+        Ok(_) => eprintln!(
+            "  {} append embedding width differs from dim {}; stored without a vector",
+            "WARN".yellow(),
+            dim
+        ),
+        Err(e) => eprintln!(
+            "  {} append embedding: {}; stored without a vector",
+            "WARN".yellow(),
+            e
+        ),
+    }
+}
+
 pub fn store_memory_with_status(
     config: &Config,
     text: &str,
@@ -1529,6 +1594,11 @@ pub fn store_memory_with_status(
     )?;
     file.flush()
         .map_err(|e| format!("flush append log: {}", e))?;
+
+    // Append-log vector: embed the stored text once so the semantic path can
+    // reach it before the next rebuild (see `embed_appended_entry`). Done before
+    // the layer-file write so a slow provider cannot delay persistence.
+    embed_appended_entry(config, text);
 
     if let Err(e) = persist_to_layer_file(config, text, layer, importance) {
         eprintln!("  {} persist to layer file: {}", "WARN".yellow(), e);

@@ -107,6 +107,7 @@ microscope-memory/
 ├── dream_log.bin       DRM1
 ├── emotional_field.bin EMO1
 ├── modalities.bin     MOD1
+├── append_embeddings.bin # AEM1, vektorok az append log bejegyzéseihez
 └── append.bin         # Append-only log
 ```
 

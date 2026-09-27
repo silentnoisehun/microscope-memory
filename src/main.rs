@@ -278,6 +278,12 @@ fn recall(config: &Config, query: &str, k: usize) {
     // the stored vectors, then let those compete with the lexical hits.
     let mut semantic_hits: std::collections::HashMap<usize, f32> =
         std::collections::HashMap::new();
+    // Vectors of memories still in the append log, keyed by append position.
+    // They are not in embeddings.bin (which is built from the consolidated
+    // index) but they are real, stored memories, and until this existed they
+    // were reachable only by exact token overlap.
+    let mut appended_sem: std::collections::HashMap<usize, f32> =
+        std::collections::HashMap::new();
     {
         use microscope_memory::embedding_index::EmbeddingIndex;
         use microscope_memory::embeddings::EmbeddingProvider;
@@ -341,6 +347,18 @@ fn recall(config: &Config, query: &str, k: usize) {
                     for (sim, block_idx) in hits.into_iter().take(want) {
                         if block_idx < reader.block_count {
                             semantic_hits.insert(block_idx, sim);
+                        }
+                    }
+                    if let Some(side) =
+                        microscope_memory::embedding_index::AppendEmbeddings::open(
+                            &Path::new(&config.paths.output_dir).join(
+                                microscope_memory::embedding_index::APPEND_EMBEDDINGS_FILE,
+                            ),
+                            eidx.dim(),
+                        )
+                    {
+                        for (sim, ai) in side.search(&qe, want) {
+                            appended_sem.insert(ai as usize, sim);
                         }
                     }
                 }
@@ -419,13 +437,21 @@ fn recall(config: &Config, query: &str, k: usize) {
         let dz = entry.z - qz;
         let dist = dx * dx + dy * dy + dz * dz;
         let lexical = relevance_query.lexical_score(&entry.text);
-        if dist < 0.1 || lexical > 0.0 {
-            let combined = microscope_memory::relevance::rank_distance_from_score(
+        // A pending entry is a candidate on a semantic hit alone, exactly as a
+        // main-index block is: a paraphrase of a fresh memory shares no token
+        // with it, which is the case the embedding path exists to serve.
+        let semantic = appended_sem.get(&ai).copied();
+        if dist < 0.1 || lexical > 0.0 || semantic.is_some() {
+            let mut combined = microscope_memory::relevance::rank_distance_from_score(
                 lexical,
                 dist,
                 config.search.keyword_boost,
                 entry.importance,
             );
+            if let Some(sim) = semantic {
+                let w = config.search.semantic_weight.clamp(0.0, 1.0);
+                combined -= sim * w;
+            }
             all_results.push((combined, ai + 1_000_000, false));
         }
     }

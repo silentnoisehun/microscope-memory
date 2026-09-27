@@ -61,6 +61,12 @@ pub fn rebuild_pending(
     }
     if append_path.exists() {
         fs::remove_file(&append_path).map_err(|e| format!("clear append log: {}", e))?;
+        // The append-log vectors are keyed by position in that log, so they die
+        // with it: the entries are now main blocks and were embedded by the
+        // build above.
+        let sidecar = Path::new(&config.paths.output_dir)
+            .join(crate::embedding_index::APPEND_EMBEDDINGS_FILE);
+        let _ = fs::remove_file(sidecar);
     }
 
     Ok(RebuildOutcome {

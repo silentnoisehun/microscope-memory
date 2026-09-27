@@ -1148,11 +1148,46 @@ fn tool_recall(config: &Config, args: &Value) -> Result<String, String> {
     let (qx, qy, qz) =
         crate::emotional::apply_emotional_bias(qx, qy, qz, emotional_weight, &reader, &hebb_pre);
 
-    let (zoom_lo, zoom_hi) = match query.len() {
-        0..=8 => (0u8, 2u8),
-        9..=20 => (2, 4),
-        _ => (2, 5),
+    // Scan every populated depth, not a window guessed from query length.
+    // auto_depth puts 15..39 character statements at D5, so a short question
+    // previously never scanned the depth holding its own fact.
+    let (zoom_lo, zoom_hi) = {
+        let mut hi = 0u8;
+        for (d, &(_, count)) in reader.depth_ranges.iter().enumerate() {
+            if count > 0 {
+                hi = d as u8;
+            }
+        }
+        (0u8, hi)
     };
+
+    // Embed the query and take the nearest stored vectors, so a paraphrase with
+    // no shared token can still become a candidate. See the equivalent path in
+    // main::recall; previously this gate was `lexical > 0.0` alone, which made
+    // the embedding index unreachable from the agent-facing tool.
+    let mut semantic_hits: std::collections::HashMap<usize, f32> =
+        std::collections::HashMap::new();
+    {
+        use crate::embedding_index::EmbeddingIndex;
+        use crate::embeddings::EmbeddingProvider;
+
+        let emb_path = output_dir.join("embeddings.bin");
+        if let Some(eidx) = EmbeddingIndex::open(&emb_path) {
+            let provider: Box<dyn EmbeddingProvider> =
+                crate::embeddings::provider_from_config(&config.embedding, eidx.dim());
+            match provider.embed(query) {
+                Ok(qe) if qe.len() == eidx.dim() => {
+                    for (sim, block_idx) in eidx.search(&qe, (k * 8).max(64)) {
+                        if block_idx < reader.block_count {
+                            semantic_hits.insert(block_idx, sim);
+                        }
+                    }
+                }
+                Ok(_) => eprintln!("  semantic: provider width differs from index; skipped"),
+                Err(e) => eprintln!("  semantic: embedding failed ({}); lexical path only", e),
+            }
+        }
+    }
 
     // Load emotions.bin lookup for main-index emotional recall
     let emotion_lookup = query_emotion
@@ -1167,7 +1202,10 @@ fn tool_recall(config: &Config, args: &Value) -> Result<String, String> {
         for i in start..(start + count) {
             let text = reader.text(i);
             let lexical = relevance_query.lexical_score(text);
-            if lexical > 0.0 {
+            // Lexical OR semantic: the embedding candidates are useless if the
+            // gate ignores them.
+            let semantic = semantic_hits.get(&i).copied();
+            if lexical > 0.0 || semantic.is_some() {
                 let h = reader.header(i);
                 let dx = h.x - qx;
                 let dy = h.y - qy;
@@ -1192,7 +1230,11 @@ fn tool_recall(config: &Config, args: &Value) -> Result<String, String> {
                     config.search.keyword_boost,
                     h.importance,
                 );
-                let combined = crate::relevance::apply_boost(base, emo_boost);
+                let mut combined = crate::relevance::apply_boost(base, emo_boost);
+                if let Some(sim) = semantic {
+                    let w = config.search.semantic_weight.clamp(0.0, 1.0);
+                    combined -= sim * w;
+                }
                 all_results.push((combined, i, true));
             }
         }

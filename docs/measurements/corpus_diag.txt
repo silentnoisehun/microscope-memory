@@ -1,0 +1,93 @@
+== corpus ==
+blocks=699110 embedded=46565 dim=384 max_depth=5
+
+== embedded blocks by depth (all blocks in parens) ==
+  D0:       1 embedded  (      1 total)
+  D1:      10 embedded  (     10 total)
+  D2:     549 embedded  (    549 total)
+  D3:    2729 embedded  (   2729 total)
+  D4:    6708 embedded  (   6708 total)
+  D5:   36568 embedded  (  38893 total)
+  D6:       0 embedded  (  97106 total)
+  D7:       0 embedded  ( 271366 total)
+  D8:       0 embedded  ( 281748 total)
+
+== neighbour depth profile of sampled D5 probes (n=315) ==
+  D3:       14
+  D4:      714
+  D5:    79655
+
+== mean cosine by (probe depth, neighbour depth) ==
+  D5 -> D3: mean 0.9348  (n=14)
+  D5 -> D4: mean 0.9459  (n=714)
+  D5 -> D5: mean 0.9816  (n=79655)
+
+== high-cosine pairs (>=0.95): text agreement ==
+  sim=1.0000 jaccard=1.00
+     A[5]: LLM
+     B[5]: LLM
+  sim=1.0000 jaccard=1.00
+     A[5]: LLM
+     B[5]: LLM
+  sim=1.0000 jaccard=1.00
+     A[5]: LLM
+     B[5]: LLM
+  sim=1.0000 jaccard=1.00
+     A[5]: LLM
+     B[5]: LLM
+  sim=1.0000 jaccard=1.00
+     A[5]: LLM
+     B[5]: LLM
+  sim=1.0000 jaccard=1.00
+     A[5]: LLM
+     B[5]: LLM
+  sim=1.0000 jaccard=1.00
+     A[5]: LLM
+     B[5]: LLM
+  sim=1.0000 jaccard=1.00
+     A[5]: LLM
+     B[5]: LLM
+  sim=1.0000 jaccard=1.00
+     A[5]: LLM
+     B[5]: LLM
+  sim=1.0000 jaccard=1.00
+     A[5]: LLM
+     B[5]: LLM
+  sim=1.0000 jaccard=1.00
+     A[5]: LLM
+     B[5]: LLM
+  sim=0.9988 jaccard=0.00
+     A[5]: LLM
+     B[5]: LLVM
+     only-in-A: ["llm"]
+
+  sampled pairs >=0.98    : 21527
+  sampled pairs 0.95-0.98 : 18473
+  identical text          : 4894
+  differing numbers       : 1666
+  differing negation      : 245
+
+(total sampled high-cosine pairs: 40000)
+
+== degenerate-text census (embedded blocks only) ==
+  blocks with <=16 chars: 36136 (D5: 35685)
+
+  len : count : examples
+    1 :   431 : — | → | 🧠
+    2 :   586 : 🏗️ | és | és
+    3 :  2842 : ⚙️🔥 | ⚙️🔥 | ⚙️🔒
+    4 :  3129 : ██
+┆ | Volt | Core
+    5 :  5655 : <bin> | <bin> | <bin>
+    6 :  3155 : ▃
+   ▄ | **Port | Teljes
+    7 :  5942 : // Ha a | .. └─ . | Hebbian
+    8 :  3233 : ### Work | aláírás; | ├── mod.
+    9 :  3906 : 🔥Melyik . | 1 => "▂", | 2 => "▃",
+   10 :  1580 : pub fn tic | Hope v2.0. | Hope v2.0.
+   11 :  3372 : 71/71 test. | 71/71 test. | 91/91 test.
+   12 :   723 : 2 Befejezése | Máté kérése: | 71/71 teszt.
+   13 :   571 : ```javascript | stability: 0. | 103/103 test.
+   14 :   423 : teszt uj entry | 0.0 ELKESZULT. | 0.0 BEFEJEZVE.
+   15 :   339 : https://github. | bin (141MB) + . | 379 GiB-ról 10.
+   16 :   249 : - Swarm Protocol | Hope Ultimate 2. | Lokális whisper.

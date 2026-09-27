@@ -7,7 +7,11 @@
 //! Energy decays exponentially — recently active blocks are "hot".
 //!
 //! Binary formats:
-//!   activations.bin — per-block activation state (HEB1)
+//!   activations.bin — per-block activation state (HEB2, sparse: only records
+//!     that differ from the default are stored, plus block_count)
+//!   activations_delta.bin — append-only, CRC-checked journal of the records a
+//!     recall touched (AEM2); folded into the base on a full save or at
+//!     JOURNAL_MAX_RECORDS
 //!   coactivations.bin — sparse co-activation pairs (COA1)
 //!   fingerprints.bin — activation fingerprints for mirror neurons (FPR1)
 
@@ -240,9 +244,30 @@ impl HebbianState {
         }
     }
 
-    /// Save all Hebbian state to binary files.
+    /// Save all Hebbian state to binary files. Writes the activation base in
+    /// full, which is the correct thing after a rebuild or a remap.
     pub fn save(&self, output_dir: &Path) -> Result<(), String> {
         save_activations(output_dir, &self.activations)?;
+        save_coactivations(output_dir, &self.coactivations)?;
+        save_fingerprints(output_dir, &self.fingerprints)?;
+        Ok(())
+    }
+
+    /// Save after a recall: journal only the blocks that were actually
+    /// activated, and rewrite the base only when the journal has reached its
+    /// bound or the base is missing.
+    ///
+    /// The caller passes the dirty indices because it is the one that knows
+    /// them -- recall activates exactly the top-k blocks it returned. Nothing is
+    /// deferred to process exit on purpose: a CLI invocation is a whole
+    /// process, so "write it later" would lose the learning entirely.
+    pub fn save_dirty(&self, output_dir: &Path, dirty: &[u32]) -> Result<(), String> {
+        let base_missing = !output_dir.join("activations.bin").exists();
+        if base_missing || delta_journal_records(output_dir) >= JOURNAL_MAX_RECORDS {
+            save_activations(output_dir, &self.activations)?;
+        } else {
+            append_activation_deltas(output_dir, &self.activations, dirty)?;
+        }
         save_coactivations(output_dir, &self.coactivations)?;
         save_fingerprints(output_dir, &self.fingerprints)?;
         Ok(())
@@ -400,51 +425,236 @@ fn read_f32(b: &[u8], off: usize) -> f32 {
     f32::from_le_bytes(b[off..off + 4].try_into().unwrap())
 }
 
+/// CRC32 (IEEE, bitwise). Validates delta-journal records: a torn tail must be
+/// detected and dropped, never applied.
+fn crc32(bytes: &[u8]) -> u32 {
+    let mut crc: u32 = 0xFFFF_FFFF;
+    for &b in bytes {
+        crc ^= b as u32;
+        for _ in 0..8 {
+            let mask = (crc & 1).wrapping_neg();
+            crc = (crc >> 1) ^ (0xEDB8_8320 & mask);
+        }
+    }
+    !crc
+}
+
+/// Journal record: 4 (index) + 32 (record) + 4 (crc).
+const DELTA_RECORD_BYTES: usize = 4 + ACTIVATION_RECORD_BYTES + 4;
+const DELTA_MAGIC: &[u8; 4] = b"AEM2";
+const DELTA_FILE: &str = "activations_delta.bin";
+/// Compact the base once the journal holds this many records (~160 KB), so the
+/// load path stays bounded however long the process keeps learning.
+const JOURNAL_MAX_RECORDS: usize = 4096;
+
+fn decode_activation_record(data: &[u8], off: usize) -> ActivationRecord {
+    ActivationRecord {
+        activation_count: read_u32(data, off),
+        last_activated_ms: read_u64(data, off + 4),
+        drift_x: read_f32(data, off + 12),
+        drift_y: read_f32(data, off + 16),
+        drift_z: read_f32(data, off + 20),
+        energy: read_f32(data, off + 24),
+        _pad: read_u32(data, off + 28),
+    }
+}
+
+fn encode_activation_record(buf: &mut Vec<u8>, rec: &ActivationRecord) {
+    buf.extend_from_slice(&rec.activation_count.to_le_bytes());
+    buf.extend_from_slice(&rec.last_activated_ms.to_le_bytes());
+    buf.extend_from_slice(&rec.drift_x.to_le_bytes());
+    buf.extend_from_slice(&rec.drift_y.to_le_bytes());
+    buf.extend_from_slice(&rec.drift_z.to_le_bytes());
+    buf.extend_from_slice(&rec.energy.to_le_bytes());
+    buf.extend_from_slice(&rec._pad.to_le_bytes());
+}
+
+/// True when a record carries no information, i.e. it equals what a freshly
+/// resized vector already holds. On a clean 699k-block index that is all of
+/// them, and none of them is ever written.
+fn is_default_record(rec: &ActivationRecord) -> bool {
+    rec.activation_count == 0
+        && rec.last_activated_ms == 0
+        && rec.drift_x == 0.0
+        && rec.drift_y == 0.0
+        && rec.drift_z == 0.0
+        && rec.energy == 0.0
+        && rec._pad == 0
+}
+
+/// Apply the append-only delta journal on top of a loaded base.
+///
+/// A crash can leave a partial record. Records are CRC-checked and the first
+/// bad one ends the scan: a torn tail is dropped, never applied, and the file
+/// is truncated to the last good record so the next append lands on a valid
+/// boundary.
+fn apply_activation_deltas(output_dir: &Path, records: &mut [ActivationRecord]) {
+    let path = output_dir.join(DELTA_FILE);
+    let data = match fs::read(&path) {
+        Ok(d) => d,
+        Err(_) => return,
+    };
+    if data.len() < 8 || &data[0..4] != DELTA_MAGIC {
+        // Too short, or not ours (a future format): ignore rather than
+        // misinterpret. Never delete a file we do not understand.
+        return;
+    }
+    let mut pos = 8usize;
+    while pos + DELTA_RECORD_BYTES <= data.len() {
+        let body = &data[pos..pos + 4 + ACTIVATION_RECORD_BYTES];
+        if crc32(body) != read_u32(&data, pos + 4 + ACTIVATION_RECORD_BYTES) {
+            break;
+        }
+        let idx = read_u32(&data, pos) as usize;
+        if idx >= records.len() {
+            // The record names a block this corpus no longer has. Stop: a
+            // rebuild re-creates the file, and growing the vector here would
+            // resurrect a block the index does not have.
+            break;
+        }
+        records[idx] = decode_activation_record(&data, pos + 4);
+        pos += DELTA_RECORD_BYTES;
+    }
+    if pos != data.len() {
+        // Trim the unusable tail so the next append cannot be misread as part
+        // of a torn record.
+        if let Ok(f) = fs::OpenOptions::new().write(true).open(&path) {
+            let _ = f.set_len(pos as u64);
+        }
+    }
+}
+
 fn load_activations(output_dir: &Path, block_count: usize) -> Vec<ActivationRecord> {
     let path = output_dir.join("activations.bin");
+    let mut records = vec![ActivationRecord::default(); block_count];
     if let Ok(data) = fs::read(&path) {
-        if data.len() >= 8 && &data[0..4] == b"HEB1" {
+        if data.len() >= 12 && &data[0..4] == b"HEB2" {
+            // [HEB2][u32 block_count][u32 stored][(u32 idx, record)...]
+            let stored = read_u32(&data, 4) as usize;
+            let count = read_u32(&data, 8) as usize;
+            let stride = 4 + ACTIVATION_RECORD_BYTES;
+            let mut needed = block_count.max(stored);
+            for i in 0..count {
+                let off = 12 + i * stride;
+                if off + stride > data.len() {
+                    break;
+                }
+                needed = needed.max(read_u32(&data, off) as usize + 1);
+            }
+            records.resize(needed, ActivationRecord::default());
+            for i in 0..count {
+                let off = 12 + i * stride;
+                if off + stride > data.len() {
+                    break;
+                }
+                let idx = read_u32(&data, off) as usize;
+                if idx < records.len() {
+                    records[idx] = decode_activation_record(&data, off + 4);
+                }
+            }
+        } else if data.len() >= 8 && &data[0..4] == b"HEB1" {
+            // Legacy dense layout, still written by older builds. Read it, and
+            // the next save converts the file to the sparse form.
             let stored_count = read_u32(&data, 4) as usize;
             let expected_size = 8 + stored_count * ACTIVATION_RECORD_BYTES;
             if data.len() >= expected_size {
-                let mut records = Vec::with_capacity(block_count.max(stored_count));
+                records.clear();
+                records.reserve(block_count.max(stored_count));
                 for i in 0..stored_count {
-                    let off = 8 + i * ACTIVATION_RECORD_BYTES;
-                    records.push(ActivationRecord {
-                        activation_count: read_u32(&data, off),
-                        last_activated_ms: read_u64(&data, off + 4),
-                        drift_x: read_f32(&data, off + 12),
-                        drift_y: read_f32(&data, off + 16),
-                        drift_z: read_f32(&data, off + 20),
-                        energy: read_f32(&data, off + 24),
-                        _pad: read_u32(&data, off + 28),
-                    });
+                    records.push(decode_activation_record(
+                        &data,
+                        8 + i * ACTIVATION_RECORD_BYTES,
+                    ));
                 }
                 records.resize(block_count.max(stored_count), ActivationRecord::default());
-                return records;
             }
         }
     }
-    vec![ActivationRecord::default(); block_count]
+    apply_activation_deltas(output_dir, &mut records);
+    records
 }
 
+/// Write the sparse base atomically and retire the journal: after this a load
+/// needs the base only. This is the checkpoint a rebuild or a remap relies on.
 fn save_activations(output_dir: &Path, records: &[ActivationRecord]) -> Result<(), String> {
     let path = output_dir.join("activations.bin");
-    let mut buf = Vec::with_capacity(8 + records.len() * ACTIVATION_RECORD_BYTES);
-    buf.extend_from_slice(b"HEB1");
+    let idxs: Vec<usize> = records
+        .iter()
+        .enumerate()
+        .filter(|(_, rec)| !is_default_record(rec))
+        .map(|(i, _)| i)
+        .collect();
+    let mut buf = Vec::with_capacity(12 + idxs.len() * (4 + ACTIVATION_RECORD_BYTES));
+    buf.extend_from_slice(b"HEB2");
     buf.extend_from_slice(&(records.len() as u32).to_le_bytes());
-    for rec in records {
-        buf.extend_from_slice(&rec.activation_count.to_le_bytes());
-        buf.extend_from_slice(&rec.last_activated_ms.to_le_bytes());
-        buf.extend_from_slice(&rec.drift_x.to_le_bytes());
-        buf.extend_from_slice(&rec.drift_y.to_le_bytes());
-        buf.extend_from_slice(&rec.drift_z.to_le_bytes());
-        buf.extend_from_slice(&rec.energy.to_le_bytes());
-        buf.extend_from_slice(&rec._pad.to_le_bytes());
+    buf.extend_from_slice(&(idxs.len() as u32).to_le_bytes());
+    for &i in &idxs {
+        buf.extend_from_slice(&(i as u32).to_le_bytes());
+        encode_activation_record(&mut buf, &records[i]);
     }
     let tmp_path = output_dir.join("activations.bin.tmp");
     fs::write(&tmp_path, &buf).map_err(|e| format!("write activations.bin: {}", e))?;
-    fs::rename(&tmp_path, &path).map_err(|e| format!("rename activations.bin: {}", e))
+    fs::rename(&tmp_path, &path).map_err(|e| format!("rename activations.bin: {}", e))?;
+    // The base now contains every delta that was journalled.
+    let _ = fs::remove_file(output_dir.join(DELTA_FILE));
+    Ok(())
+}
+
+/// How many records the journal currently holds.
+fn delta_journal_records(output_dir: &Path) -> usize {
+    match fs::metadata(output_dir.join(DELTA_FILE)) {
+        Ok(m) if m.len() > 8 => ((m.len() - 8) / DELTA_RECORD_BYTES as u64) as usize,
+        _ => 0,
+    }
+}
+
+/// Append the given block indices' records to the journal.
+///
+/// The whole batch goes out with a single append, so a concurrent reader sees
+/// either none of it or all of it. Records that still hold the default value
+/// are skipped: a block that was decayed back to nothing costs nothing to keep.
+fn append_activation_deltas(
+    output_dir: &Path,
+    records: &[ActivationRecord],
+    dirty: &[u32],
+) -> Result<(), String> {
+    let path = output_dir.join(DELTA_FILE);
+    let existing = fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
+    let mut buf: Vec<u8> = Vec::with_capacity(8 + dirty.len() * DELTA_RECORD_BYTES);
+    if existing == 0 {
+        buf.extend_from_slice(DELTA_MAGIC);
+        buf.extend_from_slice(&0u32.to_le_bytes()); // record count, advisory
+    }
+    let mut written = 0usize;
+    for &i in dirty {
+        let idx = i as usize;
+        if idx >= records.len() {
+            continue;
+        }
+        let rec = &records[idx];
+        if is_default_record(rec) {
+            continue;
+        }
+        let start = buf.len();
+        buf.extend_from_slice(&i.to_le_bytes());
+        encode_activation_record(&mut buf, rec);
+        let crc = crc32(&buf[start..]);
+        buf.extend_from_slice(&crc.to_le_bytes());
+        written += 1;
+    }
+    if written == 0 && existing > 0 {
+        return Ok(());
+    }
+    let mut f = fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&path)
+        .map_err(|e| format!("open activations journal: {}", e))?;
+    f.write_all(&buf)
+        .map_err(|e| format!("write activations journal: {}", e))?;
+    f.flush()
+        .map_err(|e| format!("flush activations journal: {}", e))?;
+    Ok(())
 }
 
 fn load_coactivations(output_dir: &Path) -> HashMap<(u32, u32), CoactivationPair> {
@@ -534,27 +744,24 @@ fn save_fingerprints(
     fingerprints: &[ActivationFingerprint],
 ) -> Result<(), String> {
     let path = output_dir.join("fingerprints.bin");
-    let mut file =
-        fs::File::create(&path).map_err(|e| format!("create fingerprints.bin: {}", e))?;
-    file.write_all(b"FPR1")
-        .map_err(|e| format!("write magic: {}", e))?;
-    file.write_all(&(fingerprints.len() as u32).to_le_bytes())
-        .map_err(|e| format!("write count: {}", e))?;
+    let mut buf: Vec<u8> = Vec::with_capacity(8 + fingerprints.len() * 32);
+    buf.extend_from_slice(b"FPR1");
+    buf.extend_from_slice(&(fingerprints.len() as u32).to_le_bytes());
     for fp in fingerprints {
-        file.write_all(&fp.timestamp_ms.to_le_bytes())
-            .map_err(|e| format!("write ts: {}", e))?;
-        file.write_all(&fp.query_hash.to_le_bytes())
-            .map_err(|e| format!("write hash: {}", e))?;
-        file.write_all(&(fp.activations.len() as u16).to_le_bytes())
-            .map_err(|e| format!("write count: {}", e))?;
+        buf.extend_from_slice(&fp.timestamp_ms.to_le_bytes());
+        buf.extend_from_slice(&fp.query_hash.to_le_bytes());
+        buf.extend_from_slice(&(fp.activations.len() as u16).to_le_bytes());
         for &(block_idx, score) in &fp.activations {
-            file.write_all(&block_idx.to_le_bytes())
-                .map_err(|e| format!("write idx: {}", e))?;
-            file.write_all(&score.to_le_bytes())
-                .map_err(|e| format!("write score: {}", e))?;
+            buf.extend_from_slice(&block_idx.to_le_bytes());
+            buf.extend_from_slice(&score.to_le_bytes());
         }
     }
-    Ok(())
+    // Atomic, like every other state file here. `File::create` truncated in
+    // place, so a crash mid-write left a half-written mirror-neuron history
+    // that the next load would silently accept as the whole history.
+    let tmp_path = output_dir.join("fingerprints.bin.tmp");
+    fs::write(&tmp_path, &buf).map_err(|e| format!("write fingerprints.bin: {}", e))?;
+    fs::rename(&tmp_path, &path).map_err(|e| format!("rename fingerprints.bin: {}", e))
 }
 
 // ─── Utilities ──────────────────────────────────────
@@ -587,6 +794,201 @@ pub fn query_hash(query: &str) -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::PathBuf;
+
+    fn tmp_dir(name: &str) -> PathBuf {
+        let d = std::env::temp_dir().join(name);
+        let _ = fs::remove_dir_all(&d);
+        fs::create_dir_all(&d).unwrap();
+        d
+    }
+
+    #[test]
+    fn sparse_base_stores_only_learned_records() {
+        let dir = tmp_dir("mscope_hebb_sparse");
+        let n = 1000;
+        let mut recs = vec![ActivationRecord::default(); n];
+        recs[7].activation_count = 3;
+        recs[7].energy = 1.0;
+        recs[900].activation_count = 1;
+        recs[900].drift_x = 0.05;
+        save_activations(&dir, &recs).unwrap();
+
+        let file = fs::read(dir.join("activations.bin")).unwrap();
+        assert_eq!(&file[0..4], b"HEB2");
+        assert!(
+            file.len() < 200,
+            "sparse base should be a few records, got {} bytes",
+            file.len()
+        );
+        assert!(file.len() < 8 + n * ACTIVATION_RECORD_BYTES);
+
+        let back = load_activations(&dir, n);
+        assert_eq!(back.len(), n);
+        assert_eq!(back[7].activation_count, 3);
+        assert_eq!(back[7].energy, 1.0);
+        assert_eq!(back[900].drift_x, 0.05);
+        assert!(is_default_record(&back[11]));
+        assert!(is_default_record(&back[901]));
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn legacy_dense_base_still_loads() {
+        let dir = tmp_dir("mscope_hebb_legacy");
+        let n = 64;
+        let mut buf = Vec::new();
+        buf.extend_from_slice(b"HEB1");
+        buf.extend_from_slice(&(n as u32).to_le_bytes());
+        for i in 0..n {
+            let mut rec = ActivationRecord::default();
+            if i == 5 {
+                rec.activation_count = 9;
+                rec.energy = 0.75;
+            }
+            encode_activation_record(&mut buf, &rec);
+        }
+        fs::write(dir.join("activations.bin"), &buf).unwrap();
+
+        let back = load_activations(&dir, n);
+        assert_eq!(back.len(), n);
+        assert_eq!(back[5].activation_count, 9);
+        assert_eq!(back[5].energy, 0.75);
+        assert!(is_default_record(&back[6]));
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn journaled_update_is_visible_to_the_next_process() {
+        // The second load must see the first process's learning. This is why the
+        // write is a journal rather than a buffer flushed at exit: a CLI
+        // invocation is a whole process and there is no later.
+        let dir = tmp_dir("mscope_hebb_journal");
+        let n = 500;
+        let mut first = HebbianState::load_or_init(&dir, n);
+        first.record_activation(&[(3, 0.9)], 1);
+        first.save_dirty(&dir, &[3]).unwrap(); // bootstraps the base
+
+        let mut second = HebbianState::load_or_init(&dir, n);
+        assert_eq!(second.activations[3].activation_count, 1);
+        second.record_activation(&[(3, 0.8), (4, 0.4)], 2);
+        second.save_dirty(&dir, &[3, 4]).unwrap(); // journals
+        assert!(
+            dir.join(DELTA_FILE).exists(),
+            "an incremental save must not rewrite the whole base"
+        );
+
+        let third = HebbianState::load_or_init(&dir, n);
+        assert_eq!(third.activations[3].activation_count, 2);
+        assert_eq!(third.activations[4].activation_count, 1);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn torn_journal_tail_is_dropped_and_the_file_is_truncated() {
+        let dir = tmp_dir("mscope_hebb_torn");
+        let n = 200;
+        let mut first = HebbianState::load_or_init(&dir, n);
+        first.record_activation(&[(1, 1.0)], 1);
+        first.save_dirty(&dir, &[1]).unwrap();
+
+        let mut second = HebbianState::load_or_init(&dir, n);
+        second.record_activation(&[(2, 1.0)], 2);
+        second.save_dirty(&dir, &[2]).unwrap();
+
+        // A crash mid-append leaves a partial record at the tail.
+        let jp = dir.join(DELTA_FILE);
+        let mut data = fs::read(&jp).unwrap();
+        let good_len = data.len();
+        data.extend_from_slice(&[0x01, 0x02, 0x03]);
+        fs::write(&jp, &data).unwrap();
+
+        let loaded = HebbianState::load_or_init(&dir, n);
+        assert_eq!(loaded.activations[1].activation_count, 1);
+        assert_eq!(
+            loaded.activations[2].activation_count,
+            1,
+            "the record before the tear must be applied"
+        );
+        assert_eq!(
+            fs::metadata(&jp).unwrap().len(),
+            good_len as u64,
+            "the unusable tail is truncated so the next append is readable"
+        );
+
+        // A later append must still be seen: the tear cost one record, not the
+        // journal.
+        let mut third = loaded.clone();
+        third.record_activation(&[(3, 1.0)], 3);
+        third.save_dirty(&dir, &[3]).unwrap();
+        let after = HebbianState::load_or_init(&dir, n);
+        assert_eq!(after.activations[3].activation_count, 1);
+        assert_eq!(after.activations[2].activation_count, 1);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn journal_is_folded_into_the_base_at_the_threshold() {
+        let dir = tmp_dir("mscope_hebb_compact");
+        let n = 64;
+        // Pre-fill the journal past its bound with valid records.
+        let mut buf = Vec::new();
+        buf.extend_from_slice(DELTA_MAGIC);
+        buf.extend_from_slice(&0u32.to_le_bytes());
+        for i in 0..JOURNAL_MAX_RECORDS {
+            let rec = ActivationRecord {
+                activation_count: 1,
+                energy: 1.0,
+                ..Default::default()
+            };
+            let start = buf.len();
+            buf.extend_from_slice(&((i % n) as u32).to_le_bytes());
+            encode_activation_record(&mut buf, &rec);
+            let crc = crc32(&buf[start..]);
+            buf.extend_from_slice(&crc.to_le_bytes());
+        }
+        fs::write(dir.join(DELTA_FILE), &buf).unwrap();
+        assert!(delta_journal_records(&dir) >= JOURNAL_MAX_RECORDS);
+
+        // A load folds the journal into memory; the next save must checkpoint.
+        let mut state = HebbianState::load_or_init(&dir, n);
+        state.save_dirty(&dir, &[1]).unwrap();
+        assert_eq!(
+            delta_journal_records(&dir),
+            0,
+            "the journal is retired when the base is rewritten"
+        );
+        let data = fs::read(dir.join("activations.bin")).unwrap();
+        assert_eq!(&data[0..4], b"HEB2");
+        let back = load_activations(&dir, n);
+        // The journal is last-write-wins per index, so 4096 records over 64
+        // indices must leave exactly those 64 at their latest value -- not 4096
+        // activations. Compaction must not lose an index.
+        let learned = back.iter().filter(|r| r.activation_count > 0).count();
+        assert_eq!(learned, n, "every journalled index must survive compaction");
+        assert!(back.iter().all(|r| r.activation_count == 1));
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn remap_keeps_activations_across_a_rebuild() {
+        let dir = tmp_dir("mscope_hebb_remap");
+        let n = 10;
+        let mut state = HebbianState::load_or_init(&dir, n);
+        state.record_activation(&[(2, 1.0), (7, 1.0)], 42);
+        state.save(&dir).unwrap(); // a rebuild checkpoints in full
+
+        // Reverse the layout, as a rebuild that reorders blocks would.
+        let map: Vec<u32> = (0..n).map(|i| (n - 1 - i) as u32).collect();
+        let mut state = HebbianState::load_or_init(&dir, n);
+        state.remap_indexes(&map);
+        state.save(&dir).unwrap();
+
+        let back = HebbianState::load_or_init(&dir, n);
+        assert_eq!(back.activations[n - 1 - 2].activation_count, 1);
+        assert_eq!(back.activations[n - 1 - 7].activation_count, 1);
+        let _ = fs::remove_dir_all(&dir);
+    }
 
     #[test]
     fn test_serialization_sizes() {

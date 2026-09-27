@@ -94,7 +94,8 @@ microscope-memory/
 ├── meta.bin           # MSC3 header
 ├── merkle.bin         # SHA-256 fa
 ├── embeddings.bin     # Vektor index
-├── activations.bin     HEB1
+├── activations.bin     HEB2 (sparse)
+├── activations_delta.bin AEM2, aktivációs delta-napló
 ├── coactivations.bin   COA1
 ├── resonance.bin       RES1
 ├── pulses.bin          PLS1

@@ -656,7 +656,12 @@ fn recall(config: &Config, query: &str, k: usize) {
         // Attention: mark recall and save
         attention.mark_recall();
 
-        let _ = hebb.save(output_dir);
+        // Only the blocks this recall actually activated are journalled. The
+        // activation base is 32 bytes per corpus block (22.4 MB on the 699k-block
+        // eval index, almost all of it default records), and rewriting it in
+        // full on every recall cost ~20 ms idle and ~60 ms on a loaded disk --
+        // measured, not estimated.
+        let _ = hebb.save_dirty(output_dir, &activated.iter().map(|(i, _)| *i).collect::<Vec<_>>());
         let _ = mirror.save(output_dir);
         let _ = resonance.save(output_dir);
         let _ = archetypes.save(output_dir);

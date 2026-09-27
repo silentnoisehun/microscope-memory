@@ -127,7 +127,7 @@ config, and it is **worse** than the earlier D4 figure:
 | lexical only | 30.0% | 43.3% | 48.3% | 124.9 |
 | D5 index, semantic path, `want`=64 (pre-gate) | 31.7% | 46.7% | 48.3% | 287.5 |
 | D5 index, semantic path, `want`=256 (pre-gate) | 33.3% | 48.3% | 51.7% | 331.0 |
-| **D5 index + embedding quality gate, `want`=256 (current)** | **70.0%** | **80.0%** | **81.7%** | 398.5 / 415.6 |
+| **D5 index + embedding quality gate, `want`=256 (current)** | **70.0%** | **80.0%** | **81.7%** | 355.0 / 361.0 |
 | *earlier D4 index (9,999 vectors) — superseded, not reproducible* | *56.7%* | *75.0%* | *80.0%* | *283.9* |
 
 The D4 number is retained only to show that it does not reproduce. The 75.0%
@@ -174,13 +174,15 @@ vegetarian.", which fall under the floor. Floor 17 keeps them and measured
 worse overall, so 24 stands.
 
 Two measurement conditions, both measured rather than assumed. **Latency:**
-one `recall` writes 15 mutable state files including a 22.4 MB
-`activations.bin` and reads every block header once, and that I/O is what
-varies — on an idle machine the semantic path (provider, query embedding,
-vector search) is 127–137 ms with no variance in 8 of 8 runs and process
-start is 25–40 ms, so the two clean-state runs give p50 398.5 and 415.6 ms;
-figures taken while an index was being rebuilt reached 1,176 ms through the
-same state I/O, not through the gate. **State:** because every recall writes
+on an idle machine the semantic path (provider, query embedding, vector search)
+is 127–137 ms with no variance in 8 of 8 runs and process start is 25–40 ms, so
+what is left is learning-state I/O — and that was 22.4 MB of `activations.bin`
+read and rewritten per recall. The activation file is now a sparse base plus an
+append-only CRC-checked journal of the records a recall touched (372 B + ~24 KB
+after 60 recalls on this index), and the two clean-state runs give p50 355.0
+and 361.0 ms against 398.5 / 415.6 ms before, with recall unchanged at 42/48/49.
+The 1,176 ms figures taken while an index was being rebuilt came from the same
+state I/O, not from the gate. **State:** because every recall writes
 learning state back, consecutive runs on one build measure different systems —
 after ~240 extra recalls R@5/R@10 fell to 76.7%/78.3%, and deleting the
 mutable state files restored 42/48/49 twice. `scripts/eval_real.sh` already

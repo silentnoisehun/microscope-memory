@@ -414,7 +414,8 @@ The predictive cache, when warmed, provides effectively **zero-cost** result boo
 | `embeddings.bin` | — | Pre-computed embedding vectors |
 | `append.bin` | APv2 | Hot memory append log |
 | `append_embeddings.bin` | AEM1 | Vectors of append-log entries, by position |
-| `activations.bin` | HEB1 | Hebbian activation records |
+| `activations.bin` | HEB2 | Hebbian activation records, sparse (only non-default) |
+| `activations_delta.bin` | AEM2 | Append-only, CRC-checked journal of activation updates |
 | `coactivations.bin` | COA1 | Co-activation pairs |
 | `fingerprints.idx` | FGP1 | Structural fingerprints |
 | `links.bin` | LNK1 | Wormhole links |
@@ -532,7 +533,7 @@ systems on the same machine and the same MiniLM vectors
 
 | System | p50 ms | R@1 | R@5 | R@10 |
 |--------|--------|-----|-----|------|
-| **Microscope, D5 index + embedding quality gate (current)** | 399–416 | **70.0%** | **80.0%** | **81.7%** |
+| **Microscope, D5 index + embedding quality gate (current)** | 355–361 | **70.0%** | **80.0%** | **81.7%** |
 | Microscope, D5 index, semantic path (pre-gate) | 331.0 | 33.3% | 48.3% | 51.7% |
 | FAISS `IndexFlatIP` (60 fact vectors, query time only) | 0.010 | 90.0% | 96.7% | 96.7% |
 | SQLite FTS5 (BM25, 60 facts, query time only) | 0.034 | 53.3% | 60.0% | 63.3% |
@@ -620,7 +621,7 @@ back from the `embeddings.bin` header (`dim=384 max_depth=5`).
 
 | System | p50 ms | p95 ms | p99 ms | R@1 | R@5 | R@10 |
 |--------|--------|--------|--------|-----|-----|------|
-| **Microscope, D5 + quality gate, `want`=256 (current)** | 398.5 / 415.6 | 615.5 / 636.2 | 619.5 / 665.1 | **70.0%** | **80.0%** | **81.7%** |
+| **Microscope, D5 + quality gate, `want`=256 (current)** | 355.0 / 361.0 | 533.6 / 550.0 | 542.0 / 560.3 | **70.0%** | **80.0%** | **81.7%** |
 | Microscope, lexical only | 124.9 | — | — | 30.0% | 43.3% | 48.3% |
 | Microscope, D5, semantic path, `want`=64 (pre-gate) | 287.5 | 386.1 | 428.2 | 31.7% | 46.7% | 48.3% |
 | Microscope, D5, semantic path, `want`=256 (pre-gate) | 331.0 | 451.9 | 505.2 | 33.3% | 48.3% | 51.7% |
@@ -712,17 +713,41 @@ variance and is not quoted as a precise figure. The pre-gate recall numbers
 (33.3 / 48.3 / 51.7%) are stable across every run, and so are the post-gate
 figures (70.0 / 80.0 / 81.7%) in every run.
 
-**What the post-gate latency actually is.** A single `recall` writes 15
-mutable state files, among them a 22.4 MB `activations.bin`, and reads every
-block header once for the emotional field. Measured on an otherwise idle
-machine: process start plus config 25–40 ms (the gap between wall time and
-the in-process `results in` line); provider construction, query embedding and
-the vector search 127–137 ms in 8 of 8 runs, with no variance at all; the
-state I/O is the remainder. The published post-gate figures are two
-consecutive runs from a freshly built index: p50 398.5 and 415.6 ms. The
-431–1,176 ms range observed while embedding indexes were being rebuilt is that
-state I/O under load, not a code regression — the gate only shrinks the vector
-set, and setting `HF_HUB_OFFLINE=1` does not move it.
+**What the post-gate latency is, phase by phase.** Instrumented over 10 identical
+queries from a clean state, on an idle machine and again on a loaded disk, the
+in-process 290 ms broke down as: provider construction, query embedding and the
+vector search 138.8 ms; loading the learning state 61.2 ms; the post-recall
+writes 28.2 ms; the tail (eureka, spaced repetition, narrative) 43.1 ms; the
+emotional-field header scan 11.7 ms. Process start and config are another
+25–40 ms of wall time outside all of it. The search phase is the embedding
+model, not state I/O, and is out of reach of an I/O fix; an MCP server pays it
+once instead of per request.
+
+**The learning state was the part that could be fixed, and it was.** The
+activation vector was 32 bytes per corpus block — 22.4 MB for the 699,110-block
+eval index, almost all of it default records — and it was read and rewritten
+in full on every recall: ~20 ms of writing on an idle machine, ~60 ms on a
+loaded one, plus the 55 ms load. It is now a sparse base (`HEB2`: only records
+that differ from the default, plus the block count) plus an append-only,
+CRC-checked journal (`activations_delta.bin`) of the records a recall actually
+touched; the base is rewritten when the journal passes 4096 records or a full
+save (rebuild, remap) asks for it. On the eval index the base is 372 bytes and
+the journal ~24 KB after 60 recalls. Nothing is deferred to process exit — a
+CLI invocation is a whole process, so a buffered write would lose the learning.
+
+Measured, not estimated: clean-state p50 405.9 ms before, 355.0 and 361.0 ms
+after, with recall unchanged at 42/48/49 on both runs. The 431–1,176 ms range
+seen while an index was being rebuilt was that state I/O under load; removing
+the per-recall 22 MB write removes the mechanism, not just the symptom.
+
+Two smaller targets were measured and deliberately left alone. The other seven
+post-recall writes (mirror, resonance, archetypes, temporal, thought graph,
+predictive cache, attention) cost ~6–8 ms together, and dirty-tracking each of
+them separately would add state-tracking code to seven modules for less than
+the run-to-run spread. The emotional-field scan reads every block header
+(11.7 ms); caching it is not sound, because energy decays in wall-clock time
+and a cached centroid would be wrong rather than merely stale. Both are
+recorded here as measured, not addressed.
 
 **Measurement protocol: the state must be reset, not just the index.** Every
 `recall` writes learning state back, so consecutive measurement runs on one

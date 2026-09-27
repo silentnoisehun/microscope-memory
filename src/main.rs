@@ -292,22 +292,23 @@ fn recall(config: &Config, query: &str, k: usize) {
                     // Over-fetch, then let the final ranking do the ordering.
                     // The floor is 256, raised from 64 after a diagnostic run over
                     // all 60 eval questions that classified every miss as one of
-                    // three kinds: the correct block is not in the vector list at
-                    // all, or it is dropped by this pre-fetch, or it is dropped by
-                    // the final ranking. Of the 31 misses, 6 were lost to the
-                    // 64-entry cut and sit in the 128..256 band: 128 recovers
-                    // none of them (R@5 stays 46.7%), 256 recovers all six
-                    // (R@1 31.7->33.3%, R@5 46.7->48.3%, R@10 48.3->51.7%) for
-                    // ~15 ms of p50, and 512 is identical to 256 at higher cost.
-                    // So 256 is the measured floor, not a guess.
+                    // three kinds: not in the vector list, dropped by this
+                    // pre-fetch, or dropped by the final ranking. Of the 31
+                    // misses, 6 were lost to the 64-entry cut and sit in the
+                    // 128..256 band: 128 recovers none of them (R@5 stays
+                    // 46.7%), 256 recovers all six (R@5 48.3%, R@10 51.7%), and
+                    // 512 is identical to 256 at higher cost. So 256 is a
+                    // measured floor, not a guess.
                     //
-                    // This is a partial fix only. The dominant failure -- 21 of the
-                    // 31 misses -- is unrelated to this constant: the correct block
-                    // is absent from the cosine list entirely, because the vector
-                    // search returns almost exclusively D5 blocks (typically 1021
-                    // of the top 1024) while the stored facts sit at other depths.
-                    // Fixing that requires depth-aware vector selection, which is
-                    // not attempted here.
+                    // This is a partial fix. The dominant failure -- 21 of the 31
+                    // misses -- is not a pre-fetch problem: `want`=2048 admits
+                    // those answers and changes recall by exactly nothing. They
+                    // are embedded, they score a mean cosine of 0.935, and they
+                    // sit at mean rank 6,209 of 46,565, because the corpus holds
+                    // 36,568 D5 summaries of similar content that outscore them.
+                    // Neither a duplicate-vector cap nor removing the spatial term
+                    // moves this either; both were measured and changed nothing.
+                    // The remedy is corpus-level, not a reweighting of the score.
                     let want = (k * 8).max(256);
                     // Diagnostic only: when MICROSCOPE_EVAL_MATCH is set, fetch a
                     // deeper list once so the expected answer can be located

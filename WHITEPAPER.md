@@ -551,9 +551,9 @@ flat vector scan does not. Given identical embeddings, FAISS reaches 96.7% and
 the full system 51.7%: the depth structure, the reinforcement layers and the
 candidate filtering cost 45 points of accuracy and buy inspectability, bounded
 memory, and a per-recall write path. A diagnostic pass over all 60 questions
-localises most of that loss (§10.1): the cosine search returns almost
-exclusively D5 blocks, so a fact stored at another depth frequently never
-enters the candidate set at all.
+locates that loss (§10.1): the expected answers are embedded and score a mean
+cosine of 0.935, yet rank 6,209th on average out of 46,565 stored vectors,
+because 36,568 of those are D5 summaries of similar content.
 
 Two caveats that bound the table. The measurement asymmetry favours the
 baselines: their timings are query-only, while Microscope's include process
@@ -631,18 +631,45 @@ the 31 initial misses, using the match tokens passed to the binary via
 | (b) lost in the pre-fetch | 6 | Present in the top-1024, dropped by the `want`-entry cut |
 | (c) lost in the final ranking | 4 | Admitted, but ranked below k by the combined score |
 
-**Class (a) is the dominant failure, and it is not a ranking problem.** The
-depth histogram of the returned vector hits is almost degenerate: typically
-`[0, 0, 0, 0, 3, 1021]` — 1021 of the top 1024 are D5, and D0-D3 never appear.
-A stored fact at any other depth therefore frequently has no chance of being
-selected by the vector search, whatever the ranking does. This is a property of
-the candidate generation, not of the scoring function.
+**Class (a) is the largest group — and four hypotheses for it were tested and
+rejected.** The depth histogram of the returned hits is almost degenerate
+(typically `[0, 0, 0, 0, 3, 1021]`), which suggested that D5 crowds out every
+other depth. Extending the diagnostic to report each answer's score and rank
+across the *whole* 46,565-vector set showed the opposite of a scoring problem:
+
+- All 60 answers **are** embedded (60/60).
+- Mean cosine of the expected block is **0.935** — a strong match.
+- Mean full rank is **6,209** of 46,565. Only 36/60 are inside rank 256.
+
+So roughly six thousand blocks score *higher* than a 0.935 match. Four
+explanations were implemented and measured, and only the first survived:
+
+| Hypothesis | Experiment | Result |
+|---|---|---|
+| Pre-fetch too shallow | `want` 64 → 256 | **helps**: R@5 46.7% → 48.3% |
+| Query needs a deeper list | `want` → 2048 | **no change** in R@k; p50 roughly doubles |
+| Bit-identical duplicate vectors flood the list | cap identical vectors | **no change** — the apparent 1,996-block cluster was a quantisation artefact; the blocks are *near*-duplicates, not byte-identical |
+| The spatial term drowns the cosine bonus | scale spatial 1.0 → 0.0 | **no change** at any scale |
+
+Raising `want` to 2048 admits the deeply-ranked answers and still changes
+nothing, so the obstruction is not a shortage of candidates. Removing the
+spatial term entirely also changes nothing, so it is not the spatial term.
+**The honest conclusion is that the ranking is behaving correctly and the
+corpus is the problem**: 36,568 of the 46,565 embedded blocks are D5
+summaries of largely similar content, so an exact answer does not stand out in
+the vector space. The fix is corpus-level — collapsing near-duplicate blocks at
+build time — not a reweighting of the score. That is untested here and would
+require a full re-embed.
 
 **Class (b) is what the `want` constant controls.** Measured directly:
 `want`=64 → R@5 46.7%, `want`=128 → 46.7% (no change), `want`=256 → 48.3%,
 `want`=512 → 48.3% (no further gain). All six class-(b) answers sit in the
-128..256 band. The constant was raised to 256, costing ~44 ms of p50
-(287.5 → 331.0 ms) for +1.6 points at R@5 and +3.4 at R@10.
+128..256 band. The constant is set to 256, the measured floor.
+
+Note on latency: repeated runs of the same build give p50 between 331 and
+376 ms, so the cost attributed to the 64 → 256 change is within run-to-run
+variance and is not quoted as a precise figure. The recall numbers
+(33.3 / 48.3 / 51.7%) are stable across every run.
 
 **Class (c) was not addressed.** Only 4 questions are affected, and any
 quota reserving top-N slots for vector hits would need to be measured against
@@ -758,12 +785,16 @@ the distinction between inner-loop and end-to-end cost are also in
    are not comparable, see §9.3). The hierarchy costs accuracy and latency here,
    and buys inspectability, bounded memory and a per-recall write path. That is
    the trade this paper documents, not an argument that the hierarchy is faster.
-5. **The vector candidate set collapses onto one depth.** Measured over all 60
-   evaluation questions, the cosine search returns almost only D5 blocks
-   (typically 1021 of the top 1024), and D0-D3 never appear. A fact stored at
-   another depth is frequently never offered to the ranker at all. This, not the
-   scoring function, is the dominant cause of the 21 of 31 misses in §10.1, and
-   it is the clearest target for future work.
+5. **The corpus contains many near-duplicate blocks.** All 60 evaluation answers
+   are embedded and score a mean cosine of 0.935, but their mean rank across the
+   46,565 stored vectors is 6,209: roughly six thousand blocks outscore an exact
+   answer. Raising the vector pre-fetch to 2048, capping duplicate vectors, and
+   removing the spatial term from the score were each implemented and measured,
+   and none of them changes recall — the ranking is behaving correctly and the
+   vectors are good. The obstacle is that 36,568 of the embedded blocks are D5
+   summaries of similar content, so a specific fact does not stand out in the
+   vector space. The remedy is corpus-level (collapsing near-duplicates at
+   build time), which is untested here and would need a full re-embed.
 5. **The resonance set is synthetic** — 60 hand-written facts, not a sample of
    real usage. The measured hit@10 of 51.7% says how often the retrieval path
    answers one of these 60 known questions; it does not say how the system
@@ -801,10 +832,10 @@ With the semantic path connected and the pre-fetch widened, the system reaches
 51.7% hit@10 on the resonance set, against 43.3% for lexical-only. It does not
 beat a general-purpose lexical index (SQLite FTS5, 63.3%) on that set, and it
 is far below exhaustive vector search over the same embeddings (FAISS, 96.7%).
-A diagnostic pass over all 60 questions (§10.1) localises most of that gap to
-candidate generation rather than ranking: the cosine search returns almost only
-D5 blocks, so facts stored at other depths never reach the ranker. The first
-fix in this line of work --
+A diagnostic pass over all 60 questions (§10.1) locates that gap: the expected
+answers are embedded and score a mean cosine of 0.935, yet rank 6,209th on
+average out of 46,565 stored vectors, because 36,568 of those are D5 summaries
+of similar content. The first fix in this line of work --
 connecting embeddings.bin to the recall path -- moved hit@5 by 31.7 points,
 which is larger than any architectural difference measured elsewhere in this
 paper.

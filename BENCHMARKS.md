@@ -134,10 +134,19 @@ was measured on a depth-truncated index with a pre-fix candidate gate; on the
 committed D5 configuration the same harness returns 48.3%.
 
 A diagnostic pass classified all 31 remaining misses: 21 are cases where the
-correct block never enters the cosine list (the vector search returns almost
-exclusively D5 blocks), 6 are lost to the `want` pre-fetch, and 4 are lost in
-the final ranking. Only the pre-fetch group was addressed, by raising `want`
-from 64 to 256; 128 recovers none of them and 512 adds nothing over 256.
+correct block never enters the cosine top-1024, 6 are lost to the `want`
+pre-fetch, and 4 are lost in the final ranking. Only the pre-fetch group was
+addressed, by raising `want` from 64 to 256; 128 recovers none of them and 512
+adds nothing over 256.
+
+Three further explanations for the 21 were implemented and measured, and all
+three were rejected: raising `want` to 2048 (R@k unchanged, p50 roughly
+doubles), capping bit-identical duplicate vectors (unchanged — the apparent
+1,996-block cluster was a quantisation artefact; the blocks are near-duplicates)
+and scaling the spatial term from 1.0 to 0.0 (unchanged at every scale). The
+answers are all embedded with a mean cosine of 0.935 at mean rank 6,209 of
+46,565, so the ranking and the embeddings are both sound; the corpus holds too
+many near-duplicate D5 summaries for a specific fact to stand out.
 
 The FAISS and FTS5 rows are diagnostics, not a like-for-like comparison. They
 index only the 60 fact vectors and report query-time search only, while

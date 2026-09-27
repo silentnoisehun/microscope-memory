@@ -95,11 +95,13 @@ def _rates(per_k: dict, ks: list[int]) -> dict:
     return {str(k): round(100.0 * per_k[k] / len(CASES), 1) for k in ks}
 
 
-def run_microscope(ks: list[int]) -> dict:
+def run_microscope(ks: list[int], config: Path) -> dict:
     """Time `recall` end-to-end and compute recall@k from its output."""
     if BIN is None:
         return {"system": "microscope (recall)", "error": "binary not built"}
-    env = dict(os.environ, MICROSCOPE_CONFIG=str(CONFIG.resolve()))
+    if not config.exists():
+        return {"system": "microscope (recall)", "error": f"{config} missing"}
+    env = dict(os.environ, MICROSCOPE_CONFIG=str(config.resolve()))
     per_k = {k: 0 for k in ks}
     times: list[float] = []
     top = max(ks)
@@ -109,11 +111,13 @@ def run_microscope(ks: list[int]) -> dict:
         r = subprocess.run(
             [str(BIN), "recall", c.question, str(top)],
             capture_output=True,
-            text=True,
             env=env,
         )
         times.append((time.perf_counter() - t0) * 1000.0)
-        rows = result_lines(r.stdout.lower())
+        # Decode explicitly: the corpus is UTF-8 and the platform default
+        # (cp1252 on Windows) raises on non-ASCII bytes.
+        out = r.stdout.decode("utf-8", errors="replace").lower()
+        rows = result_lines(out)
         for k, hit in _score(rows, c, ks).items():
             if hit:
                 per_k[k] += 1
@@ -210,44 +214,149 @@ def run_fts5(ks: list[int]) -> dict:
     }
 
 
+def load_microscope_vectors(facts: list[str]) -> "np.ndarray | None":
+    """Read the real MiniLM vectors Microscope stored, so FAISS is fed the
+    same embeddings rather than a bag-of-words proxy. Returns None if the
+    index is missing or the dimension cannot be read."""
+    try:
+        import numpy as np
+    except ImportError:
+        return None
+    path = ROOT / "eval_output" / "embeddings.bin"
+    if not path.exists():
+        return None
+    raw = path.read_bytes()
+    if len(raw) < 12:
+        return None
+    count = int.from_bytes(raw[0:4], "little")
+    dim = int.from_bytes(raw[4:8], "little")
+    if count == 0 or dim == 0:
+        return None
+    need = 12 + count * 4 + count * dim * 4
+    if len(raw) < need:
+        return None
+    ids = np.frombuffer(raw, dtype="<u4", count=count, offset=12)
+    vecs = np.frombuffer(raw, dtype="<f4", count=count * dim, offset=12 + count * 4)
+    return ids, vecs.reshape(count, dim)
+
+
+def run_faiss_real(ks: list[int], index_type: str) -> dict:
+    """FAISS over the same MiniLM vectors, restricted to the 60 evaluation
+    facts. Uses sentence-transformers with the identical checkpoint the binary
+    used, so the comparison is embedding-for-embedding rather than against a
+    bag-of-words proxy."""
+    try:
+        import faiss
+        import numpy as np
+        from sentence_transformers import SentenceTransformer
+    except ImportError as e:
+        return {"system": "faiss (real MiniLM vectors)", "error": str(e)}
+
+    st = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
+    facts = [c.fact for c in CASES]
+    mat = np.ascontiguousarray(
+        st.encode(facts, normalize_embeddings=True).astype("float32")
+    )
+    qmat = np.ascontiguousarray(
+        st.encode([c.question for c in CASES], normalize_embeddings=True).astype("float32")
+    )
+
+    index = (
+        faiss.IndexFlatIP(mat.shape[1])
+        if index_type == "flat"
+        else faiss.IndexHNSWFlat(mat.shape[1], 32)
+    )
+    index.add(mat)
+
+    top = max(ks)
+    faiss.omp_set_num_threads(1)
+    times, per_k = [], {k: 0 for k in ks}
+    for i, c in enumerate(CASES):
+        t0 = time.perf_counter()
+        _d, idx = index.search(qmat[i : i + 1], top)
+        times.append((time.perf_counter() - t0) * 1000.0)
+        ranked = [facts[j] for j in idx[0] if 0 <= j < len(facts)]
+        for k, hit in _score(ranked, c, ks).items():
+            if hit:
+                per_k[k] += 1
+
+    label = "faiss IndexHNSWFlat (MiniLM)" if index_type == "hnsw" else "faiss IndexFlatIP (MiniLM)"
+    return {
+        "system": label,
+        "note": f"all-MiniLM-L6-v2, d={mat.shape[1]}; 1 thread; query only",
+        "latency": pcts(times),
+        "recall_at_k": {str(k): per_k[k] for k in ks},
+        "recall_rate": _rates(per_k, ks),
+    }
+
+
+def _parse_query_vector(stdout: bytes) -> "list[float] | None":
+    """Parse a whitespace/comma separated float vector printed by the binary."""
+    try:
+        text = stdout.decode("utf-8", errors="replace")
+    except Exception:
+        return None
+    for line in text.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        if "," in line:
+            parts = line.split(",")
+        else:
+            parts = line.split()
+        try:
+            vals = [float(p) for p in parts if p]
+        except ValueError:
+            continue
+        if len(vals) >= 8:
+            return vals
+    return None
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--k", type=int, nargs="+", default=[1, 5, 10])
+    ap.add_argument("--config", default="eval_config.toml")
     a = ap.parse_args()
 
+    cfg = Path(a.config)
     ks = sorted(a.k)
+    if not cfg.exists():
+        print(f"error: {cfg} not found; run scripts/eval_real.sh first", file=sys.stderr)
+        return 1
+
     runs = [
-        run_microscope(ks),
-        run_faiss(ks, dense=False, index_type="flat"),
-        run_faiss(ks, dense=True, index_type="flat"),
-        run_faiss(ks, dense=True, index_type="hnsw"),
+        run_microscope(ks, cfg),
+        run_faiss_real(ks, index_type="flat"),
+        run_faiss_real(ks, index_type="hnsw"),
         run_fts5(ks),
     ]
 
     print(f"\nCorpus: {len(CASES)} facts, {len(CASES)} queries, k={ks}")
-    print("Same machine, same corpus, same queries.")
+    print("Microscope: provider=candle, all-MiniLM-L6-v2, semantic_weight=1.0")
     print("Latency and recall together: a system returning nothing is fast.\n")
-    head = f"{'system':<34} {'p50 ms':>9} {'p95 ms':>9} {'p99 ms':>9}  " + "  ".join(
+    head = f"{'system':<36} {'p50 ms':>9} {'p95 ms':>9} {'p99 ms':>9}  " + "  ".join(
         f"R@{k}" for k in ks
     )
     print(head)
     print("-" * len(head))
     for r in runs:
         if "error" in r:
-            print(f"{r['system']:<34} {r['error']}")
+            print(f"{r['system']:<36} {r['error']}")
             continue
         lat = r["latency"]
         rec = "  ".join(f"{r['recall_rate'][str(k)]:5.1f}%" for k in ks)
         print(
-            f"{r['system']:<34} {lat['p50_ms']:>9.4f} {lat['p95_ms']:>9.4f} "
-            f"{lat['p99_ms']:>9.4f}  {rec}"
+            f"{r['system']:<36} {lat['p50_ms']:>9.3f} {lat['p95_ms']:>9.3f} "
+            f"{lat['p99_ms']:>9.3f}  {rec}"
         )
 
-    out = Path("docs/measurements/baseline_comparison.json")
+    out = Path("docs/measurements/real_embedding_comparison.json")
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(
         json.dumps(
             {
+                "config": "provider=candle model=all-MiniLM-L6-v2 semantic_weight=1.0",
                 "corpus_facts": len(CASES),
                 "queries": len(CASES),
                 "k_values": ks,
@@ -259,13 +368,8 @@ def main() -> int:
         encoding="utf-8",
     )
     print(f"\nwrote {out}")
-    print(
-        "\nAsymmetry, stated rather than hidden: FAISS and FTS5 numbers are\n"
-        "query-only and exclude index build. Microscope numbers are end-to-end\n"
-        "process invocations including start-up and state load. This asymmetry\n"
-        "works against Microscope, so the comparison is conservative."
-    )
     return 0
+
 
 
 if __name__ == "__main__":

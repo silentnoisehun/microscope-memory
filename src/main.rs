@@ -314,13 +314,28 @@ fn recall(config: &Config, query: &str, k: usize) {
                     // within it. Admission is unchanged either way -- the
                     // admitted set is always the first `want` entries, which is
                     // exactly the top of the cosine-sorted list.
-                    let diag = std::env::var("MICROSCOPE_EVAL_MATCH")
+                    // Diagnostics are opt-in and cost real time: full_rank_of
+                    // scans every stored vector, and it was observed to roughly
+                    // double end-to-end p50. Require MICROSCOPE_EVAL_DIAG=1 in
+                    // addition to the match tokens, so a normal measurement run
+                    // is unaffected.
+                    let diag = std::env::var("MICROSCOPE_EVAL_DIAG")
                         .ok()
+                        .filter(|v| v == "1")
+                        .and_then(|_| std::env::var("MICROSCOPE_EVAL_MATCH").ok())
                         .filter(|s| !s.is_empty());
                     let fetch = if diag.is_some() { want.max(1024) } else { want };
+                    // NOTE: a bit-exact redundancy filter was tried here and
+                    // reverted. The Python-side check suggested 1,996 identical
+                    // vectors, but that was a quantisation artefact; the D5
+                    // blocks are near-duplicates, not byte-identical ones, so
+                    // capping identical vectors did not change the result list
+                    // (depth histogram [0,0,0,0,3,1021] -> [0,0,0,0,7,1017]).
+                    // The real obstacle is near-duplicate crowding, which needs
+                    // similarity-based diversity, not a bit comparison.
                     let hits = eidx.search(&qe, fetch);
                     if let Some(matches) = &diag {
-                        report_vector_diag(&reader, &hits, matches, want, eidx.block_count());
+                        report_vector_diag(&reader, &eidx, &qe, &hits, matches, want);
                     }
                     for (sim, block_idx) in hits.into_iter().take(want) {
                         if block_idx < reader.block_count {
@@ -466,7 +481,8 @@ fn recall(config: &Config, query: &str, k: usize) {
     // Diagnostic: where did the expected answer end up after the final sort,
     // and did it arrive from the lexical side, the vector side, or both?
     // Runs only when MICROSCOPE_EVAL_MATCH is set; never influences ranking.
-    if let Ok(m) = std::env::var("MICROSCOPE_EVAL_MATCH") {
+    if std::env::var("MICROSCOPE_EVAL_DIAG").ok().as_deref() == Some("1") {
+        if let Ok(m) = std::env::var("MICROSCOPE_EVAL_MATCH") {
         let needles: Vec<String> = m
             .split('|')
             .map(|s| s.trim().to_lowercase())
@@ -514,6 +530,7 @@ fn recall(config: &Config, query: &str, k: usize) {
                     ),
                 }
             );
+        }
         }
     }
 
@@ -1263,10 +1280,11 @@ fn init_demo(config: &Config, force: bool) -> Result<(), String> {
 /// or scoring.
 fn report_vector_diag(
     reader: &microscope_memory::reader::MicroscopeReader,
+    eidx: &microscope_memory::embedding_index::EmbeddingIndex,
+    qe: &[f32],
     hits: &[(f32, usize)],
     matches: &str,
     want: usize,
-    embedded_count: usize,
 ) {
     let needles: Vec<String> = matches
         .split('|')
@@ -1286,7 +1304,39 @@ fn report_vector_diag(
             }
         }
     }
-    // Locate the first hit whose block text contains a match token.
+    // Depth histogram of the WHOLE embedded set. If D5 dominates here too, the
+    // top-k being all D5 is a property of the corpus, not of the scoring.
+    let mut all_hist = [0usize; 9];
+    for id in eidx.all_block_ids() {
+        let i = *id as usize;
+        if i < reader.block_count {
+            let d = reader.header(i).depth as usize;
+            if d < all_hist.len() {
+                all_hist[d] += 1;
+            }
+        }
+    }
+    // Score of the expected block wherever it lives, its depth, and its rank in
+    // the FULL untruncated cosine ordering. The last number is the decisive one:
+    // a high rank with a high score means the top-k is crowded out, not that the
+    // embedding is bad.
+    let mut answer_sim: Option<(f32, usize, Option<usize>)> = None;
+    for id in eidx.all_block_ids() {
+        let i = *id as usize;
+        if i >= reader.block_count {
+            continue;
+        }
+        let text = reader.text(i).to_lowercase();
+        if needles.iter().any(|n| text.contains(n)) {
+            if let Some(sim) = eidx.similarity_of(i, qe) {
+                let d = reader.header(i).depth as usize;
+                if sim > answer_sim.map(|a| a.0).unwrap_or(f32::MIN) {
+                    let rank = eidx.full_rank_of(i, qe).map(|(r, _)| r);
+                    answer_sim = Some((sim, d, rank));
+                }
+            }
+        }
+    }
     let mut found: Option<(usize, f32, usize)> = None;
     for (rank, (sim, idx)) in hits.iter().enumerate() {
         if *idx >= reader.block_count {
@@ -1299,28 +1349,18 @@ fn report_vector_diag(
         }
     }
     let verdict = match found {
-        None => {
-            if embedded_count == 0 {
-                "a_not_embedded"
-            } else {
-                "a_outside_top1024"
-            }
-        }
+        None => "a_outside_top1024",
         Some((rank, _, _)) if rank >= want => "b_lost_in_prefetch",
         Some(_) => "c_in_prefetch",
     };
     eprintln!(
-        "EVALDIAG vectors={} want={} depths={:?} answer={}",
+        "EVALDIAG vectors={} want={} depths={:?} all_depths={:?} answer={} answer_sim={:?}",
         hits.len(),
         want,
         &depth_hist[0..6],
-        match found {
-            None => verdict.to_string(),
-            Some((rank, sim, depth)) => format!(
-                "{} rank={} sim={:.4} depth={}",
-                verdict, rank, sim, depth
-            ),
-        }
+        &all_hist[0..6],
+        verdict,
+        answer_sim.map(|(s, d, r)| (s, d, r)),
     );
 }
 

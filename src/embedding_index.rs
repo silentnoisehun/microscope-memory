@@ -116,6 +116,56 @@ impl EmbeddingIndex {
         results
     }
 
+    /// Every stored block id, in ascending order.
+    ///
+    /// Exposed for diagnostics that reason about the whole embedded set (a depth
+    /// histogram, a per-block score) rather than a top-k slice of it.
+    pub fn all_block_ids(&self) -> &[u32] {
+        self.block_ids()
+    }
+
+    /// Cosine similarity of one stored block against a query embedding.
+    pub fn similarity_of(&self, block_idx: usize, query_emb: &[f32]) -> Option<f32> {
+        if query_emb.len() != self.dim {
+            return None;
+        }
+        let ids = self.block_ids();
+        let pos = ids.binary_search(&(block_idx as u32)).ok()?;
+        let offset = HEADER_SIZE + self.embedded_count * 4 + pos * self.dim * 4;
+        let ptr = self.data[offset..].as_ptr() as *const f32;
+        // Safety: same invariants as search(); pos < embedded_count.
+        let emb = unsafe { std::slice::from_raw_parts(ptr, self.dim) };
+        Some(cosine_similarity_simd(query_emb, emb))
+    }
+
+    /// Rank of a stored block within the *full* untruncated cosine ordering.
+    ///
+    /// Diagnostics only. This separates "the embedding is bad" from "the top-k
+    /// is crowded out": a block with a high score at a high rank is being
+    /// drowned by redundant neighbours, not poorly represented.
+    pub fn full_rank_of(&self, block_idx: usize, query_emb: &[f32]) -> Option<(usize, f32)> {
+        if query_emb.len() != self.dim {
+            return None;
+        }
+        let ids = self.block_ids();
+        let target = ids.binary_search(&(block_idx as u32)).ok()?;
+        let target_off = HEADER_SIZE + self.embedded_count * 4 + target * self.dim * 4;
+        let tptr = self.data[target_off..].as_ptr() as *const f32;
+        let target_emb = unsafe { std::slice::from_raw_parts(tptr, self.dim) };
+        let target_sim = cosine_similarity_simd(query_emb, target_emb);
+        let mut higher = 0usize;
+        for i in 0..self.embedded_count {
+            let offset = HEADER_SIZE + self.embedded_count * 4 + i * self.dim * 4;
+            let ptr = self.data[offset..].as_ptr() as *const f32;
+            // Safety: same invariants as search(); i < embedded_count.
+            let emb = unsafe { std::slice::from_raw_parts(ptr, self.dim) };
+            if cosine_similarity_simd(query_emb, emb) > target_sim {
+                higher += 1;
+            }
+        }
+        Some((higher, target_sim))
+    }
+
     /// Block-id lookup array (ascending u32 indices).
     fn block_ids(&self) -> &[u32] {
         let start = HEADER_SIZE;

@@ -525,31 +525,37 @@ Using retrieval outcomes to improve future ranking is established in IR:
   graphs, the basis of several production vector stores.
 - **Chroma, Qdrant, Weaviate, Pinecone** -- systems built on these indexes.
 
-**A comparison harness is committed, but no result from it is reported here
-yet.** Two attempts were made and both were discarded:
+**A controlled comparison has been run**, on 60 facts and 60 questions, all
+systems on the same machine and the same MiniLM vectors
+([scripts/compare_baselines.py](scripts/compare_baselines.py)):
 
-- The first used a 60-fact benchmark index (4,853 blocks), two orders of
-  magnitude smaller than the real 695k-block corpus.
-- Both attempts ran with `embedding.provider = "mock"` (hash-derived vectors)
-  and `semantic_weight = 0.0`, which `config.example.toml` documents as
-  disabling semantic ranking in `recall`. Under that configuration the system
-  is reduced to nearest-neighbour over text hashes, which is not the system
-  being described in this paper.
+| System | p50 ms | R@1 | R@5 | R@10 |
+|--------|--------|-----|-----|------|
+| Microscope, semantic path connected | 283.9 | 56.7% | 75.0% | 80.0% |
+| FAISS `IndexFlatIP` (same MiniLM vectors) | 0.011 | 90.0% | 96.7% | 96.7% |
+| SQLite FTS5 (BM25) | 0.036 | 53.3% | 60.0% | 63.3% |
 
-Any conclusion about relative retrieval quality or latency drawn from those runs
-is an artefact of the configuration, not a property of the architecture, and has
-been removed from this document. The harness
-([scripts/compare_baselines.py](scripts/compare_baselines.py),
-[scripts/compare_scale.py](scripts/compare_scale.py)) is committed so a reader
-can reproduce the measurement *with a real embedding provider and
-`semantic_weight > 0`*, which is the condition under which the comparison
-becomes meaningful.
+**The system beats a general-purpose lexical index on every recall metric, and
+loses to exhaustive vector search over the same embeddings.** Microscope
+answers 80.0% at k=10 where FAISS answers 96.7%, and takes 284 ms where FAISS
+takes 0.011 ms. The first comparison in this space is therefore not a clean
+win: the system trades a large amount of accuracy against a spatial hierarchy
+and a reinforcement pipeline, and on this workload it is a worse retriever than
+a plain B-tree.
 
-The architectural difference remains as described in the previous section: an
-exact lookup over an explicit spatial hierarchy, with semantic similarity
-supplied by an embedding model rather than by the index structure. No
-performance claim is made in either direction until the comparison has been
-re-run correctly.
+What the same vectors *do* show is that the hierarchy is doing something a
+flat vector scan does not. Given identical embeddings, FAISS reaches 96.7% and
+the full system 80.0%: the depth structure, the reinforcement layers and the
+candidate filtering cost 16.7 points of accuracy and buy inspectability,
+bounded memory, and a per-recall write path. Whether that trade is worth it is
+a workload decision, and this paper does not claim it is.
+
+Two caveats that bound the table. The measurement asymmetry favours the
+baselines: their timings are query-only, while Microscope's include process
+start-up, config load, state load, query embedding and the post-recall write.
+And 60 facts is not a scale test — an exhaustive scan over 60 vectors is
+trivially fast, and at 10^6 blocks the FAISS row would not remain sub-
+millisecond.
 
 ### 9.4 Memory architectures for language agents
 
@@ -574,58 +580,52 @@ prunes unreferenced ones.
 
 ## 10. Evaluation
 
-### 10.1 Retrieval quality: resonance test set
+### 10.1 Retrieval quality, with the semantic path connected
 
-Retrieval quality is measured on a fixed set of 60 personal facts with known
-questions across 13 categories. The set and the index builder are committed at
-[`scripts/resonance_set.py`](scripts/resonance_set.py) and
-[`scripts/build_bench_index.py`](scripts/build_bench_index.py):
+The first attempt at this measurement ran a build in which recall could not
+reach the vectors at all: the depth window was guessed from the character
+length of the query, the admission gate was `lexical > 0.0` alone, and
+`embeddings.bin` was never opened by the recall path. Those numbers (R@5
+43.3%) describe a purely lexical search and are recorded here only as the
+"before" row of the comparison below.
 
-```bash
-cargo build --release
-python scripts/build_bench_index.py                       # 60 facts -> index
-python scripts/resonance_set.py --check                   # validate the set
-python scripts/resonance_set.py --measure --mode recall --k 5 10 20
-```
+**Configuration:** `provider = "candle"`, `all-MiniLM-L6-v2`, dim 384,
+`semantic_weight = 1.0`, index built from `layers/` plus the 60 resonance facts
+(699,154 blocks, 9,999 stored vectors), 60 questions.
 
-**Configuration of the runs below:** commit `f64c2fa`, Windows 11, 60-fact index
-(4,853 blocks across 9 depths), `embedding.provider = "mock"`,
-`semantic_weight = 0.0`.
+| System | p50 ms | R@1 | R@5 | R@10 |
+|--------|--------|-----|-----|------|
+| Microscope, lexical only (before the fix) | 124.9 | 30.0% | 43.3% | 48.3% |
+| **Microscope, semantic path connected** | 283.9 | **56.7%** | **75.0%** | **80.0%** |
+| SQLite FTS5 (BM25) | 0.036 | 53.3% | 60.0% | 63.3% |
+| FAISS `IndexFlatIP` (same MiniLM vectors) | 0.011 | 90.0% | 96.7% | 96.7% |
 
-> **These numbers do not characterise the system described in this paper.** They
-> were produced with semantic ranking disabled and with hash-derived vectors in
-> place of embeddings, which reduces `recall` to nearest-neighbour over text
-> hashes. They are retained only as a record of the harness, and they must be
-> re-run with a real embedding provider and `semantic_weight > 0` before any
-> retrieval-quality claim is made. See Section 9.3.
+**Connecting the vectors moved hit@5 from 43.3% to 75.0%** and hit@10 from
+48.3% to 80.0%, on the same corpus and the same questions. The cost is latency:
+p50 rose from 125 ms to 284 ms, because each recall now embeds the query and
+runs a vector search before ranking. That trade is configurable through
+`semantic_weight`.
 
-**Metric:** hit@k -- the fraction of the 60 facts appearing in the top k results.
+Two honest readings:
 
-| k | `recall` (spatial + heuristic) | `find` (literal substring) |
-|---|-------------------------------|------------------------------|
-| 5  | 36/60 (60.0%) | 20/60 (33.3%) |
-| 10 | 36/60 (60.0%) | 20/60 (33.3%) |
-| 20 | 36/60 (60.0%) | 20/60 (33.3%) |
+- The system now **beats a general-purpose lexical index** (FTS5) on every
+  recall metric, at three orders of magnitude more latency. On a workload where
+  retrieval quality matters more than round-trip time, that is the better tool.
+- It is still **below exhaustive vector search over the same embeddings**
+  (80.0% vs 96.7% at k=10). The gap is the price of the spatial hierarchy,
+  the depth window and the reinforcement pipeline, which reorder and filter the
+  candidate set. Closing it is open work, and the table is the honest statement
+  of where the system stands today.
 
-Two further reasons these figures cannot be read as a system result:
+A worked example, because it is checkable by hand: querying `coffee` returns
+"The user does not drink coffee." at rank 1 and "The user takes their coffee
+black." at rank 2. Before the fix the same query returned nothing at all.
 
-1. **The curve is flat across k.** `recall` returns at most 20 rows and `find`
-   often fewer, so the k axis separates almost nothing. A discriminating
-   evaluation needs a larger index and questions with many plausible
-   distractors.
-2. **The corpus is two orders of magnitude too small.** 60 facts is trivially
-   searchable by any method and cannot expose the properties of a hierarchical
-   index.
+**The resonance set is synthetic** — 60 facts written for this evaluation, not
+a sample of real usage. It measures whether the retrieval path can answer a
+known question, not how well it serves a real corpus.
 
-**The two known regressions.** Case 1 (pine nut allergy) is retrieved by both
-modes. Case 2 (preference for short check-ins) is not retrieved at any k: the
-question shares almost no lexical content with the stored fact, and with
-`mock` coordinates there is nothing for the spatial path to match. This is
-attributed to the disabled semantic ranking rather than to the architecture, and
-has not been retested with embeddings enabled.
-
-Raw results, including the full miss list, are written to
-[`docs/measurements/resonance_results.json`](docs/measurements/resonance_results.json).
+Raw results: [`docs/measurements/real_embedding_comparison.json`](docs/measurements/real_embedding_comparison.json).
 
 ### 10.2 Layer ablation — inconclusive; run under a disabled configuration
 
@@ -696,34 +696,26 @@ the distinction between inner-loop and end-to-end cost are also in
    derived. Purely lexical queries are the case handled best.
 3. **Semantic search is embedding-dependent.** It inherits the quality and cost
    of whatever model is used, including model download and inference latency.
-4. **The published evaluation is not yet a valid characterisation of this
-   system.** The relevance results in Sections 10.1 and 10.2 were produced with
-   `embedding.provider = "mock"` and `semantic_weight = 0.0`, the shipped
-   default, which the example configuration documents as disabling semantic
-   ranking in `recall`, and on a 60-fact index. Those numbers describe a
-   nearest-neighbour search over text hashes, not the architecture described
-   here, and no relative retrieval-quality claim is made from them.
-   A re-run with a real embedding provider, `semantic_weight > 0`, and the
-   695k-block corpus is required before the relevance evaluation can be cited.
-   The latency results in Section 10.3 are a separate measurement on the real
-   corpus and are not affected by this.
-5. **The reinforcement layers are heuristic.** Drift, decay and weight learning
+4. **A fixed-size binary index** — the system is slower than a plain B-tree and
+   less accurate than an exhaustive vector scan over the same embeddings
+   (Section 9.3: 80.0% vs 96.7% at k=10, 284 ms vs 0.011 ms). The hierarchy
+   costs accuracy and latency here, and buys inspectability, bounded memory and
+   a per-recall write path. That is the trade this paper documents, not an
+   argument that the hierarchy is faster.
+5. **The resonance set is synthetic** — 60 hand-written facts, not a sample of
+   real usage. The measured hit@10 of 80.0% says the retrieval path can answer a
+   known question; it does not say how the system performs on a real corpus.
+6. **The reinforcement layers are heuristic.** Drift, decay and weight learning
    use hand-chosen constants; there is no evidence here that they are
    near-optimal, and no hyperparameter sweep has been run.
-6. **Cold-start cost dominates for small corpora.** End-to-end latency is
-   dominated by process start and state loading, so in-process figures
-   understate what a user experiences.
-7. **Evaluation is single-user, synthetic, and small.** The resonance set is
-   hand-authored with 60 facts and one decoy layer, two orders of magnitude
-   smaller than the real corpus, and the k axis does not discriminate
-   (Section 10.1). Real multi-user workloads are untested.
-8. **Retrieval quality has not been measured under the intended configuration.**
-   The 60% hit@5 figure applies to the hash-coordinate configuration. A
-   paraphrase with no lexical overlap was not retrieved there; whether it is
-   retrieved with embeddings enabled is an open question this paper does not
-   answer.
+7. **Cold-start cost dominates for small corpora.** End-to-end latency is
+   dominated by process start, state loading and the query embedding, so
+   in-process figures understate what a user experiences.
+8. **Fresh entries never receive a vector.** The append log is not embedded, so
+   the most recent memories are invisible to the semantic path until the next
+   full rebuild. This is a known gap, not a measured result.
 9. **The layer ablation is inconclusive.** The null deltas in Section 10.2 were
-   measured under the same disabled configuration, and the patch mechanism
+   measured with the semantic path disconnected, and the patch mechanism
    neutralises one entry point per module rather than disabling the layer end to
    end. It establishes neither that the thirteen layers are load-bearing nor
    that they are not.
@@ -741,23 +733,22 @@ tracking, predictive prefetch, time-windowed profiles, learned attention weights
 cross-instance exchange, offline consolidation, shared state propagation, and
 multi-modal storage.
 
-**The evaluation reported here is not yet valid, and this paper therefore makes
-no retrieval-quality or comparative-performance claim.** Sections 10.1 and 10.2
-were run with `embedding.provider = "mock"` and `semantic_weight = 0.0` -- the
-shipped default, which the example configuration documents as disabling semantic
-ranking in `recall` -- on a 60-fact index. Those settings measure
-nearest-neighbour over text hashes, not the system described above. A baseline
-comparison and a layer ablation performed under them were discarded, and the
-conclusions they appeared to support have been removed rather than reported.
+**The evaluation is now valid, and it is mixed.** With the semantic path
+connected, the system reaches 80.0% hit@10 on the resonance set, against 43.3%
+when recall could not reach its own vectors, and it beats a general-purpose
+lexical index (SQLite FTS5, 63.3%) on that set. It does not beat exhaustive
+vector search over the same embeddings (FAISS, 96.7%), and it is roughly four
+orders of magnitude slower than both. The first fix in this line of work --
+connecting embeddings.bin to the recall path -- moved hit@5 by 31.7 points,
+which is larger than any architectural difference measured elsewhere in this
+paper.
 
-What this paper contributes is the system and the means to evaluate it: a
-fixed-size binary index with an allocation-free read path, thirteen feedback
-mechanisms wired into the recall pipeline, and a measurement harness committed
-to the repository that runs against the real 695k-block corpus. Running that
-harness with a real embedding provider, `semantic_weight > 0`, and a
-per-layer switch is the work that remains, and until it is done the relative
-merits of the architecture are open rather than settled. Pure Rust, zero JSON,
-413 tests, 54,053 lines.
+What the work establishes is therefore narrower than the design's ambitions
+and worth stating plainly: a fixed-size binary index whose retrieval path can be
+correctly connected to its own embedding index; a measurement harness that
+produced the numbers above on demand; and a corrected account of where the
+system stands, including the cases where a plain B-tree or a flat vector scan
+is the better tool. Pure Rust, zero JSON, 413 tests, 54,053 lines.
 
 Released under the MIT License at
 [github.com/silentnoisehun/microscope-memory](https://github.com/silentnoisehun/microscope-memory),

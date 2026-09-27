@@ -40,6 +40,9 @@ s = re.sub(r'^temp_dir\s*=.*$', 'temp_dir = "./eval_tmp"', s, flags=re.M)
 s = re.sub(r'^semantic_weight\s*=.*$', 'semantic_weight = 1.0', s, flags=re.M)
 s = re.sub(r'^(provider\s*=\s*)"[^"]*"', r'\1"candle"', s, flags=re.M)
 s = re.sub(r'^(model\s*=\s*)"[^"]*"', r'\1"sentence-transformers/all-MiniLM-L6-v2"', s, flags=re.M)
+# D5 doubles the embedding build time for no benefit when measuring whether the
+# recall fix works; the recall fix itself is independent of this depth.
+s = re.sub(r'^max_depth\s*=\s*5$', 'max_depth = 4', s, flags=re.M)
 # The build reads only the layers named in [memory_layers]. The resonance
 # layer must be listed or its 60 facts are silently skipped.
 s = re.sub(

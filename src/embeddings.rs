@@ -402,15 +402,34 @@ pub fn provider_from_config(
                 match CandleEmbeddingProvider::new(&cfg.model) {
                     Ok(p) => Box::new(p),
                     Err(e) => {
-                        eprintln!("  WARN: candle init failed: {:?} — using mock", e);
-                        Box::new(MockEmbeddingProvider::new(idx_dim))
+                        // A silent fallback to the hash-based mock provider
+                        // produces plausible-looking but semantically empty
+                        // results, and previously it printed a WARN and
+                        // continued. That is worse than failing: it makes a
+                        // misconfigured build look like a working one.
+                        eprintln!(
+                            "  ERROR: candle provider '{}' failed to load: {:?}\n  \
+                             Rebuild with --features \"native embeddings\", or set \
+                             [embedding] provider = \"python\" / \"mock\" explicitly.\n  \
+                             Refusing to fall back to mock: it would silently \
+                             return meaningless results.",
+                            cfg.model, e
+                        );
+                        std::process::exit(2);
                     }
                 }
             }
             #[cfg(not(feature = "embeddings"))]
             {
-                eprintln!("  WARN: candle provider requires the 'embeddings' feature — using mock");
-                Box::new(MockEmbeddingProvider::new(idx_dim))
+                eprintln!(
+                    "  ERROR: [embedding] provider = \"candle\" requires the \
+                     'embeddings' feature, but the binary was built without it.\n  \
+                     Rebuild with --features \"native embeddings\", or set \
+                     [embedding] provider = \"python\" / \"mock\" explicitly.\n  \
+                     Refusing to fall back to mock: it would silently return \
+                     meaningless results."
+                );
+                std::process::exit(2);
             }
         }
         "none" | "mock" => Box::new(MockEmbeddingProvider::new(idx_dim)),

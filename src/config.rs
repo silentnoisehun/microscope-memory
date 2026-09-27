@@ -157,7 +157,10 @@ fn default_dim() -> usize {
     384
 }
 fn default_max_depth() -> u8 {
-    4
+    // D5 holds 15..39 character statements (auto_depth), which is where short
+    // personal facts are stored. Embedding only to D4 left those facts without
+    // any vector, making them unreachable from the semantic path.
+    5
 }
 
 impl Default for Embedding {

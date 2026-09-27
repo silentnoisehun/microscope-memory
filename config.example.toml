@@ -94,8 +94,10 @@ model = "sentence-transformers/all-MiniLM-L6-v2"
 dim = 384
 
 # Max depth to embed (deeper = more vectors, more disk).
-# NOTE: D5-D8 (words/tokens) are usually too small for meaningful embeddings.
-max_depth = 4
+# D5 holds 15..39 character statements (see auto_depth), which is exactly where
+# short personal facts live, so it is included by default. Going deeper costs
+# build time and disk for diminishing semantic value.
+max_depth = 5
 
 [server]
 # HTTP server port

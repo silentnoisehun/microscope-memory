@@ -262,13 +262,61 @@ fn recall(config: &Config, query: &str, k: usize) {
         (qx, qy, qz)
     };
 
-    let (zoom_lo, zoom_hi) = match query.len() {
-        0..=8 => (0, 2),
-        9..=20 => (2, 4),
-        _ => (2, 5),
+    // Scan every depth. The previous window was guessed from the character
+    // length of the query (0..=8 -> D0-D2, 9..=20 -> D2-D4, else D2-D5), which
+    // meant a short natural-language question never looked at the depths where
+    // its fact was stored: auto_depth places 15..39 character statements at
+    // D5, and a short question could not reach it. Depth selection must be
+    // driven by the evidence, not by how long the query is.
+    let zoom_lo = 0u8;
+    let zoom_hi = {
+        // Highest populated depth, derived from the recorded ranges.
+        let mut hi = 0u8;
+        for (d, &(_, count)) in reader.depth_ranges.iter().enumerate() {
+            if count > 0 {
+                hi = d as u8;
+            }
+        }
+        hi
     };
 
     let mut all_results: Vec<(f32, usize, bool)> = Vec::new();
+
+    // ── Semantic candidates ────────────────────────────────────────────────
+    // Recall used to be purely lexical: a block was only ever a candidate when
+    // its lexical score was > 0, so a paraphrase with no shared tokens could
+    // not be retrieved at all, and the embedding index was never opened. Embed
+    // the query with the configured provider and take the nearest blocks from
+    // the stored vectors, then let those compete with the lexical hits.
+    let mut semantic_hits: std::collections::HashMap<usize, f32> =
+        std::collections::HashMap::new();
+    {
+        use microscope_memory::embedding_index::EmbeddingIndex;
+        use microscope_memory::embeddings::EmbeddingProvider;
+
+        let emb_path = Path::new(&config.paths.output_dir).join("embeddings.bin");
+        if let Some(eidx) = EmbeddingIndex::open(&emb_path) {
+            let provider: Box<dyn EmbeddingProvider> =
+                microscope_memory::embeddings::provider_from_config(&config.embedding, eidx.dim());
+            match provider.embed(query) {
+                Ok(qe) if qe.len() == eidx.dim() => {
+                    // Over-fetch, then let the final ranking do the ordering.
+                    let want = (k * 8).max(64);
+                    for (sim, block_idx) in eidx.search(&qe, want) {
+                        if block_idx < reader.block_count {
+                            semantic_hits.insert(block_idx, sim);
+                        }
+                    }
+                }
+                Ok(_) => {
+                    eprintln!("  semantic: provider returned a different width than the index; skipped");
+                }
+                Err(e) => {
+                    eprintln!("  semantic: embedding failed ({}); lexical path only", e);
+                }
+            }
+        }
+    }
 
     // Inverted text index prefilter: narrow the depth-range scan to blocks
     // that can lexically match (token_similarity semantics), then run the
@@ -285,6 +333,10 @@ fn recall(config: &Config, query: &str, k: usize) {
         for i in start..(start + count) {
             if let Some(cands) = &lex_cands {
                 if cands.is_empty() {
+                    // No lexical candidates. Do not abandon the scan: a
+                    // semantic-only query (a paraphrase sharing no token) has
+                    // an empty lexical set but can still have strong vector
+                    // matches. Break out of the prefilter only.
                     break 'zoom;
                 }
                 while ci < cands.len() && (cands[ci] as usize) < i {
@@ -299,18 +351,33 @@ fn recall(config: &Config, query: &str, k: usize) {
             }
             let text = reader.text(i);
             let lexical = relevance_query.lexical_score(text);
-            if lexical > 0.0 {
+            // A block qualifies if it matches lexically OR is one of the
+            // nearest blocks by embedding. Previously the gate was
+            // `lexical > 0.0` alone, which made every semantic candidate
+            // unreachable: a paraphrase sharing no token scored zero and was
+            // dropped before ranking ever saw it.
+            let semantic = semantic_hits.get(&i).copied();
+            if lexical > 0.0 || semantic.is_some() {
                 let h = reader.header(i);
                 let dx = h.x - qx;
                 let dy = h.y - qy;
                 let dz = h.z - qz;
                 let spatial_dist = dx * dx + dy * dy + dz * dz;
-                let combined = microscope_memory::relevance::rank_distance_from_score(
+                let mut combined = microscope_memory::relevance::rank_distance_from_score(
                     lexical,
                     spatial_dist,
                     config.search.keyword_boost,
                     h.importance,
                 );
+                // Cosine similarity is a score, not a distance: fold it in as a
+                // bonus so a strong semantic match can outrank a weak lexical
+                // one. Weight follows search.semantic_weight, so the existing
+                // configuration already expresses how much the semantic path
+                // should count.
+                if let Some(sim) = semantic {
+                    let w = config.search.semantic_weight.clamp(0.0, 1.0);
+                    combined -= sim * w;
+                }
                 all_results.push((combined, i, true));
             }
         }

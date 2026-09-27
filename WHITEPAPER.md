@@ -531,7 +531,7 @@ systems on the same machine and the same MiniLM vectors
 
 | System | p50 ms | R@1 | R@5 | R@10 |
 |--------|--------|-----|-----|------|
-| **Microscope, D5 index + embedding quality gate (current)** | 431–1176 | **70.0%** | **80.0%** | **81.7%** |
+| **Microscope, D5 index + embedding quality gate (current)** | 399–416 | **70.0%** | **80.0%** | **81.7%** |
 | Microscope, D5 index, semantic path (pre-gate) | 331.0 | 33.3% | 48.3% | 51.7% |
 | FAISS `IndexFlatIP` (60 fact vectors, query time only) | 0.010 | 90.0% | 96.7% | 96.7% |
 | SQLite FTS5 (BM25, 60 facts, query time only) | 0.034 | 53.3% | 60.0% | 63.3% |
@@ -619,7 +619,7 @@ back from the `embeddings.bin` header (`dim=384 max_depth=5`).
 
 | System | p50 ms | p95 ms | p99 ms | R@1 | R@5 | R@10 |
 |--------|--------|--------|--------|-----|-----|------|
-| **Microscope, D5 + quality gate, `want`=256 (current)** | 431–1176 | 792–2223 | 1498–2289 | **70.0%** | **80.0%** | **81.7%** |
+| **Microscope, D5 + quality gate, `want`=256 (current)** | 398.5 / 415.6 | 615.5 / 636.2 | 619.5 / 665.1 | **70.0%** | **80.0%** | **81.7%** |
 | Microscope, lexical only | 124.9 | — | — | 30.0% | 43.3% | 48.3% |
 | Microscope, D5, semantic path, `want`=64 (pre-gate) | 287.5 | 386.1 | 428.2 | 31.7% | 46.7% | 48.3% |
 | Microscope, D5, semantic path, `want`=256 (pre-gate) | 331.0 | 451.9 | 505.2 | 33.3% | 48.3% | 51.7% |
@@ -708,11 +708,30 @@ the measured floor; those two questions remain the gate's measured cost.
 Note on latency: repeated runs of the same build give p50 between 331 and
 376 ms, so the cost attributed to the 64 → 256 change is within run-to-run
 variance and is not quoted as a precise figure. The pre-gate recall numbers
-(33.3 / 48.3 / 51.7%) are stable across every run. Post-gate runs of the same
-harness give p50 between 431 and 1,176 ms with p95 up to 2.2 s; the gate only
-shrinks the vector set, so the search cannot explain an increase, and the
-cause was not investigated. The post-gate recall figures (70.0 / 80.0 / 81.7%)
-are identical across three runs.
+(33.3 / 48.3 / 51.7%) are stable across every run, and so are the post-gate
+figures (70.0 / 80.0 / 81.7%) in every run.
+
+**What the post-gate latency actually is.** A single `recall` writes 15
+mutable state files, among them a 22.4 MB `activations.bin`, and reads every
+block header once for the emotional field. Measured on an otherwise idle
+machine: process start plus config 25–40 ms (the gap between wall time and
+the in-process `results in` line); provider construction, query embedding and
+the vector search 127–137 ms in 8 of 8 runs, with no variance at all; the
+state I/O is the remainder. The published post-gate figures are two
+consecutive runs from a freshly built index: p50 398.5 and 415.6 ms. The
+431–1,176 ms range observed while embedding indexes were being rebuilt is that
+state I/O under load, not a code regression — the gate only shrinks the vector
+set, and setting `HF_HUB_OFFLINE=1` does not move it.
+
+**Measurement protocol: the state must be reset, not just the index.** Every
+`recall` writes learning state back, so consecutive measurement runs on one
+build do not measure the same system. Measured: after roughly 240 additional
+recalls, R@5 fell 80.0% → 76.7% and R@10 81.7% → 78.3% (the reinforced blocks
+of earlier questions re-rank later ones). Deleting the 20 mutable state files
+— `load_or_init` recreates them — restored 42/48/49 exactly, twice.
+`scripts/eval_real.sh` already guarantees this by removing `eval_output`
+before it builds; a measurement taken any other way must reset the state
+first.
 
 **Class (c) was not addressed.** Only 4 questions are affected, and any
 quota reserving top-N slots for vector hits would need to be measured against

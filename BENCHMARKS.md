@@ -127,7 +127,7 @@ config, and it is **worse** than the earlier D4 figure:
 | lexical only | 30.0% | 43.3% | 48.3% | 124.9 |
 | D5 index, semantic path, `want`=64 (pre-gate) | 31.7% | 46.7% | 48.3% | 287.5 |
 | D5 index, semantic path, `want`=256 (pre-gate) | 33.3% | 48.3% | 51.7% | 331.0 |
-| **D5 index + embedding quality gate, `want`=256 (current)** | **70.0%** | **80.0%** | **81.7%** | 355.0 / 361.0 |
+| **D5 index + embedding quality gate, `want`=256 (current)** | **70.0%** | **80.0%** | **81.7%** | 323.2 / 331.5 |
 | *earlier D4 index (9,999 vectors) — superseded, not reproducible* | *56.7%* | *75.0%* | *80.0%* | *283.9* |
 
 The D4 number is retained only to show that it does not reproduce. The 75.0%
@@ -177,12 +177,14 @@ Two measurement conditions, both measured rather than assumed. **Latency:**
 on an idle machine the semantic path (provider, query embedding, vector search)
 is 127–137 ms with no variance in 8 of 8 runs and process start is 25–40 ms, so
 what is left is learning-state I/O — and that was 22.4 MB of `activations.bin`
-read and rewritten per recall. The activation file is now a sparse base plus an
-append-only CRC-checked journal of the records a recall touched (372 B + ~24 KB
-after 60 recalls on this index), and the two clean-state runs give p50 355.0
-and 361.0 ms against 398.5 / 415.6 ms before, with recall unchanged at 42/48/49.
-The 1,176 ms figures taken while an index was being rebuilt came from the same
-state I/O, not from the gate. **State:** because every recall writes
+read and rewritten per recall, a full-corpus header scan for the emotional
+field (11.7 ms) and a 58.7 MB emotion lookup that `detect_eureka` loaded and
+never read (17.5 ms). With the activation file sparse plus a CRC-checked delta
+journal, the header scan restricted to the hot set, and the lookup loaded only
+when a query emotion exists, the clean-state runs give p50 323.2 and 331.5 ms
+against 405.9 ms before, with recall unchanged at 42/48/49. A run started
+right after a build measured 1,123 ms with the same recall: the published
+figures are unloaded runs. **State:** because every recall writes
 learning state back, consecutive runs on one build measure different systems —
 after ~240 extra recalls R@5/R@10 fell to 76.7%/78.3%, and deleting the
 mutable state files restored 42/48/49 twice. `scripts/eval_real.sh` already

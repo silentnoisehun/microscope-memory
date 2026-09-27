@@ -142,6 +142,76 @@ fn test_pending_memory_gets_a_vector_and_rebuild_clears_it() {
 }
 
 #[test]
+fn emotional_field_candidate_set_matches_a_full_scan() {
+    use microscope_memory::emotional::emotional_field;
+    use microscope_memory::hebbian::HebbianState;
+
+    let (_tmp, mut config) = setup_test_env();
+    // The shared fixture has only a long_term layer; add an emotional one so
+    // the field has something to find.
+    fs::write(
+        Path::new(&config.paths.layers_dir).join("emotional.txt"),
+        "The user felt uneasy about the unannounced change and said so.\n\
+         The user was delighted by the finished build and said so loudly.\n",
+    )
+    .unwrap();
+    config.memory_layers.layers = vec!["long_term".to_string(), "emotional".to_string()];
+    microscope_memory::build::build(&config, true, true).unwrap();
+
+    let reader = microscope_memory::reader::MicroscopeReader::open(&config).unwrap();
+    let mut hebb = HebbianState::load_or_init(Path::new(&config.paths.output_dir), reader.block_count);
+
+    // Activate the first 40 blocks plus every emotional-layer block, so both
+    // the candidate set and the layer filter matter.
+    let activated: Vec<(u32, f32)> = (0..reader.block_count as u32)
+        .filter(|i| {
+            let i = *i as usize;
+            i < 40 || reader.header(i).layer_id == 4 // 4 = emotional
+        })
+        .map(|i| (i, 1.0f32))
+        .collect();
+    assert!(!activated.is_empty());
+    hebb.record_activation(&activated, 99);
+
+    let got = emotional_field(&reader, &hebb).expect("activated blocks exist");
+
+    // Reference: the original full-scan formulation, kept here so the two
+    // cannot silently diverge. Same predicate, same ascending order.
+    let (mut sx, mut sy, mut sz, mut te, mut n) = (0f32, 0f32, 0f32, 0f32, 0usize);
+    let mut hottest: Option<(usize, u32)> = None;
+    for i in 0..reader.block_count {
+        let h = reader.header(i);
+        if h.layer_id != 4 {
+            continue;
+        }
+        let e = hebb.energy(i);
+        if e < 0.01 {
+            continue;
+        }
+        sx += h.x * e;
+        sy += h.y * e;
+        sz += h.z * e;
+        te += e;
+        n += 1;
+        if hottest.is_none() || e > f32::from_bits(hottest.unwrap().1) {
+            hottest = Some((i, e.to_bits()));
+        }
+    }
+    assert!(n > 0, "the fixture must contain an emotional-layer block");
+
+    assert_eq!(got.active_blocks, n);
+    assert_eq!(got.total_energy.to_bits(), te.to_bits());
+    assert_eq!(got.centroid.0.to_bits(), (sx / te).to_bits());
+    assert_eq!(got.centroid.1.to_bits(), (sy / te).to_bits());
+    assert_eq!(got.centroid.2.to_bits(), (sz / te).to_bits());
+    assert_eq!(
+        got.hottest_block.map(|(i, e)| (i, e.to_bits())),
+        hottest,
+        "hottest_block must match the full scan"
+    );
+}
+
+#[test]
 fn test_auto_rebuild_after_configured_threshold() {
     let (_tmp, mut config) = setup_test_env();
     config.index.auto_rebuild = true;

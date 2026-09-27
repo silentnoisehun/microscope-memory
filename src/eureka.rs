@@ -204,7 +204,16 @@ pub fn detect_eureka(
     results: &[(f32, usize, bool)],
 ) -> Vec<EurekaEvent> {
     let output_dir = Path::new(&config.paths.output_dir);
-    let emotion_lookup = load_emotion_lookup(output_dir);
+    // The emotion lookup is 58.7 MB on the 699k-block eval index and is only
+    // ever read in the `(Some(qe), Some(lookup))` arm below. `recall` calls
+    // this with `emotion: None`, so loading it unconditionally cost 17.5 ms per
+    // recall to build a value nothing reads. Load it when there is a query
+    // emotion to compare against, and not otherwise.
+    let emotion_lookup = if emotion.is_some() {
+        load_emotion_lookup(output_dir)
+    } else {
+        None
+    };
     let (qx, qy, qz) =
         crate::content_coords_blended(query, "long_term", config.search.semantic_weight);
     let mut eureka_events = Vec::new();

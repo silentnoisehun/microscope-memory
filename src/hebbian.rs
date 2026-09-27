@@ -244,6 +244,29 @@ impl HebbianState {
         }
     }
 
+    /// Block indices whose decayed energy is at or above `threshold`, ascending.
+    ///
+    /// The energy lives in memory, so the candidate set can be built before any
+    /// block header is touched. A consumer that would otherwise scan all
+    /// 699,110 headers to find the handful of hot blocks reads only those
+    /// headers. The result is exactly `{i : energy(i) >= threshold}`, in
+    /// ascending order, so a full-scan formulation and this one produce
+    /// bit-identical sums.
+    pub fn hot_indices(&self, threshold: f32) -> Vec<usize> {
+        let mut out = Vec::new();
+        for (i, rec) in self.activations.iter().enumerate() {
+            // energy() is 0.0 in exactly these two cases; skip the exp() for
+            // them, which is nearly every record on a fresh index.
+            if rec.energy <= 0.0 || rec.last_activated_ms == 0 {
+                continue;
+            }
+            if self.energy(i) >= threshold {
+                out.push(i);
+            }
+        }
+        out
+    }
+
     /// Save all Hebbian state to binary files. Writes the activation base in
     /// full, which is the correct thing after a rebuild or a remap.
     pub fn save(&self, output_dir: &Path) -> Result<(), String> {

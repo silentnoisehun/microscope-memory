@@ -35,16 +35,17 @@ pub fn apply_emotional_bias(
     let mut sum_z = 0.0f32;
     let mut total_energy = 0.0f32;
 
-    for i in 0..reader.block_count {
+    // Candidates first, headers second. The previous form read all 699,110
+    // block headers to find the handful of hot emotional blocks (measured:
+    // 11.7 ms per recall, and this function runs on every recall when
+    // emotional_bias_weight > 0). hot_indices() yields the same set in the
+    // same order, so the sums below are unchanged bit for bit.
+    for i in hebb.hot_indices(0.01) {
         let h = reader.header(i);
         if h.layer_id != EMOTIONAL_LAYER_ID {
             continue;
         }
-
         let energy = hebb.energy(i);
-        if energy < 0.01 {
-            continue;
-        }
 
         // Copy packed struct fields
         let hx = h.x;
@@ -84,16 +85,16 @@ pub fn emotional_field(reader: &MicroscopeReader, hebb: &HebbianState) -> Option
     let mut active_count = 0usize;
     let mut hottest_idx: Option<(usize, f32)> = None;
 
-    for i in 0..reader.block_count {
+    // Same candidate-first construction as apply_emotional_bias: build the hot
+    // set from the in-memory energy, then read only those headers. The
+    // integration test asserts the result is bit-identical to the full scan,
+    // including the accumulation order.
+    for i in hebb.hot_indices(0.01) {
         let h = reader.header(i);
         if h.layer_id != EMOTIONAL_LAYER_ID {
             continue;
         }
-
         let energy = hebb.energy(i);
-        if energy < 0.01 {
-            continue;
-        }
 
         let hx = h.x;
         let hy = h.y;

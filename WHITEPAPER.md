@@ -533,7 +533,7 @@ systems on the same machine and the same MiniLM vectors
 
 | System | p50 ms | R@1 | R@5 | R@10 |
 |--------|--------|-----|-----|------|
-| **Microscope, D5 index + embedding quality gate (current)** | 355–361 | **70.0%** | **80.0%** | **81.7%** |
+| **Microscope, D5 index + embedding quality gate (current)** | 323–332 | **70.0%** | **80.0%** | **81.7%** |
 | Microscope, D5 index, semantic path (pre-gate) | 331.0 | 33.3% | 48.3% | 51.7% |
 | FAISS `IndexFlatIP` (60 fact vectors, query time only) | 0.010 | 90.0% | 96.7% | 96.7% |
 | SQLite FTS5 (BM25, 60 facts, query time only) | 0.034 | 53.3% | 60.0% | 63.3% |
@@ -621,7 +621,7 @@ back from the `embeddings.bin` header (`dim=384 max_depth=5`).
 
 | System | p50 ms | p95 ms | p99 ms | R@1 | R@5 | R@10 |
 |--------|--------|--------|--------|-----|-----|------|
-| **Microscope, D5 + quality gate, `want`=256 (current)** | 355.0 / 361.0 | 533.6 / 550.0 | 542.0 / 560.3 | **70.0%** | **80.0%** | **81.7%** |
+| **Microscope, D5 + quality gate, `want`=256 (current)** | 323.2 / 331.5 | 510.3 / 503.1 | 549.0 / 524.2 | **70.0%** | **80.0%** | **81.7%** |
 | Microscope, lexical only | 124.9 | — | — | 30.0% | 43.3% | 48.3% |
 | Microscope, D5, semantic path, `want`=64 (pre-gate) | 287.5 | 386.1 | 428.2 | 31.7% | 46.7% | 48.3% |
 | Microscope, D5, semantic path, `want`=256 (pre-gate) | 331.0 | 451.9 | 505.2 | 33.3% | 48.3% | 51.7% |
@@ -736,9 +736,40 @@ the journal ~24 KB after 60 recalls. Nothing is deferred to process exit — a
 CLI invocation is a whole process, so a buffered write would lose the learning.
 
 Measured, not estimated: clean-state p50 405.9 ms before, 355.0 and 361.0 ms
-after, with recall unchanged at 42/48/49 on both runs. The 431–1,176 ms range
-seen while an index was being rebuilt was that state I/O under load; removing
-the per-recall 22 MB write removes the mechanism, not just the symptom.
+after the sparse activation file, 323.2 and 331.5 ms after the two changes
+below, with recall unchanged at 42/48/49 on every run.
+
+**The two findings that followed the first fix**, both from the same
+instrumentation and both a case of doing work whose result nobody reads:
+
+- The emotional field read all 699,110 block headers on every recall to find
+  the handful of hot emotional blocks (11.7 ms). The hot set is computable from
+  the in-memory energy alone, so `HebbianState::hot_indices` builds it before
+  any header is touched and only those headers are read. The result is the
+  same set in the same order, so the centroid, the total energy and
+  `hottest_block` are bit-identical — the integration test asserts that
+  against the original full-scan formulation, which stays in the test as the
+  reference. Phase: 11.7 → 1.5 ms. The same construction is applied to
+  `apply_emotional_bias`, which runs on every recall wherever
+  `emotional_bias_weight > 0`.
+- `detect_eureka` loaded the 58.7 MB emotion lookup on every recall, and
+  `recall` calls it with `emotion: None` — the lookup is read only inside the
+  `(Some(qe), Some(lookup))` arm, so it was built and never touched. It is now
+  loaded when there is a query emotion to compare against and not otherwise.
+  Phase: 17.5 ms → ~0.
+
+**What is left, measured.** Provider construction, query embedding and the
+vector search are 135 ms of the remaining ~237 ms in-process and are not state
+I/O: an MCP server pays the model once instead of per request, which is the
+fix for that, not a code change here. Materialising the activation vector
+costs 12.2 ms per process — not the file (372 bytes) but zeroing 22.4 MB of
+`ActivationRecord` in memory, which needs a sparse in-memory representation
+rather than an I/O change. The remaining small state files cost 1–14 ms each
+to load, which is why the seven of them are not dirty-tracked individually.
+One measurement is reported as an outlier rather than smoothed away: a run
+started immediately after a release build measured p50 1,123 ms with recall
+unchanged, so the published figures are unloaded runs and the build-then-measure
+sequence is exactly what the protocol below warns about.
 
 Two smaller targets were measured and deliberately left alone. The other seven
 post-recall writes (mirror, resonance, archetypes, temporal, thought graph,

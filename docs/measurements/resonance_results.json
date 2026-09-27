@@ -1,12 +1,62 @@
 {
   "cases": 60,
   "hit_at_k": {
-    "5": 36
+    "1": 19,
+    "5": 28,
+    "10": 29
   },
   "hit_rate": {
-    "5": 60.0
+    "1": 31.7,
+    "5": 46.7,
+    "10": 48.3
   },
   "missed": [
+    {
+      "id": 3,
+      "fact": "The user lives in Szeged.",
+      "question": "where does the user live",
+      "match": [
+        "szeged"
+      ],
+      "category": "location"
+    },
+    {
+      "id": 4,
+      "fact": "The user's dog is called Morzska.",
+      "question": "what is the dog's name",
+      "match": [
+        "morzska"
+      ],
+      "category": "pet"
+    },
+    {
+      "id": 5,
+      "fact": "The user works as a software engineer.",
+      "question": "what does the user do for work",
+      "match": [
+        "software engineer",
+        "engineer"
+      ],
+      "category": "work"
+    },
+    {
+      "id": 8,
+      "fact": "The user has two children.",
+      "question": "how many children",
+      "match": [
+        "two children"
+      ],
+      "category": "family"
+    },
+    {
+      "id": 9,
+      "fact": "The user's partner is called Anna.",
+      "question": "partner's name",
+      "match": [
+        "anna"
+      ],
+      "category": "family"
+    },
     {
       "id": 10,
       "fact": "The user was born in 1985.",
@@ -17,13 +67,14 @@
       "category": "personal"
     },
     {
-      "id": 12,
-      "fact": "The user is vegetarian.",
-      "question": "diet",
+      "id": 11,
+      "fact": "The user speaks Hungarian, English and German.",
+      "question": "languages spoken",
       "match": [
-        "vegetarian"
+        "hungarian",
+        "german"
       ],
-      "category": "health"
+      "category": "personal"
     },
     {
       "id": 13,
@@ -45,23 +96,50 @@
       "category": "habit"
     },
     {
-      "id": 16,
-      "fact": "The user does not drink coffee.",
-      "question": "coffee",
+      "id": 15,
+      "fact": "The user's city is Budapest.",
+      "question": "which city",
       "match": [
-        "not drink coffee",
-        "does not drink coffee"
+        "budapest"
+      ],
+      "category": "location"
+    },
+    {
+      "id": 17,
+      "fact": "The user prefers dark mode in every editor.",
+      "question": "editor theme",
+      "match": [
+        "dark mode"
       ],
       "category": "preference"
     },
     {
-      "id": 20,
-      "fact": "The user uses a standing desk.",
-      "question": "desk",
+      "id": 18,
+      "fact": "The user has a cat named Bella.",
+      "question": "cat's name",
       "match": [
-        "standing desk"
+        "bella"
       ],
-      "category": "workspace"
+      "category": "pet"
+    },
+    {
+      "id": 19,
+      "fact": "The user's project is called Hope Ecosystem.",
+      "question": "project name",
+      "match": [
+        "hope ecosystem",
+        "hope"
+      ],
+      "category": "project"
+    },
+    {
+      "id": 22,
+      "fact": "The user's mother is called Klara.",
+      "question": "mother's name",
+      "match": [
+        "klara"
+      ],
+      "category": "family"
     },
     {
       "id": 23,
@@ -92,14 +170,22 @@
       "category": "education"
     },
     {
-      "id": 27,
-      "fact": "The user does not smoke.",
-      "question": "smoking",
+      "id": 29,
+      "fact": "The user is learning Spanish.",
+      "question": "language being learned",
       "match": [
-        "not smoke",
-        "does not smoke"
+        "spanish"
       ],
-      "category": "health"
+      "category": "education"
+    },
+    {
+      "id": 30,
+      "fact": "The user's team is called Platform.",
+      "question": "team name",
+      "match": [
+        "platform"
+      ],
+      "category": "work"
     },
     {
       "id": 32,
@@ -112,40 +198,22 @@
       "category": "health"
     },
     {
-      "id": 36,
-      "fact": "The user keeps a journal.",
-      "question": "journal",
+      "id": 33,
+      "fact": "The user supports the Hungarian national team.",
+      "question": "sports team",
       "match": [
-        "journal"
-      ],
-      "category": "habit"
-    },
-    {
-      "id": 38,
-      "fact": "The user plays chess online.",
-      "question": "chess",
-      "match": [
-        "chess"
+        "hungarian national"
       ],
       "category": "hobby"
     },
     {
-      "id": 41,
-      "fact": "The user has a garden.",
-      "question": "garden",
+      "id": 40,
+      "fact": "The user prefers meetings in the morning.",
+      "question": "meeting time",
       "match": [
-        "garden"
+        "morning"
       ],
-      "category": "property"
-    },
-    {
-      "id": 42,
-      "fact": "The user speaks basic Japanese.",
-      "question": "japanese",
-      "match": [
-        "japanese"
-      ],
-      "category": "personal"
+      "category": "preference"
     },
     {
       "id": 43,
@@ -157,6 +225,15 @@
       "category": "personal"
     },
     {
+      "id": 44,
+      "fact": "The user's car is a Volvo.",
+      "question": "car model",
+      "match": [
+        "volvo"
+      ],
+      "category": "property"
+    },
+    {
       "id": 46,
       "fact": "The user has studied architecture.",
       "question": "past study",
@@ -166,13 +243,31 @@
       "category": "education"
     },
     {
-      "id": 50,
-      "fact": "The user collects vinyl records.",
-      "question": "vinyl",
+      "id": 47,
+      "fact": "The user runs the project called Microscope.",
+      "question": "which project",
       "match": [
-        "vinyl"
+        "microscope"
       ],
-      "category": "hobby"
+      "category": "project"
+    },
+    {
+      "id": 48,
+      "fact": "The user's favourite season is autumn.",
+      "question": "favourite season",
+      "match": [
+        "autumn"
+      ],
+      "category": "preference"
+    },
+    {
+      "id": 51,
+      "fact": "The user has a brother called Gabor.",
+      "question": "brother's name",
+      "match": [
+        "gabor"
+      ],
+      "category": "family"
     },
     {
       "id": 52,
@@ -185,51 +280,23 @@
       "category": "preference"
     },
     {
-      "id": 53,
-      "fact": "The user has a passport expiring next year.",
-      "question": "passport",
+      "id": 57,
+      "fact": "The user's email address ends with .hu.",
+      "question": "email domain",
       "match": [
-        "passport"
+        ".hu"
       ],
       "category": "personal"
     },
     {
-      "id": 55,
-      "fact": "The user owns a bicycle.",
-      "question": "bicycle",
+      "id": 59,
+      "fact": "The user prefers asynchronous communication.",
+      "question": "communication style",
       "match": [
-        "bicycle"
+        "asynchronous",
+        "async"
       ],
-      "category": "property"
-    },
-    {
-      "id": 56,
-      "fact": "The user is learning to play the guitar.",
-      "question": "guitar",
-      "match": [
-        "guitar"
-      ],
-      "category": "hobby"
-    },
-    {
-      "id": 58,
-      "fact": "The user does not have a driver's licence.",
-      "question": "driving licence",
-      "match": [
-        "not have a driver",
-        "does not have a driver"
-      ],
-      "category": "personal"
-    },
-    {
-      "id": 60,
-      "fact": "The user has a subscription to a science magazine.",
-      "question": "magazine",
-      "match": [
-        "magazine",
-        "subscription"
-      ],
-      "category": "hobby"
+      "category": "work"
     }
   ]
 }

@@ -578,6 +578,7 @@ fn recall(config: &Config, query: &str, k: usize) {
         }
         microscope_memory::narrative::metacognitive_store(
             output_dir,
+            Path::new(&config.paths.layers_dir),
             &narrative.narrative,
             &narrative.emotion,
         );

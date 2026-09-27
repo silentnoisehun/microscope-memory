@@ -15,6 +15,39 @@ MM_ROOT="${MM_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 cd "$MM_ROOT" || { echo "MM_ROOT does not exist: $MM_ROOT" >&2; exit 1; }
 echo "MM_ROOT=$MM_ROOT"
 
+# Python interpreter. Bare `python` is not on PATH under every shell (Git Bash
+# on Windows exposes `python3` and a *different* MSYS interpreter that cannot
+# see the site-packages holding numpy/faiss/sentence-transformers), and the
+# failure mode is a confusing traceback rather than a clear message. Resolve an
+# interpreter that can actually import the dependencies, and let the caller
+# override with PY=/path/to/python.
+if [ -z "${PY:-}" ]; then
+    for cand in python3 python; do
+        if command -v "$cand" >/dev/null 2>&1 && \
+           "$cand" -c "import numpy" >/dev/null 2>&1; then
+            PY="$cand"
+            break
+        fi
+    done
+fi
+if [ -z "${PY:-}" ]; then
+    # Fall back to a Windows-style interpreter if one is on PATH.
+    for cand in /c/Python*/python.exe python.exe; do
+        if command -v "$cand" >/dev/null 2>&1; then PY="$cand"; break; fi
+    done
+fi
+if [ -z "${PY:-}" ]; then
+    echo "ABORT: no usable Python found. Set PY=/path/to/python." >&2
+    exit 1
+fi
+echo "PY=$PY"
+if ! "$PY" -c "import numpy, faiss, sentence_transformers" >/dev/null 2>&1; then
+    echo "WARNING: $PY cannot import numpy/faiss/sentence-transformers." >&2
+    echo "         The Microscope row will still be measured; the FAISS and" >&2
+    echo "         SQLite rows will report an error." >&2
+    echo "         pip install faiss-cpu numpy sentence-transformers" >&2
+fi
+
 rm -rf eval_layers eval_output eval_tmp
 mkdir -p eval_layers
 
@@ -24,7 +57,7 @@ rm -f eval_layers/session.txt
 cp layers/session.txt eval_layers/session.txt
 
 # The 60 known facts, as one extra layer.
-python - <<'PY'
+  "$PY" - <<'PY'
 import sys
 sys.path.insert(0, "scripts")
 from resonance_set import CASES
@@ -35,7 +68,7 @@ print(f"wrote {len(CASES)} resonance facts")
 PY
 
 cp config.example.toml eval_config.toml
-python - <<'PY'
+  "$PY" - <<'PY'
 import re
 p = "eval_config.toml"
 s = open(p, encoding="utf-8", errors="replace").read()
@@ -63,7 +96,7 @@ PY
 
 # The regex above can leave a trailing comma before the closing bracket, which
 # TOML rejects and which made the binary fall back to defaults. Drop it.
-python - <<'PY'
+  "$PY" - <<'PY'
 import re
 p = "eval_config.toml"
 s = open(p, encoding="utf-8").read()
@@ -85,7 +118,7 @@ export HF_HOME="$HOME/.cache/huggingface"
 # failing*, so a measurement can silently run against a different configuration
 # than the one on disk. Parsing the file and asserting the fields is the only
 # reliable check; grepping the first lines of `stats` output is not.
-python - <<'PY'
+  "$PY" - <<'PY'
 import sys
 try:
     import tomllib
@@ -143,16 +176,95 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
+echo "--- building release binary with the embeddings feature ---"
+# The candle provider lives behind the `embeddings` cargo feature, which is NOT
+# in the default set (`default = ["native"]`). A build without it compiles fine
+# and then fails at run time with "requires the 'embeddings' feature ... Refusing
+# to fall back to mock", so the index never gets built and the harness measures
+# an empty corpus. Build with the feature explicitly.
+CARGO_LOG="$(mktemp)"
+cargo build --release --features native,embeddings >"$CARGO_LOG" 2>&1
+CARGO_RC=$?
+if [ $CARGO_RC -ne 0 ]; then
+    echo "ABORT: cargo build --features native,embeddings failed (exit $CARGO_RC)" >&2
+    tail -30 "$CARGO_LOG" >&2
+    exit 1
+fi
+if [ ! -x ./target/release/microscope-mem.exe ]; then
+    echo "ABORT: release binary missing after a successful cargo build" >&2
+    exit 1
+fi
+
 echo "--- building eval index (real embeddings) ---"
 # Do not pipe the build through grep | head: that discards the exit status, so a
 # failed or partial embedding build still produced a "successful" measurement.
 BUILD_LOG="$(mktemp)"
 ./target/release/microscope-mem.exe build >"$BUILD_LOG" 2>&1
 BUILD_RC=$?
-grep -E 'Embedding up to|stored vectors|OK embeddings|ERR|WARN|Blocks:' "$BUILD_LOG" | head -8
+grep -E 'Embedding up to|stored vectors|OK embeddings|ERR|WARN|ERROR|Blocks:' "$BUILD_LOG" | head -8
 if [ $BUILD_RC -ne 0 ]; then
     echo "ABORT: build failed (exit $BUILD_RC). Full log: $BUILD_LOG" >&2
     tail -30 "$BUILD_LOG" >&2
     exit 1
 fi
+# The binary refuses to substitute the mock provider for candle, and exits
+# non-zero, but assert the embedding file too: a build that "succeeds" without
+# embeddings must never be measured.
+if [ ! -s eval_output/embeddings.bin ]; then
+    echo "ABORT: build reported success but eval_output/embeddings.bin is missing." >&2
+    echo "       The provider probably fell back to mock." >&2
+    tail -20 "$BUILD_LOG" >&2
+    exit 1
+fi
+
+# ── Verify the index actually survived the build ──────────────────────────
+# A previous run built the index successfully and then measured against
+# nothing: the output directory had been removed between the build and the
+# query loop, so all 60 recalls ran on a missing index. The harness still
+# printed a result table -- R@5 6.7%, p50 10.4 s -- which looked like a
+# regression but was an artifact of measuring an absent index. Assert the
+# files are present, and again after the measurement, so a vanished index
+# fails loudly instead of producing a plausible-looking number.
+require_index() {
+    local missing=0 f
+    for f in meta.bin embeddings.bin; do
+        if [ ! -s "eval_output/$f" ]; then
+            echo "ABORT: eval_output/$f is missing or empty" >&2
+            missing=1
+        fi
+    done
+    [ $missing -eq 0 ] || exit 1
+    echo "index present: $(ls -1 eval_output | tr '\n' ' ')"
+}
+echo "--- verifying eval index ---"
+require_index
+
+# ── Measure ───────────────────────────────────────────────────────────────
+# The query loop lives in compare_baselines.py: it drives the same `recall` CLI
+# a user would run, times it end to end, and writes
+# docs/measurements/real_embedding_comparison.json. It defaults to
+# eval_config.toml, i.e. exactly the config the gate above verified.
+#
+# Note on the baselines: the FAISS and SQLite rows are diagnostics, not a
+# like-for-like comparison. They index only the 60 fact vectors and report
+# query-time search only, while the Microscope row scans the full corpus and
+# includes process start, provider construction and query embedding.
+echo "--- measuring recall + latency vs baselines ---"
+"$PY" scripts/compare_baselines.py --config eval_config.toml --k 1 5 10
+MEASURE_RC=$?
+if [ $MEASURE_RC -ne 0 ]; then
+    echo "ABORT: measurement failed (exit $MEASURE_RC)" >&2
+    exit 1
+fi
+
+# The index must still be there after the run, and recall must return
+# something. A table of near-zero recall with a huge p50 is the signature of a
+# broken measurement, not a broken retriever; fail rather than publish it.
+require_index
+if ! MICROSCOPE_CONFIG="$PWD/eval_config.toml" \
+     ./target/release/microscope-mem.exe recall coffee 5 2>/dev/null | grep -q .; then
+    echo "ABORT: recall returned nothing on a sanity query; the measurement is not trustworthy" >&2
+    exit 1
+fi
+echo "--- sanity check passed ---"
 

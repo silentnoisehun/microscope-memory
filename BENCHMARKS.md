@@ -118,19 +118,26 @@ would be needed to state this precisely.
 > nearest-neighbour over text hashes. Conclusions drawn from that configuration
 > describe the configuration, not the architecture, and have been withdrawn.
 
-A later run with a real provider (`candle` + MiniLM) is recorded in
-`WHITEPAPER.md` §10.1, and it is **not** a valid baseline comparison either:
+A run with a real provider (`candle` + MiniLM) on the full D5 index is
+recorded in `WHITEPAPER.md` §10.1. It is reproducible from the committed
+config, and it is **worse** than the earlier D4 figure:
 
-- the index was embedded to D4 while the committed default is D5;
-- FAISS and FTS5 were run over only the 60 fact vectors, while Microscope
-  scanned the full 699,154-block index;
-- the Microscope latency is end-to-end (process start, provider construction,
-  query embedding, index open) and the FAISS/FTS5 latency is query-time only.
+| | R@1 | R@5 | R@10 | p50 ms |
+|---|---|---|---|---|
+| lexical only | 30.0% | 43.3% | 48.3% | 124.9 |
+| D5 index, semantic path (46,565 vectors) | 31.7% | 46.7% | 48.3% | 287.5 |
+| *earlier D4 index (9,999 vectors) — superseded, not reproducible* | *56.7%* | *75.0%* | *80.0%* | *283.9* |
 
-Those two rows therefore differ in corpus, candidate set and latency
-definition, and the difference between them is not a speedup or slowdown figure.
-The 96.7% FAISS R@5 is an upper bound on what the same embeddings achieve with
-no filtering, useful as a diagnostic ceiling, not a competitive result.
+The D4 number is retained only to show that it does not reproduce. The 75.0%
+was measured on a depth-truncated index with a pre-fix candidate gate; on the
+committed D5 configuration the same harness returns 46.7%.
+
+The FAISS and FTS5 rows are diagnostics, not a like-for-like comparison. They
+index only the 60 fact vectors and report query-time search only, while
+Microscope scans the full 699,110-block index and its 288 ms is end-to-end
+(process start, provider construction, query embedding, index open). The
+96.7% FAISS R@5 is an upper bound on what the same embeddings achieve with no
+filtering — a diagnostic ceiling, not a competitive result.
 
 The harness is committed so a reader can run the comparison correctly:
 
@@ -148,6 +155,13 @@ silently, and it no longer rewrites the embedding depth. `compare_scale.py`
 reports p50/p95/p99 together with hit@k. A valid comparison additionally
 requires the same corpus and the same searchable vector set on both sides, with
 end-to-end time and query-only time reported separately.
+
+The script also builds with `--features native,embeddings`. Without that
+feature the `candle` provider cannot run, the index is produced without
+vectors, and `build` still exits 0 — so the harness would print a result table
+measured on a vectorless index. It now asserts `embeddings.bin` exists after
+the build, re-checks the index after measuring, and fails if a sanity recall
+returns nothing.
 
 Until such a run exists, no claim is made about relative retrieval quality or
 speed against any other system.

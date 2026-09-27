@@ -254,6 +254,44 @@ cargo build --release
 cargo build --target wasm32-unknown-unknown --release --features wasm --no-default-features
 ```
 
+### Embeddings (semantic recall)
+
+The `candle` and `onnx` embedding providers are behind the **`embeddings` cargo
+feature, which is not in the default feature set** (`default = ["native"]`).
+
+```bash
+cargo build --release --features native,embeddings
+```
+
+A build without this feature compiles and links cleanly, and then fails at run
+time:
+
+```
+ERROR: [embedding] provider = "candle" requires the 'embeddings' feature,
+but the binary was built without it.
+Refusing to fall back to mock: it would silently return meaningless results.
+```
+
+Note that `build` still exits 0 in this path, so a script that checks only the
+exit code will happily continue with an index that has no vectors. Verify
+`data/embeddings.bin` exists before measuring.
+
+`provider = "mock"` (the default in `config.example.toml`) produces hash-derived
+vectors. It is fast and dependency-free, but it is **not** a semantic
+representation and any retrieval quality measured with it describes the mock,
+not the architecture. Use `candle` (BERT) or `onnx` for real measurements.
+
+To reproduce the published retrieval numbers:
+
+```bash
+bash scripts/eval_real.sh    # asserts provider/model/weight/max_depth, then measures
+```
+
+The script refuses to run if the generated config is not the one it expects, if
+the build fails, if the index is missing after the build, or if a sanity
+recall returns nothing. Set `PY=/path/to/python` if the interpreter that can
+import numpy/faiss/sentence-transformers is not the default one.
+
 ## License
 
 MIT

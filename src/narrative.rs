@@ -131,24 +131,27 @@ impl NarrativeState {
 /// Minden generált narratív mondatot elmentünk store_memory-val,
 /// [MetaCognitive] prefix-szel, hogy a rendszer később emlékezzen rá,
 /// miről gondolkodott.
-pub fn metacognitive_store(output_dir: &Path, narrative: &str, emotion: &[f32; 21]) {
+pub fn metacognitive_store(
+    output_dir: &Path,
+    layers_dir: &Path,
+    narrative: &str,
+    emotion: &[f32; 21],
+) {
     // Nem tároljuk a csendes vagy üres narratívákat
     if narrative.is_empty() || narrative == "I am silent." {
         return;
     }
-    // A store_memory-hoz config kell, de itt nincs. Használjuk az emotion_log-ot
-    // és a persist_to_layer_file-t, hogy a rebuild túlélje.
+    // A rétegfájlt a konfigurált layers_dir alá kell írni. A korábbi
+    // implementáció az output_dir-ból visszaszámolta a repó gyökerét
+    // (parent().parent()/"layers"), ami NEM feltétlenül egyezik a
+    // config.paths.layers_dir értékével: egy eval vagy teszt futás
+    // eval_layers-t használ, de a narratíva ettől függetlenül a valódi
+    // layers/meta_cognitive.txt-t írta, szennyezve a commitolt korpuszt.
     let layer = "meta_cognitive";
-    let layer_path = output_dir
-        .parent()
-        .and_then(|p| p.parent())
-        .map(|root| root.join("layers").join(format!("{}.txt", layer)))
-        .unwrap_or_else(|| {
-            output_dir
-                .join("..")
-                .join("layers")
-                .join(format!("{}.txt", layer))
-        });
+    let layer_path = layers_dir.join(format!("{}.txt", layer));
+    if let Some(parent) = layer_path.parent() {
+        let _ = fs::create_dir_all(parent);
+    }
 
     // Write directly to layer file (best-effort)
     if let Ok(mut file) = fs::OpenOptions::new()

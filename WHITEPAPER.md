@@ -582,63 +582,70 @@ prunes unreferenced ones.
 
 ### 10.1 Retrieval quality, with the semantic path connected
 
-**This section is under correction and is not yet a reproducible result.**
-The measurement below is real, but three details of it prevent it from
-supporting the claims its wording previously made. They are recorded here
-rather than quietly corrected.
+> **Reproducing these numbers requires a feature-gated build.** The `candle` and
+> `onnx` providers are behind the `embeddings` cargo feature, which is not in the
+> default feature set (`default = ["native"]`):
+>
+> ```bash
+> cargo build --release --features native,embeddings
+> ```
+>
+> A build without it compiles and links cleanly, fails at run time with
+> *"requires the 'embeddings' feature"*, and — because `build` still exits 0 on
+> that path — leaves a script that checks only the exit code measuring an index
+> with no vectors at all. The consequence is not a clean failure: it is a
+> plausible-looking result table with near-zero recall, which is easily mistaken
+> for a regression in the retriever. This was observed in practice during this
+> work. `scripts/eval_real.sh` now builds with the feature, asserts that
+> `embeddings.bin` exists afterwards, and re-checks the index after measuring.
 
-**Configuration of the recorded run:** `provider = "candle"`,
-`all-MiniLM-L6-v2`, dim 384, `semantic_weight = 1.0`, index built from
-`layers/` plus the 60 resonance facts (699,154 blocks, 9,999 stored vectors),
-60 questions.
+**The measurement below is reproducible from the committed configuration.**
 
-**Caveat 1 — the index was embedded to D4, not the committed D5.** The harness
-rewrote `[embedding].max_depth` from 5 to 4 to shorten the build. The 75.0%
-therefore describes a depth-truncated index, not the default configuration. The
-harness no longer performs that rewrite, and it now parses the generated config
-and aborts unless `provider`, `model`, `semantic_weight` and `max_depth` are the
-expected values. A D5 run has not been completed, so no D5 number is claimed.
+**Configuration:** `provider = "candle"`, `all-MiniLM-L6-v2`, dim 384,
+`semantic_weight = 1.0`, `embedding.max_depth = 5`, index built from `layers/`
+plus the 60 resonance facts — **699,110 blocks, 46,565 stored vectors**, 60
+questions. The vector count and depth were read back from the
+`embeddings.bin` header (`count=46565 dim=384 max_depth=5`).
 
-**Caveat 2 — the FAISS row is not a like-for-like baseline.** FAISS was given
-only the 60 fact vectors and a freshly computed set of 60 query embeddings. The
-Microscope row scanned the full 699,154-block index, and its 283.9 ms p50
-includes process start, configuration load, provider construction, query
-embedding and index open. Its 0.011 ms is query-time search only. The two rows
-measure different corpora, different candidate sets, and different latency
-definitions; the gap between them is not an architectural overhead figure.
-A fair comparison requires the same corpus and the same searchable vector set
-under both, with the end-to-end time reported separately from search time.
+| System | p50 ms | p95 ms | p99 ms | R@1 | R@5 | R@10 |
+|--------|--------|--------|--------|-----|-----|------|
+| Microscope, lexical only | 124.9 | — | — | 30.0% | 43.3% | 48.3% |
+| **Microscope, D5 index, semantic path connected** | 287.5 | 386.1 | 428.2 | **31.7%** | **46.7%** | **48.3%** |
+| SQLite FTS5 (BM25), 60 facts, query time only | 0.034 | 0.168 | 0.173 | 53.3% | 60.0% | 63.3% |
+| FAISS `IndexFlatIP`, 60 fact vectors, query time only | 0.010 | 0.013 | 0.028 | 90.0% | 96.7% | 96.7% |
+| FAISS `IndexHNSWFlat`, 60 fact vectors, query time only | 0.015 | 0.023 | 0.077 | 90.0% | 96.7% | 96.7% |
 
-**Caveat 3 — the candidate set was narrower than the table implies.** While
-these numbers were being collected, the CLI's inverted text index was still
-acting as a gate rather than a prefilter: recall skipped any block that was not
-a lexical candidate, and returned nothing when the lexical candidate set was
-empty. Vector hits were therefore only ranked when they also happened to be
-lexical hits, and a pure paraphrase with no shared token returned no result at
-all. This has been fixed (the two candidate sources are now merged into one
-sorted, deduplicated list), but the effect of the fix on hit@k is **not yet
-measured**. The table below is the pre-fix state and is retained only to show
-the effect of connecting vectors at all.
+**The D5 result is worse than the earlier D4 figure, and that is the honest
+outcome.** A previous run reported R@5 75.0% on an index embedded to D4
+(9,999 vectors). The same harness on the full D5 index (46,565 vectors)
+returns **46.7%**. The earlier number was not a measurement of this
+configuration and should not be cited as one.
 
-| System | p50 ms | R@1 | R@5 | R@10 |
-|--------|--------|-----|-----|------|
-| Microscope, lexical only | 124.9 | 30.0% | 43.3% | 48.3% |
-| Microscope, semantic path connected (D4 index, pre-fix candidate gate) | 283.9 | 56.7% | 75.0% | 80.0% |
-| SQLite FTS5 (BM25), 60 facts only, query time only | 0.036 | 53.3% | 60.0% | 63.3% |
-| FAISS `IndexFlatIP`, 60 fact vectors, query time only | 0.011 | 90.0% | 96.7% | 96.7% |
+Two things are established by the reproducible run, and one is open:
 
-**What this run does support.** Connecting the vectors moved hit@5 from 43.3%
-to 75.0% and hit@10 from 48.3% to 80.0% on the same corpus and the same
-questions, at a p50 cost of 125 ms → 284 ms. That comparison is internally
-valid: both rows are full end-to-end CLI runs over the same index. The FAISS and
-FTS5 rows are **not** comparable to them and are shown as diagnostics — an upper
-bound on what the same embeddings can do when nothing is filtered — not as a
-speed or quality benchmark against this system.
+- **Connecting the vectors still helps, but far less than previously claimed.**
+  Lexical-only was 43.3% at R@5; with the semantic path on the real D5 index it
+  is 46.7%. The large jump previously attributed to vector integration does not
+  reproduce at D5.
+- **The p50 cost is 288 ms** end to end, essentially unchanged from the 284 ms
+  of the D4 run, and is dominated by process start, model load and query
+  embedding rather than by search.
+- **Open: why deeper embedding hurt retrieval.** More vectors means a larger
+  competing pool for the same over-fetch budget (`k*8`, floored at 64), so
+  vector-only candidates at the deepest levels can crowd out the correct block.
+  This has not been measured and is the obvious next experiment. It is stated
+  here as a hypothesis, not a finding.
+
+**Caveat on the baselines.** FAISS and FTS5 index only the 60 fact vectors and
+report query-time search only; Microscope scans the full 699,110-block index
+and its 288 ms includes process start, provider construction, query embedding
+and index open. These rows are **not comparable**. The FAISS 96.7% is an upper
+bound on what the same embeddings achieve with no filtering — a diagnostic
+ceiling, not a competitive result.
 
 **Scope.** The 60 facts and 60 questions are synthetic and test *reachability*:
 whether a stored fact can be found at all. They do not estimate retrieval
-quality for real user searches, and the D5 configuration and the effect of the
-candidate-gate fix are both unmeasured.
+quality for real user searches.
 
 A worked example, because it is checkable by hand: querying `coffee` returns
 "The user does not drink coffee." at rank 1 and "The user takes their coffee

@@ -38,6 +38,53 @@ operation.
 - **Memory index:** 1010 KB (28679 blocks, 9 depths)
 - **Block size:** 256 bytes data + 32 byte header
 
+## Inverted text index and reinforcement cost (measured)
+
+This is the benchmark the project's own `.scratch_bench.ps1` performs: the
+inverted text index present versus removed, on the real `layers/` corpus.
+Reproduced by [`scripts/bench_text_index.sh`](scripts/bench_text_index.sh).
+
+**Run:** 2026-09-27, Windows 11, AMD Ryzen 5 7535HS, 694,868 blocks,
+`text_index.bin` = 2.6 MB, page cache warm, `provider = "mock"` and
+`semantic_weight = 0.0` (this measures the text path, not the embedding path).
+Each figure is a single invocation including process start-up, so the numbers
+are end-to-end and dominated by fixed cost.
+
+| Query | With text index | Without (full scan) |
+|-------|-----------------|---------------------|
+| `find "memory indexing"` | 91 ms | 89 ms |
+| `find "binary mmap recall"` | 92 ms | 89 ms |
+| `find "cognitive systems"` | 97 ms | 90 ms |
+| `recall "memory indexing"` | 218 ms | 227 ms |
+| `recall "hebbian remap bug fix"` | 219 ms | 314 ms |
+
+**The inverted text index shows no measurable speedup at this scale.** `find`
+is within noise with and without it, and `recall` is not consistently better
+with it. The second `recall` row is the one apparent exception (219 ms vs
+314 ms) but it is a single sample and the other `recall` row runs the opposite
+way (218 vs 227), so no ordering can be claimed from these figures. What the
+table does establish is that at 695k blocks the text path is not the bottleneck
+— something else dominates.
+
+**The reinforcement write block is the measurable cost.** A `recall` that
+returns nothing skips the post-recall write entirely:
+
+| Path | Latency |
+|------|---------|
+| `recall` with hits (full pipeline + write) | 218 ms |
+| `recall`, zero hits (write block skipped) | 114 ms |
+| `find`, zero hits | 91 ms |
+
+That is roughly a **100 ms** difference attributable to the reinforcement stack
+and its state persistence, on a warm cache. This is the cost the layers impose
+on every non-empty recall, and it is a real, reproducible figure.
+
+Two honest caveats: these are single samples, not distributions, so they should
+be read as order-of-magnitude; and process start-up is included in every row,
+which is why the absolute values sit near 100 ms even for a no-op query. A
+p50/p95/p99 over many runs, and an in-process timing that excludes start-up,
+would be needed to state this precisely.
+
 ## In-process spatial query (10,000 queries per zoom level)
 
 | Zoom | Blocks | Avg Query Time |

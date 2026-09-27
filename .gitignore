@@ -122,3 +122,9 @@ bench_config.toml
 real_output/
 real_tmp/
 real_config.toml
+
+eval_layers/
+eval_output/
+eval_tmp/
+eval_config.toml
+perf_corpus/

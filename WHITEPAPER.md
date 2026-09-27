@@ -658,8 +658,32 @@ The remaining ten layers were not ablated.
 
 ### 10.3 Performance
 
-In-process spatial query latencies, measurement method, and the distinction
-between inner-loop and end-to-end cost are given in
+Two separate measurements, both reproduced by scripts committed to the
+repository.
+
+**Text index and reinforcement cost.** Reproducing the project's own latency
+benchmark (`.scratch_bench.ps1`) on the real corpus -- 694,868 blocks, warm page
+cache, one end-to-end invocation per row -- via
+[`scripts/bench_text_index.sh`](scripts/bench_text_index.sh):
+
+| Path | Latency |
+|------|---------|
+| `find`, with the inverted text index | 91-97 ms |
+| `find`, index removed (full scan) | 89-90 ms |
+| `recall` with hits | 218-219 ms |
+| `recall`, zero hits (write block skipped) | 114 ms |
+
+Two findings, stated at the confidence the data supports. First, **the inverted
+text index shows no measurable speedup at this scale**: the `find` rows are
+within noise with and without it, and the two `recall` rows disagree in
+direction, so no ordering is claimed. Second, **the post-recall reinforcement
+and its state write cost roughly 100 ms** on a warm cache -- the price the
+layers impose on every non-empty recall. Both are single-sample figures that
+include process start-up; the full table and caveats are in
+[BENCHMARKS.md](BENCHMARKS.md).
+
+**In-process spatial query.** The per-zoom latencies, the measurement method, and
+the distinction between inner-loop and end-to-end cost are also in
 [BENCHMARKS.md](BENCHMARKS.md).
 
 ## 11. Limitations
@@ -673,14 +697,16 @@ between inner-loop and end-to-end cost are given in
 3. **Semantic search is embedding-dependent.** It inherits the quality and cost
    of whatever model is used, including model download and inference latency.
 4. **The published evaluation is not yet a valid characterisation of this
-   system.** The results in Sections 10.1 and 10.2 were produced with
+   system.** The relevance results in Sections 10.1 and 10.2 were produced with
    `embedding.provider = "mock"` and `semantic_weight = 0.0`, the shipped
    default, which the example configuration documents as disabling semantic
    ranking in `recall`, and on a 60-fact index. Those numbers describe a
    nearest-neighbour search over text hashes, not the architecture described
-   here, and no relative performance claim is made from them. A re-run with a
-   real embedding provider, `semantic_weight > 0`, and the 695k-block corpus is
-   required before the evaluation can be cited.
+   here, and no relative retrieval-quality claim is made from them.
+   A re-run with a real embedding provider, `semantic_weight > 0`, and the
+   695k-block corpus is required before the relevance evaluation can be cited.
+   The latency results in Section 10.3 are a separate measurement on the real
+   corpus and are not affected by this.
 5. **The reinforcement layers are heuristic.** Drift, decay and weight learning
    use hand-chosen constants; there is no evidence here that they are
    near-optimal, and no hyperparameter sweep has been run.

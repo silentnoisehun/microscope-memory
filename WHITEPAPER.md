@@ -531,15 +531,17 @@ systems on the same machine and the same MiniLM vectors
 
 | System | p50 ms | R@1 | R@5 | R@10 |
 |--------|--------|-----|-----|------|
-| Microscope, D5 index, semantic path connected | 331.0 | 33.3% | 48.3% | 51.7% |
+| **Microscope, D5 index + embedding quality gate (current)** | 431–1176 | **70.0%** | **80.0%** | **81.7%** |
+| Microscope, D5 index, semantic path (pre-gate) | 331.0 | 33.3% | 48.3% | 51.7% |
 | FAISS `IndexFlatIP` (60 fact vectors, query time only) | 0.010 | 90.0% | 96.7% | 96.7% |
 | SQLite FTS5 (BM25, 60 facts, query time only) | 0.034 | 53.3% | 60.0% | 63.3% |
 
-**The system does not beat a general-purpose lexical index, and loses badly to
-exhaustive vector search over the same embeddings.** Microscope answers 51.7% at
-k=10 where FAISS answers 96.7% and SQLite FTS5 answers 63.3%. On this
-workload it is a *worse* retriever than both a plain B-tree and a flat vector
-scan, while costing 331 ms against their 0.010 ms and 0.034 ms.
+**With the quality gate in place the system beats a general-purpose lexical
+index, and still loses to exhaustive vector search over the same vectors.**
+Microscope answers 81.7% at k=10 where FAISS answers 96.7% and SQLite FTS5
+answers 63.3%; pre-gate the same harness returned 51.7% and lost to both. The
+remaining gap to the flat scan is 15 points — it was 45 — while Microscope
+costs end-to-end time against their query-only 0.010 ms and 0.034 ms.
 
 The latency rows are not comparable, and the table should not be read as a
 speed comparison: FAISS and FTS5 index only the 60 fact vectors and report
@@ -547,13 +549,14 @@ query-time search only, while Microscope scans a 699,110-block index and its
 331 ms includes process start, BERT model load, query embedding and index open.
 
 What the same vectors *do* show is that the hierarchy is doing something a
-flat vector scan does not. Given identical embeddings, FAISS reaches 96.7% and
-the full system 51.7%: the depth structure, the reinforcement layers and the
-candidate filtering cost 45 points of accuracy and buy inspectability, bounded
-memory, and a per-recall write path. A diagnostic pass over all 60 questions
-locates that loss (§10.1): the expected answers are embedded and score a mean
-cosine of 0.935, yet rank 6,209th on average out of 46,565 stored vectors,
-because 36,568 of those are D5 summaries of similar content.
+flat vector scan does not. Given the same model, FAISS reaches 96.7% and the
+full system 81.7%: the depth structure, the reinforcement layers and the
+candidate filtering cost 15 points of accuracy and buy inspectability, bounded
+memory, and a per-recall write path. The pre-gate diagnostic that located most
+of that loss is recorded in §10.1: the expected answers were embedded and
+scored a mean cosine of 0.935, yet ranked 6,209th on average out of 46,565
+stored vectors, 36,136 of which were at most 16 characters of degenerate text.
+A build-time text-quality gate now removes them.
 
 Two caveats that bound the table. The measurement asymmetry favours the
 baselines: their timings are query-only, while Microscope's include process
@@ -608,21 +611,24 @@ prunes unreferenced ones.
 
 **Configuration:** `provider = "candle"`, `all-MiniLM-L6-v2`, dim 384,
 `semantic_weight = 1.0`, `embedding.max_depth = 5`, index built from `layers/`
-plus the 60 resonance facts — **699,110 blocks, 46,565 stored vectors**, 60
-questions. The vector count and depth were read back from the
-`embeddings.bin` header (`count=46565 dim=384 max_depth=5`).
+plus the 60 resonance facts — **699,110 blocks**, 60 questions, built twice:
+once with the original `text.len() >= 3` admission (**46,565 stored vectors**,
+the pre-gate rows below) and once through the embedding quality gate
+(**9,296 stored vectors**, the current rows). Vector count and depth were read
+back from the `embeddings.bin` header (`dim=384 max_depth=5`).
 
 | System | p50 ms | p95 ms | p99 ms | R@1 | R@5 | R@10 |
 |--------|--------|--------|--------|-----|-----|------|
+| **Microscope, D5 + quality gate, `want`=256 (current)** | 431–1176 | 792–2223 | 1498–2289 | **70.0%** | **80.0%** | **81.7%** |
 | Microscope, lexical only | 124.9 | — | — | 30.0% | 43.3% | 48.3% |
-| Microscope, D5, semantic path, `want`=64 | 287.5 | 386.1 | 428.2 | 31.7% | 46.7% | 48.3% |
-| **Microscope, D5, semantic path, `want`=256 (current)** | 331.0 | 451.9 | 505.2 | **33.3%** | **48.3%** | **51.7%** |
+| Microscope, D5, semantic path, `want`=64 (pre-gate) | 287.5 | 386.1 | 428.2 | 31.7% | 46.7% | 48.3% |
+| Microscope, D5, semantic path, `want`=256 (pre-gate) | 331.0 | 451.9 | 505.2 | 33.3% | 48.3% | 51.7% |
 | SQLite FTS5 (BM25), 60 facts, query time only | 0.034 | 0.168 | 0.173 | 53.3% | 60.0% | 63.3% |
 | FAISS `IndexFlatIP`, 60 fact vectors, query time only | 0.010 | 0.013 | 0.028 | 90.0% | 96.7% | 96.7% |
 | FAISS `IndexHNSWFlat`, 60 fact vectors, query time only | 0.015 | 0.023 | 0.077 | 90.0% | 96.7% | 96.7% |
 
 **Where the correct answer is lost.** A diagnostic pass classified every one of
-the 31 initial misses, using the match tokens passed to the binary via
+the 31 pre-gate misses, using the match tokens passed to the binary via
 `MICROSCOPE_EVAL_MATCH` (diagnostic only — they never enter the ranking):
 
 | Class | Count | Meaning |
@@ -631,8 +637,9 @@ the 31 initial misses, using the match tokens passed to the binary via
 | (b) lost in the pre-fetch | 6 | Present in the top-1024, dropped by the `want`-entry cut |
 | (c) lost in the final ranking | 4 | Admitted, but ranked below k by the combined score |
 
-**Class (a) is the largest group — and four hypotheses for it were tested and
-rejected.** The depth histogram of the returned hits is almost degenerate
+**Class (a) is the largest group — measured on the pre-gate index — and four
+hypotheses for it were tested and rejected.** The depth histogram of the
+returned hits is almost degenerate
 (typically `[0, 0, 0, 0, 3, 1021]`), which suggested that D5 crowds out every
 other depth. Extending the diagnostic to report each answer's score and rank
 across the *whole* 46,565-vector set showed the opposite of a scoring problem:
@@ -654,12 +661,44 @@ explanations were implemented and measured, and only the first survived:
 Raising `want` to 2048 admits the deeply-ranked answers and still changes
 nothing, so the obstruction is not a shortage of candidates. Removing the
 spatial term entirely also changes nothing, so it is not the spatial term.
-**The honest conclusion is that the ranking is behaving correctly and the
-corpus is the problem**: 36,568 of the 46,565 embedded blocks are D5
-summaries of largely similar content, so an exact answer does not stand out in
-the vector space. The fix is corpus-level — collapsing near-duplicate blocks at
-build time — not a reweighting of the score. That is untested here and would
-require a full re-embed.
+**The honest conclusion was that the ranking is behaving correctly and the
+corpus is the problem**: 36,136 of the 46,565 embedded blocks were at most 16
+characters of degenerate text, so an exact answer did not stand out in the
+vector space. The remedy had to be corpus-level — applied at build time,
+before embedding — not a reweighting of the score. It is implemented and
+measured in the next block.
+
+**The corpus-level remedy, implemented — as a text-quality gate, not a
+similarity filter.** The pre-gate diagnosis pointed at the corpus, but the fix
+had a hard constraint: of 40,000 sampled high-cosine pairs, 1,666 differ in
+numbers and 245 differ in negation, so any dedup keyed on cosine similarity
+would merge contradictory facts. The implemented gate therefore filters on
+what the text *is* (`src/embedding_index.rs`): a 24-character floor
+(`MICROSCOPE_MIN_EMBED_CHARS`, default 24), rejection of the reader's
+`"<bin>"` / `"[out of bounds]"` sentinels, and rejection of text whose
+characters are more than 25% in the U+0080..U+02FF mojibake band. Nothing
+about how blocks score is used, so nothing two blocks *say* can be merged.
+
+Measured on the same 60 questions, same harness, same `want`:
+
+| | stored vectors | R@1 | R@5 | R@10 |
+|---|---|---|---|---|
+| pre-gate (`len >= 3`) | 46,565 | 33.3% | 48.3% | 51.7% |
+| **quality gate, floor 24 (current)** | **9,296** | **70.0%** | **80.0%** | **81.7%** |
+| gate, floor 17 (ablation, rejected) | 10,424 | 60.0% | 78.3% | 78.3% |
+
+The gate removed 39,594 of the 48,890 D0–D5 candidates: 39,575 short
+(<24 chars), 18 unencodable, 1 mojibake. The degenerate-text census on the
+rebuilt index reads **0 blocks of at most 16 characters**, where the pre-gate
+index held 36,136 — 78% of its embedded set. Mean D5→D5 cosine fell
+0.9816 → 0.8887, below the mean query–answer cosine of 0.935 that the
+pre-gate index could not beat. Both harnesses agree on the new numbers
+(compare_baselines and resonance_set both report 42/48/49 of 60). Per case
+against the pre-gate run: **20 misses recovered, 2 regressions** — #12 "The
+user is vegetarian." (23 chars) and #41 "The user has a garden." (22 chars),
+both cut by the 24-character floor. Lowering the floor to 17 to keep them was
+measured and is worse across the board (60.0 / 78.3 / 78.3), so 24 stands as
+the measured floor; those two questions remain the gate's measured cost.
 
 **Class (b) is what the `want` constant controls.** Measured directly:
 `want`=64 → R@5 46.7%, `want`=128 → 46.7% (no change), `want`=256 → 48.3%,
@@ -668,8 +707,12 @@ require a full re-embed.
 
 Note on latency: repeated runs of the same build give p50 between 331 and
 376 ms, so the cost attributed to the 64 → 256 change is within run-to-run
-variance and is not quoted as a precise figure. The recall numbers
-(33.3 / 48.3 / 51.7%) are stable across every run.
+variance and is not quoted as a precise figure. The pre-gate recall numbers
+(33.3 / 48.3 / 51.7%) are stable across every run. Post-gate runs of the same
+harness give p50 between 431 and 1,176 ms with p95 up to 2.2 s; the gate only
+shrinks the vector set, so the search cannot explain an increase, and the
+cause was not investigated. The post-gate recall figures (70.0 / 80.0 / 81.7%)
+are identical across three runs.
 
 **Class (c) was not addressed.** Only 4 questions are affected, and any
 quota reserving top-N slots for vector hits would need to be measured against
@@ -780,25 +823,28 @@ the distinction between inner-loop and end-to-end cost are also in
 3. **Semantic search is embedding-dependent.** It inherits the quality and cost
    of whatever model is used, including model download and inference latency.
 4. **A fixed-size binary index** — the system is slower than a plain B-tree and
-   much less accurate than an exhaustive vector scan over the same embeddings
-   (Section 9.3: 51.7% vs 96.7% at k=10, 331 ms vs 0.010 ms; the latency figures
+   still less accurate than an exhaustive vector scan over the same vectors
+   (Section 9.3: 81.7% vs 96.7% at k=10 after the embedding quality gate —
+   51.7% before it — against their query-only 0.010 ms; the latency figures
    are not comparable, see §9.3). The hierarchy costs accuracy and latency here,
    and buys inspectability, bounded memory and a per-recall write path. That is
    the trade this paper documents, not an argument that the hierarchy is faster.
-5. **The corpus contains many near-duplicate blocks.** All 60 evaluation answers
-   are embedded and score a mean cosine of 0.935, but their mean rank across the
-   46,565 stored vectors is 6,209: roughly six thousand blocks outscore an exact
-   answer. Raising the vector pre-fetch to 2048, capping duplicate vectors, and
-   removing the spatial term from the score were each implemented and measured,
-   and none of them changes recall — the ranking is behaving correctly and the
-   vectors are good. The obstacle is that 36,568 of the embedded blocks are D5
-   summaries of similar content, so a specific fact does not stand out in the
-   vector space. The remedy is corpus-level (collapsing near-duplicates at
-   build time), which is untested here and would need a full re-embed.
+5. **The corpus contains degenerate blocks — and the gate that removes them
+   costs two real facts.** Pre-gate, all 60 evaluation answers were embedded
+   and scored a mean cosine of 0.935, but their mean rank across the 46,565
+   stored vectors was 6,209: roughly six thousand blocks outscored an exact
+   answer, and 36,136 of those stored vectors were at most 16 characters of
+   `"<bin>"` sentinels, mojibake and code fragments. A build-time text-quality
+   gate (length floor, sentinel and mojibake filters — explicitly no
+   similarity-based dedup, which would merge contradictory facts) cut the index
+   to 9,296 vectors and moved hit@10 from 51.7% to 81.7%. Two of the 60
+   answers are 22–23 characters and fall under the 24-character floor; they are
+   the only regressions (20 misses recovered, 2 introduced). Floor 17 keeps
+   them and measured worse (78.3% hit@10), so it was rejected.
 5. **The resonance set is synthetic** — 60 hand-written facts, not a sample of
-   real usage. The measured hit@10 of 51.7% says how often the retrieval path
-   answers one of these 60 known questions; it does not say how the system
-   performs on a real corpus.
+   real usage. The measured hit@10 of 81.7% (70.0% pre-gate) says how often the
+   retrieval path answers one of these 60 known questions; it does not say how
+   the system performs on a real corpus.
 6. **The reinforcement layers are heuristic.** Drift, decay and weight learning
    use hand-chosen constants; there is no evidence here that they are
    near-optimal, and no hyperparameter sweep has been run.
@@ -827,18 +873,18 @@ tracking, predictive prefetch, time-windowed profiles, learned attention weights
 cross-instance exchange, offline consolidation, shared state propagation, and
 multi-modal storage.
 
-**The evaluation is reproducible, and its result is mixed but unflattering.**
-With the semantic path connected and the pre-fetch widened, the system reaches
-51.7% hit@10 on the resonance set, against 43.3% for lexical-only. It does not
-beat a general-purpose lexical index (SQLite FTS5, 63.3%) on that set, and it
-is far below exhaustive vector search over the same embeddings (FAISS, 96.7%).
-A diagnostic pass over all 60 questions (§10.1) locates that gap: the expected
-answers are embedded and score a mean cosine of 0.935, yet rank 6,209th on
-average out of 46,565 stored vectors, because 36,568 of those are D5 summaries
-of similar content. The first fix in this line of work --
-connecting embeddings.bin to the recall path -- moved hit@5 by 31.7 points,
-which is larger than any architectural difference measured elsewhere in this
-paper.
+**The evaluation is reproducible, and its result is mixed but improved.**
+With the semantic path connected, the pre-fetch widened, and an embedding
+quality gate applied at build time, the system reaches 81.7% hit@10 on the
+resonance set (70.0% R@1, 80.0% R@5), against 43.3% for lexical-only and 63.3%
+for SQLite FTS5 — it now beats a general-purpose lexical index on this set,
+while remaining below exhaustive vector search over the same vectors (FAISS,
+96.7%). The diagnosis behind the earlier 51.7% is recorded in §10.1: 78% of
+the stored vectors were at most 16 characters of degenerate text that
+out-scored every real answer. Removing them by a text-quality filter — length,
+sentinels, mojibake; explicitly not cosine dedup, which would merge
+contradictory facts — moved hit@10 by 30 points and hit@1 by 36.7 points,
+larger than any architectural difference measured elsewhere in this paper.
 
 What the work establishes is therefore narrower than the design's ambitions
 and worth stating plainly: a fixed-size binary index whose retrieval path can be

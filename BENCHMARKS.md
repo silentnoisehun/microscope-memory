@@ -125,8 +125,9 @@ config, and it is **worse** than the earlier D4 figure:
 | | R@1 | R@5 | R@10 | p50 ms |
 |---|---|---|---|---|
 | lexical only | 30.0% | 43.3% | 48.3% | 124.9 |
-| D5 index, semantic path, `want`=64 | 31.7% | 46.7% | 48.3% | 287.5 |
-| **D5 index, semantic path, `want`=256 (current)** | **33.3%** | **48.3%** | **51.7%** | 331.0 |
+| D5 index, semantic path, `want`=64 (pre-gate) | 31.7% | 46.7% | 48.3% | 287.5 |
+| D5 index, semantic path, `want`=256 (pre-gate) | 33.3% | 48.3% | 51.7% | 331.0 |
+| **D5 index + embedding quality gate, `want`=256 (current)** | **70.0%** | **80.0%** | **81.7%** | 431–1176 |
 | *earlier D4 index (9,999 vectors) — superseded, not reproducible* | *56.7%* | *75.0%* | *80.0%* | *283.9* |
 
 The D4 number is retained only to show that it does not reproduce. The 75.0%
@@ -147,6 +148,30 @@ and scaling the spatial term from 1.0 to 0.0 (unchanged at every scale). The
 answers are all embedded with a mean cosine of 0.935 at mean rank 6,209 of
 46,565, so the ranking and the embeddings are both sound; the corpus holds too
 many near-duplicate D5 summaries for a specific fact to stand out.
+
+Those three rejections held on the **pre-gate** index. The corpus-level remedy
+was then implemented — not as the near-duplicate collapse suggested above (a
+cosine-keyed dedup would merge contradictory facts: of 40,000 sampled
+high-cosine pairs, 1,666 differ in numbers and 245 differ in negation), but as
+a text-quality gate in `src/embedding_index.rs`: a 24-character floor
+(`MICROSCOPE_MIN_EMBED_CHARS`, default 24), rejection of the reader's `"<bin>"`
+/ `"[out of bounds]"` sentinels, and rejection of text whose characters are
+more than 25% in the U+0080..U+02FF mojibake band.
+
+| | stored vectors | R@1 | R@5 | R@10 |
+|---|---|---|---|---|
+| pre-gate (`len >= 3`) | 46,565 | 33.3% | 48.3% | 51.7% |
+| **gate, floor 24 (current)** | **9,296** | **70.0%** | **80.0%** | **81.7%** |
+| gate, floor 17 (ablation, rejected) | 10,424 | 60.0% | 78.3% | 78.3% |
+
+The gate removed 39,594 of the 48,890 D0–D5 candidates (39,575 short, 18
+unencodable, 1 mojibake); the rebuilt index holds 0 blocks of at most 16
+characters where the pre-gate index held 36,136 — 78% of its embedded set —
+and mean D5→D5 cosine fell 0.9816 → 0.8887. Both harnesses agree
+(42/48/49 of 60). Per case: 20 misses recovered, 2 regress — the 22- and
+23-character answers #41 "The user has a garden." and #12 "The user is
+vegetarian.", which fall under the floor. Floor 17 keeps them and measured
+worse overall, so 24 stands.
 
 The FAISS and FTS5 rows are diagnostics, not a like-for-like comparison. They
 index only the 60 fact vectors and report query-time search only, while

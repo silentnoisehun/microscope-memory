@@ -1,61 +1,16 @@
 {
   "cases": 60,
   "hit_at_k": {
-    "1": 20,
-    "5": 29,
-    "10": 31
+    "1": 42,
+    "5": 48,
+    "10": 49
   },
   "hit_rate": {
-    "1": 33.3,
-    "5": 48.3,
-    "10": 51.7
+    "1": 70.0,
+    "5": 80.0,
+    "10": 81.7
   },
   "missed": [
-    {
-      "id": 3,
-      "fact": "The user lives in Szeged.",
-      "question": "where does the user live",
-      "match": [
-        "szeged"
-      ],
-      "category": "location"
-    },
-    {
-      "id": 4,
-      "fact": "The user's dog is called Morzska.",
-      "question": "what is the dog's name",
-      "match": [
-        "morzska"
-      ],
-      "category": "pet"
-    },
-    {
-      "id": 8,
-      "fact": "The user has two children.",
-      "question": "how many children",
-      "match": [
-        "two children"
-      ],
-      "category": "family"
-    },
-    {
-      "id": 9,
-      "fact": "The user's partner is called Anna.",
-      "question": "partner's name",
-      "match": [
-        "anna"
-      ],
-      "category": "family"
-    },
-    {
-      "id": 10,
-      "fact": "The user was born in 1985.",
-      "question": "birth year",
-      "match": [
-        "1985"
-      ],
-      "category": "personal"
-    },
     {
       "id": 11,
       "fact": "The user speaks Hungarian, English and German.",
@@ -65,6 +20,15 @@
         "german"
       ],
       "category": "personal"
+    },
+    {
+      "id": 12,
+      "fact": "The user is vegetarian.",
+      "question": "diet",
+      "match": [
+        "vegetarian"
+      ],
+      "category": "health"
     },
     {
       "id": 13,
@@ -86,89 +50,6 @@
       "category": "habit"
     },
     {
-      "id": 15,
-      "fact": "The user's city is Budapest.",
-      "question": "which city",
-      "match": [
-        "budapest"
-      ],
-      "category": "location"
-    },
-    {
-      "id": 17,
-      "fact": "The user prefers dark mode in every editor.",
-      "question": "editor theme",
-      "match": [
-        "dark mode"
-      ],
-      "category": "preference"
-    },
-    {
-      "id": 19,
-      "fact": "The user's project is called Hope Ecosystem.",
-      "question": "project name",
-      "match": [
-        "hope ecosystem",
-        "hope"
-      ],
-      "category": "project"
-    },
-    {
-      "id": 22,
-      "fact": "The user's mother is called Klara.",
-      "question": "mother's name",
-      "match": [
-        "klara"
-      ],
-      "category": "family"
-    },
-    {
-      "id": 23,
-      "fact": "The user reads science fiction.",
-      "question": "reading genre",
-      "match": [
-        "science fiction"
-      ],
-      "category": "hobby"
-    },
-    {
-      "id": 24,
-      "fact": "The user commutes by bicycle.",
-      "question": "commute",
-      "match": [
-        "bicycle",
-        "commutes by"
-      ],
-      "category": "habit"
-    },
-    {
-      "id": 26,
-      "fact": "The user has a mathematics degree.",
-      "question": "degree",
-      "match": [
-        "mathematics"
-      ],
-      "category": "education"
-    },
-    {
-      "id": 29,
-      "fact": "The user is learning Spanish.",
-      "question": "language being learned",
-      "match": [
-        "spanish"
-      ],
-      "category": "education"
-    },
-    {
-      "id": 30,
-      "fact": "The user's team is called Platform.",
-      "question": "team name",
-      "match": [
-        "platform"
-      ],
-      "category": "work"
-    },
-    {
       "id": 32,
       "fact": "The user has a shoulder injury on the left side.",
       "question": "injury",
@@ -188,13 +69,13 @@
       "category": "hobby"
     },
     {
-      "id": 40,
-      "fact": "The user prefers meetings in the morning.",
-      "question": "meeting time",
+      "id": 41,
+      "fact": "The user has a garden.",
+      "question": "garden",
       "match": [
-        "morning"
+        "garden"
       ],
-      "category": "preference"
+      "category": "property"
     },
     {
       "id": 43,
@@ -204,51 +85,6 @@
         "morning person"
       ],
       "category": "personal"
-    },
-    {
-      "id": 44,
-      "fact": "The user's car is a Volvo.",
-      "question": "car model",
-      "match": [
-        "volvo"
-      ],
-      "category": "property"
-    },
-    {
-      "id": 46,
-      "fact": "The user has studied architecture.",
-      "question": "past study",
-      "match": [
-        "architecture"
-      ],
-      "category": "education"
-    },
-    {
-      "id": 47,
-      "fact": "The user runs the project called Microscope.",
-      "question": "which project",
-      "match": [
-        "microscope"
-      ],
-      "category": "project"
-    },
-    {
-      "id": 48,
-      "fact": "The user's favourite season is autumn.",
-      "question": "favourite season",
-      "match": [
-        "autumn"
-      ],
-      "category": "preference"
-    },
-    {
-      "id": 51,
-      "fact": "The user has a brother called Gabor.",
-      "question": "brother's name",
-      "match": [
-        "gabor"
-      ],
-      "category": "family"
     },
     {
       "id": 52,

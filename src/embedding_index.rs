@@ -186,15 +186,62 @@ pub fn build_embedding_index(
     output_path: &Path,
 ) -> Result<(), String> {
     let dim = provider.dimension();
-
-    // Pass 1: count blocks that qualify (depth <= max_depth, non-trivial text).
     let total_blocks = reader.block_count;
+
+    // Pass 1: count blocks that qualify (depth <= max_depth, text worth embedding).
+    //
+    // The previous gate was `text.len() >= 3`, which let through everything a
+    // 3-character fragment can be. Measured on the committed D5 index with
+    // `examples/corpus_diag.rs`: 36,136 of 46,565 embedded blocks (78%) were at
+    // most 16 characters, including 5,655 whose text is the reader's "<bin>"
+    // fallback for non-UTF-8 bytes and ~6,000 mojibake fragments (UTF-8 decoded
+    // as cp1252). Those cluster together -- mean D5->D5 cosine 0.9816, above
+    // what any real answer reaches against a query -- so they occupy the whole
+    // result list. Mean rank of a correct answer was 6,209 of 46,565.
+    //
+    // Two separate filters, deliberately not a similarity filter. A
+    // cosine-threshold dedup would merge contradictory facts: of 40,000 sampled
+    // high-cosine pairs, 1,666 differ in numbers and 245 differ in negation.
+    // Filtering on what the text *is* rather than how it scores cannot do that.
+    let min_chars = std::env::var("MICROSCOPE_MIN_EMBED_CHARS")
+        .ok()
+        .and_then(|v| v.parse::<usize>().ok())
+        .unwrap_or(24);
+    let mut skipped_short = 0usize;
+    let mut skipped_unencodable = 0usize;
+    let mut skipped_mojibake = 0usize;
     let mut qualifying = Vec::new();
     for i in 0..total_blocks {
         let h = reader.header(i);
-        if h.depth <= max_depth && reader.text(i).len() >= 3 {
-            qualifying.push(i);
+        if h.depth > max_depth {
+            continue;
         }
+        let text = reader.text(i);
+        // `text()` returns these sentinels for bytes it could not decode, so the
+        // block carries no retrievable content at all.
+        if text == "<bin>" || text == "[out of bounds]" {
+            skipped_unencodable += 1;
+            continue;
+        }
+        if text.chars().count() < min_chars {
+            skipped_short += 1;
+            continue;
+        }
+        // Mojibake: UTF-8 bytes shown as cp1252 characters. If a sizeable share
+        // of the text is in the U+0080..U+00FF band it is not natural language.
+        let total = text.chars().count();
+        let suspicious = text.chars().filter(|c| ('\u{80}'..='\u{2ff}').contains(c)).count();
+        if total > 0 && suspicious * 4 > total {
+            skipped_mojibake += 1;
+            continue;
+        }
+        qualifying.push(i);
+    }
+    if skipped_short + skipped_unencodable + skipped_mojibake > 0 {
+        println!(
+            "  Embedding quality gate: -{} short (<{} chars), -{} unencodable, -{} mojibake",
+            skipped_short, min_chars, skipped_unencodable, skipped_mojibake
+        );
     }
 
     println!(

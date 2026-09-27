@@ -116,9 +116,18 @@ mod tests {
     fn test_config() -> Config {
         let dir = std::env::temp_dir().join("hope-pipeline-test");
         std::fs::create_dir_all(&dir).ok();
+        let layers = dir.join("layers");
+        std::fs::create_dir_all(&layers).ok();
         let mut cfg = Config::default();
         cfg.paths.output_dir = dir.to_string_lossy().to_string();
         cfg.paths.temp_dir = dir.join("tmp").to_string_lossy().to_string();
+        // layers_dir must be redirected too. The store path resolves the layer
+        // file as layers_dir/<layer>.txt, and the default is "./layers"
+        // relative to the process CWD -- which during `cargo test` is the
+        // repository root. Without this, running the suite appended test
+        // strings to the real layers/session.txt on every run, silently
+        // polluting the committed corpus.
+        cfg.paths.layers_dir = layers.to_string_lossy().to_string();
         cfg
     }
 

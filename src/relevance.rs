@@ -194,3 +194,63 @@ mod tests {
         assert!(apply_boost(0.2, 0.5) < apply_boost(0.4, 0.5));
     }
 }
+
+/// Build the block set that recall ranks, from the two independent candidate
+/// sources.
+///
+/// The inverted text index and the embedding index each produce a partial view:
+/// tokens for one, nearest neighbours for the other. Neither is a gate on the
+/// other. An earlier CLI implementation walked the depth ranges and *skipped*
+/// any block absent from the lexical candidate list, which silently discarded
+/// every vector hit that was not also a lexical hit -- and returned nothing at
+/// all when the lexical list came back empty, i.e. for exactly the paraphrases
+/// the embedding path is meant to answer.
+///
+/// Returns a sorted, deduplicated list; out-of-range ids are dropped so a stale
+/// or corrupt index cannot cause an out-of-bounds read.
+pub fn merge_candidates(
+    lexical: impl IntoIterator<Item = u32>,
+    semantic: impl IntoIterator<Item = usize>,
+    block_count: usize,
+) -> Vec<usize> {
+    let mut out: Vec<usize> = lexical
+        .into_iter()
+        .map(|c| c as usize)
+        .chain(semantic)
+        .filter(|&i| i < block_count)
+        .collect();
+    out.sort_unstable();
+    out.dedup();
+    out
+}
+
+#[cfg(test)]
+mod candidate_tests {
+    use super::merge_candidates;
+
+    #[test]
+    fn semantic_candidates_survive_without_any_lexical_overlap() {
+        // The regression: a paraphrase sharing no token with the target block.
+        // The lexical index contributes nothing; the vector hit must still rank.
+        let merged = merge_candidates(Vec::<u32>::new(), [7usize], 16);
+        assert_eq!(merged, vec![7]);
+    }
+
+    #[test]
+    fn lexical_and_semantic_are_unioned_and_deduplicated() {
+        let merged = merge_candidates([3u32, 1, 9], [9usize, 4, 1], 16);
+        assert_eq!(merged, vec![1, 3, 4, 9]);
+    }
+
+    #[test]
+    fn out_of_range_ids_are_dropped() {
+        // A corrupt or stale index must not produce an out-of-bounds access.
+        let merged = merge_candidates([2u32, 99], [50usize, 2], 16);
+        assert_eq!(merged, vec![2]);
+    }
+
+    #[test]
+    fn empty_sources_yield_no_candidates() {
+        assert!(merge_candidates(Vec::<u32>::new(), Vec::<usize>::new(), 16).is_empty());
+    }
+}

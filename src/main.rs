@@ -268,18 +268,6 @@ fn recall(config: &Config, query: &str, k: usize) {
     // its fact was stored: auto_depth places 15..39 character statements at
     // D5, and a short question could not reach it. Depth selection must be
     // driven by the evidence, not by how long the query is.
-    let zoom_lo = 0u8;
-    let zoom_hi = {
-        // Highest populated depth, derived from the recorded ranges.
-        let mut hi = 0u8;
-        for (d, &(_, count)) in reader.depth_ranges.iter().enumerate() {
-            if count > 0 {
-                hi = d as u8;
-            }
-        }
-        hi
-    };
-
     let mut all_results: Vec<(f32, usize, bool)> = Vec::new();
 
     // ── Semantic candidates ────────────────────────────────────────────────
@@ -318,37 +306,28 @@ fn recall(config: &Config, query: &str, k: usize) {
         }
     }
 
-    // Inverted text index prefilter: narrow the depth-range scan to blocks
-    // that can lexically match (token_similarity semantics), then run the
-    // exact scoring on those candidates — identical results, far fewer scans.
-    let lex_cands: Option<Vec<u32>> = reader
+    // Candidate set. The inverted text index is a *prefilter*, not a gate.
+    // Previously the scan walked the depth ranges but skipped every block that
+    // was not a lexical candidate, and abandoned the whole loop when the
+    // lexical set came back empty. Both behaviours are wrong: a vector hit was
+    // only ever considered when it happened to be a lexical hit too, and a
+    // query sharing no token with any block (a pure paraphrase) returned
+    // nothing at all -- which is precisely the case the embedding path exists
+    // to serve. Merge both sources into one sorted, deduplicated list and let
+    // the ranking below see it.
+    let lex_cands: Vec<u32> = reader
         .text_index
         .as_ref()
-        .and_then(|idx| idx.candidates_lexical(relevance_query.tokens()));
+        .and_then(|idx| idx.candidates_lexical(relevance_query.tokens()))
+        .unwrap_or_default();
 
-    let mut ci = 0usize;
-    'zoom: for zoom in zoom_lo..=zoom_hi {
-        let (start, count) = reader.depth_ranges[zoom as usize];
-        let (start, count) = (start as usize, count as usize);
-        for i in start..(start + count) {
-            if let Some(cands) = &lex_cands {
-                if cands.is_empty() {
-                    // No lexical candidates. Do not abandon the scan: a
-                    // semantic-only query (a paraphrase sharing no token) has
-                    // an empty lexical set but can still have strong vector
-                    // matches. Break out of the prefilter only.
-                    break 'zoom;
-                }
-                while ci < cands.len() && (cands[ci] as usize) < i {
-                    ci += 1;
-                }
-                if ci >= cands.len() {
-                    break 'zoom;
-                }
-                if (cands[ci] as usize) != i {
-                    continue;
-                }
-            }
+    let candidates = microscope_memory::relevance::merge_candidates(
+        lex_cands,
+        semantic_hits.keys().copied(),
+        reader.block_count,
+    );
+
+    for i in candidates {
             let text = reader.text(i);
             let lexical = relevance_query.lexical_score(text);
             // A block qualifies if it matches lexically OR is one of the
@@ -380,7 +359,6 @@ fn recall(config: &Config, query: &str, k: usize) {
                 }
                 all_results.push((combined, i, true));
             }
-        }
     }
 
     let append_path = Path::new(&config.paths.output_dir).join("append.bin");

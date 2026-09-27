@@ -107,7 +107,7 @@ would be needed to state this precisely.
 |------|------|
 | 4D soft (all 28679 blocks) | 380 µs/query |
 
-## Comparison with lexical and vector baselines — NOT YET VALIDLY MEASURED
+## Comparison with lexical and vector baselines — partially measured, not yet a fair comparison
 
 > **Warning: the numbers previously published in this section have been
 > removed.** They were produced with `embedding.provider = "mock"` and
@@ -118,23 +118,39 @@ would be needed to state this precisely.
 > nearest-neighbour over text hashes. Conclusions drawn from that configuration
 > describe the configuration, not the architecture, and have been withdrawn.
 
+A later run with a real provider (`candle` + MiniLM) is recorded in
+`WHITEPAPER.md` §10.1, and it is **not** a valid baseline comparison either:
+
+- the index was embedded to D4 while the committed default is D5;
+- FAISS and FTS5 were run over only the 60 fact vectors, while Microscope
+  scanned the full 699,154-block index;
+- the Microscope latency is end-to-end (process start, provider construction,
+  query embedding, index open) and the FAISS/FTS5 latency is query-time only.
+
+Those two rows therefore differ in corpus, candidate set and latency
+definition, and the difference between them is not a speedup or slowdown figure.
+The 96.7% FAISS R@5 is an upper bound on what the same embeddings achieve with
+no filtering, useful as a diagnostic ceiling, not a competitive result.
+
 The harness is committed so a reader can run the comparison correctly:
 
 ```bash
 # required: a real embedding provider, and semantic_weight > 0
 python scripts/build_real_index.sh        # 695,868 blocks from layers/
 python scripts/compare_scale.py           # same corpus, same queries, recall@k
+bash scripts/eval_real.sh                 # asserts provider/model/weight/depth
 ```
 
-`scripts/compare_scale.py` reports p50/p95/p99 latency together with hit@k, and
-covers a 60-fact and a 695k-block index so the two can be compared directly.
-A valid comparison additionally requires a real embedding provider (candle/BERT
-or ONNX), since a bag-of-words or hash representation understates what a
-production vector store achieves and is not a fair proxy for the semantic path.
+`scripts/eval_real.sh` now parses the config it generates and aborts unless
+`provider`, `model`, `semantic_weight` and `max_depth` are the expected values,
+because a malformed TOML makes the binary fall back to built-in defaults
+silently, and it no longer rewrites the embedding depth. `compare_scale.py`
+reports p50/p95/p99 together with hit@k. A valid comparison additionally
+requires the same corpus and the same searchable vector set on both sides, with
+end-to-end time and query-only time reported separately.
 
-Until that run exists, the only measured latency figures in this document are
-the in-process spatial query above, and no claim is made about relative
-retrieval quality or speed against any other system.
+Until such a run exists, no claim is made about relative retrieval quality or
+speed against any other system.
 
 
 

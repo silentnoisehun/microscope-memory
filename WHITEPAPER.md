@@ -435,7 +435,7 @@ All binary formats use safe manual byte-level serialization (no unsafe pointer c
 
 ## 8. Test Coverage
 
-413 library tests plus 16 hook tests:
+417 library tests plus 16 hook tests:
 
 | Module | Tests | Coverage |
 |--------|-------|----------|
@@ -582,40 +582,63 @@ prunes unreferenced ones.
 
 ### 10.1 Retrieval quality, with the semantic path connected
 
-The first attempt at this measurement ran a build in which recall could not
-reach the vectors at all: the depth window was guessed from the character
-length of the query, the admission gate was `lexical > 0.0` alone, and
-`embeddings.bin` was never opened by the recall path. Those numbers (R@5
-43.3%) describe a purely lexical search and are recorded here only as the
-"before" row of the comparison below.
+**This section is under correction and is not yet a reproducible result.**
+The measurement below is real, but three details of it prevent it from
+supporting the claims its wording previously made. They are recorded here
+rather than quietly corrected.
 
-**Configuration:** `provider = "candle"`, `all-MiniLM-L6-v2`, dim 384,
-`semantic_weight = 1.0`, index built from `layers/` plus the 60 resonance facts
-(699,154 blocks, 9,999 stored vectors), 60 questions.
+**Configuration of the recorded run:** `provider = "candle"`,
+`all-MiniLM-L6-v2`, dim 384, `semantic_weight = 1.0`, index built from
+`layers/` plus the 60 resonance facts (699,154 blocks, 9,999 stored vectors),
+60 questions.
+
+**Caveat 1 — the index was embedded to D4, not the committed D5.** The harness
+rewrote `[embedding].max_depth` from 5 to 4 to shorten the build. The 75.0%
+therefore describes a depth-truncated index, not the default configuration. The
+harness no longer performs that rewrite, and it now parses the generated config
+and aborts unless `provider`, `model`, `semantic_weight` and `max_depth` are the
+expected values. A D5 run has not been completed, so no D5 number is claimed.
+
+**Caveat 2 — the FAISS row is not a like-for-like baseline.** FAISS was given
+only the 60 fact vectors and a freshly computed set of 60 query embeddings. The
+Microscope row scanned the full 699,154-block index, and its 283.9 ms p50
+includes process start, configuration load, provider construction, query
+embedding and index open. Its 0.011 ms is query-time search only. The two rows
+measure different corpora, different candidate sets, and different latency
+definitions; the gap between them is not an architectural overhead figure.
+A fair comparison requires the same corpus and the same searchable vector set
+under both, with the end-to-end time reported separately from search time.
+
+**Caveat 3 — the candidate set was narrower than the table implies.** While
+these numbers were being collected, the CLI's inverted text index was still
+acting as a gate rather than a prefilter: recall skipped any block that was not
+a lexical candidate, and returned nothing when the lexical candidate set was
+empty. Vector hits were therefore only ranked when they also happened to be
+lexical hits, and a pure paraphrase with no shared token returned no result at
+all. This has been fixed (the two candidate sources are now merged into one
+sorted, deduplicated list), but the effect of the fix on hit@k is **not yet
+measured**. The table below is the pre-fix state and is retained only to show
+the effect of connecting vectors at all.
 
 | System | p50 ms | R@1 | R@5 | R@10 |
 |--------|--------|-----|-----|------|
-| Microscope, lexical only (before the fix) | 124.9 | 30.0% | 43.3% | 48.3% |
-| **Microscope, semantic path connected** | 283.9 | **56.7%** | **75.0%** | **80.0%** |
-| SQLite FTS5 (BM25) | 0.036 | 53.3% | 60.0% | 63.3% |
-| FAISS `IndexFlatIP` (same MiniLM vectors) | 0.011 | 90.0% | 96.7% | 96.7% |
+| Microscope, lexical only | 124.9 | 30.0% | 43.3% | 48.3% |
+| Microscope, semantic path connected (D4 index, pre-fix candidate gate) | 283.9 | 56.7% | 75.0% | 80.0% |
+| SQLite FTS5 (BM25), 60 facts only, query time only | 0.036 | 53.3% | 60.0% | 63.3% |
+| FAISS `IndexFlatIP`, 60 fact vectors, query time only | 0.011 | 90.0% | 96.7% | 96.7% |
 
-**Connecting the vectors moved hit@5 from 43.3% to 75.0%** and hit@10 from
-48.3% to 80.0%, on the same corpus and the same questions. The cost is latency:
-p50 rose from 125 ms to 284 ms, because each recall now embeds the query and
-runs a vector search before ranking. That trade is configurable through
-`semantic_weight`.
+**What this run does support.** Connecting the vectors moved hit@5 from 43.3%
+to 75.0% and hit@10 from 48.3% to 80.0% on the same corpus and the same
+questions, at a p50 cost of 125 ms → 284 ms. That comparison is internally
+valid: both rows are full end-to-end CLI runs over the same index. The FAISS and
+FTS5 rows are **not** comparable to them and are shown as diagnostics — an upper
+bound on what the same embeddings can do when nothing is filtered — not as a
+speed or quality benchmark against this system.
 
-Two honest readings:
-
-- The system now **beats a general-purpose lexical index** (FTS5) on every
-  recall metric, at three orders of magnitude more latency. On a workload where
-  retrieval quality matters more than round-trip time, that is the better tool.
-- It is still **below exhaustive vector search over the same embeddings**
-  (80.0% vs 96.7% at k=10). The gap is the price of the spatial hierarchy,
-  the depth window and the reinforcement pipeline, which reorder and filter the
-  candidate set. Closing it is open work, and the table is the honest statement
-  of where the system stands today.
+**Scope.** The 60 facts and 60 questions are synthetic and test *reachability*:
+whether a stored fact can be found at all. They do not estimate retrieval
+quality for real user searches, and the D5 configuration and the effect of the
+candidate-gate fix are both unmeasured.
 
 A worked example, because it is checkable by hand: querying `coffee` returns
 "The user does not drink coffee." at rank 1 and "The user takes their coffee
@@ -748,7 +771,7 @@ and worth stating plainly: a fixed-size binary index whose retrieval path can be
 correctly connected to its own embedding index; a measurement harness that
 produced the numbers above on demand; and a corrected account of where the
 system stands, including the cases where a plain B-tree or a flat vector scan
-is the better tool. Pure Rust, zero JSON, 413 tests, 54,053 lines.
+is the better tool. Pure Rust, zero JSON, 417 tests, 54,053 lines.
 
 Released under the MIT License at
 [github.com/silentnoisehun/microscope-memory](https://github.com/silentnoisehun/microscope-memory),

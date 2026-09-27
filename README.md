@@ -6,7 +6,7 @@
 
 [![Rust](https://img.shields.io/badge/language-Rust-orange.svg)](https://www.rust-lang.org)
 [![License: MIT](https://img.shields.io/badge/Limit-MIT-blue.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/Tests-413%20passing-brightgreen.svg)](#-testing)
+[![Tests](https://img.shields.io/badge/Tests-417%20passing-brightgreen.svg)](#-testing)
 [![Blocks](https://img.shields.io/badge/Blocks-1.28M-purple.svg)](#-statistics)
 [![WASM](https://img.shields.io/badge/WASM-151%20KB-blueviolet.svg)](#-wasm)
 
@@ -40,7 +40,7 @@ A living, self-organizing memory architecture with 13 layers, 9 depths, and 1.28
 | Data size | 284.7 MB |
 | Rust files | 97 |
 | Lines of code (`src/**/*.rs`) | 54,053 |
-| Tests | 413 library + 16 hooks |
+| Tests | 417 library + 16 hooks |
 | Build time | ~2m 30s |
 | Binary size | ~3.0 MB |
 | WASM size | 151.6 KB |
@@ -114,7 +114,7 @@ The shadow term prevents growth toward areas with weak evidence, without blockin
 
 ### Unit Tests
 ```bash
-cargo test                    # All tests (413 passing)
+cargo test                    # All tests (417 passing)
 cargo test --lib              # Library tests only
 cargo test --test integration # Integration tests only
 ```

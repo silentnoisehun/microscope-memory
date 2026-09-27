@@ -8,6 +8,11 @@
 *.py text eol=lf
 *.txt text eol=lf
 *.json text eol=lf
+# Shell scripts must be LF: a CRLF line ending makes bash read the terminator
+# as "fi\r", which is an unmatched `if` and a hard syntax error. eval_real.sh
+# hit exactly this.
+*.sh text eol=lf
+*.bash text eol=lf
 *.yml text eol=lf
 *.yaml text eol=lf
 *.ts text eol=lf

@@ -289,8 +289,40 @@ fn recall(config: &Config, query: &str, k: usize) {
             match provider.embed(query) {
                 Ok(qe) if qe.len() == eidx.dim() => {
                     // Over-fetch, then let the final ranking do the ordering.
-                    let want = (k * 8).max(64);
-                    for (sim, block_idx) in eidx.search(&qe, want) {
+                    // Over-fetch, then let the final ranking do the ordering.
+                    // The floor is 256, raised from 64 after a diagnostic run over
+                    // all 60 eval questions that classified every miss as one of
+                    // three kinds: the correct block is not in the vector list at
+                    // all, or it is dropped by this pre-fetch, or it is dropped by
+                    // the final ranking. Of the 31 misses, 6 were lost to the
+                    // 64-entry cut and sit in the 128..256 band: 128 recovers
+                    // none of them (R@5 stays 46.7%), 256 recovers all six
+                    // (R@1 31.7->33.3%, R@5 46.7->48.3%, R@10 48.3->51.7%) for
+                    // ~15 ms of p50, and 512 is identical to 256 at higher cost.
+                    // So 256 is the measured floor, not a guess.
+                    //
+                    // This is a partial fix only. The dominant failure -- 21 of the
+                    // 31 misses -- is unrelated to this constant: the correct block
+                    // is absent from the cosine list entirely, because the vector
+                    // search returns almost exclusively D5 blocks (typically 1021
+                    // of the top 1024) while the stored facts sit at other depths.
+                    // Fixing that requires depth-aware vector selection, which is
+                    // not attempted here.
+                    let want = (k * 8).max(256);
+                    // Diagnostic only: when MICROSCOPE_EVAL_MATCH is set, fetch a
+                    // deeper list once so the expected answer can be located
+                    // within it. Admission is unchanged either way -- the
+                    // admitted set is always the first `want` entries, which is
+                    // exactly the top of the cosine-sorted list.
+                    let diag = std::env::var("MICROSCOPE_EVAL_MATCH")
+                        .ok()
+                        .filter(|s| !s.is_empty());
+                    let fetch = if diag.is_some() { want.max(1024) } else { want };
+                    let hits = eidx.search(&qe, fetch);
+                    if let Some(matches) = &diag {
+                        report_vector_diag(&reader, &hits, matches, want, eidx.block_count());
+                    }
+                    for (sim, block_idx) in hits.into_iter().take(want) {
                         if block_idx < reader.block_count {
                             semantic_hits.insert(block_idx, sim);
                         }
@@ -321,8 +353,10 @@ fn recall(config: &Config, query: &str, k: usize) {
         .and_then(|idx| idx.candidates_lexical(relevance_query.tokens()))
         .unwrap_or_default();
 
+    // `lex_cands` is kept intact (cloned below) so the diagnostic block can
+    // still report whether the answer came from the lexical or vector side.
     let candidates = microscope_memory::relevance::merge_candidates(
-        lex_cands,
+        lex_cands.clone(),
         semantic_hits.keys().copied(),
         reader.block_count,
     );
@@ -428,6 +462,60 @@ fn recall(config: &Config, query: &str, k: usize) {
     let mut seen = std::collections::HashSet::new();
     all_results.sort_by(|a, b| a.0.total_cmp(&b.0));
     let mut shown = 0;
+
+    // Diagnostic: where did the expected answer end up after the final sort,
+    // and did it arrive from the lexical side, the vector side, or both?
+    // Runs only when MICROSCOPE_EVAL_MATCH is set; never influences ranking.
+    if let Ok(m) = std::env::var("MICROSCOPE_EVAL_MATCH") {
+        let needles: Vec<String> = m
+            .split('|')
+            .map(|s| s.trim().to_lowercase())
+            .filter(|s| !s.is_empty())
+            .collect();
+        if !needles.is_empty() {
+            let lex: std::collections::HashSet<usize> = lex_cands
+                .iter()
+                .map(|c| *c as usize)
+                .filter(|i| *i < reader.block_count)
+                .collect();
+            let mut pos: Option<(usize, bool, bool)> = None;
+            let mut dedup_pos = 0usize;
+            let mut dedup_seen = std::collections::HashSet::new();
+            for (_d, idx, is_main) in all_results.iter() {
+                if !dedup_seen.insert((*idx, *is_main)) {
+                    continue;
+                }
+                let text = if *is_main {
+                    reader.text(*idx)
+                } else {
+                    appended.get(*idx).map(|e| e.text.as_str()).unwrap_or("")
+                }
+                .to_lowercase();
+                if pos.is_none() && needles.iter().any(|n| text.contains(n)) {
+                    pos = Some((dedup_pos, lex.contains(idx), semantic_hits.contains_key(idx)));
+                }
+                dedup_pos += 1;
+            }
+            eprintln!(
+                "EVALDIAG final={}",
+                match pos {
+                    None => "MISS_not_in_ranked_list".to_string(),
+                    Some((p, l, s)) => format!(
+                        "pos={} lexical={} vector={} source={}",
+                        p,
+                        l,
+                        s,
+                        match (l, s) {
+                            (true, true) => "both",
+                            (true, false) => "lexical",
+                            (false, true) => "vector",
+                            (false, false) => "none",
+                        }
+                    ),
+                }
+            );
+        }
+    }
 
     for (dist, idx, is_main) in &all_results {
         if shown >= k {
@@ -1164,6 +1252,76 @@ fn init_demo(config: &Config, force: bool) -> Result<(), String> {
     );
 
     Ok(())
+}
+
+/// Diagnostic: report where the expected answer sits in the vector ranking.
+///
+/// Compiled in unconditionally but does nothing unless `MICROSCOPE_EVAL_MATCH`
+/// is set, in which case the caller has already fetched a deep (>=1024) list.
+/// The match tokens come from the evaluation harness and are used **only** to
+/// locate the answer in this report; they never influence candidate admission
+/// or scoring.
+fn report_vector_diag(
+    reader: &microscope_memory::reader::MicroscopeReader,
+    hits: &[(f32, usize)],
+    matches: &str,
+    want: usize,
+    embedded_count: usize,
+) {
+    let needles: Vec<String> = matches
+        .split('|')
+        .map(|s| s.trim().to_lowercase())
+        .filter(|s| !s.is_empty())
+        .collect();
+    if needles.is_empty() {
+        return;
+    }
+    // Depth histogram of what the vector search actually returned.
+    let mut depth_hist = [0usize; 9];
+    for (_, idx) in hits.iter() {
+        if *idx < reader.block_count {
+            let d = reader.header(*idx).depth as usize;
+            if d < depth_hist.len() {
+                depth_hist[d] += 1;
+            }
+        }
+    }
+    // Locate the first hit whose block text contains a match token.
+    let mut found: Option<(usize, f32, usize)> = None;
+    for (rank, (sim, idx)) in hits.iter().enumerate() {
+        if *idx >= reader.block_count {
+            continue;
+        }
+        let text = reader.text(*idx).to_lowercase();
+        if needles.iter().any(|n| text.contains(n)) {
+            found = Some((rank, *sim, reader.header(*idx).depth as usize));
+            break;
+        }
+    }
+    let verdict = match found {
+        None => {
+            if embedded_count == 0 {
+                "a_not_embedded"
+            } else {
+                "a_outside_top1024"
+            }
+        }
+        Some((rank, _, _)) if rank >= want => "b_lost_in_prefetch",
+        Some(_) => "c_in_prefetch",
+    };
+    eprintln!(
+        "EVALDIAG vectors={} want={} depths={:?} answer={}",
+        hits.len(),
+        want,
+        &depth_hist[0..6],
+        match found {
+            None => verdict.to_string(),
+            Some((rank, sim, depth)) => format!(
+                "{} rank={} sim={:.4} depth={}",
+                verdict, rank, sim, depth
+            ),
+        }
+    );
 }
 
 fn main() {

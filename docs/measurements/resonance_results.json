@@ -1,14 +1,14 @@
 {
   "cases": 60,
   "hit_at_k": {
-    "1": 19,
-    "5": 28,
-    "10": 29
+    "1": 20,
+    "5": 29,
+    "10": 31
   },
   "hit_rate": {
-    "1": 31.7,
-    "5": 46.7,
-    "10": 48.3
+    "1": 33.3,
+    "5": 48.3,
+    "10": 51.7
   },
   "missed": [
     {
@@ -28,16 +28,6 @@
         "morzska"
       ],
       "category": "pet"
-    },
-    {
-      "id": 5,
-      "fact": "The user works as a software engineer.",
-      "question": "what does the user do for work",
-      "match": [
-        "software engineer",
-        "engineer"
-      ],
-      "category": "work"
     },
     {
       "id": 8,
@@ -112,15 +102,6 @@
         "dark mode"
       ],
       "category": "preference"
-    },
-    {
-      "id": 18,
-      "fact": "The user has a cat named Bella.",
-      "question": "cat's name",
-      "match": [
-        "bella"
-      ],
-      "category": "pet"
     },
     {
       "id": 19,

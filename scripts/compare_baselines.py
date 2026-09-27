@@ -108,12 +108,24 @@ def run_microscope(ks: list[int], config: Path) -> dict:
 
     for c in CASES:
         t0 = time.perf_counter()
+        # Diagnostic hook: pass the accepted match tokens so the binary can
+        # report *where* a correct answer was lost (not embedded / lost in the
+        # pre-fetch / lost in the final ranking). Only active when this var is
+        # set; the normal path is unchanged. The tokens are used purely to
+        # locate the answer in the diagnostic output and never affect ranking.
+        case_env = dict(env)
+        if c.match:
+            case_env["MICROSCOPE_EVAL_MATCH"] = "|".join(c.match)
         r = subprocess.run(
             [str(BIN), "recall", c.question, str(top)],
             capture_output=True,
-            env=env,
+            env=case_env,
         )
         times.append((time.perf_counter() - t0) * 1000.0)
+        if c.match and r.stderr:
+            # Keep the diagnostic lines next to the case they describe.
+            sys.stderr.write(r.stderr.decode("utf-8", errors="replace"))
+            sys.stderr.flush()
         # Decode explicitly: the corpus is UTF-8 and the platform default
         # (cp1252 on Windows) raises on non-ASCII bytes.
         out = r.stdout.decode("utf-8", errors="replace").lower()

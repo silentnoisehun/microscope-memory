@@ -531,24 +531,29 @@ systems on the same machine and the same MiniLM vectors
 
 | System | p50 ms | R@1 | R@5 | R@10 |
 |--------|--------|-----|-----|------|
-| Microscope, semantic path connected | 283.9 | 56.7% | 75.0% | 80.0% |
-| FAISS `IndexFlatIP` (same MiniLM vectors) | 0.011 | 90.0% | 96.7% | 96.7% |
-| SQLite FTS5 (BM25) | 0.036 | 53.3% | 60.0% | 63.3% |
+| Microscope, D5 index, semantic path connected | 331.0 | 33.3% | 48.3% | 51.7% |
+| FAISS `IndexFlatIP` (60 fact vectors, query time only) | 0.010 | 90.0% | 96.7% | 96.7% |
+| SQLite FTS5 (BM25, 60 facts, query time only) | 0.034 | 53.3% | 60.0% | 63.3% |
 
-**The system beats a general-purpose lexical index on every recall metric, and
-loses to exhaustive vector search over the same embeddings.** Microscope
-answers 80.0% at k=10 where FAISS answers 96.7%, and takes 284 ms where FAISS
-takes 0.011 ms. The first comparison in this space is therefore not a clean
-win: the system trades a large amount of accuracy against a spatial hierarchy
-and a reinforcement pipeline, and on this workload it is a worse retriever than
-a plain B-tree.
+**The system does not beat a general-purpose lexical index, and loses badly to
+exhaustive vector search over the same embeddings.** Microscope answers 51.7% at
+k=10 where FAISS answers 96.7% and SQLite FTS5 answers 63.3%. On this
+workload it is a *worse* retriever than both a plain B-tree and a flat vector
+scan, while costing 331 ms against their 0.010 ms and 0.034 ms.
+
+The latency rows are not comparable, and the table should not be read as a
+speed comparison: FAISS and FTS5 index only the 60 fact vectors and report
+query-time search only, while Microscope scans a 699,110-block index and its
+331 ms includes process start, BERT model load, query embedding and index open.
 
 What the same vectors *do* show is that the hierarchy is doing something a
 flat vector scan does not. Given identical embeddings, FAISS reaches 96.7% and
-the full system 80.0%: the depth structure, the reinforcement layers and the
-candidate filtering cost 16.7 points of accuracy and buy inspectability,
-bounded memory, and a per-recall write path. Whether that trade is worth it is
-a workload decision, and this paper does not claim it is.
+the full system 51.7%: the depth structure, the reinforcement layers and the
+candidate filtering cost 45 points of accuracy and buy inspectability, bounded
+memory, and a per-recall write path. A diagnostic pass over all 60 questions
+localises most of that loss (§10.1): the cosine search returns almost
+exclusively D5 blocks, so a fact stored at another depth frequently never
+enters the candidate set at all.
 
 Two caveats that bound the table. The measurement asymmetry favours the
 baselines: their timings are query-only, while Microscope's include process
@@ -610,31 +615,52 @@ questions. The vector count and depth were read back from the
 | System | p50 ms | p95 ms | p99 ms | R@1 | R@5 | R@10 |
 |--------|--------|--------|--------|-----|-----|------|
 | Microscope, lexical only | 124.9 | — | — | 30.0% | 43.3% | 48.3% |
-| **Microscope, D5 index, semantic path connected** | 287.5 | 386.1 | 428.2 | **31.7%** | **46.7%** | **48.3%** |
+| Microscope, D5, semantic path, `want`=64 | 287.5 | 386.1 | 428.2 | 31.7% | 46.7% | 48.3% |
+| **Microscope, D5, semantic path, `want`=256 (current)** | 331.0 | 451.9 | 505.2 | **33.3%** | **48.3%** | **51.7%** |
 | SQLite FTS5 (BM25), 60 facts, query time only | 0.034 | 0.168 | 0.173 | 53.3% | 60.0% | 63.3% |
 | FAISS `IndexFlatIP`, 60 fact vectors, query time only | 0.010 | 0.013 | 0.028 | 90.0% | 96.7% | 96.7% |
 | FAISS `IndexHNSWFlat`, 60 fact vectors, query time only | 0.015 | 0.023 | 0.077 | 90.0% | 96.7% | 96.7% |
 
-**The D5 result is worse than the earlier D4 figure, and that is the honest
-outcome.** A previous run reported R@5 75.0% on an index embedded to D4
-(9,999 vectors). The same harness on the full D5 index (46,565 vectors)
-returns **46.7%**. The earlier number was not a measurement of this
-configuration and should not be cited as one.
+**Where the correct answer is lost.** A diagnostic pass classified every one of
+the 31 initial misses, using the match tokens passed to the binary via
+`MICROSCOPE_EVAL_MATCH` (diagnostic only — they never enter the ranking):
 
-Two things are established by the reproducible run, and one is open:
+| Class | Count | Meaning |
+|-------|-------|---------|
+| (a) not in the vector list | 21 | The correct block is absent from the cosine top-1024 entirely |
+| (b) lost in the pre-fetch | 6 | Present in the top-1024, dropped by the `want`-entry cut |
+| (c) lost in the final ranking | 4 | Admitted, but ranked below k by the combined score |
 
-- **Connecting the vectors still helps, but far less than previously claimed.**
-  Lexical-only was 43.3% at R@5; with the semantic path on the real D5 index it
-  is 46.7%. The large jump previously attributed to vector integration does not
-  reproduce at D5.
-- **The p50 cost is 288 ms** end to end, essentially unchanged from the 284 ms
-  of the D4 run, and is dominated by process start, model load and query
-  embedding rather than by search.
-- **Open: why deeper embedding hurt retrieval.** More vectors means a larger
-  competing pool for the same over-fetch budget (`k*8`, floored at 64), so
-  vector-only candidates at the deepest levels can crowd out the correct block.
-  This has not been measured and is the obvious next experiment. It is stated
-  here as a hypothesis, not a finding.
+**Class (a) is the dominant failure, and it is not a ranking problem.** The
+depth histogram of the returned vector hits is almost degenerate: typically
+`[0, 0, 0, 0, 3, 1021]` — 1021 of the top 1024 are D5, and D0-D3 never appear.
+A stored fact at any other depth therefore frequently has no chance of being
+selected by the vector search, whatever the ranking does. This is a property of
+the candidate generation, not of the scoring function.
+
+**Class (b) is what the `want` constant controls.** Measured directly:
+`want`=64 → R@5 46.7%, `want`=128 → 46.7% (no change), `want`=256 → 48.3%,
+`want`=512 → 48.3% (no further gain). All six class-(b) answers sit in the
+128..256 band. The constant was raised to 256, costing ~44 ms of p50
+(287.5 → 331.0 ms) for +1.6 points at R@5 and +3.4 at R@10.
+
+**Class (c) was not addressed.** Only 4 questions are affected, and any
+quota reserving top-N slots for vector hits would need to be measured against
+all three k values and the latency percentiles before being adopted. It is
+left as open work rather than a guess.
+
+**The D5 result remains below the earlier D4 figure.** A previous run reported
+R@5 75.0% on an index embedded to D4 (9,999 vectors) behind a pre-fix
+candidate gate. On the committed D5 configuration the same harness returns
+48.3% even after the pre-fetch fix. The D4 number is not reproducible from the
+committed configuration and should not be cited.
+
+Two further facts from the reproducible run:
+
+- **The p50 cost is 331 ms** end to end, dominated by process start, BERT model
+  load and query embedding rather than by search.
+- **The depth collapse above is the single most promising next lever**, and it
+  is not addressed here.
 
 **Caveat on the baselines.** FAISS and FTS5 index only the 60 fact vectors and
 report query-time search only; Microscope scans the full 699,110-block index
@@ -727,14 +753,21 @@ the distinction between inner-loop and end-to-end cost are also in
 3. **Semantic search is embedding-dependent.** It inherits the quality and cost
    of whatever model is used, including model download and inference latency.
 4. **A fixed-size binary index** — the system is slower than a plain B-tree and
-   less accurate than an exhaustive vector scan over the same embeddings
-   (Section 9.3: 80.0% vs 96.7% at k=10, 284 ms vs 0.011 ms). The hierarchy
-   costs accuracy and latency here, and buys inspectability, bounded memory and
-   a per-recall write path. That is the trade this paper documents, not an
-   argument that the hierarchy is faster.
+   much less accurate than an exhaustive vector scan over the same embeddings
+   (Section 9.3: 51.7% vs 96.7% at k=10, 331 ms vs 0.010 ms; the latency figures
+   are not comparable, see §9.3). The hierarchy costs accuracy and latency here,
+   and buys inspectability, bounded memory and a per-recall write path. That is
+   the trade this paper documents, not an argument that the hierarchy is faster.
+5. **The vector candidate set collapses onto one depth.** Measured over all 60
+   evaluation questions, the cosine search returns almost only D5 blocks
+   (typically 1021 of the top 1024), and D0-D3 never appear. A fact stored at
+   another depth is frequently never offered to the ranker at all. This, not the
+   scoring function, is the dominant cause of the 21 of 31 misses in §10.1, and
+   it is the clearest target for future work.
 5. **The resonance set is synthetic** — 60 hand-written facts, not a sample of
-   real usage. The measured hit@10 of 80.0% says the retrieval path can answer a
-   known question; it does not say how the system performs on a real corpus.
+   real usage. The measured hit@10 of 51.7% says how often the retrieval path
+   answers one of these 60 known questions; it does not say how the system
+   performs on a real corpus.
 6. **The reinforcement layers are heuristic.** Drift, decay and weight learning
    use hand-chosen constants; there is no evidence here that they are
    near-optimal, and no hyperparameter sweep has been run.
@@ -763,12 +796,15 @@ tracking, predictive prefetch, time-windowed profiles, learned attention weights
 cross-instance exchange, offline consolidation, shared state propagation, and
 multi-modal storage.
 
-**The evaluation is now valid, and it is mixed.** With the semantic path
-connected, the system reaches 80.0% hit@10 on the resonance set, against 43.3%
-when recall could not reach its own vectors, and it beats a general-purpose
-lexical index (SQLite FTS5, 63.3%) on that set. It does not beat exhaustive
-vector search over the same embeddings (FAISS, 96.7%), and it is roughly four
-orders of magnitude slower than both. The first fix in this line of work --
+**The evaluation is reproducible, and its result is mixed but unflattering.**
+With the semantic path connected and the pre-fetch widened, the system reaches
+51.7% hit@10 on the resonance set, against 43.3% for lexical-only. It does not
+beat a general-purpose lexical index (SQLite FTS5, 63.3%) on that set, and it
+is far below exhaustive vector search over the same embeddings (FAISS, 96.7%).
+A diagnostic pass over all 60 questions (§10.1) localises most of that gap to
+candidate generation rather than ranking: the cosine search returns almost only
+D5 blocks, so facts stored at other depths never reach the ranker. The first
+fix in this line of work --
 connecting embeddings.bin to the recall path -- moved hit@5 by 31.7 points,
 which is larger than any architectural difference measured elsewhere in this
 paper.

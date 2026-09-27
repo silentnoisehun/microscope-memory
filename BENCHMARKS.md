@@ -125,19 +125,26 @@ config, and it is **worse** than the earlier D4 figure:
 | | R@1 | R@5 | R@10 | p50 ms |
 |---|---|---|---|---|
 | lexical only | 30.0% | 43.3% | 48.3% | 124.9 |
-| D5 index, semantic path (46,565 vectors) | 31.7% | 46.7% | 48.3% | 287.5 |
+| D5 index, semantic path, `want`=64 | 31.7% | 46.7% | 48.3% | 287.5 |
+| **D5 index, semantic path, `want`=256 (current)** | **33.3%** | **48.3%** | **51.7%** | 331.0 |
 | *earlier D4 index (9,999 vectors) — superseded, not reproducible* | *56.7%* | *75.0%* | *80.0%* | *283.9* |
 
 The D4 number is retained only to show that it does not reproduce. The 75.0%
 was measured on a depth-truncated index with a pre-fix candidate gate; on the
-committed D5 configuration the same harness returns 46.7%.
+committed D5 configuration the same harness returns 48.3%.
+
+A diagnostic pass classified all 31 remaining misses: 21 are cases where the
+correct block never enters the cosine list (the vector search returns almost
+exclusively D5 blocks), 6 are lost to the `want` pre-fetch, and 4 are lost in
+the final ranking. Only the pre-fetch group was addressed, by raising `want`
+from 64 to 256; 128 recovers none of them and 512 adds nothing over 256.
 
 The FAISS and FTS5 rows are diagnostics, not a like-for-like comparison. They
 index only the 60 fact vectors and report query-time search only, while
-Microscope scans the full 699,110-block index and its 288 ms is end-to-end
-(process start, provider construction, query embedding, index open). The
-96.7% FAISS R@5 is an upper bound on what the same embeddings achieve with no
-filtering — a diagnostic ceiling, not a competitive result.
+Microscope scans the full 699,110-block index and its 331 ms is end-to-end
+(process start, BERT model load, query embedding, index open). The 96.7% FAISS
+R@5 is an upper bound on what the same embeddings achieve with no filtering —
+a diagnostic ceiling, not a competitive result.
 
 The harness is committed so a reader can run the comparison correctly:
 

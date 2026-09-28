@@ -1487,7 +1487,11 @@ fn tool_recall(config: &Config, args: &Value) -> Result<String, String> {
                 }
             }
         }
-        if !links.is_empty() {
+        // Read-only: skip the linking writes entirely. The links are the
+        // learning here, so this both keeps a measurement from writing and
+        // reports the p50 of a server that no longer learns -- a floor, not
+        // the number a real server sees.
+        if !links.is_empty() && !crate::no_learn::enabled() {
             let dim = config.embedding.dim;
             // `with_cached_provider` is generic in the closure's return type, so
             // this is the vector of results itself -- no Result to unwrap.

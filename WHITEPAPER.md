@@ -992,26 +992,47 @@ the distinction between inner-loop and end-to-end cost are also in
    A trustworthy control needs the writes turned off for the duration of the
    measurement, or a fresh copy of the index per run, and the distance printed
    alongside the rank so a drifting system is visible rather than averaged
-   away. Until that exists, the honest statement is that the recall number is
-   a function of run order, and the latency numbers are solid while the
-   accuracy numbers are not.
+   away. `MICROSCOPE_NO_LEARN=1` now does the first of those. The CLI recall
+   returns as soon as the ranking is printed -- the search runs in full, the same
+   blocks are scored, boosted and ranked, and only the learning writes after it
+   are skipped -- and an MCP recall skips its associative links. It is opt-in and
+   off by default, because a server that forgets a query it just served is
+   broken, and it is unrelated to `[hooks] read_only`, which governs the hook
+   manager.
+
+   It works, and the numbers it produces are the ones worth having. Six replays
+   of the same query under the flag returned the identical distance to five
+   decimal places and wrote nothing at all; three full benchmark runs gave
+   R@1/R@5/R@10 of 56.7%/56.7%/63.3% every time, at a p50 of 169.7, 169.7 and
+   171.0 ms. The reproducibility is the point. The recall is lower than the
+   70.0% recorded earlier, and that is not a regression: the earlier number was
+   measured on an index the benchmark had already warmed, so it partly counted
+   what previous runs had taught. 34/34/38 is the answer to 'what does this
+   index know', and it is now a number that can be checked.
+
+   The p50 drop from 324 ms to 170 ms is the same effect seen as latency: about
+   150 ms per recall was the learning pipeline's own writes, which a real,
+   learning server still pays. The honest summary is that this figure is the
+   read cost, and the number for a serving system is this plus the writes it
+   does on purpose.
+
 12. **Fresh entries are embedded at store time, and that has a cost.** The
-   append log used to be invisible to the semantic path until the next full
-   rebuild. It no longer is: `store` embeds the text once, under the same
-   quality gate the index build uses, and records the vector in
-   `append_embeddings.bin` keyed by its position in the log. Measured on a
-   scratch index: a paraphrase query sharing no token with a freshly stored
-   memory returns that memory at rank 1, and with the sidecar deleted the same
-   query does not return it at all. The costs are real and unmeasured at
-   scale — a CLI `store` now pays a model load (201 ms wall against ~30 ms
-   before, while an MCP server loads the model once), the sidecar is discarded
-   at the next rebuild, where the entries are re-embedded as main blocks, and
-   how this behaves with thousands of pending entries is untested.
+    append log used to be invisible to the semantic path until the next full
+    rebuild. It no longer is: `store` embeds the text once, under the same
+    quality gate the index build uses, and records the vector in
+    `append_embeddings.bin` keyed by its position in the log. Measured on a
+    scratch index: a paraphrase query sharing no token with a freshly stored
+    memory returns that memory at rank 1, and with the sidecar deleted the same
+    query does not return it at all. The costs are real and unmeasured at
+    scale — a CLI `store` now pays a model load (201 ms wall against ~30 ms
+    before, while an MCP server loads the model once), the sidecar is discarded
+    at the next rebuild, where the entries are re-embedded as main blocks, and
+    how this behaves with thousands of pending entries is untested.
 13. **The layer ablation is inconclusive.** The null deltas in Section 10.2 were
-   measured with the semantic path disconnected, and the patch mechanism
-   neutralises one entry point per module rather than disabling the layer end to
-   end. It establishes neither that the thirteen layers are load-bearing nor
-   that they are not.
+    measured with the semantic path disconnected, and the patch mechanism
+    neutralises one entry point per module rather than disabling the layer end to
+    end. It establishes neither that the thirteen layers are load-bearing nor
+    that they are not.
 
 ---
 

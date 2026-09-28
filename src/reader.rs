@@ -1480,16 +1480,12 @@ pub fn store_memory_temporary(
 /// cannot slip in under a looser rule than the one that built the index -- that
 /// is how the 17..23 character crowding would come straight back.
 /// Embed the stored text and record it in the append-embeddings sidecar.
-fn embed_appended_entry(config: &Config, text: &str) {
-    embed_appended_entry_with(config, text, None);
-}
-
-/// As `embed_appended_entry`, but `precomputed` short-circuits the inference.
 ///
-/// A caller that already embedded the text -- the MCP recall embeds its nine
-/// associative links up front, in parallel -- passes the vector it computed.
-/// The gate below still decides admission, so a precomputed vector can never
-/// smuggle a fragment past the same policy the build applies.
+/// `precomputed` short-circuits the inference for a caller that already
+/// embedded the text -- the MCP recall embeds its nine associative links up
+/// front, in parallel. The gate below still decides admission, so a
+/// precomputed vector can never smuggle a fragment past the same policy the
+/// build applies.
 fn embed_appended_entry_with(config: &Config, text: &str, precomputed: Option<Vec<f32>>) {
     use crate::embedding_index::{
         min_embed_chars, quality_gate, AppendEmbeddings, EmbedVerdict, APPEND_EMBEDDINGS_FILE,

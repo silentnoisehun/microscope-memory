@@ -101,7 +101,17 @@ def run_microscope(ks: list[int], config: Path) -> dict:
         return {"system": "microscope (recall)", "error": "binary not built"}
     if not config.exists():
         return {"system": "microscope (recall)", "error": f"{config} missing"}
-    env = dict(os.environ, MICROSCOPE_CONFIG=str(config.resolve()))
+    # Read-only: a recall is not a read. It records activations, strengthens
+    # co-activations, refines attention and rewrites the narrative, so without
+    # this every run would measure the state the previous run left behind --
+    # one query's top hit drifted from L2=0.45051 to 0.16108 over six replays,
+    # and three runs of one binary gave R@1 of 37, 34 and 34. The ranking path
+    # is unchanged; only the learning writes are skipped.
+    env = dict(
+        os.environ,
+        MICROSCOPE_CONFIG=str(config.resolve()),
+        MICROSCOPE_NO_LEARN="1",
+    )
     per_k = {k: 0 for k in ks}
     times: list[float] = []
     top = max(ks)

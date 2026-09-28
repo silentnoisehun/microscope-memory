@@ -48,7 +48,13 @@ def main() -> int:
         print("release binary not found; run: cargo build --release --features native,embeddings")
         return 1
 
-    env = dict(os.environ, MICROSCOPE_CONFIG=str(config))
+    # Read-only, so twenty identical questions do not warm each other up: an
+    # MCP recall writes associative links, and without this the p50 would partly
+    # measure what the previous calls left behind rather than the server. Note
+    # what this then excludes -- the linking writes are part of the cost being
+    # measured elsewhere, and with them suppressed this p50 is a floor, not the
+    # number a real, learning server sees.
+    env = dict(os.environ, MICROSCOPE_CONFIG=str(config), MICROSCOPE_NO_LEARN="1")
     proc = subprocess.Popen(
         [str(binary), "mcp"],
         stdin=subprocess.PIPE,

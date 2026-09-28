@@ -577,6 +577,25 @@ fn recall(config: &Config, query: &str, k: usize) {
         shown += 1;
     }
 
+    // No-learn mode stops here. Everything below this line is the learning:
+    // Hebbian activations, mirror boosts, co-activation pairs, resonance
+    // pulses, attention weights, thought-graph patterns, the predictive cache,
+    // spaced repetition. The search above has already produced and printed its
+    // ranking, so a measurement still sees the same result -- it just does not
+    // feed the run that comes after it. Replaying a query otherwise pulled its
+    // own answer closer each time (L2 0.45051 -> 0.16108 over six runs, with
+    // the pre-fetch confidence climbing 62% -> 98%), which made R@k a function
+    // of run order: three runs of one binary gave 37, 34 and 34.
+    if microscope_memory::no_learn::enabled() {
+        let elapsed = t0.elapsed();
+        println!("\n  {} results in {:.0} us", shown, elapsed.as_micros());
+        println!(
+            "  {} read-only: learning state not written",
+            "MEASURE".dimmed()
+        );
+        return;
+    }
+
     // â”€â”€â”€ Hebbian + Mirror: record activations & detect resonance â”€â”€
     let output_dir = Path::new(&config.paths.output_dir);
     let mut mirror = microscope_memory::mirror::MirrorState::load_or_init(output_dir);

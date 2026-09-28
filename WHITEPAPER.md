@@ -928,26 +928,35 @@ the distinction between inner-loop and end-to-end cost are also in
 7. **Cold-start cost dominates for small corpora.** End-to-end latency is
    dominated by process start, state loading and the query embedding, so
    in-process figures understate what a user experiences.
-9. **The MCP path is slower than the CLI, and part of it is still unexplained.**
-   Measured on the same index with the same questions, one process serving
-   twenty `memory_recall` calls: 1,771 ms warm p50 before this work, 1,711 ms
-   after caching the provider and the link table, and in a later session a
-   bimodal series with no growth across the session (4516 4336 712 4328 305
-   4259 254 259 251 4261 …) — against 260–331 ms for the CLI path. Phase
-   attribution inside one MCP recall, with temporary in-process markers, put
-   the cost after everything else: open reader 0.3 ms, state acquisition and
-   its 22.4 MB clone 4.9–34 ms, search and ranking 220 ms, spreading
-   activation 32–68 ms, the consciousness-stream locks 0.1–0.4 ms, and
-   4,395–4,513 ms in the block between the prediction boosts and the end of
-   the eight state saves. That remainder is MCP-specific and bimodal; it is
-   not the clone, not the locks, not file I/O (56 MB reads in 19–57 ms,
-   writes in 47–70 ms) and not the hooks (a HashMap insert). Two real defects
-   were found and fixed on the way — emotion blending rewrote the whole 58.7 MB
-   `emotions.bin` once per activated block, and the structural-similarity scan
-   sorted ~699k matches three times per recall — but neither was the
-   remainder. Until finer markers inside that block attribute it, the published
-   latency figures are the CLI ones, and the MCP server is described as the
-   integration surface rather than the fast one.
+9. **The MCP path writes memories during a query, which is why it is slower
+   than the CLI.** Measured on the same index with the same questions, one
+   process serving twenty `memory_recall` calls: warm p50 1,771 ms before any
+   of this work, and 4,448 ms in the session where the attribution was done
+   (a bimodal per-call series — 4516 4336 712 4328 305 4259 254 259 251 … —
+   against 260–331 ms for the CLI). Phase markers inside one MCP recall
+   located the cost after everything else: the 22.4 MB state clone 4.9–34 ms,
+   the consciousness-stream locks 0.1–0.4 ms, search and ranking 220 ms,
+   spreading activation 32–68 ms, and 4,395–4,513 ms in the block that follows
+   the prediction boosts. That block turns out to be the associative-linking
+   loop: an MCP recall writes up to a dozen "associative link" memories (the
+   top-3 × top-5 keyword pairs), and since store-time embedding was added
+   (c562166) each of those writes embedded its text through a freshly
+   constructed provider — one MiniLM construction per stored link. Routing
+   that path through the cached provider took the warm p50 from 4,448 ms to
+   1,005 ms. Two other real defects were fixed on the way and are not the same
+   cost: emotion blending rewrote the whole 58.7 MB `emotions.bin` once per
+   activated block, and the structural-similarity scan sorted ~699k matches
+   three times per recall.
+
+   What remains is 229–1,253 ms per call, still bimodal, against 324 ms for
+   the CLI, and it is not attributed. The leading suspect is the same linking
+   loop: each of those writes takes the file lock, appends to `append.bin` and
+   to a layer file, and checks the auto-rebuild threshold — and the entries it
+   appends can trip that threshold (250 in the eval configuration) and rebuild
+   mid-session. That is a design question rather than a cache: a query should
+   not be writing memories at all. Until it is measured, the published latency
+   figures are the CLI ones, and the MCP server is described as the integration
+   surface rather than the fast one.
 10. **Fresh entries are embedded at store time, and that has a cost.** The
    append log used to be invisible to the semantic path until the next full
    rebuild. It no longer is: `store` embeds the text once, under the same

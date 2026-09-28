@@ -1508,8 +1508,16 @@ fn embed_appended_entry(config: &Config, text: &str) {
         .len()
         .saturating_sub(1);
 
-    let provider = crate::embeddings::provider_from_config(&config.embedding, dim);
-    match provider.embed(text) {
+    // Cached provider: one MCP recall writes up to a dozen associative links
+    // (the top-3 x top-5 keyword pairs in mcp.rs), and each write embedded its
+    // text with a freshly constructed provider -- a MiniLM construction per
+    // stored link, which is most of the 4.4 s an MCP call was taking. The
+    // cache is keyed by (provider, model, dimension), so the behaviour is the
+    // same and the model is built once per process.
+    let embedded = crate::embeddings::with_cached_provider(&config.embedding, dim, |p| {
+        p.embed(text)
+    });
+    match embedded {
         Ok(v) if v.len() == dim => {
             let path = output_dir.join(APPEND_EMBEDDINGS_FILE);
             let mut sidecar =

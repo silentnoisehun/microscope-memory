@@ -1130,11 +1130,22 @@ The user does not hav", severed mid-word. And the sentence splitter broke on
    (0.369 both) because these texts never pad; add_special_tokens on or off
    makes no difference (0.316 vs 0.311); and the mock fallback is ruled out by
    construction, since the candle path exits rather than degrading. What is
-   left is the forward pass itself -- the weights as loaded, or
-   `BertModel::forward` building its mask from token_type_ids. No fix is
-   attempted here, because guessing between those is the exact failure this
-   section documents. The target to beat is 0.32-0.37; a correct
-   implementation reaches ~1.0 on the same text.
+   left is the forward pass itself. Reading the library rather than guessing
+   rules the obvious suspect out: candle-transformers 0.3.3 never builds an
+   attention mask at all -- `BertModel::forward` calls the embeddings and the
+   encoder and nothing else, `token_type_ids` feeding only the segment
+   embedding, and `BertEncoder::forward` is a bare loop over layers. It also
+   always loads the position embeddings, which are applied as 0..seq_len. On
+   our side the weights come from model.safetensors as F32, the config is
+   parsed, and the mock fallback cannot happen.
+
+   So the provider reads correctly and still does not reproduce the model,
+   which leaves the tokenizer's actual output or a weight-mapping detail that
+   cannot be seen from outside. The diagnostic has to come from the inside:
+   dump the token ids and the pre-pooling hidden state for one fixed text and
+   compare both against the reference. No fix is attempted here -- choosing
+   between two plausible lines is the exact failure this section documents. The
+   target to beat is 0.32-0.37; a correct implementation reaches ~1.0.
    Five things in this measurement chain turned out not to be ranking problems -- a
    mock config, a learning side effect, a cosine floor that was not the cause, a
    weight that was not the cause, and a parser eating the corpus. None of the four

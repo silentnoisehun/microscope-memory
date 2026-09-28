@@ -11,6 +11,8 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 
+use rayon::prelude::*;
+
 // ─── Constants ──────────────────────────────────────
 
 /// Similarity threshold for creating a structural link (0..1).
@@ -92,15 +94,29 @@ impl LinkTable {
     /// Find the most structurally similar blocks to a query text.
     pub fn find_similar(&self, text: &str, k: usize) -> Vec<(u32, f32)> {
         let query_fp = compute_fingerprint(text.as_bytes());
+        // Total order: similarity descending, then block index ascending. A
+        // stable sort by similarity alone produced exactly this order, so
+        // naming the tie-break explicitly keeps the result identical when the
+        // sort below becomes a partial selection.
+        let cmp = |a: &(u32, f32), b: &(u32, f32)| b.1.total_cmp(&a.1).then(a.0.cmp(&b.0));
         let mut results: Vec<(u32, f32)> = self
             .fingerprints
-            .iter()
+            .par_iter()
             .enumerate()
             .map(|(i, fp)| (i as u32, fingerprint_similarity(&query_fp, fp)))
             .filter(|(_, sim)| *sim > 0.5)
             .collect();
 
-        results.sort_by(|a, b| b.1.total_cmp(&a.1));
+        // Partial selection instead of sorting every match. The caller runs
+        // this on the top-3 results of every recall, and most fingerprints
+        // clear the 0.5 threshold, so a full sort of ~699k elements three times
+        // per query is what made an MCP recall take seconds. The top k is
+        // uniquely determined by the total order above, so selecting then
+        // sorting those k yields the same answer as sorting everything.
+        if results.len() > k {
+            results.select_nth_unstable_by(k, cmp);
+        }
+        results.sort_by(cmp);
         results.truncate(k);
         results
     }

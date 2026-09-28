@@ -11,7 +11,7 @@
 use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use crate::reader::{emotional_similarity, load_emotion_lookup, write_emotion};
+use crate::reader::{emotional_similarity, load_emotion_lookup};
 use crate::{content_coords_blended, MicroscopeReader};
 
 // ─── Constants ──────────────────────────────────────
@@ -67,6 +67,7 @@ fn reconsolidate_emotions_inner(
     };
     let emotions_path = output_dir.join("emotions.bin");
     let mut blended = 0u32;
+    let mut updates: Vec<(usize, [f32; 21])> = Vec::new();
 
     // Csak a main index blokkokat reconsolidáljuk (append log entry-ket nem)
     let block_count = reader.block_count;
@@ -101,10 +102,20 @@ fn reconsolidate_emotions_inner(
             }
         }
 
-        if write_emotion(&emotions_path, idx_usize, &new_emo).is_err() {
-            continue;
+        // Collect and write once. `write_emotion` does the whole file per call
+        // -- read 58.7 MB, patch 84 bytes, write 58.7 MB, rename -- so calling
+        // it once per activated block moved ~1.2 GB per recall. That measured
+        // as 4.2 s of an MCP recall, on every call that primes an emotion from
+        // the state ring.
+        updates.push((idx_usize, new_emo));
+    }
+
+    if !updates.is_empty() {
+        if let Err(e) = crate::reader::write_emotions_batch(&emotions_path, &updates) {
+            eprintln!("  WARN batch emotion write: {}", e);
+            return blended;
         }
-        blended += 1;
+        blended += updates.len() as u32;
     }
 
     blended

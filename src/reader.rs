@@ -1754,6 +1754,45 @@ pub fn load_emotion_lookup(output_dir: &Path) -> Option<EmotionLookup> {
     }))
 }
 
+/// Write many block emotions with a single read-modify-write.
+///
+/// `write_emotion` does the whole file per call: read 58.7 MB on the eval
+/// index, patch 84 bytes, write 58.7 MB, rename. A recall that blends ten
+/// blocks therefore moved about 1.2 GB, which measured as 4.2 s. The file is
+/// read once, every update is applied in memory, and the result is written once
+/// -- same bytes, same atomic temp+rename guarantee, a tenth of the I/O.
+pub fn write_emotions_batch(
+    path: &Path,
+    updates: &[(usize, [f32; 21])],
+) -> Result<(), String> {
+    if updates.is_empty() {
+        return Ok(());
+    }
+    let entry_size = 21 * 4;
+    let max_idx = updates.iter().map(|(i, _)| *i).max().unwrap_or(0);
+    let needed = (max_idx + 1) * entry_size;
+    let mut data = if path.exists() {
+        fs::read(path).map_err(|e| format!("read emotions.bin: {}", e))?
+    } else {
+        Vec::new()
+    };
+    if data.len() < needed {
+        data.resize(needed, 0u8);
+    }
+    for &(idx, emo) in updates {
+        let off = idx * entry_size;
+        if off + entry_size > data.len() {
+            return Err(format!("emotion index {} out of range", idx));
+        }
+        for (i, v) in emo.iter().enumerate() {
+            data[off + i * 4..off + i * 4 + 4].copy_from_slice(&v.to_le_bytes());
+        }
+    }
+    let tmp_path = path.with_extension("bin.tmp");
+    fs::write(&tmp_path, &data).map_err(|e| format!("write emotions.bin: {}", e))?;
+    fs::rename(&tmp_path, path).map_err(|e| format!("rename emotions.bin: {}", e))
+}
+
 /// Write a single block's emotion vector to emotions.bin.
 /// The file is grown to fit the block index if needed.
 pub fn write_emotion(path: &Path, block_idx: usize, emotion: &[f32; 21]) -> Result<(), String> {

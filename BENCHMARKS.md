@@ -184,7 +184,12 @@ journal, the header scan restricted to the hot set, and the lookup loaded only
 when a query emotion exists, the clean-state runs give p50 323.2 and 331.5 ms
 against 405.9 ms before, with recall unchanged at 42/48/49. A run started
 right after a build measured 1,123 ms with the same recall: the published
-figures are unloaded runs. **State:** because every recall writes
+figures are unloaded runs. The small state files are deliberately not
+dirty-tracked: per file they look expensive (7.2 ms for a 48-byte
+`attention.bin`, 13.6 ms for a 12 KB `thought_graph.bin`) but the cost does not
+track size — in a fresh process the first read costs 21.7 ms, the second 9.5 ms
+and the rest 0.06–0.26 ms, so skipping a file only moves the first-touch
+penalty onto the next one. **State:** because every recall writes
 learning state back, consecutive runs on one build measure different systems —
 after ~240 extra recalls R@5/R@10 fell to 76.7%/78.3%, and deleting the
 mutable state files restored 42/48/49 twice. `scripts/eval_real.sh` already

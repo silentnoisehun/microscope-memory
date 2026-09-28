@@ -764,21 +764,22 @@ I/O: an MCP server pays the model once instead of per request, which is the
 fix for that, not a code change here. Materialising the activation vector
 costs 12.2 ms per process — not the file (372 bytes) but zeroing 22.4 MB of
 `ActivationRecord` in memory, which needs a sparse in-memory representation
-rather than an I/O change. The remaining small state files cost 1–14 ms each
-to load, which is why the seven of them are not dirty-tracked individually.
+rather than an I/O change.
+
+The small state files are not worth dirty-tracking, and the reason is measured
+rather than assumed. Per file they look expensive — 7.2 ms for a 48-byte
+`attention.bin`, 13.6 ms for a 12 KB `thought_graph.bin` — which does not
+correlate with size at all. A probe in a fresh process reads the 48-byte file
+in 21.7 ms, a second file in 9.5 ms, and everything after that in 0.06–0.26
+ms: the cost is the first touch of a file in a process (filesystem and
+antivirus filter warm-up), and it decays. Skipping a state file therefore
+moves that penalty onto the next one instead of removing it, which is why the
+seven files are left alone.
+
 One measurement is reported as an outlier rather than smoothed away: a run
 started immediately after a release build measured p50 1,123 ms with recall
-unchanged, so the published figures are unloaded runs and the build-then-measure
-sequence is exactly what the protocol below warns about.
-
-Two smaller targets were measured and deliberately left alone. The other seven
-post-recall writes (mirror, resonance, archetypes, temporal, thought graph,
-predictive cache, attention) cost ~6–8 ms together, and dirty-tracking each of
-them separately would add state-tracking code to seven modules for less than
-the run-to-run spread. The emotional-field scan reads every block header
-(11.7 ms); caching it is not sound, because energy decays in wall-clock time
-and a cached centroid would be wrong rather than merely stale. Both are
-recorded here as measured, not addressed.
+unchanged, so the published figures are unloaded runs and the
+build-then-measure sequence is exactly what the protocol below warns about.
 
 **Measurement protocol: the state must be reset, not just the index.** Every
 `recall` writes learning state back, so consecutive measurement runs on one

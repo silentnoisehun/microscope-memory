@@ -12,30 +12,30 @@
       "system": "microscope (recall, end-to-end)",
       "note": "includes process start, config load and state load",
       "latency": {
-        "p50_ms": 150.7357,
-        "p95_ms": 163.773,
-        "p99_ms": 169.9427,
-        "mean_ms": 151.8691
+        "p50_ms": 149.4268,
+        "p95_ms": 160.1806,
+        "p99_ms": 162.9187,
+        "mean_ms": 150.2631
       },
       "recall_at_k": {
-        "1": 46,
-        "5": 55,
-        "10": 57
+        "1": 48,
+        "5": 57,
+        "10": 59
       },
       "recall_rate": {
-        "1": 76.7,
-        "5": 91.7,
-        "10": 95.0
+        "1": 80.0,
+        "5": 95.0,
+        "10": 98.3
       }
     },
     {
       "system": "faiss IndexFlatIP (MiniLM)",
       "note": "all-MiniLM-L6-v2, d=384; 1 thread; query only",
       "latency": {
-        "p50_ms": 0.0082,
-        "p95_ms": 0.0107,
-        "p99_ms": 0.0221,
-        "mean_ms": 0.0094
+        "p50_ms": 0.0115,
+        "p95_ms": 0.0196,
+        "p99_ms": 0.0593,
+        "mean_ms": 0.0134
       },
       "recall_at_k": {
         "1": 54,
@@ -52,10 +52,10 @@
       "system": "faiss IndexHNSWFlat (MiniLM)",
       "note": "all-MiniLM-L6-v2, d=384; 1 thread; query only",
       "latency": {
-        "p50_ms": 0.0171,
-        "p95_ms": 0.0186,
-        "p99_ms": 0.0242,
-        "mean_ms": 0.0181
+        "p50_ms": 0.0173,
+        "p95_ms": 0.0189,
+        "p99_ms": 0.0258,
+        "mean_ms": 0.0182
       },
       "recall_at_k": {
         "1": 54,
@@ -72,10 +72,10 @@
       "system": "sqlite fts5 (bm25)",
       "note": "in-memory; query time only, no index build",
       "latency": {
-        "p50_ms": 0.0356,
-        "p95_ms": 0.1685,
-        "p99_ms": 0.1808,
-        "mean_ms": 0.0472
+        "p50_ms": 0.0294,
+        "p95_ms": 0.1598,
+        "p99_ms": 0.183,
+        "mean_ms": 0.0441
       },
       "recall_at_k": {
         "1": 32,

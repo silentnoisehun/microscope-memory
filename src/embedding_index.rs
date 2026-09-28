@@ -158,14 +158,37 @@ impl EmbeddingIndex {
 }
 
 /// Minimum text length, in characters, for a block to be embedded. Overridable
-/// with `MICROSCOPE_MIN_EMBED_CHARS`; 24 is the measured floor, not a guess --
-/// at 17 the 17..23 character band re-introduces the crowding the gate exists
-/// to remove and hit@10 fell 81.7% -> 78.3%.
+/// with `MICROSCOPE_MIN_EMBED_CHARS`.
+///
+/// The default was 24, justified as "the measured floor" on the grounds that
+/// dropping to 17 re-introduced crowding and cost hit@10 (81.7% -> 78.3%).
+/// That measurement was taken before `71e938d`, and it is void: the build at
+/// the time was cutting the evaluation corpus into fixed 1024-byte pieces at
+/// arbitrary byte offsets, so the corpus it was tuned against was itself
+/// truncated. Re-measured on the fixed build the curve is flat from 20 down to
+/// 12 -- no fall at all:
+///
+///     minimum   R@1     R@5     R@10
+///     24        76.7%   91.7%   95.0%
+///     20        80.0%   95.0%   98.3%
+///     16        80.0%   95.0%   98.3%
+///     12        80.0%   95.0%   98.3%
+///
+/// 20 is the smallest value that captures the whole gain, so it is the default:
+/// it admits the short-but-complete memories ("The user is vegetarian." is 23
+/// characters and was being refused) without going further than the measurement
+/// supports. The crowding the old comment described is not visible at any of
+/// these values on a corpus of real sentences.
+///
+/// One thing this does not re-measure: the count of short blocks in the
+/// 944,808-block evaluation corpus, which is what the old default was tuned
+/// against and which is also suspect now. If this system is pointed at a corpus
+/// of genuinely degenerate fragments rather than sentences, raise it back.
 pub fn min_embed_chars() -> usize {
     std::env::var("MICROSCOPE_MIN_EMBED_CHARS")
         .ok()
         .and_then(|v| v.parse::<usize>().ok())
-        .unwrap_or(24)
+        .unwrap_or(20)
 }
 
 /// Why a text is not worth embedding. Deliberately about what the text *is*,
@@ -562,7 +585,11 @@ mod tests {
     #[test]
     fn min_embed_chars_default_is_the_measured_floor() {
         if std::env::var_os("MICROSCOPE_MIN_EMBED_CHARS").is_none() {
-            assert_eq!(min_embed_chars(), 24);
+            // 20, not 24: see the doc comment. The 24 was justified by a
+            // measurement taken on a build that truncated the corpus it was
+            // tuned against, and on the fixed build the curve is flat from 20
+            // down to 12.
+            assert_eq!(min_embed_chars(), 20);
         }
     }
 

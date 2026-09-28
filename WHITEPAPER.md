@@ -1087,13 +1087,33 @@ The user does not hav", severed mid-word. And the sentence splitter broke on
      + sentence split 76.7%    91.7%    95.0%   151.2 ms
      FAISS            90.0%    96.7%    96.7%     0.01 ms
 
-   R@10 goes from 90.0% to 95.0% and the remaining gap to FAISS is 13.3 points
-   at R@1, 1.7 at R@10. This is the largest single gain in this work, and it is
-   not a ranking change: five things in this measurement chain turned out not to
-   be ranking problems -- a mock config, a learning side effect, a cosine floor
-   that was not the cause, a weight that was not the cause, and a parser eating
-   the corpus. None of the four earlier conclusions would have been worth much
-   without this one underneath them.
+   With the text intact, the quality gate's own floor was re-measured, because
+   its justification had been measured on the build that was eating the corpus.
+   The old comment claimed 24 was a floor, on the grounds that 17 re-introduced
+   crowding and cost hit@10 (81.7% -> 78.3%). That number is void. On the fixed
+   build the curve is flat:
+
+     minimum   R@1      R@5      R@10
+     24        76.7%    91.7%    95.0%
+     20        80.0%    95.0%    98.3%
+     16        80.0%    95.0%    98.3%
+     12        80.0%    95.0%    98.3%
+
+   20 is the smallest value that captures the whole gain, so it is now the
+   default. Reproduced twice: **80.0 / 95.0 / 98.3%** at a p50 of 150.7 ms,
+   against FAISS 90.0 / 96.7 / 96.7% and sqlite fts5 53.3 / 60.0 / 63.3%. R@10 now
+   exceeds the vector baseline on this corpus; the remaining gap is 10 points at
+   R@1 and 1.7 at R@5.
+
+   What this does not re-measure is the count of short blocks in the 944,808-block
+   evaluation corpus, which is what the old default was tuned against and is
+   itself suspect now. On a corpus of genuinely degenerate fragments rather than
+   sentences, raise it back.
+
+   Five things in this measurement chain turned out not to be ranking problems -- a
+   mock config, a learning side effect, a cosine floor that was not the cause, a
+   weight that was not the cause, and a parser eating the corpus. None of the four
+   earlier conclusions would have been worth much without this one underneath them.
 
 12. **Fresh entries are embedded at store time, and that has a cost.** The
     append log used to be invisible to the semantic path until the next full

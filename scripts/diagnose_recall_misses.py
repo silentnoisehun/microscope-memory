@@ -37,8 +37,11 @@ VECTOR_LINE = re.compile(
 FOUND_AT = re.compile(r"answer_sim=Some\(\(([\d.eE+-]+),")
 # The binary's post-sort verdict: where the answer landed in the final list.
 FINAL = re.compile(r"EVALDIAG final=(\S+)(?: pos=(-?\d+))?")
-# embedding_index::search drops any vector below this cosine, so an answer can
-# be present in the index and still never reach the candidate list.
+# embedding_index::search will not offer a vector below this cosine as a
+# candidate. Measured on the 60-fact benchmark: sweeping it from 0.3 to 0.0
+# changes no recall figure, so this constant is a report, not a cause. The
+# answers it would exclude still rank inside the fetched list -- they finish
+# last. See embedding_index::similarity_floor and MICROSCOPE_SIM_FLOOR.
 GATE = 0.3
 
 

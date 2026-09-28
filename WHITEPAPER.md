@@ -1029,15 +1029,24 @@ the distinction between inner-loop and end-to-end cost are also in
    script's default now points at that index, because leaving it on the mock
    one is how this went unnoticed.
 
-   Of the five remaining misses, two are excluded by the cosine floor that
-   `embedding_index::search` applies before a vector can become a candidate:
-   "diet" scores 0.089 and "email domain" 0.073 against a 0.3 floor, so they
-   are present in the index and never offered. Two more are reachable but outranked
-   ("team name" lands at position 65 with cosine 0.724). One is absent from the
-   ranked list entirely. Raising or removing the floor is a ranking change, so
-   it is measured before it is touched; `scripts/diagnose_recall_misses.py`
-   reports which of the two kinds each miss is, so the next change has a target
-   rather than a hunch.
+   Of the five remaining misses, one is absent from the ranked list and four are
+   reachable but outranked. An earlier reading of this blamed the cosine floor
+   that `embedding_index::search` applies, on the strength of two answers
+   scoring 0.089 and 0.073 against it. That was an inference from a diagnostic
+   line and it was wrong: the floor is now settable via
+   `MICROSCOPE_SIM_FLOOR`, and sweeping it from 0.3 down to 0.0 changes
+   R@1/R@5/R@10 not at all (73.3 / 86.7 / 90.0% at every value). With the floor
+   removed the diagnostic returns all 71 vectors and the vegetarian block is
+   there, at index 69 of 71. It was never filtered; it finishes last.
+
+   What ranks it last is the shape of the score. `main.rs` folds cosine in as
+   a bonus on top of a lexical and spatial distance, `combined -= sim * w`
+   with `w` clamped to 1.0, so a 0.089 cosine is worth about 0.09 against a
+   lexical distance of several tenths and cannot lift the answer. FAISS ranks on
+   cosine alone. That is the structural difference between 90% and 73% -- not a
+   threshold, and not a defect in the index. Letting the semantic term lead is a
+   ranking change and is not done here; the finding is what the change would
+   have to be.
 
 12. **Fresh entries are embedded at store time, and that has a cost.** The
     append log used to be invisible to the semantic path until the next full

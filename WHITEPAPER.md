@@ -376,10 +376,10 @@ Three levels of visualization output:
    - Animated wave field pulsing, dream cycle energy visualization, archetype temporal rings
 
 2. **Basic Snapshot** (`viz` command): JSON export of blocks, edges, field, archetypes, echoes, and aggregate stats.
-
 3. **Density Map** (`density` command): Binary DEN1 format — quantized 3D grid of Hebbian energy for fast volumetric rendering.
 
 ---
+
 
 ## 6. Performance
 
@@ -918,14 +918,14 @@ the distinction between inner-loop and end-to-end cost are also in
    answers are 22–23 characters and fall under the 24-character floor; they are
    the only regressions (20 misses recovered, 2 introduced). Floor 17 keeps
    them and measured worse (78.3% hit@10), so it was rejected.
-5. **The resonance set is synthetic** — 60 hand-written facts, not a sample of
+6. **The resonance set is synthetic** — 60 hand-written facts, not a sample of
    real usage. The measured hit@10 of 81.7% (70.0% pre-gate) says how often the
    retrieval path answers one of these 60 known questions; it does not say how
    the system performs on a real corpus.
-6. **The reinforcement layers are heuristic.** Drift, decay and weight learning
+7. **The reinforcement layers are heuristic.** Drift, decay and weight learning
    use hand-chosen constants; there is no evidence here that they are
    near-optimal, and no hyperparameter sweep has been run.
-7. **Cold-start cost dominates for small corpora.** End-to-end latency is
+8. **Cold-start cost dominates for small corpora.** End-to-end latency is
    dominated by process start, state loading and the query embedding, so
    in-process figures understate what a user experiences.
 9. **The MCP path writes memories during a query, which is why it is slower
@@ -960,12 +960,42 @@ the distinction between inner-loop and end-to-end cost are also in
 
    The fix is therefore not another cache. It is that a query should not be
    writing memories at all — the associative linking belongs in a background
-   consolidation step, or at minimum its nine embeddings should go through one
-   batch call instead of nine. Both change what a recall does, so neither is
-   done here. Until one is chosen, the published latency figures are the CLI
-   ones, and the MCP server is described as the integration surface rather than
-   the fast one.
-10. **Fresh entries are embedded at store time, and that has a cost.** The
+   consolidation step. That is a design question, so it is not done here. What
+   *was* done, and measured: the nine link texts are now built first and
+   embedded together through rayon on the cached provider, so the same nine
+   vectors are computed at once instead of one after another. That took the
+   warm MCP p50 from 1,005 ms to 739.7 ms. The writes stay sequential, because
+   each one takes the file lock.
+11. **The recall control is not a control.** The figures above and below are
+   the ones this project has been steering by, so they deserve the finding that
+   came out of checking them. Running the same binary against the same index
+   three times gave R@1 of 37, 34 and 34 — not one answer, and not the 42 the
+   previous session recorded. The ranking is deterministic (six queries, run
+   twice each, identical rank order every time). What moves is the *distance*:
+   the top hit came back at L2=0.45051, then 0.25906, 0.20475, 0.17290,
+   0.16108 — monotone, across consecutive runs of one query. A single recall
+   rewrites 15 files in the output directory: activations, coactivations,
+   emotion_log, narrative, narrative_memory, predictive_cache, pulses,
+   resonance, thought_graph, thought_patterns. The pre-fetch confidence on one
+   query climbed 62% → 81% → 98% over three runs.
+
+   So the system is learning, and it is learning the *questions*. Replaying a
+   query pulls its own answer closer each time, which is exactly what a
+   retrieval memory does, and it is why the number moved every time it was
+   measured. It also means R@k measured this way reports how much the system
+   has been asked, not what it knows. 42/48/49 was a real number from a real
+   run; it just was not a fixed point, and neither is 37/34/34. Nothing here
+   shows the change in this commit caused it: the CLI recall path does not call
+   the store path that was touched, and the same drift is present across runs
+   of a single unmodified binary.
+
+   A trustworthy control needs the writes turned off for the duration of the
+   measurement, or a fresh copy of the index per run, and the distance printed
+   alongside the rank so a drifting system is visible rather than averaged
+   away. Until that exists, the honest statement is that the recall number is
+   a function of run order, and the latency numbers are solid while the
+   accuracy numbers are not.
+12. **Fresh entries are embedded at store time, and that has a cost.** The
    append log used to be invisible to the semantic path until the next full
    rebuild. It no longer is: `store` embeds the text once, under the same
    quality gate the index build uses, and records the vector in
@@ -977,7 +1007,7 @@ the distinction between inner-loop and end-to-end cost are also in
    before, while an MCP server loads the model once), the sidecar is discarded
    at the next rebuild, where the entries are re-embedded as main blocks, and
    how this behaves with thousands of pending entries is untested.
-9. **The layer ablation is inconclusive.** The null deltas in Section 10.2 were
+13. **The layer ablation is inconclusive.** The null deltas in Section 10.2 were
    measured with the semantic path disconnected, and the patch mechanism
    neutralises one entry point per module rather than disabling the layer end to
    end. It establishes neither that the thirteen layers are load-bearing nor

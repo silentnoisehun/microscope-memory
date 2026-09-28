@@ -165,7 +165,8 @@ pub use emotional_state::{emotional_prime_weight, EmotionalStateRing};
 pub use reader::{
     append_emotion_log, build_emotions_from_log, emotional_similarity, format_emotion,
     load_emotion_lookup, read_append_log, store_memory, store_memory_temporary,
-    store_memory_with_emotion, DataStore, MicroscopeReader, RadialResult, ResultSet, EMOTION_DIMS,
+    store_memory_with_embedding, store_memory_with_emotion, DataStore, MicroscopeReader,
+    RadialResult, ResultSet, EMOTION_DIMS,
     EMOTION_VECTOR_SIZE,
 };
 #[cfg(not(target_arch = "wasm32"))]

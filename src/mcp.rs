@@ -7,7 +7,10 @@
 
 use crate::config::Config;
 use crate::reader::MicroscopeReader;
-use crate::{read_append_log, store_memory, store_memory_with_emotion, LAYER_NAMES};
+use crate::{
+    read_append_log, store_memory, store_memory_with_embedding, store_memory_with_emotion,
+    LAYER_NAMES,
+};
 use microscope_hooks::*;
 use serde_json::{json, Value};
 use std::collections::{HashMap, HashSet};
@@ -1463,18 +1466,48 @@ fn tool_recall(config: &Config, args: &Value) -> Result<String, String> {
 
         attention.mark_recall();
 
-        // Associative: link top-3 results that share keywords
+        // Associative: link top-3 results that share keywords.
+        //
+        // The links are built first, then embedded together. Nine sequential
+        // MiniLM inferences measured 585 ms of a ~1,030 ms call, and each one
+        // is independent, so they go through rayon on the cached provider: the
+        // same nine texts, the same nine vectors, in the same order -- only
+        // computed at once instead of one after another. The writes themselves
+        // stay sequential because each one takes the file lock.
+        let mut links: Vec<String> = Vec::new();
         for (i, &(_, idx_a, is_a)) in all_results.iter().take(3).enumerate() {
             for &(_, idx_b, is_b) in all_results.iter().take(5).skip(i + 1) {
                 let text_a = if is_a { reader.text(idx_a) } else { "" };
                 let text_b = if is_b { reader.text(idx_b) } else { "" };
                 if !text_a.is_empty() && !text_b.is_empty() {
-                    let link = format!(
+                    links.push(format!(
                         "LINK: [{:.40}] <-> [{:.40}] via '{}'",
                         text_a, text_b, query
-                    );
-                    let _ = store_memory(config, &link, "associative", 6);
+                    ));
                 }
+            }
+        }
+        if !links.is_empty() {
+            let dim = config.embedding.dim;
+            // `with_cached_provider` is generic in the closure's return type, so
+            // this is the vector of results itself -- no Result to unwrap.
+            let vectors: Vec<Result<Vec<f32>, crate::embeddings::EmbeddingError>> =
+                crate::embeddings::with_cached_provider(&config.embedding, dim, |p| {
+                    use rayon::prelude::*;
+                    links
+                        .par_iter()
+                        .map(|t| p.embed(t))
+                        .collect::<Vec<Result<Vec<f32>, _>>>()
+                });
+            for (n, link) in links.iter().enumerate() {
+                // A failed inference yields no vector, and the store then embeds
+                // inline -- slower, but a link is never dropped for want of one.
+                let precomputed = vectors
+                    .get(n)
+                    .and_then(|v| v.as_ref().ok())
+                    .filter(|v| v.len() == dim)
+                    .cloned();
+                let _ = store_memory_with_embedding(config, link, "associative", 6, precomputed);
             }
         }
 

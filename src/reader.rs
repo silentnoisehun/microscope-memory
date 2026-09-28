@@ -1479,7 +1479,18 @@ pub fn store_memory_temporary(
 /// Admission uses the same `quality_gate` as the index build, so a fresh memory
 /// cannot slip in under a looser rule than the one that built the index -- that
 /// is how the 17..23 character crowding would come straight back.
+/// Embed the stored text and record it in the append-embeddings sidecar.
 fn embed_appended_entry(config: &Config, text: &str) {
+    embed_appended_entry_with(config, text, None);
+}
+
+/// As `embed_appended_entry`, but `precomputed` short-circuits the inference.
+///
+/// A caller that already embedded the text -- the MCP recall embeds its nine
+/// associative links up front, in parallel -- passes the vector it computed.
+/// The gate below still decides admission, so a precomputed vector can never
+/// smuggle a fragment past the same policy the build applies.
+fn embed_appended_entry_with(config: &Config, text: &str, precomputed: Option<Vec<f32>>) {
     use crate::embedding_index::{
         min_embed_chars, quality_gate, AppendEmbeddings, EmbedVerdict, APPEND_EMBEDDINGS_FILE,
     };
@@ -1514,9 +1525,10 @@ fn embed_appended_entry(config: &Config, text: &str) {
     // stored link, which is most of the 4.4 s an MCP call was taking. The
     // cache is keyed by (provider, model, dimension), so the behaviour is the
     // same and the model is built once per process.
-    let embedded = crate::embeddings::with_cached_provider(&config.embedding, dim, |p| {
-        p.embed(text)
-    });
+    let embedded = match precomputed {
+        Some(v) => Ok(v),
+        None => crate::embeddings::with_cached_provider(&config.embedding, dim, |p| p.embed(text)),
+    };
     match embedded {
         Ok(v) if v.len() == dim => {
             let path = output_dir.join(APPEND_EMBEDDINGS_FILE);
@@ -1550,6 +1562,34 @@ pub fn store_memory_with_status(
     importance: u8,
     status: Option<&str>,
     emotion: Option<[f32; 21]>,
+) -> Result<(), String> {
+    store_memory_with_status_inner(config, text, layer, importance, status, emotion, None)
+}
+
+/// Store a memory whose embedding the caller has already computed.
+///
+/// The vector must be the one this store would have produced; it is only a
+/// shortcut for callers that embed several texts at once. Passing a vector for
+/// text that the quality gate rejects stores the memory without one, exactly
+/// as an inline inference would.
+pub fn store_memory_with_embedding(
+    config: &Config,
+    text: &str,
+    layer: &str,
+    importance: u8,
+    embedding: Option<Vec<f32>>,
+) -> Result<(), String> {
+    store_memory_with_status_inner(config, text, layer, importance, None, None, embedding)
+}
+
+fn store_memory_with_status_inner(
+    config: &Config,
+    text: &str,
+    layer: &str,
+    importance: u8,
+    status: Option<&str>,
+    emotion: Option<[f32; 21]>,
+    precomputed: Option<Vec<f32>>,
 ) -> Result<(), String> {
     let _lock = FileLock::acquire(config)?;
     let t0 = std::time::Instant::now();
@@ -1604,9 +1644,9 @@ pub fn store_memory_with_status(
         .map_err(|e| format!("flush append log: {}", e))?;
 
     // Append-log vector: embed the stored text once so the semantic path can
-    // reach it before the next rebuild (see `embed_appended_entry`). Done before
-    // the layer-file write so a slow provider cannot delay persistence.
-    embed_appended_entry(config, text);
+    // reach it before the next rebuild (see `embed_appended_entry_with`). Done
+    // before the layer-file write so a slow provider cannot delay persistence.
+    embed_appended_entry_with(config, text, precomputed);
 
     if let Err(e) = persist_to_layer_file(config, text, layer, importance) {
         eprintln!("  {} persist to layer file: {}", "WARN".yellow(), e);

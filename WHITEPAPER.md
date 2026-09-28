@@ -1110,6 +1110,31 @@ The user does not hav", severed mid-word. And the sentence splitter broke on
    itself suspect now. On a corpus of genuinely degenerate fragments rather than
    sentences, raise it back.
 
+   There is a deeper one underneath all of that, and it is the reason the
+   remaining gap should not be read as a ranking result. The candle provider is
+   internally consistent -- the same text always yields the same vector, and
+   querying with a fact verbatim returns that fact at Sim=1.000 -- and it is
+   still not the model it names. Against the reference all-MiniLM-L6-v2
+   embedding of the same text, the stored vectors score a mean cosine of
+   0.32-0.37, not 1.0. So two things are true at once: the provider is
+   deterministic, and the binary's embeddings are not the ones the FAISS row
+   is built from.
+
+   That makes the comparison uneven on the semantic axis, and it shows up in the
+   one case the diagnostic still misses: for "chronotype" the binary reports
+   cosine 0.860 against "The user is a morning person." and ranks it 49th,
+   while the reference gives 0.045 for the same pair and ranks it 20th. Same
+   query, different neighbourhood.
+
+   Masked and unmasked mean pooling were measured and are identical here
+   (0.369 both) because these texts never pad; add_special_tokens on or off
+   makes no difference (0.316 vs 0.311); and the mock fallback is ruled out by
+   construction, since the candle path exits rather than degrading. What is
+   left is the forward pass itself -- the weights as loaded, or
+   `BertModel::forward` building its mask from token_type_ids. No fix is
+   attempted here, because guessing between those is the exact failure this
+   section documents. The target to beat is 0.32-0.37; a correct
+   implementation reaches ~1.0 on the same text.
    Five things in this measurement chain turned out not to be ranking problems -- a
    mock config, a learning side effect, a cosine floor that was not the cause, a
    weight that was not the cause, and a parser eating the corpus. None of the four

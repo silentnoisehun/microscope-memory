@@ -12,10 +12,10 @@
       "system": "microscope (recall, end-to-end)",
       "note": "includes process start, config load and state load",
       "latency": {
-        "p50_ms": 331.5221,
-        "p95_ms": 503.0504,
-        "p99_ms": 524.2471,
-        "mean_ms": 337.3259
+        "p50_ms": 260.1219,
+        "p95_ms": 357.2294,
+        "p99_ms": 381.2022,
+        "mean_ms": 267.1842
       },
       "recall_at_k": {
         "1": 42,
@@ -32,10 +32,10 @@
       "system": "faiss IndexFlatIP (MiniLM)",
       "note": "all-MiniLM-L6-v2, d=384; 1 thread; query only",
       "latency": {
-        "p50_ms": 0.0102,
-        "p95_ms": 0.0129,
-        "p99_ms": 0.0185,
-        "mean_ms": 0.0111
+        "p50_ms": 0.0076,
+        "p95_ms": 0.0208,
+        "p99_ms": 0.0338,
+        "mean_ms": 0.0254
       },
       "recall_at_k": {
         "1": 54,
@@ -52,10 +52,10 @@
       "system": "faiss IndexHNSWFlat (MiniLM)",
       "note": "all-MiniLM-L6-v2, d=384; 1 thread; query only",
       "latency": {
-        "p50_ms": 0.0123,
-        "p95_ms": 0.0138,
-        "p99_ms": 0.0187,
-        "mean_ms": 0.0131
+        "p50_ms": 0.0112,
+        "p95_ms": 0.014,
+        "p99_ms": 0.0182,
+        "mean_ms": 0.0124
       },
       "recall_at_k": {
         "1": 54,
@@ -72,10 +72,10 @@
       "system": "sqlite fts5 (bm25)",
       "note": "in-memory; query time only, no index build",
       "latency": {
-        "p50_ms": 0.0312,
-        "p95_ms": 0.115,
-        "p99_ms": 0.1249,
-        "mean_ms": 0.0406
+        "p50_ms": 0.023,
+        "p95_ms": 0.1081,
+        "p99_ms": 0.1669,
+        "mean_ms": 0.0324
       },
       "recall_at_k": {
         "1": 32,

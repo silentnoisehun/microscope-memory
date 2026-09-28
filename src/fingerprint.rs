@@ -147,6 +147,52 @@ impl LinkTable {
             links,
         })
     }
+    /// Load the link table, reusing a previous instance when neither
+    /// `fingerprints.idx` nor `links.bin` has changed on disk.
+    ///
+    /// The MCP server rebuilt this on every recall: 65.8 MB of links parsed per
+    /// query. A long-lived process may hold it; the (length, mtime) stamp of
+    /// both files reloads it after a rebuild rewrites either one, so a server
+    /// that outlives a rebuild does not serve a stale table.
+    pub fn load_cached(output_dir: &Path) -> Option<std::sync::Arc<LinkTable>> {
+        fn stamp(path: &Path) -> (u64, u64) {
+            match fs::metadata(path) {
+                Ok(m) => {
+                    let mtime = m
+                        .modified()
+                        .ok()
+                        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                        .map(|d| d.as_millis() as u64)
+                        .unwrap_or(0);
+                    (m.len(), mtime)
+                }
+                Err(_) => (0, 0),
+            }
+        }
+        type Cache = ((u64, u64, u64, u64), std::sync::Arc<LinkTable>);
+        static CACHE: std::sync::OnceLock<std::sync::Mutex<Option<Cache>>> =
+            std::sync::OnceLock::new();
+        // The LinkTable is built from `fingerprints.idx` (FGP1) and `links.bin`
+        // (LNK1). Not from `fingerprints.bin`, which is the Hebbian activation
+        // fingerprint log (FPR1) and is rewritten by every recall -- keying on
+        // it would miss the cache on every single call, which is what the first
+        // version of this function did.
+        let (fl, fm) = stamp(&output_dir.join("fingerprints.idx"));
+        let (ll, lm) = stamp(&output_dir.join("links.bin"));
+        let key = (fl, fm, ll, lm);
+        let mut guard = CACHE
+            .get_or_init(|| std::sync::Mutex::new(None))
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        if let Some((k, table)) = guard.as_ref() {
+            if *k == key {
+                return Some(std::sync::Arc::clone(table));
+            }
+        }
+        let table = std::sync::Arc::new(Self::load(output_dir)?);
+        *guard = Some((key, std::sync::Arc::clone(&table)));
+        Some(table)
+    }
 }
 
 pub struct FingerprintStats {

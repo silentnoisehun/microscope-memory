@@ -928,7 +928,25 @@ the distinction between inner-loop and end-to-end cost are also in
 7. **Cold-start cost dominates for small corpora.** End-to-end latency is
    dominated by process start, state loading and the query embedding, so
    in-process figures understate what a user experiences.
-8. **Fresh entries are embedded at store time, and that has a cost.** The
+9. **The MCP path is slower than the CLI, and that is not yet explained.**
+   Measured on the same index with the same questions, one process serving
+   twenty `memory_recall` calls: warm p50 1,771 ms, and in a later session
+   bimodal at roughly 250 ms and 4,400 ms with no growth across the session
+   (per-call series: 4516 4336 712 4328 305 4259 254 259 251 4261 …), against
+   260–331 ms for the CLI path. The two candidates that were checked and ruled
+   out are the obvious ones: the 65.8 MB link table and the embedding provider,
+   both of which the server rebuilt per call and which are now cached (the
+   caches are correct, but the MCP latency did not measurably move, so no win is
+   claimed for them), and raw file reads, which cost 19–57 ms for 56 MB on this
+   machine. The remaining lead is structural: `tool_recall` clones the shared
+   Hebbian state — 22.4 MB of `ActivationRecord` for this corpus — under a
+   mutex on every call, and the background consciousness stream takes the same
+   lock for its own state writes, which fits the bimodal pattern. Fixing that
+   means sharing the state instead of cloning it, not another cache. Until it
+   is measured, the published latency figures are the CLI ones, and the MCP
+   server should be described as the integration surface rather than the fast
+   one.
+10. **Fresh entries are embedded at store time, and that has a cost.** The
    append log used to be invisible to the semantic path until the next full
    rebuild. It no longer is: `store` embeds the text once, under the same
    quality gate the index build uses, and records the vector in

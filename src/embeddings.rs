@@ -376,6 +376,50 @@ impl EmbeddingProvider for PythonEmbeddingProvider {
     }
 }
 
+/// Run `f` with the configured provider, reusing the previous instance when
+/// (provider, model, dimension) is unchanged.
+///
+/// A long-lived process used to rebuild the provider on every call, and for the
+/// candle provider that means re-reading the tokenizer and re-faulting the model
+/// weights: measured at 127-137 ms of a recall on the eval index, paid again for
+/// every query. The MCP server is the case that matters — one process, many
+/// queries — and it was doing exactly that.
+///
+/// The cache is keyed by the configuration, so a different provider, model or
+/// dimension rebuilds it. A construction that falls back to the mock is cached
+/// like any other value: `provider_from_config` reports the fallback on stderr
+/// and returns a working provider either way, so caching it cannot hide an
+/// error. A panic inside `f` must not poison the cache for the next call, so the
+/// lock recovers rather than propagating.
+pub fn with_cached_provider<R>(
+    cfg: &crate::config::Embedding,
+    idx_dim: usize,
+    f: impl FnOnce(&dyn EmbeddingProvider) -> R,
+) -> R {
+    type Cache = (String, String, usize, Box<dyn EmbeddingProvider>);
+    static CACHE: std::sync::OnceLock<std::sync::Mutex<Option<Cache>>> = std::sync::OnceLock::new();
+    let mut guard = CACHE
+        .get_or_init(|| std::sync::Mutex::new(None))
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
+    let rebuild = match guard.as_ref() {
+        Some((p, m, d, _)) => (p, m, d) != (&cfg.provider, &cfg.model, &idx_dim),
+        None => true,
+    };
+    if rebuild {
+        *guard = Some((
+            cfg.provider.clone(),
+            cfg.model.clone(),
+            idx_dim,
+            provider_from_config(cfg, idx_dim),
+        ));
+    }
+    match guard.as_ref() {
+        Some((_, _, _, provider)) => f(provider.as_ref()),
+        None => unreachable!("the provider was installed above"),
+    }
+}
+
 /// Build the embedding provider requested by config with an honest fallback:
 /// a configured provider that cannot be initialized is reported on stderr
 /// instead of silently degrading to the mock. The mock is returned for

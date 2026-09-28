@@ -1173,13 +1173,17 @@ fn tool_recall(config: &Config, args: &Value) -> Result<String, String> {
         std::collections::HashMap::new();
     {
         use crate::embedding_index::EmbeddingIndex;
-        use crate::embeddings::EmbeddingProvider;
 
         let emb_path = output_dir.join("embeddings.bin");
         if let Some(eidx) = EmbeddingIndex::open(&emb_path) {
-            let provider: Box<dyn EmbeddingProvider> =
-                crate::embeddings::provider_from_config(&config.embedding, eidx.dim());
-            match provider.embed(query) {
+            // Cached: a long-lived server used to rebuild the provider -- and
+            // re-fault the model weights -- on every single query.
+            let embedded = crate::embeddings::with_cached_provider(
+                &config.embedding,
+                eidx.dim(),
+                |p| p.embed(query),
+            );
+            match embedded {
                 Ok(qe) if qe.len() == eidx.dim() => {
                     for (sim, block_idx) in eidx.search(&qe, (k * 8).max(64)) {
                         if block_idx < reader.block_count {
@@ -1282,7 +1286,7 @@ fn tool_recall(config: &Config, args: &Value) -> Result<String, String> {
     }
 
     // Spreading activation: fingerprint-linked blocks get boosted across 2-hop
-    let link_table = crate::fingerprint::LinkTable::load(output_dir);
+    let link_table = crate::fingerprint::LinkTable::load_cached(output_dir);
     if let Some(ref lt) = link_table {
         all_results.sort_by(|a, b| a.0.total_cmp(&b.0));
         let top_n = all_results.len().min(3);

@@ -1047,14 +1047,32 @@ the distinction between inner-loop and end-to-end cost are also in
    the lexical base adds and the scale is saturated. The clamp at 1.0 is not
    what holds the recall back.
 
-   What is left is crowding, and it is the defect this section already names
-   and does not fix. The 71-vector index holds 62 blocks at depth 4 -- the
-   neighbourhood of a one-word "hu." fragment -- and the correct answer sits at
-   vector index 69, last of 71. It is not beaten by better answers; it is
-   outvoted by 62 near-identical neighbours that all share the query's tokens,
-   so the lexical term floats that cluster to the top. The note on the D5
-   blocks already says this needs similarity-based diversity rather than a bit
-   comparison, and the bit comparison was tried and reverted.
+   Crowding was the next guess and it was wrong too: the depth-4 blocks are 69
+   distinct entries, not near-duplicates. Reading the index directly found the
+   real cause. "The user is vegetarian." exists as block 27 and was never
+   embedded -- the quality gate's minimum is 24 characters and the fact is 23.
+   That gate is the one this project added first, and it was refusing a
+   legitimate short memory. Lowering it is measurable, on this corpus:
+
+     minimum   blocks embedded   R@1     R@5     R@10
+     24 (default)      71        73.3%   86.7%   90.0%
+     16                82        76.7%   90.0%   95.0%
+     8                 83        76.7%   88.3%   95.0%
+
+   16 is better on all three and 8 starts admitting noise (R@5 falls back), so
+   the floor is a real cost and a real lever. The default is left at 24: that
+   number was chosen against a 944,808-block corpus where 50,509 blocks sit
+   under it, and a 60-fact synthetic set of short sentences is the wrong corpus
+   to decide a global admission policy from. The measurement is the argument
+   for whoever deploys a short-note memory to set
+   `MICROSCOPE_MIN_EMBED_CHARS=16`.
+
+   A second defect, unrelated to any threshold, is worth recording because it
+   is silent: the corpus line is "The user's email address ends with .hu." and
+   the stored block reads "The user's email address ends with ." -- 39 characters
+   became 36, and ".hu" is exactly the token the evaluation looks for. The build
+   is losing the tail of an entry without saying so, and no threshold can
+   recover a fact whose text no longer contains the answer.
 
 12. **Fresh entries are embedded at store time, and that has a cost.** The
     append log used to be invisible to the semantic path until the next full

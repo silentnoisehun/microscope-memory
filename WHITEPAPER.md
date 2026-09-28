@@ -1039,14 +1039,22 @@ the distinction between inner-loop and end-to-end cost are also in
    removed the diagnostic returns all 71 vectors and the vegetarian block is
    there, at index 69 of 71. It was never filtered; it finishes last.
 
-   What ranks it last is the shape of the score. `main.rs` folds cosine in as
-   a bonus on top of a lexical and spatial distance, `combined -= sim * w`
-   with `w` clamped to 1.0, so a 0.089 cosine is worth about 0.09 against a
-   lexical distance of several tenths and cannot lift the answer. FAISS ranks on
-   cosine alone. That is the structural difference between 90% and 73% -- not a
-   threshold, and not a defect in the index. Letting the semantic term lead is a
-   ranking change and is not done here; the finding is what the change would
-   have to be.
+   What ranks it last is not the score shape either. Sweeping
+   `semantic_weight` from 1.0 to 5.0 changes nothing: 73.3 / 86.7 / 90.0% at
+   every value, flat like the floor. The printed distances explain why no
+   weight could matter -- the top results for "diet" come back at L2 = -0.064,
+   -0.052, -0.047, already negative, so the semantic term subtracts more than
+   the lexical base adds and the scale is saturated. The clamp at 1.0 is not
+   what holds the recall back.
+
+   What is left is crowding, and it is the defect this section already names
+   and does not fix. The 71-vector index holds 62 blocks at depth 4 -- the
+   neighbourhood of a one-word "hu." fragment -- and the correct answer sits at
+   vector index 69, last of 71. It is not beaten by better answers; it is
+   outvoted by 62 near-identical neighbours that all share the query's tokens,
+   so the lexical term floats that cluster to the top. The note on the D5
+   blocks already says this needs similarity-based diversity rather than a bit
+   comparison, and the bit comparison was tried and reverted.
 
 12. **Fresh entries are embedded at store time, and that has a cost.** The
     append log used to be invisible to the semantic path until the next full

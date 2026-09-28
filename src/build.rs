@@ -143,14 +143,39 @@ fn extract_texts_from_file(path: &Path) -> Vec<(String, u8)> {
         }
     }
 
-    // Fallback if no doubles: chunk by size
+    // Fallback if no doubles: chunk by size.
+    //
+    // The chunks are cut on line boundaries, not at an arbitrary byte. A layer
+    // file with one entry per line has no blank lines, so the split above
+    // yields the whole file as one text, and cutting that at BLOCK_DATA_SIZE
+    // severed entries mid-word: the 60-fact evaluation corpus became a single
+    // 1024-byte block ending "...ends with .hu.\r\nThe user does not hav",
+    // and the fragment that held the answer lost the tail that the evaluation
+    // looks for. Cutting on a line boundary keeps every entry whole; an entry
+    // longer than the limit is still truncated, which `to_block` records.
     if texts.len() < 2 {
         texts.clear();
-        let chars: Vec<char> = raw.chars().collect();
-        for chunk in chars.chunks(BLOCK_DATA_SIZE) {
-            let s: String = chunk.iter().collect();
-            if s.trim().len() > 5 {
-                let (text, importance) = crate::reader::parse_imp_marker(&s);
+        let mut current = String::new();
+        for line in raw.lines() {
+            let line = line.trim();
+            if line.is_empty() {
+                continue;
+            }
+            if !current.is_empty() && current.len() + line.len() + 1 > BLOCK_DATA_SIZE {
+                let (text, importance) = crate::reader::parse_imp_marker(&current);
+                if text.trim().len() > 3 {
+                    texts.push((text.to_string(), importance));
+                }
+                current.clear();
+            }
+            if !current.is_empty() {
+                current.push('\n');
+            }
+            current.push_str(line);
+        }
+        if !current.is_empty() {
+            let (text, importance) = crate::reader::parse_imp_marker(&current);
+            if text.trim().len() > 3 {
                 texts.push((text.to_string(), importance));
             }
         }
@@ -163,9 +188,25 @@ fn extract_texts_from_file(path: &Path) -> Vec<(String, u8)> {
 fn split_sentences(text: &str) -> Vec<String> {
     let mut sentences = Vec::new();
     let mut current = String::new();
-    for ch in text.chars() {
+    let chars: Vec<char> = text.chars().collect();
+    for (i, &ch) in chars.iter().enumerate() {
         current.push(ch);
-        if matches!(ch, '.' | '!' | '?' | '\n') && current.len() > 10 {
+        if !matches!(ch, '.' | '!' | '?' | '\n') || current.trim().len() <= 10 {
+            continue;
+        }
+        // A period inside a token is not a sentence end. "ends with .hu." and
+        // "3.5" and "e.g." were being cut there, and the fragment that survived
+        // lost the very token a search would look for: the 60-fact corpus
+        // stored "The user's email address ends with ." with ".hu" split off
+        // into its own block. A terminator only counts when what follows is
+        // the end of the text, whitespace, or a capital -- which keeps
+        // sentence-initial capitals working without breaking abbreviations.
+        let next = chars.get(i + 1).copied();
+        let ends_here = match next {
+            None => true,
+            Some(c) => c.is_whitespace() || c.is_uppercase(),
+        };
+        if ends_here {
             sentences.push(current.trim().to_string());
             current = String::new();
         }

@@ -948,15 +948,23 @@ the distinction between inner-loop and end-to-end cost are also in
    activated block, and the structural-similarity scan sorted ~699k matches
    three times per recall.
 
-   What remains is 229–1,253 ms per call, still bimodal, against 324 ms for
-   the CLI, and it is not attributed. The leading suspect is the same linking
-   loop: each of those writes takes the file lock, appends to `append.bin` and
-   to a layer file, and checks the auto-rebuild threshold — and the entries it
-   appends can trip that threshold (250 in the eval configuration) and rebuild
-   mid-session. That is a design question rather than a cache: a query should
-   not be writing memories at all. Until it is measured, the published latency
-   figures are the CLI ones, and the MCP server is described as the integration
-   surface rather than the fast one.
+   What remains is 229–1,253 ms per call, still bimodal, and it is now
+   attributed as well: the cost tracks the number of writes, not anything
+   ambient. A call that wrote nine links took ~1,030 ms, one that wrote one
+   took 342 ms, one that wrote none took 286 ms. Each write costs 72.8–80.1 ms
+   in-process with the cached provider, of which 63.5–70.6 ms is a single
+   MiniLM inference on the stored text; the lock is 0.3–0.4 ms, the layer
+   file 1.8–10.3 ms and the auto-rebuild check 5.8–6.3 ms. So what is left is
+   nine embedding inferences per query, which is arithmetic rather than waste:
+   the same embedding of a short text costs ~65 ms on this machine.
+
+   The fix is therefore not another cache. It is that a query should not be
+   writing memories at all — the associative linking belongs in a background
+   consolidation step, or at minimum its nine embeddings should go through one
+   batch call instead of nine. Both change what a recall does, so neither is
+   done here. Until one is chosen, the published latency figures are the CLI
+   ones, and the MCP server is described as the integration surface rather than
+   the fast one.
 10. **Fresh entries are embedded at store time, and that has a cost.** The
    append log used to be invisible to the semantic path until the next full
    rebuild. It no longer is: `store` embeds the text once, under the same

@@ -94,26 +94,7 @@ impl EmbeddingIndex {
     /// Search for top-k most similar blocks to query embedding.
     /// Returns Vec<(similarity, block_index)> sorted descending.
     pub fn search(&self, query_emb: &[f32], k: usize) -> Vec<(f32, usize)> {
-        if query_emb.len() != self.dim {
-            return vec![];
-        }
-
-        let ids = self.block_ids();
-        let mut results: Vec<(f32, usize)> = (0..self.embedded_count)
-            .into_par_iter()
-            .filter_map(|i| {
-                let offset = HEADER_SIZE + self.embedded_count * 4 + i * self.dim * 4;
-                let ptr = self.data[offset..].as_ptr() as *const f32;
-                // Safety: validated in open(); i < embedded_count.
-                let emb = unsafe { std::slice::from_raw_parts(ptr, self.dim) };
-                let sim = cosine_similarity_simd(query_emb, emb);
-                (sim > 0.3).then_some((sim, ids[i] as usize))
-            })
-            .collect();
-
-        results.sort_by(|a, b| b.0.total_cmp(&a.0));
-        results.truncate(k);
-        results
+        search_with_floor(query_emb, k, self.dim, &self.data, HEADER_SIZE, self.embedded_count, &self.block_ids())
     }
 
     /// Every stored block id, in ascending order.
@@ -327,8 +308,8 @@ impl AppendEmbeddings {
         Ok(())
     }
 
-    /// Top-k by cosine as (similarity, append index), with the same 0.3 floor
-    /// the main index uses so the two candidate sources stay comparable.
+    /// Top-k by cosine as (similarity, append index), with the same floor the
+    /// main index uses so the two candidate sources stay comparable.
     pub fn search(&self, query_emb: &[f32], k: usize) -> Vec<(f32, u32)> {
         if query_emb.len() != self.dim {
             return vec![];
@@ -338,13 +319,66 @@ impl AppendEmbeddings {
             .iter()
             .filter_map(|(i, v)| {
                 let sim = cosine_similarity_simd(query_emb, v);
-                (sim > 0.3).then_some((sim, *i))
+                (sim > similarity_floor()).then_some((sim, *i))
             })
             .collect();
         out.sort_by(|a, b| b.0.total_cmp(&a.0));
         out.truncate(k);
         out
     }
+}
+
+/// The cosine below which a stored vector is not offered as a candidate.
+///
+/// This was a literal `0.3` in two places. It is read from
+/// `MICROSCOPE_SIM_FLOOR` so the value can be measured instead of guessed:
+/// on the 60-fact benchmark the default excludes two correct answers that are
+/// present and embedded -- "diet" scores 0.089 and "email domain" 0.073 -- and
+/// whether a lower floor recovers them is a ranking question, so it is
+/// measured before it is changed. The default is unchanged.
+pub fn similarity_floor() -> f32 {
+    static FLOOR: std::sync::OnceLock<f32> = std::sync::OnceLock::new();
+    *FLOOR.get_or_init(|| {
+        std::env::var("MICROSCOPE_SIM_FLOOR")
+            .ok()
+            .and_then(|v| v.trim().parse::<f32>().ok())
+            .filter(|v| v.is_finite())
+            .unwrap_or(0.3)
+    })
+}
+
+/// The shared scan behind `EmbeddingIndex::search`, with the floor passed in.
+///
+/// Split out so a test can measure a different floor without going through the
+/// process-wide environment read, which happens once per process.
+fn search_with_floor(
+    query_emb: &[f32],
+    k: usize,
+    dim: usize,
+    data: &[u8],
+    header: usize,
+    count: usize,
+    ids: &[u32],
+) -> Vec<(f32, usize)> {
+    if query_emb.len() != dim {
+        return vec![];
+    }
+    let floor = similarity_floor();
+    let mut results: Vec<(f32, usize)> = (0..count)
+        .into_par_iter()
+        .filter_map(|i| {
+            let offset = header + count * 4 + i * dim * 4;
+            let ptr = data[offset..].as_ptr() as *const f32;
+            // Safety: validated in open(); i < count.
+            let emb = unsafe { std::slice::from_raw_parts(ptr, dim) };
+            let sim = cosine_similarity_simd(query_emb, emb);
+            (sim > floor).then_some((sim, ids[i] as usize))
+        })
+        .collect();
+
+    results.sort_by(|a, b| b.0.total_cmp(&a.0));
+    results.truncate(k);
+    results
 }
 
 /// Build a sparse embedding index file from a provider and reader.

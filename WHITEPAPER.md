@@ -1067,12 +1067,33 @@ the distinction between inner-loop and end-to-end cost are also in
    for whoever deploys a short-note memory to set
    `MICROSCOPE_MIN_EMBED_CHARS=16`.
 
-   A second defect, unrelated to any threshold, is worth recording because it
-   is silent: the corpus line is "The user's email address ends with .hu." and
-   the stored block reads "The user's email address ends with ." -- 39 characters
-   became 36, and ".hu" is exactly the token the evaluation looks for. The build
-   is losing the tail of an entry without saying so, and no threshold can
-   recover a fact whose text no longer contains the answer.
+   Both of those turned out to be data loss in the build rather than anything
+   about thresholds, and both are now fixed (71e938d). A layer file with one
+   entry per line has no blank lines, so the parser's blank-line split missed it
+   and the size fallback cut the corpus into fixed 1024-byte pieces at arbitrary
+   boundaries -- the 60-fact corpus became one block ending "...ends with
+   .hu.\r
+The user does not hav", severed mid-word. And the sentence splitter broke on
+   every period, so the ".hu" in that very fact was split into its own block and
+   the fragment a search would rank no longer held the token. Chunks are now cut
+   on line boundaries and a terminator only counts before whitespace, a capital
+   or the end.
+
+   With the text intact, on the same corpus and config, reproduced twice:
+
+                     R@1      R@5      R@10     p50
+     before          73.3%    86.7%    90.0%   151.9 ms
+     + line-boundary  75.0%    90.0%    93.3%   149.8 ms
+     + sentence split 76.7%    91.7%    95.0%   151.2 ms
+     FAISS            90.0%    96.7%    96.7%     0.01 ms
+
+   R@10 goes from 90.0% to 95.0% and the remaining gap to FAISS is 13.3 points
+   at R@1, 1.7 at R@10. This is the largest single gain in this work, and it is
+   not a ranking change: five things in this measurement chain turned out not to
+   be ranking problems -- a mock config, a learning side effect, a cosine floor
+   that was not the cause, a weight that was not the cause, and a parser eating
+   the corpus. None of the four earlier conclusions would have been worth much
+   without this one underneath them.
 
 12. **Fresh entries are embedded at store time, and that has a cost.** The
     append log used to be invisible to the semantic path until the next full

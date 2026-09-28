@@ -1016,6 +1016,29 @@ the distinction between inner-loop and end-to-end cost are also in
    read cost, and the number for a serving system is this plus the writes it
    does on purpose.
 
+   And then the control turned out to be measuring nothing. The benchmark's
+   own config, `bench_config.toml`, sets `semantic_weight = 0.0` and
+   `provider = "mock"`: the index it builds holds no real vectors, and the
+   diagnostic confirms the vector path returns nothing at all on it
+   (`EVALDIAG vectors=0`). Every R@k above was a lexical-only number, and the
+   gap to FAISS was not a ranking gap but the absence of ranking by vectors.
+   With a real MiniLM index over the same 60 facts
+   (`bench_config_semantic.toml`) the picture is: R@1/R@5/R@10 of
+   **73.3 / 86.7 / 90.0%** at a p50 of ~151 ms, reproduced exactly across runs,
+   against FAISS 90.0 / 96.7 / 96.7% and sqlite fts5 53.3 / 60.0 / 63.3%. The
+   script's default now points at that index, because leaving it on the mock
+   one is how this went unnoticed.
+
+   Of the five remaining misses, two are excluded by the cosine floor that
+   `embedding_index::search` applies before a vector can become a candidate:
+   "diet" scores 0.089 and "email domain" 0.073 against a 0.3 floor, so they
+   are present in the index and never offered. Two more are reachable but outranked
+   ("team name" lands at position 65 with cosine 0.724). One is absent from the
+   ranked list entirely. Raising or removing the floor is a ranking change, so
+   it is measured before it is touched; `scripts/diagnose_recall_misses.py`
+   reports which of the two kinds each miss is, so the next change has a target
+   rather than a hunch.
+
 12. **Fresh entries are embedded at store time, and that has a cost.** The
     append log used to be invisible to the semantic path until the next full
     rebuild. It no longer is: `store` embeds the text once, under the same

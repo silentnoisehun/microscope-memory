@@ -38,7 +38,11 @@ CANDIDATES = [
     ROOT / "target/release/microscope-mem.exe",
 ]
 BIN = next((c for c in CANDIDATES if c.exists()), None)
-CONFIG = ROOT / "bench_config.toml"
+# The semantic index, not bench_config.toml: that one sets semantic_weight = 0.0
+# and provider = "mock", so it contains no real vectors and the vector path
+# returns nothing. Measuring there reports a lexical-only system. Measured
+# R@1/R@5/R@10 with the real MiniLM index: 73.3 / 86.7 / 90.0%.
+CONFIG = ROOT / "bench_config_semantic.toml"
 
 D = 3           # Microscope's coordinate dimensionality
 BOW = 256       # bag-of-words hash width for the dense FAISS configs
@@ -338,7 +342,7 @@ def _parse_query_vector(stdout: bytes) -> "list[float] | None":
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--k", type=int, nargs="+", default=[1, 5, 10])
-    ap.add_argument("--config", default="eval_config.toml")
+    ap.add_argument("--config", default="bench_config_semantic.toml")
     a = ap.parse_args()
 
     cfg = Path(a.config)

@@ -1139,13 +1139,34 @@ The user does not hav", severed mid-word. And the sentence splitter broke on
    our side the weights come from model.safetensors as F32, the config is
    parsed, and the mock fallback cannot happen.
 
-   So the provider reads correctly and still does not reproduce the model,
-   which leaves the tokenizer's actual output or a weight-mapping detail that
-   cannot be seen from outside. The diagnostic has to come from the inside:
-   dump the token ids and the pre-pooling hidden state for one fixed text and
-   compare both against the reference. No fix is attempted here -- choosing
-   between two plausible lines is the exact failure this section documents. The
-   target to beat is 0.32-0.37; a correct implementation reaches ~1.0.
+   The answer came from inside, with a diagnostic that dumps the token ids
+   (`MICROSCOPE_EMBED_DEBUG=<path>`). They are padded to 512:
+
+       [101, 10381, 4948, 26305, 102, 0, 0, 0, ... 0]
+       [CLS]  chronotype  [SEP]   + 507 [PAD]
+
+   And since `BertModel::forward` takes no mask, the encoder attended over all
+   512 positions and the mean pooled all 512. Every embedding in the system was
+   99% padding. That is why the provider passed every consistency check --
+   the same text always gave the same padding-dominated vector, so querying
+   with a fact verbatim returned it at exactly 1.000 -- while scoring 0.32-0.37
+   against the reference. The bug was invisible to any test that only asked
+   whether the provider was deterministic.
+
+   Trimming to the real length, taken from the attention mask, before the
+   forward fixes both halves at once: the encoder no longer attends to padding
+   and the mean is over real tokens only. The stored vectors now match the
+   reference at a mean cosine of 1.0000, minimum 1.0000, over 79 blocks, and
+   none below 0.9.
+
+       before the fix    R@1 80.0%  R@5 95.0%  R@10 98.3%   p50 150.7 ms
+       after             R@1 85.0%  R@5 96.7%  R@10 96.7%   p50 105.7 ms
+       FAISS             R@1 90.0%  R@5 96.7%  R@10 96.7%   p50   0.01 ms
+
+   R@5 now equals the vector baseline exactly and the gap at R@1 is five
+   points. The p50 fell 30% as a side effect: a five-token sentence no longer
+   runs a 512-position forward. Every embedding this system has ever stored
+   was affected, not just the benchmark's.
    Five things in this measurement chain turned out not to be ranking problems -- a
    mock config, a learning side effect, a cosine floor that was not the cause, a
    weight that was not the cause, and a parser eating the corpus. None of the four

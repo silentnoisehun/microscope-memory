@@ -677,9 +677,47 @@ impl CandleEmbeddingProvider {
             .encode(text, true)
             .map_err(|e| EmbeddingError::ApiError(format!("tokenize: {}", e)))?;
 
-        let ids = encoding.get_ids();
-        let type_ids = encoding.get_type_ids();
+        // The tokenizer pads to 512 (the model max), and candle's
+        // BertModel::forward takes no attention mask -- it never constructs
+        // one. So a padded sequence was attended to and then mean-pooled over
+        // all 512 positions: five real tokens and 507 [PAD]. That made every
+        // embedding ~99% padding, which is why the stored vectors score
+        // 0.32-0.37 against the reference model where a correct implementation
+        // scores 1.0, while still being perfectly self-consistent (the same
+        // text always gave the same padding-dominated vector, so every
+        // consistency check passed).
+        //
+        // Trimming to the real length before the forward fixes both halves at
+        // once: the encoder no longer attends to padding, and the mean is over
+        // real tokens only. The attention mask is the source of truth for how
+        // long the real sequence is, because the ids alone cannot tell a
+        // genuine [PAD] from padding.
+        let mask = encoding.get_attention_mask();
+        let real_len = mask.iter().filter(|&&m| m != 0).count().max(1);
+        let all_ids = encoding.get_ids();
+        let all_type_ids = encoding.get_type_ids();
+        let ids = &all_ids[..real_len.min(all_ids.len())];
+        let type_ids = &all_type_ids[..real_len.min(all_type_ids.len())];
         let len = ids.len();
+
+        // Diagnostic: `MICROSCOPE_EMBED_DEBUG=<path>` appends the token ids
+        // and the input text for every embed, so the tokenizer can be compared
+        // against a reference implementation. This exists because the provider
+        // is internally consistent and still does not reproduce the model it
+        // loads -- the stored vectors score 0.32-0.37 against the reference
+        // all-MiniLM-L6-v2 embedding of the same text, where a correct
+        // implementation scores 1.0. Nothing here runs unless the variable is
+        // set, and nothing here can influence the result.
+        if let Ok(path) = std::env::var("MICROSCOPE_EMBED_DEBUG") {
+            use std::io::Write as _;
+            if let Ok(mut f) = std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(&path)
+            {
+                let _ = writeln!(f, "ids\t{:?}\ttext\t{:?}", ids, text);
+            }
+        }
 
         let input_ids = Tensor::new(ids, &self.device)
             .map_err(|e| EmbeddingError::ApiError(e.to_string()))?

@@ -1177,6 +1177,35 @@ The user does not hav", severed mid-word. And the sentence splitter broke on
    points. The p50 fell 30% as a side effect: a five-token sentence no longer
    runs a 512-position forward. Every embedding this system has ever stored
    was affected, not just the benchmark's.
+   The ranking itself, once the ranking was finally looked at, held one more
+   lesson. The score folds cosine in as `combined -= sim * w` with
+   `w = semantic_weight.clamp(0.0, 1.0)`. Sweeping 1.0 through 10.0 returned
+   identical recall at every value, and two sessions back that flat line was
+   written down as "the semantic weight is not the constraint". It was not flat
+   because the term did not matter -- it was flat because the parameter could
+   not be set above 1. A sweep that cannot reach the effect is not evidence of
+   its absence.
+
+   With the clamp raised so the sweep can move, and the cosine floor swept
+   against the corrected embeddings, the two effects are independent and
+   additive, each at the knee of its curve:
+
+     w     floor   R@1     R@5     R@10
+     1.0   0.30    85.0%   96.7%   96.7%
+     2.0   0.30    86.7%   96.7%   96.7%
+     1.0   0.20    85.0%   98.3%   98.3%
+     2.0   0.20    86.7%   98.3%   98.3%
+     3.0   0.20    86.7%   98.3%   98.3%
+
+   The floor default is 0.2 and the benchmark asks for a weight of 2.0, giving
+   86.7 / 98.3 / 98.3% at a p50 of 101.5 ms against FAISS 90.0 / 96.7 / 96.7%:
+   R@5 and R@10 above the vector baseline, R@1 three points behind it.
+
+   One caveat kept visible: `semantic_weight` is not only the ranking gain,
+   it also sets how far the query's coordinates blend toward the embedding, so
+   this measurement moves both together and cannot separate them. Splitting
+   those into two parameters is the obvious next design step and is not done
+   here, because which half mattered is not yet known.
    Five things in this measurement chain turned out not to be ranking problems -- a
    mock config, a learning side effect, a cosine floor that was not the cause, a
    weight that was not the cause, and a parser eating the corpus. None of the four

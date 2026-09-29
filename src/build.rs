@@ -199,67 +199,46 @@ fn extract_texts_from_file(path: &Path) -> Vec<(String, u8)> {
         }
     }
 
-    // Fallback if no doubles: chunk by size.
+    // Fallback if no doubles: one entry per line.
     //
-    // The chunks are cut on line boundaries, not at an arbitrary byte. A layer
-    // file with one entry per line has no blank lines, so the split above
-    // yields the whole file as one text, and cutting that at BLOCK_DATA_SIZE
-    // severed entries mid-word: the 60-fact evaluation corpus became a single
-    // 1024-byte block ending "...ends with .hu.\r\nThe user does not hav",
-    // and the fragment that held the answer lost the tail that the evaluation
-    // looks for. Cutting on a line boundary keeps every entry whole; an entry
-    // longer than the limit is still truncated, which `to_block` records.
+    // The original bug this replaces: the whole file was cut at an arbitrary
+    // byte, so the 60-fact evaluation corpus became a single 1,024-byte block
+    // ending "...ends with .hu.\r\nThe user does not hav", and the fragment
+    // holding the answer lost the tail the evaluation looks for.
+    //
+    // The second attempt fixed that by cutting on line boundaries, but it
+    // *packed* consecutive lines into one block until the limit was reached.
+    // That was invisible at BLOCK_DATA_SIZE = 1024, where a typical entry
+    // overflowed the limit on its own, so one line became one block. Raising the
+    // limit to 16 KiB exposed it immediately: the same code turned 5,183 SciFact
+    // abstracts into 504 blocks of roughly ten documents each, and the
+    // evaluation would have measured retrieval over merged documents.
+    //
+    // A line in a layer file is an entry. Entries are not merged.
     if texts.len() < 2 {
         texts.clear();
-        let mut current = String::new();
         for line in raw.lines() {
             let line = line.trim();
             if line.is_empty() {
                 continue;
             }
-            // A single entry can still exceed the block size, and then the
-            // line-boundary path above cannot help: there is only one line, so
-            // `to_block` truncates it and the tail is gone. On BEIR SciFact
-            // that hit 4,300 of 5,183 abstracts, which is also why long stored
-            // blocks disagreed with the reference embeddings.
-            //
-            // Splitting the entry into several blocks keeps every byte and
-            // leaves the on-disk layout alone, since data.bin is a fixed
-            // 1024-byte-per-block grid that dream.rs addresses as
-            // `idx * BLOCK_DATA_SIZE`. The alternative -- raising
-            // BLOCK_DATA_SIZE -- would change that stride for every reader.
             if line.len() > BLOCK_DATA_SIZE {
-                if !current.is_empty() {
-                    let (text, importance) = crate::reader::parse_imp_marker(&current);
-                    if text.trim().len() > 3 {
-                        texts.push((text.to_string(), importance));
-                    }
-                    current.clear();
-                }
+                // One entry larger than a whole block. `to_block` would cut it,
+                // losing the tail, so split it on sentence boundaries instead.
+                // On BEIR SciFact this used to hit 4,300 of 5,183 abstracts, and
+                // the resulting disagreement with the reference embeddings is
+                // what the earlier "long stored blocks" investigation chased.
                 for piece in split_oversized_entry(line) {
                     let (text, importance) = crate::reader::parse_imp_marker(&piece);
                     if text.trim().len() > 3 {
                         texts.push((text.to_string(), importance));
                     }
                 }
-                continue;
-            }
-            if !current.is_empty() && current.len() + line.len() + 1 > BLOCK_DATA_SIZE {
-                let (text, importance) = crate::reader::parse_imp_marker(&current);
+            } else {
+                let (text, importance) = crate::reader::parse_imp_marker(line);
                 if text.trim().len() > 3 {
                     texts.push((text.to_string(), importance));
                 }
-                current.clear();
-            }
-            if !current.is_empty() {
-                current.push('\n');
-            }
-            current.push_str(line);
-        }
-        if !current.is_empty() {
-            let (text, importance) = crate::reader::parse_imp_marker(&current);
-            if text.trim().len() > 3 {
-                texts.push((text.to_string(), importance));
             }
         }
     }
@@ -1339,7 +1318,10 @@ mod tests {
     #[test]
     fn oversized_entry_is_split_without_losing_bytes() {
         let sentence = "The quick brown fox jumps over the lazy dog. ";
-        let entry = sentence.repeat(200); // ~9,000 bytes, one layer line
+        // Sized past BLOCK_DATA_SIZE (16 KiB), not to a fixed byte count: this
+        // constant was raised from 1024 and the test has to follow it, or it
+        // silently stops exercising the split path it exists to cover.
+        let entry = sentence.repeat(400);
         assert!(entry.len() > BLOCK_DATA_SIZE);
 
         let pieces = split_oversized_entry(entry.trim());
@@ -1364,7 +1346,7 @@ mod tests {
     /// The split must also survive a single sentence longer than a block.
     #[test]
     fn oversized_single_sentence_is_split_on_whitespace() {
-        let entry = "word ".repeat(3000); // no sentence terminator at all
+        let entry = "word ".repeat(4000); // no sentence terminator at all
         assert!(entry.len() > BLOCK_DATA_SIZE);
         let pieces = split_oversized_entry(entry.trim());
         assert!(pieces.len() > 1);
@@ -1380,5 +1362,45 @@ mod tests {
         let entry = "A short fact that fits in a block. Another sentence.";
         let pieces = split_oversized_entry(entry);
         assert_eq!(pieces, vec![entry.to_string()]);
+    }
+
+    /// A layer file with one entry per line must yield one block per line.
+    ///
+    /// This is the regression behind 504 blocks for 5,183 abstracts. The reader
+    /// used to pack consecutive lines together until BLOCK_DATA_SIZE was
+    /// reached, which was invisible while the limit was 1,024 and a typical
+    /// abstract overflowed it alone. At 16 KiB the same code merged about ten
+    /// documents per block, and the benchmark would have scored retrieval over
+    /// merged documents while reporting a plausible-looking R@k.
+    ///
+    /// The entries here are sized well below the limit, so any packing
+    /// whatsoever fails the assertion.
+    #[test]
+    fn one_line_per_entry_is_not_packed_into_shared_blocks() {
+        let n = 40usize;
+        let mut file = String::new();
+        for i in 0..n {
+            file.push_str(&format!("document number {} with some body text\n", i));
+        }
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let path = tmp.path().join("long_term.txt");
+        fs::write(&path, &file).unwrap();
+
+        let texts = extract_texts_from_file(&path);
+        assert_eq!(
+            texts.len(),
+            n,
+            "one line must be one block; {} lines produced {} blocks",
+            n,
+            texts.len()
+        );
+        for (i, (text, _)) in texts.iter().enumerate() {
+            assert!(
+                text.contains(&format!("document number {}", i)),
+                "block {} does not hold its own entry: {:?}",
+                i,
+                text
+            );
+        }
     }
 }

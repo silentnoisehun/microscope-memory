@@ -182,7 +182,31 @@ pub use cli::{Cli, Cmd};
 
 // Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬ Shared constants Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬
 pub const DEFAULT_CONFIG_PATH: &str = "config.toml";
-pub const BLOCK_DATA_SIZE: usize = 1024;
+
+/// Maximum bytes of text stored in one block.
+///
+/// Raised from 1024 on the evidence of the BEIR SciFact run, and the reason is
+/// worth recording because the fix looked like a storage-format change and was
+/// not. At 1024, `to_block` truncated 4,300 of the 5,183 abstracts at byte 1,021,
+/// so most of that corpus was silently cut. Splitting the tail into further
+/// blocks stopped the data loss but cost 9.4 points of R@1 (51.0% -> 41.6%),
+/// because a 1,400-character abstract is a better retrieval unit than two
+/// ~700-character fragments: the sentence that answers a query gets separated
+/// from the title that the query matches against.
+///
+/// 16 KiB is large enough to hold the longest SciFact abstract (10,127 bytes)
+/// whole, so the index stores one block per document and the embedded set
+/// matches what the FAISS baseline embeds -- one vector per abstract. It does
+/// not mean long inputs are embedded whole: the MiniLM provider truncates at
+/// 512 tokens regardless, exactly as the reference encoder does, so the two
+/// systems see the same text.
+///
+/// This was always safe to raise. data.bin is a packed, variable-length file
+/// whose real span lives in BlockHeader's data_offset (u32) and data_len (u16),
+/// not a fixed-stride grid, so no reader assumes a particular block size. The
+/// u16 is the real ceiling: 65,535 bytes. Entries longer than BLOCK_DATA_SIZE
+/// are still split rather than truncated, by `build::split_oversized_entry`.
+pub const BLOCK_DATA_SIZE: usize = 16384;
 pub const HEADER_SIZE: usize = 50;
 pub const LEGACY_HEADER_SIZE: usize = 32;
 pub const APV3_MAGIC: &[u8] = b"APv3";

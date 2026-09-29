@@ -119,7 +119,7 @@ would be needed to state this precisely.
 > describe the configuration, not the architecture, and have been withdrawn.
 
 A run with a real provider (`candle` + MiniLM) on the full D5 index is
-recorded in `WHITEPAPER.md` §10.1. It is reproducible from the committed
+recorded in `WHITEPAPER.md` §11.1. It is reproducible from the committed
 config, and it is **worse** than the earlier D4 figure:
 
 | | R@1 | R@5 | R@10 | p50 ms |
@@ -127,8 +127,13 @@ config, and it is **worse** than the earlier D4 figure:
 | lexical only | 30.0% | 43.3% | 48.3% | 124.9 |
 | D5 index, semantic path, `want`=64 (pre-gate) | 31.7% | 46.7% | 48.3% | 287.5 |
 | D5 index, semantic path, `want`=256 (pre-gate) | 33.3% | 48.3% | 51.7% | 331.0 |
-| **D5 index + embedding quality gate, `want`=256 (current)** | **70.0%** | **80.0%** | **81.7%** | 323.2 / 331.5 |
+| D5 index + gate, before the padding fix | 70.0% | 80.0% | 81.7% | 323.2 / 331.5 |
+| **D5 eval index, rebuilt after the padding fix (current)** | **78.3%** | **80.0%** | **81.7%** | **121.3** |
 | *earlier D4 index (9,999 vectors) — superseded, not reproducible* | *56.7%* | *75.0%* | *80.0%* | *283.9* |
+
+The current row is the same harness on the same 699,110-block corpus, after
+rebuilding the index so the vectors are not 99% padding. R@1 moved by 8.3
+points and p50 by 2.7×; R@5 and R@10 did not move at all.
 
 The D4 number is retained only to show that it does not reproduce. The 75.0%
 was measured on a depth-truncated index with a pre-fix candidate gate; on the
@@ -161,8 +166,13 @@ more than 25% in the U+0080..U+02FF mojibake band.
 | | stored vectors | R@1 | R@5 | R@10 |
 |---|---|---|---|---|
 | pre-gate (`len >= 3`) | 46,565 | 33.3% | 48.3% | 51.7% |
-| **gate, floor 24 (current)** | **9,296** | **70.0%** | **80.0%** | **81.7%** |
+| **gate, floor 20, rebuilt after the padding fix (current)** | **12,640** | **78.3%** | **80.0%** | **81.7%** |
+| gate, floor 24, before the padding fix | 9,296 | 70.0% | 80.0% | 81.7% |
 | gate, floor 17 (ablation, rejected) | 10,424 | 60.0% | 78.3% | 78.3% |
+
+The floor-17 row is void: it was measured before the padding fix, on vectors
+that were 99% padding. Re-measured on the fixed build the curve is flat from 20
+down to 12, so 20 is the floor and 17 is no longer the question.
 
 The gate removed 39,594 of the 48,890 D0–D5 candidates (39,575 short, 18
 unencodable, 1 mojibake); the rebuilt index holds 0 blocks of at most 16

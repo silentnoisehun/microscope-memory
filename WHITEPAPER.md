@@ -16,7 +16,7 @@
 
 This paper presents Microscope Memory, a hierarchical memory index implemented in Rust that models information retrieval as magnification: data is organised into nine depth levels (D0--D8), from identity summaries to raw bytes, with every block constrained to a 256-byte viewport. Beyond the core indexing engine, the system implements thirteen adaptive-ranking layers that let retrieval outcomes feed back into the index. These are described in engineering terms throughout: Hebbian reinforcement (block-level activation and coordinate drift), activation-fingerprint matching, spatial pulse propagation, archetype extraction from recurring activation patterns, query-space warping, recall-path tracking, predictive prefetch with reinforcement feedback, time-windowed activation profiles, a learned attention weight vector, cross-instance pattern exchange, offline consolidation with pruning, shared state propagation across instances, and multi-modal memory (images, audio, structured data). The system achieves sub-microsecond in-process query latencies at shallow depths while maintaining reinforcement loops at multiple levels -- predictions, attention weights, and temporal profiles all adapt from observed usage. Pure binary, zero JSON, 54,053 lines of Rust.
 
-**Scope of the claims.** This paper describes an engineering artefact and its measured behaviour. It makes no claim about consciousness, sentience, or cognition in the strong sense; "memory" throughout means an index with learned relevance signals. Every performance number is tied to a stated measurement path; see Section 9 and the Limitations section for what is *not* claimed.
+**Scope of the claims.** This paper describes an engineering artefact and its measured behaviour. It makes no claim about consciousness, sentience, or cognition in the strong sense; "memory" throughout means an index with learned relevance signals. Every performance number is tied to a stated measurement path; see Section 11 and the Limitations section for what is *not* claimed.
 
 ---
 
@@ -111,7 +111,7 @@ When a recall activates blocks, the system:
 
 Binary formats: `activations.bin` (HEB1), `coactivations.bin` (COA1).
 
-### 3.2 Layer 2: Mirror Neurons (`mirror.rs`)
+#### 3.2.1 Mirror Neurons (`mirror.rs`)
 
 Activation fingerprints from L1 are compared via sparse cosine similarity. When two fingerprints (from different queries) exceed a threshold, a resonance echo is created, boosting the block's future retrieval score.
 
@@ -476,7 +476,7 @@ All tests use safe binary I/O roundtrip verification.
 
 ---
 
-## 9. Related Work
+## 10. Related Work
 
 Microscope Memory sits at the intersection of hierarchical index structures,
 learning-to-rank feedback loops, and reinforcement-based retrieval. This section
@@ -484,7 +484,7 @@ places the system relative to the established literature. The comparison is
 deliberately conservative: where a claim is not backed by a measurement in this
 paper, that is stated.
 
-### 9.1 Hierarchical and multi-resolution indexing
+### 10.1 Hierarchical and multi-resolution indexing
 
 The zoom-based D0--D8 structure follows the general idea of indexing data at
 multiple resolutions so a query can be answered at a coarser level when detail
@@ -506,7 +506,7 @@ stores all of them on an mmap'd plane. This makes index size predictable from
 corpus size and removes deserialisation from the read path, at the cost of not
 compressing text.
 
-### 9.2 Learned ranking and feedback loops
+### 10.2 Learned ranking and feedback loops
 
 Using retrieval outcomes to improve future ranking is established in IR:
 
@@ -520,7 +520,7 @@ Using retrieval outcomes to improve future ranking is established in IR:
 - **Recency and importance weighting** are standard IR practice; the
   `importance` field and the reinforcement loop implement both.
 
-### 9.3 Vector databases and ANN search
+### 10.3 Vector databases and ANN search
 
 - **FAISS** (Johnson, Douze & Jégou, 2017) -- efficient similarity search.
 - **HNSW** (Malkov & Yashunin, 2016) -- hierarchical navigable small-world
@@ -533,32 +533,51 @@ systems on the same machine and the same MiniLM vectors
 
 | System | p50 ms | R@1 | R@5 | R@10 |
 |--------|--------|-----|-----|------|
-| **Microscope, D5 index + embedding quality gate (current)** | 323–332 | **70.0%** | **80.0%** | **81.7%** |
+| **Microscope, D5 eval index, rebuilt after the padding fix (current)** | 121.3 | **78.3%** | **80.0%** | **81.7%** |
+| Microscope, D5 eval index, before the padding fix | 323–332 | 70.0% | 80.0% | 81.7% |
 | Microscope, D5 index, semantic path (pre-gate) | 331.0 | 33.3% | 48.3% | 51.7% |
-| FAISS `IndexFlatIP` (60 fact vectors, query time only) | 0.010 | 90.0% | 96.7% | 96.7% |
-| SQLite FTS5 (BM25, 60 facts, query time only) | 0.034 | 53.3% | 60.0% | 63.3% |
+| FAISS `IndexFlatIP` (60 fact vectors, query time only) | 0.007 | 90.0% | 96.7% | 96.7% |
+| SQLite FTS5 (BM25, 60 facts, query time only) | 0.032 | 53.3% | 60.0% | 63.3% |
+
+**The numbers 86.7 / 98.3 / 98.3% quoted in §11.1 and §12 are on a different index** and do not
+belong in this table. Those are the 60-fact benchmark corpus
+(`bench_config_semantic.toml`, 81 stored vectors), where the whole index is the
+evaluation set. This table is the 699,110-block evaluation index with 12,640
+stored vectors, where 60 blocks are the answers and the rest is noise the
+ranking has to survive. Same harness, same vectors, same questions; the
+difference is entirely how much there is to be wrong about. Quoting the
+benchmark number here would quietly swap one corpus for another, which is the
+mistake that made 42/48/49 unreproducible in the first place.
 
 **With the quality gate in place the system beats a general-purpose lexical
 index, and still loses to exhaustive vector search over the same vectors.**
 Microscope answers 81.7% at k=10 where FAISS answers 96.7% and SQLite FTS5
 answers 63.3%; pre-gate the same harness returned 51.7% and lost to both. The
 remaining gap to the flat scan is 15 points — it was 45 — while Microscope
-costs end-to-end time against their query-only 0.010 ms and 0.034 ms.
+costs end-to-end time against their query-only 0.007 ms and 0.032 ms.
 
 The latency rows are not comparable, and the table should not be read as a
 speed comparison: FAISS and FTS5 index only the 60 fact vectors and report
 query-time search only, while Microscope scans a 699,110-block index and its
-331 ms includes process start, BERT model load, query embedding and index open.
+121 ms includes process start, BERT model load, query embedding and index open.
+
+That 121 ms is itself a result worth stating plainly: before the padding fix
+the same row read 323–332 ms, because every embedding ran a 512-token forward
+for a sentence of ten. The accuracy gain from rebuilding (R@1 70.0 → 78.3%) and
+the 2.7× latency gain come from the same commit.
 
 What the same vectors *do* show is that the hierarchy is doing something a
 flat vector scan does not. Given the same model, FAISS reaches 96.7% and the
 full system 81.7%: the depth structure, the reinforcement layers and the
 candidate filtering cost 15 points of accuracy and buy inspectability, bounded
-memory, and a per-recall write path. The pre-gate diagnostic that located most
-of that loss is recorded in §10.1: the expected answers were embedded and
-scored a mean cosine of 0.935, yet ranked 6,209th on average out of 46,565
-stored vectors, 36,136 of which were at most 16 characters of degenerate text.
-A build-time text-quality gate now removes them.
+memory, and a per-recall write path. On the 60-fact benchmark index, where
+there is no noise to survive, the same system reaches 98.3% — so the 15 points
+are spent on the other 699,050 blocks, not on the ranking. The pre-gate
+diagnostic that located most of that loss is recorded in §11.1: the expected
+answers were embedded and scored a mean cosine of 0.935, yet ranked 6,209th on
+average out of 46,565 stored vectors, 36,136 of which were at most 16
+characters of degenerate text. A build-time text-quality gate now removes
+them.
 
 Two caveats that bound the table. The measurement asymmetry favours the
 baselines: their timings are query-only, while Microscope's include process
@@ -567,7 +586,7 @@ And 60 facts is not a scale test — an exhaustive scan over 60 vectors is
 trivially fast, and at 10^6 blocks the FAISS row would not remain sub-
 millisecond.
 
-### 9.4 Memory architectures for language agents
+### 10.4 Memory architectures for language agents
 
 - **Generative Agents** (Park et al., 2023) -- agent memory as a stream of
   observations, retrieved with recency, importance and relevance scoring.
@@ -579,7 +598,7 @@ Microscope overlaps in intent and differs in on-disk representation. The
 three-part scoring used here (recency, importance, relevance) is close to that
 used in generative-agent retrieval, and is presented as such.
 
-### 9.5 Consolidation and forgetting
+### 10.5 Consolidation and forgetting
 
 Offline replay-and-prune resembles sleep-dependent memory consolidation in
 neuropsychology (Lewis & Durrant, 2011); the engineering pattern of periodic
@@ -588,9 +607,9 @@ naming in the source retains biological vocabulary for continuity; the mechanism
 is a background replay pass that strengthens recently accessed blocks and
 prunes unreferenced ones.
 
-## 10. Evaluation
+## 11. Evaluation
 
-### 10.1 Retrieval quality, with the semantic path connected
+### 11.1 Retrieval quality, with the semantic path connected
 
 > **Reproducing these numbers requires a feature-gated build.** The `candle` and
 > `onnx` providers are behind the `embeddings` cargo feature, which is not in the
@@ -613,21 +632,39 @@ prunes unreferenced ones.
 
 **Configuration:** `provider = "candle"`, `all-MiniLM-L6-v2`, dim 384,
 `semantic_weight = 1.0`, `embedding.max_depth = 5`, index built from `layers/`
-plus the 60 resonance facts — **699,110 blocks**, 60 questions, built twice:
-once with the original `text.len() >= 3` admission (**46,565 stored vectors**,
-the pre-gate rows below) and once through the embedding quality gate
-(**9,296 stored vectors**, the current rows). Vector count and depth were read
-back from the `embeddings.bin` header (`dim=384 max_depth=5`).
+plus the 60 resonance facts — **699,110 blocks**, 60 questions, built three
+times: once with the original `text.len() >= 3` admission (**46,565 stored
+vectors**, the pre-gate rows below), once through the embedding quality gate
+before the padding fix (**9,296 stored vectors**, the before row), and once
+after it with the fixed parser and a floor of 20 characters (**12,640 stored
+vectors**, the current rows). Vector count and depth were read back from the
+`embeddings.bin` header (`dim=384 max_depth=5`).
 
 | System | p50 ms | p95 ms | p99 ms | R@1 | R@5 | R@10 |
 |--------|--------|--------|--------|-----|-----|------|
-| **Microscope, D5 + quality gate, `want`=256 (current)** | 323.2 / 331.5 | 510.3 / 503.1 | 549.0 / 524.2 | **70.0%** | **80.0%** | **81.7%** |
+| **Microscope, D5 eval index, rebuilt after the padding fix (current)** | 121.3 | 139.0 | 143.8 | **78.3%** | **80.0%** | **81.7%** |
+| Microscope, D5 eval index, before the padding fix | 323.2 / 331.5 | 510.3 / 503.1 | 549.0 / 524.2 | 70.0% | 80.0% | 81.7% |
 | Microscope, lexical only | 124.9 | — | — | 30.0% | 43.3% | 48.3% |
 | Microscope, D5, semantic path, `want`=64 (pre-gate) | 287.5 | 386.1 | 428.2 | 31.7% | 46.7% | 48.3% |
 | Microscope, D5, semantic path, `want`=256 (pre-gate) | 331.0 | 451.9 | 505.2 | 33.3% | 48.3% | 51.7% |
-| SQLite FTS5 (BM25), 60 facts, query time only | 0.034 | 0.168 | 0.173 | 53.3% | 60.0% | 63.3% |
-| FAISS `IndexFlatIP`, 60 fact vectors, query time only | 0.010 | 0.013 | 0.028 | 90.0% | 96.7% | 96.7% |
-| FAISS `IndexHNSWFlat`, 60 fact vectors, query time only | 0.015 | 0.023 | 0.077 | 90.0% | 96.7% | 96.7% |
+| SQLite FTS5 (BM25), 60 facts, query time only | 0.032 | 0.158 | 0.178 | 53.3% | 60.0% | 63.3% |
+| FAISS `IndexFlatIP`, 60 fact vectors, query time only | 0.007 | 0.009 | 0.019 | 90.0% | 96.7% | 96.7% |
+| FAISS `IndexHNSWFlat`, 60 fact vectors, query time only | 0.017 | 0.014 | 0.019 | 90.0% | 96.7% | 96.7% |
+
+The two Microscope rows that are labelled "current" in older revisions of this
+document — 70.0 / 80.0 / 81.7% at 323–332 ms — were measured before the padding
+fix, on an index whose vectors were 99% padding. They are kept above as the
+before row rather than deleted, because the comparison is the point: rebuilding
+moved R@1 by 8.3 points and p50 by 2.7×, and neither change is visible in
+R@5 or R@10.
+
+The 86.7 / 98.3 / 98.3% figures in §11.1 come from a *different* index --
+`bench_config_semantic.toml`, the 60-fact benchmark corpus, 81 stored vectors,
+where the evaluation set is the entire index. Putting them in this table would
+swap a 699,110-block index for a 81-block one without saying so. On this index
+the system is at 81.7% at k=10; on the benchmark index it is at 98.3%. Both are
+real; only one of them is evidence about a corpus with anything in it to be
+wrong about.
 
 **Where the correct answer is lost.** A diagnostic pass classified every one of
 the 31 pre-gate misses, using the match tokens passed to the binary via
@@ -686,8 +723,18 @@ Measured on the same 60 questions, same harness, same `want`:
 | | stored vectors | R@1 | R@5 | R@10 |
 |---|---|---|---|---|
 | pre-gate (`len >= 3`) | 46,565 | 33.3% | 48.3% | 51.7% |
-| **quality gate, floor 24 (current)** | **9,296** | **70.0%** | **80.0%** | **81.7%** |
+| **quality gate, floor 20, rebuilt after the padding fix (current)** | **12,640** | **78.3%** | **80.0%** | **81.7%** |
+| quality gate, floor 24, before the padding fix | 9,296 | 70.0% | 80.0% | 81.7% |
 | gate, floor 17 (ablation, rejected) | 10,424 | 60.0% | 78.3% | 78.3% |
+
+The floor-17 row is kept for the record but is **void**: it was measured before
+the padding fix, on vectors that were 99% padding, so it compared the wrong
+thing. Re-measured on the fixed build the curve is flat from 20 down to 12 and
+falls only below that, so 20 is the current floor and 17 is no longer the
+interesting question. What the current rows show is that the gate and the
+padding fix are separable: the gate alone took hit@10 from 51.7% to 81.7%, and
+the padding fix then moved R@1 from 70.0% to 78.3% without touching R@5 or
+R@10.
 
 The gate removed 39,594 of the 48,890 D0–D5 candidates: 39,575 short
 (<24 chars), 18 unencodable, 1 mojibake. The degenerate-text census on the
@@ -830,7 +877,7 @@ known question, not how well it serves a real corpus.
 
 Raw results: [`docs/measurements/real_embedding_comparison.json`](docs/measurements/real_embedding_comparison.json).
 
-### 10.2 Layer ablation — inconclusive; run under a disabled configuration
+### 11.2 Layer ablation — inconclusive; run under a disabled configuration
 
 Three of the thirteen reinforcement layers were disabled one at a time, the
 index was rebuilt, and hit@5 was re-measured. The patches were verified to
@@ -845,7 +892,7 @@ compile and to be present in the source before each measurement.
 
 **The result is a null delta, but it does not support a conclusion about the
 layers.** The measurement was run under the configuration described in
-Section 10.1 -- semantic ranking disabled, hash-derived vectors, a 60-fact
+Section 11.1 -- semantic ranking disabled, hash-derived vectors, a 60-fact
 corpus. Under those conditions there is no co-activation structure to learn
 from and no semantic signal for a reinforcement layer to reweight, so a zero
 delta is the expected outcome whether or not the layers matter in normal
@@ -859,7 +906,7 @@ the question even under a correct configuration.
 
 The remaining ten layers were not ablated.
 
-### 10.3 Performance
+### 11.3 Performance
 
 Two separate measurements, both reproduced by scripts committed to the
 repository.
@@ -889,7 +936,7 @@ include process start-up; the full table and caveats are in
 the distinction between inner-loop and end-to-end cost are also in
 [BENCHMARKS.md](BENCHMARKS.md).
 
-## 11. Limitations
+## 12. Limitations
 
 1. **Lexical retrieval is slow at scale.** Text search scans block contents; cost
    is linear in corpus size, and a large index makes this the bottleneck. The
@@ -901,27 +948,36 @@ the distinction between inner-loop and end-to-end cost are also in
    of whatever model is used, including model download and inference latency.
 4. **A fixed-size binary index** — the system is slower than a plain B-tree and
    still less accurate than an exhaustive vector scan over the same vectors
-   (Section 9.3: 81.7% vs 96.7% at k=10 after the embedding quality gate —
-   51.7% before it — against their query-only 0.010 ms; the latency figures
-   are not comparable, see §9.3). The hierarchy costs accuracy and latency here,
-   and buys inspectability, bounded memory and a per-recall write path. That is
-   the trade this paper documents, not an argument that the hierarchy is faster.
+   (Section 10.3: 81.7% vs 96.7% at k=10 on the 699,110-block index after the
+   padding fix — 51.7% before the quality gate — against their query-only
+   0.007 ms; the latency figures are not comparable, see §10.3). The hierarchy
+   costs accuracy and latency here, and buys inspectability, bounded memory and
+   a per-recall write path. That is the trade this paper documents, not an
+   argument that the hierarchy is faster.
 5. **The corpus contains degenerate blocks — and the gate that removes them
-   costs two real facts.** Pre-gate, all 60 evaluation answers were embedded
-   and scored a mean cosine of 0.935, but their mean rank across the 46,565
-   stored vectors was 6,209: roughly six thousand blocks outscored an exact
-   answer, and 36,136 of those stored vectors were at most 16 characters of
-   `"<bin>"` sentinels, mojibake and code fragments. A build-time text-quality
-   gate (length floor, sentinel and mojibake filters — explicitly no
-   similarity-based dedup, which would merge contradictory facts) cut the index
-   to 9,296 vectors and moved hit@10 from 51.7% to 81.7%. Two of the 60
-   answers are 22–23 characters and fall under the 24-character floor; they are
-   the only regressions (20 misses recovered, 2 introduced). Floor 17 keeps
-   them and measured worse (78.3% hit@10), so it was rejected.
-6. **The resonance set is synthetic** — 60 hand-written facts, not a sample of
-   real usage. The measured hit@10 of 81.7% (70.0% pre-gate) says how often the
-   retrieval path answers one of these 60 known questions; it does not say how
-   the system performs on a real corpus.
+   cost two real facts, which the gate's own floor then had to be lowered to
+   fix.** Pre-gate, all 60 evaluation answers were embedded and scored a mean
+   cosine of 0.935, but their mean rank across the 46,565 stored vectors was
+   6,209: roughly six thousand blocks outscored an exact answer, and 36,136 of
+   those stored vectors were at most 16 characters of `"<bin>"` sentinels,
+   mojibake and code fragments. A build-time text-quality gate (length floor,
+   sentinel and mojibake filters — explicitly no similarity-based dedup, which
+   would merge contradictory facts) cut the index and moved hit@10 from 51.7% to
+   81.7%. Two of the 60 answers are 22–23 characters and fell under the
+   original 24-character floor, which is why the floor is 20 now. The earlier
+   justification for 24 — a floor-17 ablation that measured *worse* — was taken
+   on an index whose vectors were 99% padding and is void; on the fixed build
+   the curve is flat from 20 down to 12.
+6. **The resonance set is synthetic, and the index it is measured against
+   matters more than the questions.** 60 hand-written facts, not a sample of
+   real usage. On the 699,110-block evaluation index the system answers 81.7%
+   at k=10 (78.3% at k=1) with those 60 facts buried in 12,640 stored vectors;
+   on the 60-fact benchmark index, where the evaluation set *is* the whole
+   index, the same build reaches 98.3% at k=10. Both numbers are correct and
+   they are not interchangeable: the second is evidence that the ranking works
+   when there is nothing else to confuse it, and the first is evidence about
+   scale. Neither is evidence about a real corpus, which is the gap this
+   section is really about — §12 records what would close it.
 7. **The reinforcement layers are heuristic.** Drift, decay and weight learning
    use hand-chosen constants; there is no evidence here that they are
    near-optimal, and no hyperparameter sweep has been run.
@@ -1237,7 +1293,7 @@ The user does not hav", severed mid-word. And the sentence splitter broke on
     before, while an MCP server loads the model once), the sidecar is discarded
     at the next rebuild, where the entries are re-embedded as main blocks, and
     how this behaves with thousands of pending entries is untested.
-13. **The layer ablation is inconclusive.** The null deltas in Section 10.2 were
+13. **The layer ablation is inconclusive.** The null deltas in Section 11.2 were
     measured with the semantic path disconnected, and the patch mechanism
     neutralises one entry point per module rather than disabling the layer end to
     end. It establishes neither that the thirteen layers are load-bearing nor
@@ -1245,7 +1301,7 @@ The user does not hav", severed mid-word. And the sentence splitter broke on
 
 ---
 
-## 12. Conclusion
+## 13. Conclusion
 
 Microscope Memory implements a hierarchical memory index in which every block
 occupies a fixed 256-byte viewport across nine depth levels, D0--D8, and in which
@@ -1257,24 +1313,41 @@ cross-instance exchange, offline consolidation, shared state propagation, and
 multi-modal storage.
 
 **The evaluation is reproducible, and its result is mixed but improved.**
-With the semantic path connected, the pre-fetch widened, and an embedding
-quality gate applied at build time, the system reaches 81.7% hit@10 on the
-resonance set (70.0% R@1, 80.0% R@5), against 43.3% for lexical-only and 63.3%
-for SQLite FTS5 — it now beats a general-purpose lexical index on this set,
-while remaining below exhaustive vector search over the same vectors (FAISS,
-96.7%). The diagnosis behind the earlier 51.7% is recorded in §10.1: 78% of
-the stored vectors were at most 16 characters of degenerate text that
-out-scored every real answer. Removing them by a text-quality filter — length,
-sentinels, mojibake; explicitly not cosine dedup, which would merge
-contradictory facts — moved hit@10 by 30 points and hit@1 by 36.7 points,
-larger than any architectural difference measured elsewhere in this paper.
+With the semantic path connected, the pre-fetch widened, a text-quality gate
+applied at build time, and the embedding padding fixed, the system reaches
+**78.3% hit@1 / 80.0% hit@5 / 81.7% hit@10** on the 699,110-block evaluation
+index (48.3% for lexical-only, 63.3% for SQLite FTS5, 96.7% for FAISS
+`IndexFlatIP` over the same vectors) at a p50 of 121 ms. It beats a
+general-purpose lexical index on this set and remains below an exhaustive vector
+scan, which is the trade §10.3 describes rather than a claim of superiority.
+
+Two numbers in this paper are not interchangeable, and conflating them is what
+made an earlier revision of this conclusion unreproducible. On the 60-fact
+benchmark index, where the evaluation set is the entire index, the same build
+reaches **86.7 / 98.3 / 98.3%**. The first row is evidence about scale; the
+second is evidence that the ranking works when there is nothing else to
+confuse it. Neither is evidence about a real corpus, and §12 records what
+would close that gap.
+
+The diagnosis behind the earlier 51.7% is recorded in §11.1: 78% of the stored
+vectors were at most 16 characters of degenerate text that out-scored every
+real answer. Removing them by a text-quality filter — length, sentinels,
+mojibake; explicitly not cosine dedup, which would merge contradictory facts —
+moved hit@10 by 30 points and hit@1 by 36.7 points, larger than any
+architectural difference measured elsewhere in this paper. A second defect
+found later was larger still and quieter: every embedding the system had ever
+stored was 99% padding, because the tokenizer pads to 512 and the forward pass
+was given no attention mask. Fixing it moved hit@1 by 8.3 points and cut p50 by
+2.7×, and it is the kind of bug that no consistency check can catch, because it
+was perfectly deterministic.
 
 What the work establishes is therefore narrower than the design's ambitions
 and worth stating plainly: a fixed-size binary index whose retrieval path can be
 correctly connected to its own embedding index; a measurement harness that
-produced the numbers above on demand; and a corrected account of where the
-system stands, including the cases where a plain B-tree or a flat vector scan
-is the better tool. Pure Rust, zero JSON, 417 tests, 54,053 lines.
+produced the numbers above on demand, and that caught six of the claims made
+along the way being wrong; and a corrected account of where the system stands,
+including the cases where a plain B-tree or a flat vector scan is the better
+tool. Pure Rust, zero JSON, 464 tests, 54,053 lines.
 
 Released under the MIT License at
 [github.com/silentnoisehun/microscope-memory](https://github.com/silentnoisehun/microscope-memory),

@@ -533,7 +533,7 @@ systems on the same machine and the same MiniLM vectors
 
 | System | p50 ms | R@1 | R@5 | R@10 |
 |--------|--------|-----|-----|------|
-| **Microscope, D5 eval index, rebuilt after the padding fix (current)** | 121.3 | **78.3%** | **80.0%** | **81.7%** |
+| Microscope, D5 eval index, rebuilt after the padding fix (superseded) | 121.3 | 78.3% | 80.0% | 81.7% |
 | Microscope, D5 eval index, before the padding fix | 323–332 | 70.0% | 80.0% | 81.7% |
 | Microscope, D5 index, semantic path (pre-gate) | 331.0 | 33.3% | 48.3% | 51.7% |
 | FAISS `IndexFlatIP` (60 fact vectors, query time only) | 0.007 | 90.0% | 96.7% | 96.7% |
@@ -609,6 +609,61 @@ prunes unreferenced ones.
 
 ## 11. Evaluation
 
+### 11.0 BEIR SciFact — the public-corpus result
+
+The rest of §11 measures recall on 60 hand-written facts, and on a synthetic
+699,110-block evaluation index. Both should be discounted accordingly: the
+60-fact set stores only the answers, so retrieval is nearly trivial, and the
+evaluation index cannot be rebuilt by the current code (see 11.1). SciFact is a
+public claim-verification corpus, so the number is one anybody can rerun and
+disagree with.
+
+All 5,183 abstracts stored, 286 test queries, `MICROSCOPE_NO_LEARN=1`, one clean
+run, `scifact_config.toml` with `max_depth = 3` — the embedded set is one vector
+per abstract, the same count FAISS embeds. Index: 5,183 blocks, 6,230 embedded,
+1,331 MB. 14 of the 300 queries are excluded because no unique 3–12 word phrase
+could be found for them; a match token appearing in more than one document would
+credit a retrieval that found the wrong document.
+
+| System | p50 ms | R@1 | R@5 | R@10 |
+|---|---|---|---|---|
+| **Microscope (recall, end-to-end)** | 600.6 | **53.1%** | **74.8%** | **81.8%** |
+| FAISS `IndexFlatIP` (MiniLM) | 0.41 | 48.3% | 73.4% | 78.3% |
+| FAISS `IndexHNSWFlat` (MiniLM) | 0.06 | 47.6% | 72.0% | 76.6% |
+| SQLite FTS5 (BM25) | 8.06 | 45.8% | 66.8% | 74.8% |
+
+Microscope leads on every k, with the lexical baseline last, which is the
+expected ordering. Two limits on what this table supports:
+
+- **The latency column is not a speed comparison.** Microscope's 600 ms is
+  process start plus config load plus opening a 1.3 GB index; the FAISS figures
+  are query-time search only. Reading this row as a 1,500× slowdown would be
+  wrong — it compares two different operations.
+- **These are recall@k, not the nDCG@10 of the BEIR literature,** so they are
+  not comparable to published SciFact results. Only the four rows are comparable
+  to each other, and they share a corpus, a query set and a scorer.
+
+Reproduce with `python scripts/build_scifact_index.py --force` followed by
+`python scripts/compare_baselines.py --corpus scifact`; the output is
+`docs/measurements/scifact_comparison.json`, which records the corpus and config
+in the payload.
+
+**How this number was reached, because the first two attempts were wrong.** At
+`BLOCK_DATA_SIZE = 1024` the storage layer truncated 4,300 of the 5,183
+abstracts at byte 1,021, so 83% of the corpus was never stored. That index
+scored R@1 51.0% and led FAISS, which is why the truncation is worth naming
+rather than quietly fixing. Splitting the tail into extra blocks recovered every
+byte and dropped the score to 41.6%, because a whole abstract is a better
+retrieval unit than two fragments of it. Storing one document per block at
+16 KiB gives 53.1% on a complete corpus. The baseline rows are byte-identical
+across all three runs, so the movement is the system, not the measurement.
+
+The same investigation also fixed a latent defect in `data.bin` handling: the
+file is packed and variable-length, with each block's span in its header, but
+`dream.rs` addressed it as a fixed `idx * BLOCK_DATA_SIZE` grid. On an index
+whose mean block is 5.6 bytes that read the wrong bytes for every block past the
+first.
+
 ### 11.1 Retrieval quality, with the semantic path connected
 
 > **Reproducing these numbers requires a feature-gated build.** The `candle` and
@@ -642,7 +697,7 @@ vectors**, the current rows). Vector count and depth were read back from the
 
 | System | p50 ms | p95 ms | p99 ms | R@1 | R@5 | R@10 |
 |--------|--------|--------|--------|-----|-----|------|
-| **Microscope, D5 eval index, rebuilt after the padding fix (current)** | 121.3 | 139.0 | 143.8 | **78.3%** | **80.0%** | **81.7%** |
+| Microscope, D5 eval index, rebuilt after the padding fix (superseded) | 121.3 | 139.0 | 143.8 | 78.3% | 80.0% | 81.7% |
 | Microscope, D5 eval index, before the padding fix | 323.2 / 331.5 | 510.3 / 503.1 | 549.0 / 524.2 | 70.0% | 80.0% | 81.7% |
 | Microscope, lexical only | 124.9 | — | — | 30.0% | 43.3% | 48.3% |
 | Microscope, D5, semantic path, `want`=64 (pre-gate) | 287.5 | 386.1 | 428.2 | 31.7% | 46.7% | 48.3% |
@@ -657,6 +712,14 @@ fix, on an index whose vectors were 99% padding. They are kept above as the
 before row rather than deleted, because the comparison is the point: rebuilding
 moved R@1 by 8.3 points and p50 by 2.7×, and neither change is visible in
 R@5 or R@10.
+
+The 78.3 / 80.0 / 81.7% row above is now labelled **superseded** for the same
+reason. It was built when `BLOCK_DATA_SIZE` was 1,024 bytes and the layer reader
+packed consecutive lines into shared blocks; `BLOCK_DATA_SIZE` is 16,384 now and
+one line is one entry, so a clean checkout cannot rebuild that index. The figures
+stay because they characterise the 699,110-block evaluation corpus better than
+anything else available, but **they are not reproducible and should not be quoted
+as current**. §11.0 is the reproducible retrieval measurement.
 
 The 86.7 / 98.3 / 98.3% figures in §11.1 come from a *different* index --
 `bench_config_semantic.toml`, the 60-fact benchmark corpus, 81 stored vectors,
@@ -723,7 +786,7 @@ Measured on the same 60 questions, same harness, same `want`:
 | | stored vectors | R@1 | R@5 | R@10 |
 |---|---|---|---|---|
 | pre-gate (`len >= 3`) | 46,565 | 33.3% | 48.3% | 51.7% |
-| **quality gate, floor 20, rebuilt after the padding fix (current)** | **12,640** | **78.3%** | **80.0%** | **81.7%** |
+| quality gate, floor 20, rebuilt after the padding fix (superseded) | 12,640 | 78.3% | 80.0% | 81.7% |
 | quality gate, floor 24, before the padding fix | 9,296 | 70.0% | 80.0% | 81.7% |
 | gate, floor 17 (ablation, rejected) | 10,424 | 60.0% | 78.3% | 78.3% |
 
@@ -1084,6 +1147,13 @@ the distinction between inner-loop and end-to-end cost are also in
    against FAISS 90.0 / 96.7 / 96.7% and sqlite fts5 53.3 / 60.0 / 63.3%. The
    script's default now points at that index, because leaving it on the mock
    one is how this went unnoticed.
+
+   These 60-fact figures are **superseded and not reproducible** for the same
+   reason as §11.1: the index was built when `BLOCK_DATA_SIZE` was 1,024 bytes,
+   and the current code cannot rebuild it. More to the point they should not be
+   compared with anything at all — the 60 facts *are* the query set, so the index
+   contains only the answers. §11.0 is the retrieval number that means
+   something.
 
    Of the five remaining misses, one is absent from the ranked list and four are
    reachable but outranked. An earlier reading of this blamed the cosine floor

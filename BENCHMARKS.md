@@ -20,6 +20,92 @@ These are all correct measurements of different things. Quoting 112 µs as "the
 recall latency" is misleading: it describes the inner loop, not the user-visible
 operation.
 
+## BEIR SciFact — the measurement to argue with
+
+Everything below the Method section that uses recall was measured on a
+60-entry set of hand-written facts, and a reader is right to discount it: that
+set stores only the answers, so retrieval is close to trivial. SciFact is a
+public claim-verification corpus, so the number is one anybody can rerun and
+disagree with.
+
+**Setup.** All 5,183 abstracts stored, 286 test queries, `MICROSCOPE_NO_LEARN=1`,
+one clean run, `scifact_config.toml` with `max_depth = 3` so the embedded set is
+one vector per abstract — the same count FAISS embeds. Index: 5,183 blocks, 6,230
+embedded, 1,331 MB. 14 of the 300 queries are dropped because no unique
+3–12 word phrase could be found for them; a match token occurring in more than
+one document would credit a retrieval that found the wrong document.
+
+| System | p50 ms | R@1 | R@5 | R@10 |
+|---|---|---|---|---|
+| **microscope (recall, end-to-end)** | 600.6 | **53.1%** | **74.8%** | **81.8%** |
+| faiss IndexFlatIP (MiniLM) | 0.41 | 48.3% | 73.4% | 78.3% |
+| faiss IndexHNSWFlat (MiniLM) | 0.06 | 47.6% | 72.0% | 76.6% |
+| sqlite fts5 (bm25) | 8.06 | 45.8% | 66.8% | 74.8% |
+
+Microscope leads on every k, and the ordering against the lexical baseline is the
+expected one. Two things this table does **not** say:
+
+- **The latency column is not a speed comparison.** Microscope's p50 includes
+  process start, config load and loading a 1.3 GB index; FAISS reports
+  query-time search only. 600 ms against 0.41 ms is not a 1,500× slowdown, it
+  is two different measurements. A fair comparison needs a resident process on
+  both sides and is not in this file.
+- **These are recall@k, not the nDCG@10 the BEIR papers report,** so they are not
+  comparable to published SciFact numbers. The only comparison here is between
+  the four rows, which share a corpus, a query set and a scorer.
+
+### Getting here: three runs, and the first two were wrong
+
+This is recorded because the error is instructive and because two earlier
+commit messages in this repository state the opposite conclusion.
+
+| | truncated | split | **current** |
+|---|---|---|---|
+| blocks | 5,181 | 10,518 | **5,183** |
+| R@1 | 51.0% | 41.6% | **53.1%** |
+| R@5 | 74.8% | 67.5% | **74.8%** |
+| R@10 | 80.4% | 76.2% | **81.8%** |
+| p50 ms | 434.3 | 605.4 | 600.6 |
+
+**Run 1 (51.0%) led FAISS while discarding 83% of the corpus.** `BLOCK_DATA_SIZE`
+was 1,024 bytes and `to_block` truncated 4,300 of the 5,183 abstracts at byte
+1,021, so the tail of most documents was never stored, embedded or printed for
+the scorer to read. The corpus was not complete; the number was an artefact.
+
+**Run 2 (41.6%) removed the data loss and lost 9.4 points of R@1.** Splitting the
+tail into further blocks kept every byte, but a 1,400-character abstract is a
+better retrieval unit than two ~700-character fragments: the sentence that
+answers the query is separated from the title it matches against. The fix
+removed a data-loss bug and made retrieval worse, which is the honest reading.
+
+**Run 3 (53.1%) stores whole documents.** `BLOCK_DATA_SIZE` is now 16 KiB, which
+holds the longest abstract (10,127 bytes), so one block is one document. This was
+safe to do because `data.bin` is a packed, variable-length file whose real span
+lives in `BlockHeader`'s `data_offset`/`data_len` — not a fixed-stride grid, as two
+earlier commit messages here claimed. The real ceiling is the `u16` `data_len`,
+65,535 bytes.
+
+Raising the limit also exposed a second bug. The layer reader *packed* consecutive
+lines into one block until the limit was reached, which was invisible at 1,024
+bytes where a typical abstract overflowed the limit alone. At 16 KiB it turned
+5,183 abstracts into 504 blocks of roughly ten documents each. Caught during the
+rebuild, before it could produce a plausible-looking but meaningless R@k.
+
+The three baseline rows are byte-identical across all three runs (48.3/73.4/78.3,
+47.6/72.0/76.6, 45.8/66.8/74.8), which is the evidence that the movement is ours
+and the measurement is deterministic.
+
+### Reproduce
+
+```
+python scripts/build_scifact_index.py --force     # downloads SciFact, builds the index
+python scripts/compare_baselines.py --corpus scifact
+```
+
+Output: `docs/measurements/scifact_comparison.json`, which carries the corpus
+name and config file in the payload. Results are written to a corpus-specific
+file so a SciFact number can never be mistaken for a 60-fact number.
+
 ### Method
 
 - **Percentiles:** the per-zoom figures below are means over 10,000 queries per
@@ -128,12 +214,20 @@ config, and it is **worse** than the earlier D4 figure:
 | D5 index, semantic path, `want`=64 (pre-gate) | 31.7% | 46.7% | 48.3% | 287.5 |
 | D5 index, semantic path, `want`=256 (pre-gate) | 33.3% | 48.3% | 51.7% | 331.0 |
 | D5 index + gate, before the padding fix | 70.0% | 80.0% | 81.7% | 323.2 / 331.5 |
-| **D5 eval index, rebuilt after the padding fix (current)** | **78.3%** | **80.0%** | **81.7%** | **121.3** |
+| D5 eval index, rebuilt after the padding fix (superseded, see below) | 78.3% | 80.0% | 81.7% | 121.3 |
 | *earlier D4 index (9,999 vectors) — superseded, not reproducible* | *56.7%* | *75.0%* | *80.0%* | *283.9* |
 
 The current row is the same harness on the same 699,110-block corpus, after
 rebuilding the index so the vectors are not 99% padding. R@1 moved by 8.3
 points and p50 by 2.7×; R@5 and R@10 did not move at all.
+
+**That row was current until `BLOCK_DATA_SIZE` moved from 1,024 to 16,384 bytes.**
+The index it describes was built with the 1,024-byte limit and with the layer
+reader that packed consecutive lines into shared blocks, so the current code can
+no longer produce it. The numbers are kept because they remain the best
+characterisation of the evaluation corpus, but they are not reproducible from a
+clean checkout and must not be quoted as current. For a reproducible retrieval
+number, use the SciFact table at the top of this file.
 
 The D4 number is retained only to show that it does not reproduce. The 75.0%
 was measured on a depth-truncated index with a pre-fix candidate gate; on the
@@ -166,7 +260,7 @@ more than 25% in the U+0080..U+02FF mojibake band.
 | | stored vectors | R@1 | R@5 | R@10 |
 |---|---|---|---|---|
 | pre-gate (`len >= 3`) | 46,565 | 33.3% | 48.3% | 51.7% |
-| **gate, floor 20, rebuilt after the padding fix (current)** | **12,640** | **78.3%** | **80.0%** | **81.7%** |
+| gate, floor 20, rebuilt after the padding fix (superseded) | 12,640 | 78.3% | 80.0% | 81.7% |
 | gate, floor 24, before the padding fix | 9,296 | 70.0% | 80.0% | 81.7% |
 | gate, floor 17 (ablation, rejected) | 10,424 | 60.0% | 78.3% | 78.3% |
 

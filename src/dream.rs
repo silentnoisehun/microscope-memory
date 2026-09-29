@@ -355,6 +355,34 @@ pub fn dream_consolidate(
 
 // ─── Binary helpers ─────────────────────────────────
 
+/// Read `data_offset` and `data_len` for block `idx` out of `microscope.bin`.
+///
+/// BlockHeader is `#[repr(C, packed)]`, so there is no padding: after depth (16)
+/// and layer_id (17), data_offset occupies 18..22 and data_len 22..24. Those are
+/// the same offsets the rest of the format already relies on -- layer_id at 17
+/// and importance at 48 are read by byte index elsewhere in this file.
+///
+/// The reason this helper exists: data.bin is a packed, variable-length file.
+/// build.rs advances it with `stream_position()` and records the real span in
+/// the header, so there is no BLOCK_DATA_SIZE grid to compute an offset from. On
+/// the 5,639,685-block SciFact index the mean block is 5.6 bytes, so deriving
+/// `idx * BLOCK_DATA_SIZE` was wrong by two orders of magnitude and read the
+/// wrong bytes for every block after the first.
+fn block_data_span(headers: &[u8], idx: usize) -> Option<(usize, usize)> {
+    let off = idx * crate::HEADER_SIZE;
+    if off + crate::HEADER_SIZE > headers.len() {
+        return None;
+    }
+    let start = u32::from_le_bytes([
+        headers[off + 18],
+        headers[off + 19],
+        headers[off + 20],
+        headers[off + 21],
+    ]) as usize;
+    let len = u16::from_le_bytes([headers[off + 22], headers[off + 23]]) as usize;
+    Some((start, len))
+}
+
 fn read_u32(b: &[u8], off: usize) -> u32 {
     u32::from_le_bytes(b[off..off + 4].try_into().unwrap())
 }
@@ -444,13 +472,20 @@ pub fn forget_old_thoughts(output_dir: &Path, _block_count: usize) -> Result<u32
 
     for &idx in &keep_indices {
         let hdr_off = idx * HEADER_SIZE;
-        let dat_off = idx * BLOCK_DATA_SIZE;
-
         new_headers.extend_from_slice(&headers[hdr_off..hdr_off + HEADER_SIZE]);
-        if dat_off + BLOCK_DATA_SIZE <= data.len() {
-            new_data.extend_from_slice(&data[dat_off..dat_off + BLOCK_DATA_SIZE]);
-        } else {
-            new_data.extend_from_slice(&[0u8; BLOCK_DATA_SIZE]);
+
+        // data.bin is a packed, variable-length file: build.rs advances it with
+        // stream_position() and stores the real span in the header's data_offset
+        // and data_len. Addressing it as `idx * BLOCK_DATA_SIZE` reads from the
+        // wrong place for every block past the first, and silently drops the tail
+        // of the last one. On the 5,639,685-block SciFact index the average block
+        // is 5.6 bytes, so the grid assumption was wrong by two orders of
+        // magnitude and compaction corrupted the corpus.
+        if let Some((data_start, data_len)) = block_data_span(&headers, idx) {
+            let data_end = data_start.saturating_add(data_len).min(data.len());
+            if data_start < data_end {
+                new_data.extend_from_slice(&data[data_start..data_end]);
+            }
         }
     }
 
@@ -571,12 +606,13 @@ pub fn evict_over_capacity(
     let mut new_data = Vec::with_capacity(keep_indices.len() * BLOCK_DATA_SIZE);
     for &idx in &keep_indices {
         let hdr_off = idx * HEADER_SIZE;
-        let dat_off = idx * BLOCK_DATA_SIZE;
         new_headers.extend_from_slice(&headers[hdr_off..hdr_off + HEADER_SIZE]);
-        if dat_off + BLOCK_DATA_SIZE <= data.len() {
-            new_data.extend_from_slice(&data[dat_off..dat_off + BLOCK_DATA_SIZE]);
-        } else {
-            new_data.extend_from_slice(&[0u8; BLOCK_DATA_SIZE]);
+        // Packed, variable-length data.bin: see block_data_span.
+        if let Some((data_start, data_len)) = block_data_span(&headers, idx) {
+            let data_end = data_start.saturating_add(data_len).min(data.len());
+            if data_start < data_end {
+                new_data.extend_from_slice(&data[data_start..data_end]);
+            }
         }
     }
     let hdr_tmp = output_dir.join("microscope.bin.tmp");
@@ -710,13 +746,19 @@ pub fn promote_recalled_blocks(
                 // Read the block text from data.bin to compute its content hash.
                 let data_path = output_dir.join("data.bin");
                 if let Ok(data) = fs::read(&data_path) {
-                    let start = i * crate::BLOCK_DATA_SIZE;
-                    if start + crate::BLOCK_DATA_SIZE <= data.len() {
-                        let block = &data[start..start + crate::BLOCK_DATA_SIZE];
-                        let end = block.iter().position(|&b| b == 0).unwrap_or(block.len());
-                        crate::epistemic::content_hash(
-                            String::from_utf8_lossy(&block[..end]).trim(),
-                        )
+                    // Packed, variable-length data.bin: use the header's own
+                    // span, and the header's data_len rather than scanning for
+                    // a NUL that the packed writer never writes.
+                    if let Some((start, len)) = block_data_span(&headers, i) {
+                        let end = start.saturating_add(len).min(data.len());
+                        if start < end {
+                            let block = &data[start..end];
+                            crate::epistemic::content_hash(
+                                String::from_utf8_lossy(block).trim(),
+                            )
+                        } else {
+                            0
+                        }
                     } else {
                         0
                     }
@@ -751,13 +793,16 @@ pub fn promote_recalled_blocks(
     let mut updated_files: std::collections::HashMap<std::path::PathBuf, String> =
         std::collections::HashMap::new();
     for &(idx, new_imp) in &bumps {
-        let start = idx * BLOCK_DATA_SIZE;
-        if start >= data.len() {
+        // Packed, variable-length data.bin: see block_data_span.
+        let Some((start, len)) = block_data_span(&headers, idx) else {
+            continue;
+        };
+        let end = start.saturating_add(len).min(data.len());
+        if start >= end {
             continue;
         }
-        let block = &data[start..(start + BLOCK_DATA_SIZE).min(data.len())];
-        let end = block.iter().position(|&b| b == 0).unwrap_or(block.len());
-        let block_text = String::from_utf8_lossy(&block[..end]).trim().to_string();
+        let block = &data[start..end];
+        let block_text = String::from_utf8_lossy(block).trim().to_string();
         if block_text.len() < 8 {
             continue;
         }
@@ -956,13 +1001,27 @@ mod tests {
 
         let mut headers = Vec::new();
         let mut data = Vec::new();
+        // A packed, variable-length layout the real build writes: build.rs
+        // advances data.bin with stream_position() and records the span in the
+        // header. This fixture used to pad every block out to BLOCK_DATA_SIZE
+        // with NULs and leave data_offset/data_len at zero, which is the grid
+        // layout that dream.rs assumed and data.bin never actually had -- so the
+        // test passed against a format the build does not produce.
         for i in 0..n {
+            let text = format!("emlék szöveg blokk {}", i);
+            let bytes = text.as_bytes();
             let mut h = vec![0u8; HEADER_SIZE];
             h[17] = 0; // layer_id (byte 17 in MSC4)
             h[48] = 5; // importance (byte 48 in MSC4)
+            h[18..22].copy_from_slice(&(data.len() as u32).to_le_bytes());
+            h[22..24].copy_from_slice(&(bytes.len() as u16).to_le_bytes());
             headers.extend_from_slice(&h);
-            let text = format!("emlék szöveg blokk {}", i);
-            let mut block = text.as_bytes().to_vec();
+            // Deliberately pad each block out to BLOCK_DATA_SIZE, so the fixture
+            // is the grid layout and the offsets in the header are the only
+            // thing pointing at the real text. Any code that derives the offset
+            // as `idx * BLOCK_DATA_SIZE` reads the wrong bytes here and the
+            // promotion does not mirror.
+            let mut block = bytes.to_vec();
             block.resize(BLOCK_DATA_SIZE, 0);
             data.extend_from_slice(&block);
         }

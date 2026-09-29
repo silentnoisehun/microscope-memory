@@ -1201,11 +1201,25 @@ The user does not hav", severed mid-word. And the sentence splitter broke on
    86.7 / 98.3 / 98.3% at a p50 of 101.5 ms against FAISS 90.0 / 96.7 / 96.7%:
    R@5 and R@10 above the vector baseline, R@1 three points behind it.
 
-   One caveat kept visible: `semantic_weight` is not only the ranking gain,
-   it also sets how far the query's coordinates blend toward the embedding, so
-   this measurement moves both together and cannot separate them. Splitting
-   those into two parameters is the obvious next design step and is not done
-   here, because which half mattered is not yet known.
+   That caveat was closed by doing the split rather than by arguing about it.
+   `search.semantic_rank_gain` is a separate field; `semantic_weight` went
+   back to being only the 0..1 coordinate blend. Measured one at a time:
+
+   ranking gain, coordinates held at blend 1.0      coordinate blend, gain at 2.0
+
+     gain    R@1                                blend    R@1
+     0.0    61.7%                                0.0    86.7%
+     1.0    85.0%                                0.5    86.7%
+     2.0    86.7%                                1.0    86.7%
+     4.0    86.7%
+
+   The effect is entirely the ranking gain, and it is worth 25 points of R@1: at
+   gain 0 the semantic term contributes nothing and the system is lexical, at
+   61.7%. The coordinate blend does nothing at any value on this corpus. "Flat
+   here" is not "inert" -- the blend decides how far query coordinates move
+   toward the embedding, and a corpus where semantics already dominates the
+   ranking would not show it -- so it stays wired and measured rather than
+   deleted on the strength of one corpus.
    Five things in this measurement chain turned out not to be ranking problems -- a
    mock config, a learning side effect, a cosine floor that was not the cause, a
    weight that was not the cause, and a parser eating the corpus. None of the four

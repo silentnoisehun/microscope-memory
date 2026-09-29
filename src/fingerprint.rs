@@ -113,11 +113,20 @@ impl LinkTable {
         // per query is what made an MCP recall take seconds. The top k is
         // uniquely determined by the total order above, so selecting then
         // sorting those k yields the same answer as sorting everything.
+        //
+        // The order of these three statements is the whole optimisation.
+        // `select_nth_unstable_by(k, cmp)` partitions in place: positions 0..k
+        // end up holding the k best elements but in *no* order, and position k
+        // holds the (k+1)-th. Truncating immediately after it keeps exactly
+        // those k; sorting first threw the partition away and re-sorted all
+        // ~699k, which is the cost this was written to avoid. `cmp` is a total
+        // order, so the k-element set is well defined even with ties, and
+        // `partial_selection_matches_full_sort` pins that against a full sort.
         if results.len() > k {
             results.select_nth_unstable_by(k, cmp);
+            results.truncate(k);
         }
         results.sort_by(cmp);
-        results.truncate(k);
         results
     }
 
@@ -463,6 +472,131 @@ fn load_links(output_dir: &Path) -> Option<Vec<StructuralLink>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The partial selection in `find_similar` must return exactly what a full
+    /// sort of every candidate would, including when similarities tie.
+    ///
+    /// Ties are the interesting case and the reason the comparator carries an
+    /// explicit index tie-break: if it sorted by similarity alone, the k-element
+    /// set would not be well defined and this test could pass by luck. Here
+    /// many blocks are byte-identical, so their similarities are exactly equal
+    /// and the tie-break alone decides which of them lands in the top k.
+    #[test]
+    fn partial_selection_matches_full_sort() {
+        // 400 blocks, deliberately repetitive: 20 distinct texts repeated, so
+        // similarities tie exactly and the boundary of the top k is decided by
+        // the index tie-break rather than by the score.
+        let mut texts: Vec<String> = Vec::new();
+        for i in 0..20 {
+            for _ in 0..20 {
+                texts.push(format!(
+                    "block {i} mentions topic {} with a fairly long body so the \
+                     fingerprint histogram is not degenerate",
+                    i * 7919
+                ));
+            }
+        }
+        let owned: Vec<&str> = texts.iter().map(|s| s.as_str()).collect();
+        let table = LinkTable::build(&owned);
+
+        let query = owned[7];
+        for k in [1usize, 2, 3, 5, 19, 20, 21, 100, 399, 400] {
+            // Reference: the same candidate set and the same comparator, sorted
+            // in full. Recomputed here rather than reusing find_similar, because
+            // reusing it would test the implementation against itself.
+            let query_fp = compute_fingerprint(query.as_bytes());
+            let mut full: Vec<(u32, f32)> = table
+                .fingerprints
+                .iter()
+                .enumerate()
+                .map(|(i, fp)| (i as u32, fingerprint_similarity(&query_fp, fp)))
+                .filter(|(_, sim)| *sim > 0.5)
+                .collect();
+            full.sort_by(|a, b| b.1.total_cmp(&a.1).then(a.0.cmp(&b.0)));
+            full.truncate(k);
+
+            let got = table.find_similar(query, k);
+            assert_eq!(
+                got, full,
+                "partial selection differs from a full sort at k={k} ({} candidates)",
+                full.len()
+            );
+        }
+    }
+
+    /// A tie in similarity must be broken by ascending block index, so the top k
+    /// is a single well-defined set rather than an arbitrary one of several.
+    #[test]
+    fn ties_break_by_ascending_index() {
+        // Every block is identical, so every similarity is identical and the
+        // order is entirely the tie-break.
+        let owned: Vec<&str> = vec!["exactly the same text in every block"; 50];
+        let table = LinkTable::build(&owned);
+        let hits = table.find_similar("exactly the same text in every block", 5);
+        assert_eq!(
+            hits.iter().map(|(i, _)| *i).collect::<Vec<_>>(),
+            vec![0, 1, 2, 3, 4],
+            "identical blocks must come back in index order"
+        );
+        assert!(
+            hits.windows(2).all(|w| w[0].1 == w[1].1),
+            "all similarities are equal here, so the ordering is the tie-break"
+        );
+    }
+
+    /// Times the partial selection against a full sort on a table large enough
+    /// for the difference to show, and prints both. Ignored by default because
+    /// it is a measurement, not an assertion -- but the fix it measures is a
+    /// performance fix, and the two equivalence tests above pass on the old
+    /// ordering too, because the old ordering was correct and merely slow. Run
+    /// it with: cargo test --release --lib -- --ignored --nocapture time_selection
+    #[test]
+    #[ignore]
+    fn time_selection() {
+        // Texts that share a byte histogram, so nearly all of them clear the
+        // 0.5 similarity floor and the sort is genuinely over the whole table.
+        // The first version of this test varied the subject number widely, which
+        // left 3 candidates -- too few for the partial path to run at all, so it
+        // measured nothing and the speedup it printed was noise.
+        let n = 200_000usize;
+        let template: String = std::iter::repeat("abcdefghijklmnopqrstuvwxyz ")
+            .take(24)
+            .collect();
+        let texts: Vec<String> = (0..n)
+            .map(|i| format!("{template} ref {i}"))
+            .collect();
+        let owned: Vec<&str> = texts.iter().map(|s| s.as_str()).collect();
+        let table = LinkTable::build(&owned);
+        let query = owned[123];
+
+        let t0 = std::time::Instant::now();
+        let got = table.find_similar(query, 3);
+        let partial = t0.elapsed();
+
+        let t1 = std::time::Instant::now();
+        let query_fp = compute_fingerprint(query.as_bytes());
+        let mut full: Vec<(u32, f32)> = table
+            .fingerprints
+            .iter()
+            .enumerate()
+            .map(|(i, fp)| (i as u32, fingerprint_similarity(&query_fp, fp)))
+            .filter(|(_, sim)| *sim > 0.5)
+            .collect();
+        // Count before truncating: an earlier version of this test printed
+        // full.len() afterwards and so always reported "3 candidates", which
+        // reads as "the partial path never ran" and is why the number below
+        // needs to be this candidate count and not the returned length.
+        let candidates = full.len();
+        full.sort_by(|a, b| b.1.total_cmp(&a.1).then(a.0.cmp(&b.0)));
+        full.truncate(3);
+        let sorted = t1.elapsed();
+
+        println!("candidates over the 0.5 floor: {candidates}");
+        println!("partial selection : {partial:?}");
+        println!("full sort         : {sorted:?}");
+        println!("speedup           : {:.1}x", sorted.as_secs_f64() / partial.as_secs_f64());
+        assert_eq!(got, full, "the two orderings must agree");
+    }
 
     #[test]
     fn test_entropy_uniform() {

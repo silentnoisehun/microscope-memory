@@ -664,6 +664,28 @@ file is packed and variable-length, with each block's span in its header, but
 whose mean block is 5.6 bytes that read the wrong bytes for every block past the
 first.
 
+**A separate defect is still open, and an earlier diagnosis of it here was
+wrong.** Stored vectors on long blocks disagree with a reference MiniLM encoding
+of the same text. `scripts/verify_stored_embeddings.py` measures it over all
+13,640 embedded blocks of the evaluation index:
+
+| text bytes | blocks | mean cosine | min |
+|---|---|---|---|
+| 0–300 | 13,031 | **1.0000** | 1.0000 |
+| 300–700 | 322 | 0.9463 | 0.6214 |
+| 700–1,100 | 116 | 0.7902 | 0.5386 |
+| 1,100–2,000 | 123 | 0.7792 | 0.5594 |
+| 2,000–4,096 | 48 | 0.7725 | 0.5825 |
+
+This was attributed here to the 1,024-byte truncation, and that attribution is
+**refuted**: raising `BLOCK_DATA_SIZE` removed the truncation and left this curve
+unchanged. The break is sharp at roughly 300 bytes — not at the 256-token model
+limit, and not at any value of `BLOCK_DATA_SIZE` — 13,031 of 13,640 blocks are
+exact, and cosine does not recover as blocks get longer. A tokenizer round-trip
+on one failing sample collapses 920 characters to 404, which points at
+tokenization rather than pooling or truncation, but the cause is not established.
+The short-text path is exactly right; the long-text path is not.
+
 ### 11.1 Retrieval quality, with the semantic path connected
 
 > **Reproducing these numbers requires a feature-gated build.** The `candle` and

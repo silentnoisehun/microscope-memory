@@ -20,9 +20,10 @@ are the layer format's, and both are worth stating before quoting R@k:
     of the corpus is stored cut. The title survives -- it is at the front --
     which is why the evaluation tokens still resolve, but a query whose gold
     passage sits past byte 1024 is answering against an incomplete document.
-    This is the same truncation that produced the unexplained low cosine
-    similarity on 700-1100 character blocks; the cause is identified now and
-    the fix is not yet written.
+    (This was also recorded here as the cause of the low cosine similarity on
+    long blocks. `scripts/verify_stored_embeddings.py` has since refuted that:
+    the divergence is unchanged at a 16 KiB limit, so truncation is not its
+    cause. See the note below.)
   * The reader packs consecutive short lines into one block, so 2 pairs of
     short abstracts share a block. 5,183 source lines become 5,181 blocks.
 

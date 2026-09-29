@@ -101,6 +101,20 @@ pub struct Search {
     pub keyword_boost: f32,
     #[serde(default)]
     pub semantic_weight: f32,
+    /// How much the cosine counts in the *ranking*, as a distance bonus.
+    ///
+    /// Separate from `semantic_weight`, which is a 0..1 blend deciding how far a
+    /// query's spatial coordinates lean toward its embedding. Those are
+    /// different units with different meanings, and sharing one knob made the
+    /// two impossible to tell apart: setting it to 2.0 to test whether the
+    /// semantic term could lead also moved the coordinates, and the measurement
+    /// credited both effects to the same number.
+    ///
+    /// The default is the value both halves independently measured best at; see
+    /// docs/measurements/ for the split curves. The two were never measured
+    /// apart before this field existed.
+    #[serde(default = "default_semantic_rank_gain")]
+    pub semantic_rank_gain: f32,
     #[serde(default)]
     pub emotional_bias_weight: f32,
     #[serde(default)]
@@ -161,6 +175,12 @@ fn default_max_depth() -> u8 {
     // personal facts are stored. Embedding only to D4 left those facts without
     // any vector, making them unreachable from the semantic path.
     5
+}
+fn default_semantic_rank_gain() -> f32 {
+    // Set from the measured curve, not chosen: see WHITEPAPER 11.9. The
+    // knee is at 2.0 -- 1.0 costs about 1.7 points of R@1 and nothing above 2.0
+    // adds any.
+    2.0
 }
 
 impl Default for Embedding {
@@ -354,6 +374,7 @@ impl Default for Config {
                 zoom_weight: 3.0,   // boost recent memories more
                 keyword_boost: 0.4, // tuned for better recall precision
                 semantic_weight: 0.0,
+                semantic_rank_gain: default_semantic_rank_gain(),
                 emotional_bias_weight: 0.0,
                 emotion_21d_weight: 0.0,
             },

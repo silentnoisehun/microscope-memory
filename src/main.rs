@@ -418,17 +418,17 @@ fn recall(config: &Config, query: &str, k: usize) {
                 );
                 // Cosine similarity is a score, not a distance: fold it in as a
                 // bonus so a strong semantic match can outrank a weak lexical
-                // one. Weight follows search.semantic_weight, so the existing
-                // configuration already expresses how much the semantic path
-                // should count.
-                //
-                // The upper bound was 1.0, which made the parameter impossible
-                // to measure: every value above 1 collapsed to the same score,
-                // so sweeping 1.0..10.0 returned identical recall and the term
-                // looked irrelevant. It was not irrelevant, it was clamped. The
-                // bound is now high enough to sweep; the default is unchanged.
+                // one. The gain is `search.semantic_rank_gain`, not
+                // `search.semantic_weight`: the latter is a 0..1 blend for the
+                // query's coordinates and was previously doubling as this,
+                // which meant raising it to test the ranking also moved the
+                // coordinates, and the two effects could not be told apart.
+                // The upper bound was 1.0, which made that unmeasurable: every
+                // value above 1 collapsed to the same score, so sweeping
+                // 1.0..10.0 returned identical recall and the term looked
+                // irrelevant. It was clamped, not irrelevant.
                 if let Some(sim) = semantic {
-                    let w = config.search.semantic_weight.clamp(0.0, 8.0);
+                    let w = config.search.semantic_rank_gain.clamp(0.0, 8.0);
                     combined -= sim * w;
                 }
                 all_results.push((combined, i, true));
@@ -455,7 +455,7 @@ fn recall(config: &Config, query: &str, k: usize) {
                 entry.importance,
             );
             if let Some(sim) = semantic {
-                let w = config.search.semantic_weight.clamp(0.0, 8.0);
+                let w = config.search.semantic_rank_gain.clamp(0.0, 8.0);
                 combined -= sim * w;
             }
             all_results.push((combined, ai + 1_000_000, false));

@@ -3548,6 +3548,7 @@ mod tests {
                 zoom_weight: 2.0,
                 keyword_boost: 0.1,
                 semantic_weight: 0.0,
+                semantic_rank_gain: 2.0,
                 emotional_bias_weight: 0.0,
                 emotion_21d_weight: 0.0,
             },

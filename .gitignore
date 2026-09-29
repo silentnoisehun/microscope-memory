@@ -99,6 +99,15 @@ bridge-proxy.mjs
 claude-ollama.cmd
 anthropic_ollama_proxy.py
 create-desktop-shortcut.ps1
+
+# BEIR SciFact benchmark. The index is 1.3 GB and the layer file is the corpus
+# itself; both are rebuilt by scripts/build_scifact_index.py from the public
+# archive, so committing them would add a gigabyte of derived data to the repo.
+scifact_output/
+scifact_layers/
+scifact_tmp/
+scifact_config.toml
+
 OneClick_Start.bat
 build-wasm.sh
 

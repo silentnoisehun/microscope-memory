@@ -56,8 +56,7 @@ keyword_boost = 0.1
 
 # Semantic blending weight (0.0 = pure hash coords, 1.0 = pure embedding coords)
 # NOTE: 0.0 disables semantic ranking in 'recall'. Set to > 0.0 to enable hybrid search.
-semantic_weight = 1.0
-
+semantic_weight = 2.0
 # Emotional bias warp strength (0.0 = disabled, 0.0-1.0 = warp toward emotional centroid)
 emotional_bias_weight = 0.0
 

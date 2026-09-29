@@ -421,8 +421,14 @@ fn recall(config: &Config, query: &str, k: usize) {
                 // one. Weight follows search.semantic_weight, so the existing
                 // configuration already expresses how much the semantic path
                 // should count.
+                //
+                // The upper bound was 1.0, which made the parameter impossible
+                // to measure: every value above 1 collapsed to the same score,
+                // so sweeping 1.0..10.0 returned identical recall and the term
+                // looked irrelevant. It was not irrelevant, it was clamped. The
+                // bound is now high enough to sweep; the default is unchanged.
                 if let Some(sim) = semantic {
-                    let w = config.search.semantic_weight.clamp(0.0, 1.0);
+                    let w = config.search.semantic_weight.clamp(0.0, 8.0);
                     combined -= sim * w;
                 }
                 all_results.push((combined, i, true));
@@ -449,7 +455,7 @@ fn recall(config: &Config, query: &str, k: usize) {
                 entry.importance,
             );
             if let Some(sim) = semantic {
-                let w = config.search.semantic_weight.clamp(0.0, 1.0);
+                let w = config.search.semantic_weight.clamp(0.0, 8.0);
                 combined -= sim * w;
             }
             all_results.push((combined, ai + 1_000_000, false));

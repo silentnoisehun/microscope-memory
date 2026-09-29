@@ -125,6 +125,62 @@ struct RawBlock {
 
 // ─── Extract text values from RAW files ───────────────────
 // Zero JSON dependency. Standard UTF-8 text files.
+/// Split one layer entry that is longer than BLOCK_DATA_SIZE into pieces that
+/// each fit, without losing any bytes.
+///
+/// `to_block` truncates at BLOCK_DATA_SIZE, so a 3,000-character abstract used
+/// to be stored as 1,021 characters plus "...". Everything past that point was
+/// unreachable: not retrievable, not embedded, and not in the printed text the
+/// evaluation scores. Cutting on sentence boundaries and, failing that, on
+/// whitespace, means every character survives and each piece still starts and
+/// ends at a natural boundary.
+///
+/// The last piece may be short. That is fine and intended: merging it into the
+/// previous one is exactly the truncation this replaces.
+fn split_oversized_entry(line: &str) -> Vec<String> {
+    let limit = BLOCK_DATA_SIZE;
+    let mut pieces: Vec<String> = Vec::new();
+    let mut current = String::new();
+
+    for sentence in split_sentences(line) {
+        let sentence = sentence.trim();
+        if sentence.is_empty() {
+            continue;
+        }
+        if sentence.len() > limit {
+            // One sentence longer than the whole block. Flush what we have and
+            // hard-split this one on whitespace.
+            if !current.is_empty() {
+                pieces.push(std::mem::take(&mut current));
+            }
+            for word in sentence.split_whitespace() {
+                if !current.is_empty() && current.len() + word.len() + 1 > limit {
+                    pieces.push(std::mem::take(&mut current));
+                }
+                if !current.is_empty() {
+                    current.push(' ');
+                }
+                current.push_str(word);
+            }
+            continue;
+        }
+        if !current.is_empty() && current.len() + sentence.len() + 2 > limit {
+            pieces.push(std::mem::take(&mut current));
+        }
+        if !current.is_empty() {
+            current.push(' ');
+        }
+        current.push_str(sentence);
+    }
+    if !current.is_empty() {
+        pieces.push(current);
+    }
+    if pieces.is_empty() {
+        pieces.push(line.to_string());
+    }
+    pieces
+}
+
 // Files are read and split into blocks by default.
 
 fn extract_texts_from_file(path: &Path) -> Vec<(String, u8)> {
@@ -159,6 +215,33 @@ fn extract_texts_from_file(path: &Path) -> Vec<(String, u8)> {
         for line in raw.lines() {
             let line = line.trim();
             if line.is_empty() {
+                continue;
+            }
+            // A single entry can still exceed the block size, and then the
+            // line-boundary path above cannot help: there is only one line, so
+            // `to_block` truncates it and the tail is gone. On BEIR SciFact
+            // that hit 4,300 of 5,183 abstracts, which is also why long stored
+            // blocks disagreed with the reference embeddings.
+            //
+            // Splitting the entry into several blocks keeps every byte and
+            // leaves the on-disk layout alone, since data.bin is a fixed
+            // 1024-byte-per-block grid that dream.rs addresses as
+            // `idx * BLOCK_DATA_SIZE`. The alternative -- raising
+            // BLOCK_DATA_SIZE -- would change that stride for every reader.
+            if line.len() > BLOCK_DATA_SIZE {
+                if !current.is_empty() {
+                    let (text, importance) = crate::reader::parse_imp_marker(&current);
+                    if text.trim().len() > 3 {
+                        texts.push((text.to_string(), importance));
+                    }
+                    current.clear();
+                }
+                for piece in split_oversized_entry(line) {
+                    let (text, importance) = crate::reader::parse_imp_marker(&piece);
+                    if text.trim().len() > 3 {
+                        texts.push((text.to_string(), importance));
+                    }
+                }
                 continue;
             }
             if !current.is_empty() && current.len() + line.len() + 1 > BLOCK_DATA_SIZE {
@@ -1244,5 +1327,58 @@ mod tests {
     fn content_remap_empty_without_old_index() {
         let map = compute_content_remap(&None, &[block(3, 1, "x")]);
         assert!(map.is_empty());
+    }
+
+    /// An entry longer than one block must be split, not truncated.
+    ///
+    /// This is the SciFact regression. 4,300 of 5,183 abstracts exceed
+    /// BLOCK_DATA_SIZE, and `to_block` used to cut them at 1,021 characters,
+    /// so the tail of most of the corpus was never stored. Asserting on the
+    /// reassembled word set is what makes the test meaningful: a truncation
+    /// passes a "does it fit in a block" check, it fails this one.
+    #[test]
+    fn oversized_entry_is_split_without_losing_bytes() {
+        let sentence = "The quick brown fox jumps over the lazy dog. ";
+        let entry = sentence.repeat(200); // ~9,000 bytes, one layer line
+        assert!(entry.len() > BLOCK_DATA_SIZE);
+
+        let pieces = split_oversized_entry(entry.trim());
+        assert!(pieces.len() > 1, "expected the entry to be split");
+        for p in &pieces {
+            assert!(
+                p.len() <= BLOCK_DATA_SIZE,
+                "piece of {} bytes exceeds the block size",
+                p.len()
+            );
+        }
+
+        let rejoined = pieces.join(" ");
+        let original_words: Vec<&str> = entry.split_whitespace().collect();
+        let rejoined_words: Vec<&str> = rejoined.split_whitespace().collect();
+        assert_eq!(
+            original_words, rejoined_words,
+            "splitting changed the content of the entry"
+        );
+    }
+
+    /// The split must also survive a single sentence longer than a block.
+    #[test]
+    fn oversized_single_sentence_is_split_on_whitespace() {
+        let entry = "word ".repeat(3000); // no sentence terminator at all
+        assert!(entry.len() > BLOCK_DATA_SIZE);
+        let pieces = split_oversized_entry(entry.trim());
+        assert!(pieces.len() > 1);
+        for p in &pieces {
+            assert!(p.len() <= BLOCK_DATA_SIZE);
+        }
+        assert_eq!(pieces.join(" "), entry.trim());
+    }
+
+    /// Ordinary short entries are untouched: no needless fragmentation.
+    #[test]
+    fn short_entry_is_returned_whole() {
+        let entry = "A short fact that fits in a block. Another sentence.";
+        let pieces = split_oversized_entry(entry);
+        assert_eq!(pieces, vec![entry.to_string()]);
     }
 }

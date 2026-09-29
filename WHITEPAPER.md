@@ -1105,10 +1105,20 @@ The user does not hav", severed mid-word. And the sentence splitter broke on
    exceeds the vector baseline on this corpus; the remaining gap is 10 points at
    R@1 and 1.7 at R@5.
 
-   What this does not re-measure is the count of short blocks in the 944,808-block
-   evaluation corpus, which is what the old default was tuned against and is
-   itself suspect now. On a corpus of genuinely degenerate fragments rather than
-   sentences, raise it back.
+   The count the old default was tuned against is now measured, on the fixed
+   parser and the new floor: rebuilding the 874,913-block evaluation index
+   reports `-44,336 short (<20 chars)`, against the 50,509-under-24 that was
+   recorded before on a build that was truncating the corpus. Both figures were
+   suspect; the new one is not. On a corpus of genuinely degenerate fragments
+   rather than sentences, raise the floor back.
+
+   Every stored index was invalid once the padding bug was found, and has been
+   rebuilt. Verification against the reference on 60 sampled blocks of the
+   rebuilt 12,640-vector index, bucketed by stored text length: exact (mean and
+   minimum 1.0000) up to 300 characters, 0.938 at 300-700, 0.741 at 700-1100.
+   Six samples in the long buckets is not enough to diagnose, so the residual
+   is recorded rather than explained -- long-tail blocks should be treated as
+   unverified rather than assumed correct.
 
    There is a deeper one underneath all of that, and it is the reason the
    remaining gap should not be read as a ranking result. The candle provider is

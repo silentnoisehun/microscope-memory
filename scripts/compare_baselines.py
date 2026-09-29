@@ -32,6 +32,13 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 from resonance_set import CASES, result_lines  # noqa: E402
 
+# The documents the baseline systems index. Deliberately not `[c.fact for c in
+# CASES]`: CASES is the query set, and for SciFact it holds 286 gold documents
+# while the corpus is 5,183. Indexing only the gold documents would hand FAISS
+# and FTS5 a corpus where the answer is one of ~286 rather than one of ~5183,
+# and their recall would not be comparable to Microscope's at all.
+CORPUS_TEXT: list[str] = []
+
 ROOT = Path(__file__).resolve().parent.parent
 CANDIDATES = [
     ROOT / "target/release/microscope-mem",
@@ -162,7 +169,7 @@ def run_faiss(ks: list[int], dense: bool, index_type: str) -> dict:
     import faiss
     import numpy as np
 
-    facts = [c.fact for c in CASES]
+    facts = CORPUS_TEXT
     dim = BOW if dense else D
     vec = bow_vector if dense else hash_coords
     mat = np.array([vec(f) for f in facts], dtype="float32")
@@ -203,7 +210,7 @@ def run_fts5(ks: list[int]) -> dict:
     """Time SQLite FTS5 lexical search on the same corpus and queries."""
     import sqlite3
 
-    facts = [c.fact for c in CASES]
+    facts = CORPUS_TEXT
     db = sqlite3.connect(":memory:")
     db.execute("CREATE VIRTUAL TABLE docs USING fts5(text)")
     db.executemany("INSERT INTO docs (text) VALUES (?)", [(f,) for f in facts])
@@ -279,7 +286,7 @@ def run_faiss_real(ks: list[int], index_type: str) -> dict:
         return {"system": "faiss (real MiniLM vectors)", "error": str(e)}
 
     st = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
-    facts = [c.fact for c in CASES]
+    facts = CORPUS_TEXT
     mat = np.ascontiguousarray(
         st.encode(facts, normalize_embeddings=True).astype("float32")
     )
@@ -343,13 +350,46 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--k", type=int, nargs="+", default=[1, 5, 10])
     ap.add_argument("--config", default="bench_config_semantic.toml")
+    ap.add_argument(
+        "--corpus",
+        choices=["synthetic", "scifact"],
+        default="synthetic",
+        help="synthetic = the 60 hand-written facts; scifact = BEIR SciFact (public)",
+    )
+    ap.add_argument(
+        "--out",
+        default=None,
+        help="output JSON; defaults to a corpus-specific file so the two are never mixed",
+    )
     a = ap.parse_args()
+
+    global CASES, CORPUS_TEXT
+    corpus_name = "synthetic-60-facts"
+    if a.corpus == "scifact":
+        from scifact_set import DEFAULT_DATA
+        from scifact_set import load as load_scifact
+        from build_scifact_index import corpus_texts as full_corpus
+
+        CASES = load_scifact()
+        CORPUS_TEXT = full_corpus(Path(DEFAULT_DATA), None)
+        corpus_name = "beir/scifact"
+        # The SciFact index is a different corpus, so it needs its own config.
+        if a.config == "bench_config_semantic.toml":
+            a.config = "scifact_config.toml"
+    else:
+        CORPUS_TEXT = [c.fact for c in CASES]
 
     cfg = Path(a.config)
     ks = sorted(a.k)
     if not cfg.exists():
         print(f"error: {cfg} not found; run scripts/eval_real.sh first", file=sys.stderr)
         return 1
+
+    out_path = Path(a.out) if a.out else Path(
+        "docs/measurements/scifact_comparison.json"
+        if a.corpus == "scifact"
+        else "docs/measurements/real_embedding_comparison.json"
+    )
 
     runs = [
         run_microscope(ks, cfg),
@@ -358,7 +398,7 @@ def main() -> int:
         run_fts5(ks),
     ]
 
-    print(f"\nCorpus: {len(CASES)} facts, {len(CASES)} queries, k={ks}")
+    print(f"\nCorpus: {corpus_name}, {len(CASES)} facts, {len(CASES)} queries, k={ks}")
     print("Microscope: provider=candle, all-MiniLM-L6-v2, semantic_weight=1.0")
     print("Latency and recall together: a system returning nothing is fast.\n")
     head = f"{'system':<36} {'p50 ms':>9} {'p95 ms':>9} {'p99 ms':>9}  " + "  ".join(
@@ -377,13 +417,17 @@ def main() -> int:
             f"{lat['p99_ms']:>9.3f}  {rec}"
         )
 
-    out = Path("docs/measurements/real_embedding_comparison.json")
-    out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(
         json.dumps(
             {
+                # Provenance first. The 60 synthetic facts and SciFact produce
+                # very different R@k, and a number without its corpus attached
+                # is not interpretable.
+                "corpus": corpus_name,
+                "config_file": str(cfg),
                 "config": "provider=candle model=all-MiniLM-L6-v2 semantic_weight=1.0",
-                "corpus_facts": len(CASES),
+                "indexed_documents": len(CORPUS_TEXT),
                 "queries": len(CASES),
                 "k_values": ks,
                 "results": runs,
@@ -393,7 +437,7 @@ def main() -> int:
         ),
         encoding="utf-8",
     )
-    print(f"\nwrote {out}")
+    print(f"\nwrote {out_path}")
     return 0
 
 

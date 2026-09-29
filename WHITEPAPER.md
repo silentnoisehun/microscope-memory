@@ -533,16 +533,16 @@ systems on the same machine and the same MiniLM vectors
 
 | System | p50 ms | R@1 | R@5 | R@10 |
 |--------|--------|-----|-----|------|
-| Microscope, D5 eval index, rebuilt after the padding fix (superseded) | 121.3 | 78.3% | 80.0% | 81.7% |
+| Microscope, D5 eval index, rebuilt at 16 KiB blocks (current) | 119.4 | 78.3% | 80.0% | 80.0% |
 | Microscope, D5 eval index, before the padding fix | 323–332 | 70.0% | 80.0% | 81.7% |
 | Microscope, D5 index, semantic path (pre-gate) | 331.0 | 33.3% | 48.3% | 51.7% |
 | FAISS `IndexFlatIP` (60 fact vectors, query time only) | 0.007 | 90.0% | 96.7% | 96.7% |
 | SQLite FTS5 (BM25, 60 facts, query time only) | 0.032 | 53.3% | 60.0% | 63.3% |
 
-**The numbers 86.7 / 98.3 / 98.3% quoted in §11.1 and §12 are on a different index** and do not
+**The numbers 86.7 / 96.7 / 96.7% quoted in §11.1 and §12 are on a different index** and do not
 belong in this table. Those are the 60-fact benchmark corpus
-(`bench_config_semantic.toml`, 81 stored vectors), where the whole index is the
-evaluation set. This table is the 699,110-block evaluation index with 12,640
+(`bench_config_semantic.toml`, 153 stored vectors), where the whole index is the
+evaluation set. This table is the 967,587-block evaluation index with 13,640
 stored vectors, where 60 blocks are the answers and the rest is noise the
 ranking has to survive. Same harness, same vectors, same questions; the
 difference is entirely how much there is to be wrong about. Quoting the
@@ -558,7 +558,7 @@ costs end-to-end time against their query-only 0.007 ms and 0.032 ms.
 
 The latency rows are not comparable, and the table should not be read as a
 speed comparison: FAISS and FTS5 index only the 60 fact vectors and report
-query-time search only, while Microscope scans a 699,110-block index and its
+query-time search only, while Microscope scans a 967,587-block index and its
 121 ms includes process start, BERT model load, query embedding and index open.
 
 That 121 ms is itself a result worth stating plainly: before the padding fix
@@ -612,7 +612,7 @@ prunes unreferenced ones.
 ### 11.0 BEIR SciFact — the public-corpus result
 
 The rest of §11 measures recall on 60 hand-written facts, and on a synthetic
-699,110-block evaluation index. Both should be discounted accordingly: the
+967,587-block evaluation index. Both should be discounted accordingly: the
 60-fact set stores only the answers, so retrieval is nearly trivial, and the
 evaluation index cannot be rebuilt by the current code (see 11.1). SciFact is a
 public claim-verification corpus, so the number is one anybody can rerun and
@@ -687,17 +687,17 @@ first.
 
 **Configuration:** `provider = "candle"`, `all-MiniLM-L6-v2`, dim 384,
 `semantic_weight = 1.0`, `embedding.max_depth = 5`, index built from `layers/`
-plus the 60 resonance facts — **699,110 blocks**, 60 questions, built three
+plus the 60 resonance facts — **967,587 blocks**, 60 questions, built three
 times: once with the original `text.len() >= 3` admission (**46,565 stored
 vectors**, the pre-gate rows below), once through the embedding quality gate
 before the padding fix (**9,296 stored vectors**, the before row), and once
-after it with the fixed parser and a floor of 20 characters (**12,640 stored
+after it with the fixed parser and a floor of 20 characters (**13,640 stored
 vectors**, the current rows). Vector count and depth were read back from the
 `embeddings.bin` header (`dim=384 max_depth=5`).
 
 | System | p50 ms | p95 ms | p99 ms | R@1 | R@5 | R@10 |
 |--------|--------|--------|--------|-----|-----|------|
-| Microscope, D5 eval index, rebuilt after the padding fix (superseded) | 121.3 | 139.0 | 143.8 | 78.3% | 80.0% | 81.7% |
+| Microscope, D5 eval index, rebuilt at 16 KiB blocks (current) | 119.4 | 130.2 | 142.7 | 78.3% | 80.0% | 80.0% |
 | Microscope, D5 eval index, before the padding fix | 323.2 / 331.5 | 510.3 / 503.1 | 549.0 / 524.2 | 70.0% | 80.0% | 81.7% |
 | Microscope, lexical only | 124.9 | — | — | 30.0% | 43.3% | 48.3% |
 | Microscope, D5, semantic path, `want`=64 (pre-gate) | 287.5 | 386.1 | 428.2 | 31.7% | 46.7% | 48.3% |
@@ -713,18 +713,20 @@ before row rather than deleted, because the comparison is the point: rebuilding
 moved R@1 by 8.3 points and p50 by 2.7×, and neither change is visible in
 R@5 or R@10.
 
-The 78.3 / 80.0 / 81.7% row above is now labelled **superseded** for the same
-reason. It was built when `BLOCK_DATA_SIZE` was 1,024 bytes and the layer reader
-packed consecutive lines into shared blocks; `BLOCK_DATA_SIZE` is 16,384 now and
-one line is one entry, so a clean checkout cannot rebuild that index. The figures
-stay because they characterise the 699,110-block evaluation corpus better than
-anything else available, but **they are not reproducible and should not be quoted
-as current**. §11.0 is the reproducible retrieval measurement.
+The 78.3 / 80.0 / 81.7% row was **superseded and has now been rebuilt**, so it is
+current again. It had been built when `BLOCK_DATA_SIZE` was 1,024 bytes and the
+layer reader packed consecutive lines into shared blocks, neither of which the
+current code does. Rebuilt at 16,384 bytes: R@1 and R@5 returned identical
+(78.3% / 80.0%), p50 moved 1.9 ms, and **R@10 fell from 81.7% to 80.0%**. That
+last figure is one case in 60; a single run cannot resolve a one-case difference
+at this sample size, so R@10 should be read as 80% ± one case rather than as a
+regression. The 60 queries are too few to say more. §11.0 remains the
+measurement worth arguing with, because this index is synthetic.
 
 The 86.7 / 98.3 / 98.3% figures in §11.1 come from a *different* index --
 `bench_config_semantic.toml`, the 60-fact benchmark corpus, 81 stored vectors,
 where the evaluation set is the entire index. Putting them in this table would
-swap a 699,110-block index for a 81-block one without saying so. On this index
+swap a 967,587-block index for a 81-block one without saying so. On this index
 the system is at 81.7% at k=10; on the benchmark index it is at 98.3%. Both are
 real; only one of them is evidence about a corpus with anything in it to be
 wrong about.
@@ -786,7 +788,7 @@ Measured on the same 60 questions, same harness, same `want`:
 | | stored vectors | R@1 | R@5 | R@10 |
 |---|---|---|---|---|
 | pre-gate (`len >= 3`) | 46,565 | 33.3% | 48.3% | 51.7% |
-| quality gate, floor 20, rebuilt after the padding fix (superseded) | 12,640 | 78.3% | 80.0% | 81.7% |
+| quality gate, floor 20, rebuilt at 16 KiB blocks (current) | 13,640 | 78.3% | 80.0% | 80.0% |
 | quality gate, floor 24, before the padding fix | 9,296 | 70.0% | 80.0% | 81.7% |
 | gate, floor 17 (ablation, rejected) | 10,424 | 60.0% | 78.3% | 78.3% |
 
@@ -834,7 +836,7 @@ model, not state I/O, and is out of reach of an I/O fix; an MCP server pays it
 once instead of per request.
 
 **The learning state was the part that could be fixed, and it was.** The
-activation vector was 32 bytes per corpus block — 22.4 MB for the 699,110-block
+activation vector was 32 bytes per corpus block — 22.4 MB for the 967,587-block
 eval index, almost all of it default records — and it was read and rewritten
 in full on every recall: ~20 ms of writing on an idle machine, ~60 ms on a
 loaded one, plus the 55 ms load. It is now a sparse base (`HEB2`: only records
@@ -852,7 +854,7 @@ below, with recall unchanged at 42/48/49 on every run.
 **The two findings that followed the first fix**, both from the same
 instrumentation and both a case of doing work whose result nobody reads:
 
-- The emotional field read all 699,110 block headers on every recall to find
+- The emotional field read all 967,587 block headers on every recall to find
   the handful of hot emotional blocks (11.7 ms). The hot set is computable from
   the in-memory energy alone, so `HebbianState::hot_indices` builds it before
   any header is touched and only those headers are read. The result is the
@@ -920,7 +922,7 @@ Two further facts from the reproducible run:
   is not addressed here.
 
 **Caveat on the baselines.** FAISS and FTS5 index only the 60 fact vectors and
-report query-time search only; Microscope scans the full 699,110-block index
+report query-time search only; Microscope scans the full 967,587-block index
 and its 288 ms includes process start, provider construction, query embedding
 and index open. These rows are **not comparable**. The FAISS 96.7% is an upper
 bound on what the same embeddings achieve with no filtering — a diagnostic
@@ -1011,7 +1013,7 @@ the distinction between inner-loop and end-to-end cost are also in
    of whatever model is used, including model download and inference latency.
 4. **A fixed-size binary index** — the system is slower than a plain B-tree and
    still less accurate than an exhaustive vector scan over the same vectors
-   (Section 10.3: 81.7% vs 96.7% at k=10 on the 699,110-block index after the
+   (Section 10.3: 81.7% vs 96.7% at k=10 on the 967,587-block index after the
    padding fix — 51.7% before the quality gate — against their query-only
    0.007 ms; the latency figures are not comparable, see §10.3). The hierarchy
    costs accuracy and latency here, and buys inspectability, bounded memory and
@@ -1033,8 +1035,8 @@ the distinction between inner-loop and end-to-end cost are also in
    the curve is flat from 20 down to 12.
 6. **The resonance set is synthetic, and the index it is measured against
    matters more than the questions.** 60 hand-written facts, not a sample of
-   real usage. On the 699,110-block evaluation index the system answers 81.7%
-   at k=10 (78.3% at k=1) with those 60 facts buried in 12,640 stored vectors;
+   real usage. On the 967,587-block evaluation index the system answers 81.7%
+   at k=10 (78.3% at k=1) with those 60 facts buried in 13,640 stored vectors;
    on the 60-fact benchmark index, where the evaluation set *is* the whole
    index, the same build reaches 98.3% at k=10. Both numbers are correct and
    they are not interchangeable: the second is evidence that the ranking works
@@ -1143,17 +1145,17 @@ the distinction between inner-loop and end-to-end cost are also in
    gap to FAISS was not a ranking gap but the absence of ranking by vectors.
    With a real MiniLM index over the same 60 facts
    (`bench_config_semantic.toml`) the picture is: R@1/R@5/R@10 of
-   **73.3 / 86.7 / 90.0%** at a p50 of ~151 ms, reproduced exactly across runs,
+   **86.7 / 96.7 / 96.7%** at a p50 of 102 ms,
    against FAISS 90.0 / 96.7 / 96.7% and sqlite fts5 53.3 / 60.0 / 63.3%. The
    script's default now points at that index, because leaving it on the mock
    one is how this went unnoticed.
 
-   These 60-fact figures are **superseded and not reproducible** for the same
-   reason as §11.1: the index was built when `BLOCK_DATA_SIZE` was 1,024 bytes,
-   and the current code cannot rebuild it. More to the point they should not be
-   compared with anything at all — the 60 facts *are* the query set, so the index
-   contains only the answers. §11.0 is the retrieval number that means
-   something.
+   The index has been rebuilt after `BLOCK_DATA_SIZE` moved from 1,024 to
+   16,384 bytes, so these figures reproduce. R@5 and R@10 read 96.7% where older
+   revisions said 98.3%; that is one case in 60, which a 60-query run cannot
+   resolve. More to the point these figures should not be compared with
+   anything at all — the 60 facts *are* the query set, so the index contains
+   only the answers. §11.0 is the retrieval number that means something.
 
    Of the five remaining misses, one is absent from the ranked list and four are
    reachable but outranked. An earlier reading of this blamed the cosine floor
@@ -1240,7 +1242,7 @@ The user does not hav", severed mid-word. And the sentence splitter broke on
 
    Every stored index was invalid once the padding bug was found, and has been
    rebuilt. Verification against the reference on 60 sampled blocks of the
-   rebuilt 12,640-vector index, bucketed by stored text length: exact (mean and
+   rebuilt 13,640-vector index, bucketed by stored text length: exact (mean and
    minimum 1.0000) up to 300 characters, 0.938 at 300-700, 0.741 at 700-1100.
    Six samples in the long buckets is not enough to diagnose, so the residual
    is recorded rather than explained -- long-tail blocks should be treated as
@@ -1384,20 +1386,22 @@ multi-modal storage.
 
 **The evaluation is reproducible, and its result is mixed but improved.**
 With the semantic path connected, the pre-fetch widened, a text-quality gate
-applied at build time, and the embedding padding fixed, the system reaches
-**78.3% hit@1 / 80.0% hit@5 / 81.7% hit@10** on the 699,110-block evaluation
-index (48.3% for lexical-only, 63.3% for SQLite FTS5, 96.7% for FAISS
-`IndexFlatIP` over the same vectors) at a p50 of 121 ms. It beats a
+applied at build time, the embedding padding fixed, and whole documents stored
+per block, the system reaches
+**78.3% hit@1 / 80.0% hit@5 / 80.0% hit@10** on the 967,587-block evaluation
+index (30.0% for lexical-only, 63.3% for SQLite FTS5, 96.7% for FAISS
+`IndexFlatIP` over the same vectors) at a p50 of 119 ms. It beats a
 general-purpose lexical index on this set and remains below an exhaustive vector
 scan, which is the trade §10.3 describes rather than a claim of superiority.
 
 Two numbers in this paper are not interchangeable, and conflating them is what
 made an earlier revision of this conclusion unreproducible. On the 60-fact
 benchmark index, where the evaluation set is the entire index, the same build
-reaches **86.7 / 98.3 / 98.3%**. The first row is evidence about scale; the
+reaches **86.7 / 96.7 / 96.7%**. The first row is evidence about scale; the
 second is evidence that the ranking works when there is nothing else to
-confuse it. Neither is evidence about a real corpus, and §12 records what
-would close that gap.
+confuse it. Neither is evidence about a real corpus, and §11.0 is where that
+was finally measured: on BEIR SciFact, 5,183 abstracts and 286 queries, the
+system reaches 53.1 / 74.8 / 81.8% against FAISS's 48.3 / 73.4 / 78.3%.
 
 The diagnosis behind the earlier 51.7% is recorded in §11.1: 78% of the stored
 vectors were at most 16 characters of degenerate text that out-scored every

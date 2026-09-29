@@ -214,20 +214,22 @@ config, and it is **worse** than the earlier D4 figure:
 | D5 index, semantic path, `want`=64 (pre-gate) | 31.7% | 46.7% | 48.3% | 287.5 |
 | D5 index, semantic path, `want`=256 (pre-gate) | 33.3% | 48.3% | 51.7% | 331.0 |
 | D5 index + gate, before the padding fix | 70.0% | 80.0% | 81.7% | 323.2 / 331.5 |
-| D5 eval index, rebuilt after the padding fix (superseded, see below) | 78.3% | 80.0% | 81.7% | 121.3 |
+| D5 eval index, rebuilt at 16 KiB blocks (current) | 78.3% | 80.0% | 80.0% | 119.4 |
 | *earlier D4 index (9,999 vectors) — superseded, not reproducible* | *56.7%* | *75.0%* | *80.0%* | *283.9* |
 
-The current row is the same harness on the same 699,110-block corpus, after
+The current row is the same harness on the same 967,587-block corpus, after
 rebuilding the index so the vectors are not 99% padding. R@1 moved by 8.3
 points and p50 by 2.7×; R@5 and R@10 did not move at all.
 
-**That row was current until `BLOCK_DATA_SIZE` moved from 1,024 to 16,384 bytes.**
-The index it describes was built with the 1,024-byte limit and with the layer
-reader that packed consecutive lines into shared blocks, so the current code can
-no longer produce it. The numbers are kept because they remain the best
-characterisation of the evaluation corpus, but they are not reproducible from a
-clean checkout and must not be quoted as current. For a reproducible retrieval
-number, use the SciFact table at the top of this file.
+**That row was superseded for one revision and has since been rebuilt**, so it is
+current again. The old index was built with the 1,024-byte limit and with the
+layer reader that packed consecutive lines into shared blocks, neither of which
+the current code does. Rebuilt at 16,384 bytes: **967,587 blocks, 13,640
+embedded, 246 MB**. R@1 and R@5 returned identical (78.3% / 80.0%), p50 moved
+1.9 ms, and R@10 fell from 81.7% to 80.0% — one case in 60, which a single
+60-query run cannot separate from noise, so read it as 80% ± one case rather
+than a regression. For a public corpus with enough queries to resolve a
+one-case difference, see the SciFact table at the top of this file.
 
 The D4 number is retained only to show that it does not reproduce. The 75.0%
 was measured on a depth-truncated index with a pre-fix candidate gate; on the
@@ -260,7 +262,7 @@ more than 25% in the U+0080..U+02FF mojibake band.
 | | stored vectors | R@1 | R@5 | R@10 |
 |---|---|---|---|---|
 | pre-gate (`len >= 3`) | 46,565 | 33.3% | 48.3% | 51.7% |
-| gate, floor 20, rebuilt after the padding fix (superseded) | 12,640 | 78.3% | 80.0% | 81.7% |
+| gate, floor 20, rebuilt at 16 KiB blocks (current) | 13,640 | 78.3% | 80.0% | 80.0% |
 | gate, floor 24, before the padding fix | 9,296 | 70.0% | 80.0% | 81.7% |
 | gate, floor 17 (ablation, rejected) | 10,424 | 60.0% | 78.3% | 78.3% |
 
@@ -301,7 +303,7 @@ does this by removing `eval_output` before it builds.
 
 The FAISS and FTS5 rows are diagnostics, not a like-for-like comparison. They
 index only the 60 fact vectors and report query-time search only, while
-Microscope scans the full 699,110-block index and its 331 ms is end-to-end
+Microscope scans the full 967,587-block index and its 331 ms is end-to-end
 (process start, BERT model load, query embedding, index open). The 96.7% FAISS
 R@5 is an upper bound on what the same embeddings achieve with no filtering —
 a diagnostic ceiling, not a competitive result.

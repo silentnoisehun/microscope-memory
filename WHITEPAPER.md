@@ -646,8 +646,11 @@ expected ordering. Two limits on what this table supports:
   vector search, 1.0 ms loading state, and under 1.5 ms for everything else.
   The gap to FAISS's 0.41 ms therefore stays real, and the query embedding
   alone is 36x it -- and FAISS does not pay that, because it searches
-  pre-computed query vectors. The split has not been measured on the SciFact
-  index, so the 600 ms there is not decomposed.
+  pre-computed query vectors. The SciFact split is *not* measured, and the row
+  cannot currently be reproduced at all on this machine: 5,183 documents expand
+  to 5,633,165 blocks, the derived files scale with blocks rather than
+  documents, and the index needs about 1.4 GB to build. `BENCHMARKS.md` records
+  the failed build and the per-file sizes.
 - **These are recall@k, not the nDCG@10 of the BEIR literature,** so they are
   not comparable to published SciFact results. Only the four rows are comparable
   to each other, and they share a corpus, a query set and a scorer.

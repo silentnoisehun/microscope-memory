@@ -56,10 +56,60 @@ expected one. Two things this table does **not** say:
   loading state, and under 1.5 ms for everything else. The gap to FAISS's
   0.41 ms stays real, and the query embedding alone is 36x it -- which FAISS
   does not pay, because it searches pre-computed query vectors. The split has
-  not been measured on the SciFact index, so the 600 ms there is not decomposed.
+  not been measured on the SciFact index -- see the note below for why that row
+  cannot presently be reproduced.
 - **These are recall@k, not the nDCG@10 the BEIR papers report,** so they are not
   comparable to published SciFact numbers. The only comparison here is between
   the four rows, which share a corpus, a query set and a scorer.
+
+### The SciFact row is not reproducible on this machine, and it is a size problem
+
+The 600.6 ms p50 in the table above was measured once, on an index that is not
+in this checkout. Rebuilding it to measure the phase split fails:
+
+```
+python scripts/build_scifact_index.py --force
+  5633165 blocks total
+  Depth 0:        1      Depth 5:   377746
+  Depth 1:        9      Depth 6:   800610
+  Depth 2:     1037      Depth 7:  2198808
+  Depth 3:     5183      Depth 8:  2200361
+  Depth 4:    49410
+  Embedding up to 6230 blocks (D0-D3, dim=384)
+  build failed: "write links.bin: Nincs elég hely a lemezen. (os error 112)"
+```
+
+The interesting part is the shape of that index. **5,183 documents become
+5,633,165 blocks**, 4.4 million of them at depths 7 and 8. The 16 KiB
+`BLOCK_DATA_SIZE` change made a stored document one block, but the hierarchy
+still subdivides every document down to the leaf depth, and the derived files
+scale with the block count rather than the document count. Every file came out
+5.8x the evaluation index's, which is exactly the ratio of the two block
+counts:
+
+| file | eval (967,587 blocks) | SciFact (5,633,165) |
+|---|---:|---:|
+| `merkle.bin` | 59.1 MB | 343.8 MB |
+| `microscope.bin` | 46.1 MB | 268.6 MB |
+| `fingerprints.idx` | 25.8 MB | 150.4 MB |
+| `text_index.bin` | ~2.6 MB | 19.6 MB |
+
+With `links.bin` still to write (87.2 MB at 967,587 blocks, so roughly 500 MB
+here), the index needs about 1.4 GB. The drive had 0.48 GB free and the build
+had already written 822 MB when it stopped. The partial output was removed,
+which freed the space back to 1.29 GB -- not enough.
+
+Two things follow, and neither is a latency claim:
+
+- **The headline SciFact number is a measurement from a machine state that no
+  longer exists here.** It should be read as "measured once, not re-runnable
+  without more disk", not as a current figure.
+- **The 25x gap against the evaluation index is not explained.** 5,183
+  documents answering in 600 ms while 967,587 blocks answer in 23.5 ms is not
+  a size effect, because the smaller corpus should be the faster one. The
+  phase trace exists and would answer it in one run; it needs ~1.4 GB to do
+  so. Until then the honest statement is that the gap is unexplained, not that
+  it is anything in particular.
 
 ### Getting here: three runs, and the first two were wrong
 

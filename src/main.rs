@@ -917,6 +917,17 @@ fn recall(config: &Config, query: &str, k: usize) {
         // the seven below still rewrite whole files on every recall. Which of
         // them actually pays is a measurement, not a guess, and guessing here
         // is what produced the wrong answers earlier in this series.
+        // Everything from the sort to here is the learning itself: Hebbian
+        // activation updates, co-activation pairs, resonance pulses and the
+        // attention weighting. The eight saves that follow are timed
+        // individually, and the gated sections after them are timed as one
+        // block, because the saves were guessed at once and turned out to be
+        // 6% of the phase.
+        trace_phase(
+            "  learn: activation + pairs + resonance",
+            t0.elapsed().as_secs_f64() * 1000.0 - t_mark,
+        );
+        t_mark = t0.elapsed().as_secs_f64() * 1000.0;
         let t_w = Instant::now();
         let _ = hebb.save_dirty(output_dir, &activated.iter().map(|(i, _)| *i).collect::<Vec<_>>());
         trace_phase("  save: hebbian (dirty)", t_w.elapsed().as_secs_f64() * 1000.0);
@@ -1057,6 +1068,16 @@ fn recall(config: &Config, query: &str, k: usize) {
             );
         }
     }
+
+    // The gated sections: eureka, spaced repetition, narrative, emotional
+    // state, self-model, curiosity, narrative memory and the inner monologue.
+    // Each of those calls `load_or_init` on every recall, so together they are
+    // eight more whole-file reads inside one query.
+    trace_phase(
+        "  learn: gated sections",
+        t0.elapsed().as_secs_f64() * 1000.0 - t_mark,
+    );
+    t_mark = t0.elapsed().as_secs_f64() * 1000.0;
 
     let elapsed = t0.elapsed();
     // Everything from the end of the sort to here: rendering each result and

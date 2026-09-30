@@ -171,6 +171,55 @@ the variable exists for that case.
 
 Tests: 443 lib + 35 integration passing.
 
+### The mode this thing actually runs in has never been timed
+
+Every accuracy number in this file, and every latency number, is measured with
+`MICROSCOPE_NO_LEARN=1`. That flag exists for a good reason -- replaying a query
+pulled its own answer closer each time and made R@k a function of run order --
+but it means **the learning path has no measurement at all**, and the learning
+path is what the system does when it is actually running.
+
+Measured on the 60-fact synthetic index, which is small enough that the state
+files are the only thing that can be slow:
+
+| `bench-recall`, 60-fact index | steady state p50 |
+|---|---:|
+| `NO_LEARN=1` | ~20 ms |
+| learning on | **116.0 ms** |
+
+and with the trace on, the shape of those 116 ms:
+
+| phase | ms | share |
+|---|---:|---:|
+| `print + save` (the learning writes) | 75.0 | 45.7% |
+| `state load` | 42.5 | 25.9% |
+| &nbsp;&nbsp;of which HebbianState | 17.9 | 10.9% |
+| &nbsp;&nbsp;of which ThoughtGraphState | 10.8 | 6.6% |
+| &nbsp;&nbsp;of which PredictiveCache | 7.4 | 4.5% |
+| &nbsp;&nbsp;of which AttentionState | 6.5 | 3.9% |
+| retrieval and ranking | the remainder | ~18% |
+
+**Roughly seven tenths of a real query is state I/O, not retrieval.** `print +
+save` is named as if it were printing, but in learn mode that phase carries
+the Hebbian activations, mirror boosts, co-activation pairs, attention weights,
+thought-graph patterns, predictive cache and spaced repetition -- all of it
+written synchronously inside the query.
+
+Two limits, because a 60-fact index is the worst possible place to measure
+this and the number should not be quoted as a general one:
+
+- The state files here are large relative to the corpus, which inflates both
+  the load and the write. The ratio is the finding; the absolute 116 ms is not.
+- The run also mutates the index, so the synthetic R@k figures quoted elsewhere
+  were taken before this and are not re-measured against a learned index.
+
+Nothing here has been optimised, and the obvious first step -- the state files
+are read and written whole on every query, which is the same anti-pattern as
+the embedding index and the append sidecar already fixed in this series -- is
+recorded as the next target rather than attempted blind. The `NO_LEARN` flag
+exists because the learning path is not idempotent, so any change to it has to
+be checked for behaviour as well as for latency.
+
 ### Disk: what it takes to build and measure this
 
 The SciFact index is 1.3 GB and the release dependencies are 1.5 GB, on a drive

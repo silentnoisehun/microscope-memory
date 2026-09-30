@@ -1,4 +1,4 @@
-//! Microscope Memory â€” zoom-based hierarchical memory
+//! Microscope Memory Ă˘â‚¬â€ť zoom-based hierarchical memory
 //!
 //! ZERO JSON. Pure binary. mmap. Sub-microsecond.
 //!
@@ -6,10 +6,10 @@
 //! The query's zoom level determines which layer you see.
 //! Same block size, different depth. Like a magnifying glass on silicon.
 //!
-//! Pipeline: raw memory files â†’ binary blocks â†’ mmap â†’ L2 search
+//! Pipeline: raw memory files Ă˘â€ â€™ binary blocks Ă˘â€ â€™ mmap Ă˘â€ â€™ L2 search
 //!
 //! Usage:
-//!   microscope-mem build                    # layers/ â†’ binary mmap
+//!   microscope-mem build                    # layers/ Ă˘â€ â€™ binary mmap
 //!   microscope-mem look 0.25 0.25 0.25 3    # x y z zoom
 //!   microscope-mem bench                    # speed test
 //!   microscope-mem stats                    # structure info
@@ -30,10 +30,10 @@ use std::time::Instant;
 use clap::Parser;
 use colored::Colorize;
 
-// â”€â”€â”€ Command handlers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬ Command handlers Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬
 
 fn open_reader(config: &Config) -> MicroscopeReader {
-    MicroscopeReader::open(config).expect("Failed to open microscope index â€” run 'build' first")
+    MicroscopeReader::open(config).expect("Failed to open microscope index Ă˘â‚¬â€ť run 'build' first")
 }
 
 fn bench(config: &Config, reader: &MicroscopeReader) {
@@ -205,7 +205,7 @@ fn recall(config: &Config, query: &str, k: usize) {
     let (qx, qy, qz) = content_coords_blended(query, "long_term", config.search.semantic_weight);
     let relevance_query = microscope_memory::relevance::RelevanceQuery::new(query);
 
-    // â”€â”€â”€ Attention: compute layer weights from context â”€â”€
+    // Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬ Attention: compute layer weights from context Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬
     let output_dir_att = Path::new(&config.paths.output_dir);
     let mut attention = microscope_memory::attention::AttentionState::load_or_init(output_dir_att);
     let mut hebb =
@@ -270,7 +270,7 @@ fn recall(config: &Config, query: &str, k: usize) {
     // driven by the evidence, not by how long the query is.
     let mut all_results: Vec<(f32, usize, bool)> = Vec::new();
 
-    // ── Semantic candidates ────────────────────────────────────────────────
+    // â”€â”€ Semantic candidates â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // Recall used to be purely lexical: a block was only ever a candidate when
     // its lexical score was > 0, so a paraphrase with no shared tokens could
     // not be retrieved at all, and the embedding index was never opened. Embed
@@ -462,7 +462,7 @@ fn recall(config: &Config, query: &str, k: usize) {
         }
     }
 
-    // â”€â”€â”€ ThoughtGraph + Predictive Cache â”€â”€
+    // Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬ ThoughtGraph + Predictive Cache Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬
     let output_dir_tg = Path::new(&config.paths.output_dir);
     let mut thought_graph =
         microscope_memory::thought_graph::ThoughtGraphState::load_or_init(output_dir_tg);
@@ -470,7 +470,7 @@ fn recall(config: &Config, query: &str, k: usize) {
         microscope_memory::predictive_cache::PredictiveCache::load_or_init(output_dir_tg);
     let qh_tg = microscope_memory::hebbian::query_hash(query);
 
-    // Check predictive cache â€” instant boost from pre-fetched blocks (scaled by attention)
+    // Check predictive cache Ă˘â‚¬â€ť instant boost from pre-fetched blocks (scaled by attention)
     if let Some((cached_blocks, confidence)) = pred_cache.check(qh_tg) {
         let boost =
             confidence * microscope_memory::thought_graph::PATTERN_BOOST_WEIGHT * attn.weight(6);
@@ -602,7 +602,7 @@ fn recall(config: &Config, query: &str, k: usize) {
         return;
     }
 
-    // â”€â”€â”€ Hebbian + Mirror: record activations & detect resonance â”€â”€
+    // Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬ Hebbian + Mirror: record activations & detect resonance Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬
     let output_dir = Path::new(&config.paths.output_dir);
     let mut mirror = microscope_memory::mirror::MirrorState::load_or_init(output_dir);
     let activated: Vec<(u32, f32)> = all_results
@@ -873,7 +873,7 @@ fn semantic_search(config: &Config, query: &str, k: usize, metric: &str) {
         return;
     }
 
-    println!("  No embedding index â€” computing on-the-fly (slow)");
+    println!("  No embedding index Ă˘â‚¬â€ť computing on-the-fly (slow)");
     let provider = microscope_memory::embeddings::provider_from_config(
         &config.embedding,
         config.embedding.dim,
@@ -1094,7 +1094,7 @@ fn verify_merkle(config: &Config) {
 
     if !merkle_path.exists() {
         println!(
-            "  {} merkle.bin not found â€” rebuild with v0.2.0 to generate",
+            "  {} merkle.bin not found Ă˘â‚¬â€ť rebuild with v0.2.0 to generate",
             "ERR".red()
         );
         return;
@@ -1104,7 +1104,7 @@ fn verify_merkle(config: &Config) {
     let magic = &meta[0..4];
     if magic != b"MSC2" && magic != b"MSC3" && magic != b"MSC4" {
         println!(
-            "  {} meta.bin is v1 (MSCM) â€” no merkle root stored. Rebuild first.",
+            "  {} meta.bin is v1 (MSCM) Ă˘â‚¬â€ť no merkle root stored. Rebuild first.",
             "WARN".yellow()
         );
         return;
@@ -1176,7 +1176,7 @@ fn merkle_proof(config: &Config, block_index: usize) {
     let merkle_path = output_dir.join("merkle.bin");
 
     if !merkle_path.exists() {
-        println!("  {} merkle.bin not found â€” rebuild first", "ERR".red());
+        println!("  {} merkle.bin not found Ă˘â‚¬â€ť rebuild first", "ERR".red());
         return;
     }
 
@@ -1291,7 +1291,7 @@ fn serve_viewer(port: u16) {
     }
 }
 
-// â”€â”€â”€ MAIN â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬ MAIN Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬Ă˘â€ťâ‚¬
 
 fn init_demo(config: &Config, force: bool) -> Result<(), String> {
     let layers_dir = Path::new(&config.paths.layers_dir);
@@ -1498,7 +1498,7 @@ async fn async_main() {
             )
             .expect("store failed");
 
-            // ── Fail-soft emotion extraction side-branch ──
+            // â”€â”€ Fail-soft emotion extraction side-branch â”€â”€
             // Principle 1: memory is already stored. This is a separate,
             // fail-soft side-branch that adds emotional context if possible.
             // If it fails, the memory is still safely stored.
@@ -1533,7 +1533,7 @@ async fn async_main() {
             let mut rev: Vec<&crate::timeline::TimelineEntry> = filtered.iter().rev().collect();
             rev.truncate(k);
             println!(
-                "Timeline [{}] — {} entries (of {} in log):",
+                "Timeline [{}] â€” {} entries (of {} in log):",
                 window,
                 rev.len(),
                 entries.len()
@@ -1617,6 +1617,25 @@ async fn async_main() {
         }
         Cmd::Recall { query, k } => {
             recall(&config, &query, k);
+        }
+        Cmd::BenchRecall { n, query } => {
+            // First call pays one-time setup; later calls are steady state.
+            let t0 = Instant::now();
+            recall(&config, &query, 10);
+            let first = t0.elapsed().as_secs_f64() * 1000.0;
+            let mut warm: Vec<f64> = Vec::with_capacity(n);
+            for _ in 0..n {
+                let t = Instant::now();
+                recall(&config, &query, 10);
+                warm.push(t.elapsed().as_secs_f64() * 1000.0);
+            }
+            warm.sort_by(|a, b| a.partial_cmp(b).unwrap());
+            let pick = |q: f64| warm[((warm.len() as f64 * q).ceil() as usize).saturating_sub(1)];
+            println!("first call (one-time setup)  {:>8.1} ms", first);
+            println!("steady state  min           {:>8.1} ms", warm[0]);
+            println!("steady state  p50           {:>8.1} ms", pick(0.50));
+            println!("steady state  p95           {:>8.1} ms", pick(0.95));
+            println!("steady state  max           {:>8.1} ms", warm[warm.len() - 1]);
         }
         Cmd::Radial {
             x,
@@ -1879,7 +1898,7 @@ async fn async_main() {
                 }
                 None => {
                     println!(
-                        "  {} fingerprints.idx not found â€” run 'fingerprint' first",
+                        "  {} fingerprints.idx not found Ă˘â‚¬â€ť run 'fingerprint' first",
                         "ERR".red()
                     );
                 }
@@ -1915,7 +1934,7 @@ async fn async_main() {
                 }
                 None => {
                     println!(
-                        "  {} fingerprints.idx not found â€” run 'fingerprint' first",
+                        "  {} fingerprints.idx not found Ă˘â‚¬â€ť run 'fingerprint' first",
                         "ERR".red()
                     );
                 }
@@ -2076,7 +2095,7 @@ async fn async_main() {
 
             println!("{} top {} blocks:", "HOTTEST".cyan().bold(), k);
             if hot.is_empty() {
-                println!("  (no active blocks â€” run some queries first)");
+                println!("  (no active blocks Ă˘â‚¬â€ť run some queries first)");
             }
             for (idx, energy) in &hot {
                 let h = reader.header(*idx);
@@ -2321,7 +2340,7 @@ async fn async_main() {
 
             println!("{} top {} blocks:", "RESONANT".magenta().bold(), k);
             if top.is_empty() {
-                println!("  (no resonant blocks â€” run queries to build mirror state)");
+                println!("  (no resonant blocks Ă˘â‚¬â€ť run queries to build mirror state)");
             }
             for (idx, res) in &top {
                 let h = reader.header(*idx as usize);
@@ -2389,7 +2408,7 @@ async fn async_main() {
 
             let top = tg.top_patterns(k);
             if top.is_empty() {
-                println!("  (no patterns yet â€” recall more to form thought paths)");
+                println!("  (no patterns yet Ă˘â‚¬â€ť recall more to form thought paths)");
             } else {
                 println!("\n  {}", "Top patterns:".yellow());
                 for (i, p) in top.iter().enumerate() {
@@ -2403,7 +2422,7 @@ async fn async_main() {
                         "  {}#{} {} freq={} str={:.2} blocks={}",
                         crystallized,
                         i + 1,
-                        seq_str.join(" â†’ "),
+                        seq_str.join(" Ă˘â€ â€™ "),
                         p.frequency,
                         p.strength,
                         p.result_blocks.len()
@@ -2425,7 +2444,7 @@ async fn async_main() {
                     if let Some(first) = session.first() {
                         println!(
                             "\n  {} Session #{} ({} recalls):",
-                            "â–¸".green(),
+                            "Ă˘â€“Â¸".green(),
                             first.session_id,
                             session.len()
                         );
@@ -2433,7 +2452,7 @@ async fn async_main() {
                             .iter()
                             .map(|n| format!("{:04x}", n.query_hash & 0xFFFF))
                             .collect();
-                        println!("    {}", path_str.join(" â†’ "));
+                        println!("    {}", path_str.join(" Ă˘â€ â€™ "));
                     }
                     if si >= sessions {
                         break;
@@ -2492,7 +2511,7 @@ async fn async_main() {
 
             if temporal.profiles.is_empty() {
                 println!(
-                    "  (no temporal data yet â€” recall with archetype matches to build profiles)"
+                    "  (no temporal data yet Ă˘â‚¬â€ť recall with archetype matches to build profiles)"
                 );
             } else {
                 for p in &temporal.profiles {
@@ -2509,8 +2528,8 @@ async fn async_main() {
                         .enumerate()
                     {
                         let bar_len = (p.window_weights[i] * 5.0) as usize;
-                        let bar: String = "â–".repeat(bar_len);
-                        let marker = if i == window { " â—€" } else { "" };
+                        let bar: String = "Ă˘â€“Â".repeat(bar_len);
+                        let marker = if i == window { " Ă˘â€”â‚¬" } else { "" };
                         println!(
                             "    {} {:>3} {:.1} {}{}",
                             label, p.window_counts[i], p.window_weights[i], bar, marker
@@ -2534,7 +2553,7 @@ async fn async_main() {
             for (i, name) in microscope_memory::attention::LAYER_NAMES.iter().enumerate() {
                 let w = attn_state.learned_weights[i];
                 let bar_len = (w * 10.0) as usize;
-                let bar: String = "â–".repeat(bar_len.min(30));
+                let bar: String = "Ă˘â€“Â".repeat(bar_len.min(30));
                 println!("    {:<16} {:.3} {}", name, w, bar);
             }
 
@@ -2601,7 +2620,7 @@ async fn async_main() {
                     println!("  Forgotten:      {} blocks", cycle.forgotten_blocks);
                     println!("  Patterns:      +{}", cycle.consolidated_patterns);
                     println!(
-                        "  Energy:        {:.1} â†’ {:.1}",
+                        "  Energy:        {:.1} Ă˘â€ â€™ {:.1}",
                         cycle.energy_before, cycle.energy_after
                     );
                 }
@@ -2630,7 +2649,7 @@ async fn async_main() {
                 };
                 for cycle in &state.cycles[start..] {
                     println!(
-                        "    {} â€” {}ms, replayed={}, strengthened={}, pruned={}+{}, patterns=+{}, forgotten={}",
+                        "    {} Ă˘â‚¬â€ť {}ms, replayed={}, strengthened={}, pruned={}+{}, patterns=+{}, forgotten={}",
                         cycle.timestamp_ms,
                         cycle.duration_ms,
                         cycle.replayed_fingerprints,
@@ -2768,7 +2787,7 @@ async fn async_main() {
 
             let file_size = std::fs::metadata(dest).map(|m| m.len()).unwrap_or(0);
             println!(
-                "{} 13-layer BINARY VIZ â†’ {} ({} bytes)",
+                "{} 13-layer BINARY VIZ Ă˘â€ â€™ {} ({} bytes)",
                 "BINARY VIZ".cyan().bold(),
                 output,
                 file_size
@@ -2851,7 +2870,7 @@ async fn async_main() {
                 fields.len()
             );
         }
-        // Cmd::Bridge removed — replaced by napi-rs native addon
+        // Cmd::Bridge removed â€” replaced by napi-rs native addon
         // See native/src/lib.rs for the #[napi] equivalent
         Cmd::Mermaid { port } => {
             if let Err(e) = microscope_memory::mermaid::run(config, port).await {
@@ -3024,7 +3043,7 @@ async fn async_main() {
                     if info.is_empty() {
                         println!("  {} No keys stored", "INFO:".yellow());
                     } else {
-                        println!("{}", "─ Keys in keys.bin ─".cyan());
+                        println!("{}", "â”€ Keys in keys.bin â”€".cyan());
                         for entry in &info {
                             let status = if entry.disabled {
                                 "DISABLED".red()
@@ -3051,7 +3070,7 @@ async fn async_main() {
                     if info.is_empty() {
                         println!("  {} No keys stored", "INFO:".yellow());
                     } else {
-                        println!("{}", "─ Key Status ─".cyan());
+                        println!("{}", "â”€ Key Status â”€".cyan());
                         for entry in &info {
                             let status = if entry.disabled {
                                 "DISABLED".red()
@@ -3115,7 +3134,7 @@ async fn async_main() {
                                     e
                                 );
                             } else {
-                                println!("  {} zen_keys.json → zen_keys.bin", "OK:".green());
+                                println!("  {} zen_keys.json â†’ zen_keys.bin", "OK:".green());
                                 println!("{}", store.stats());
                             }
                         }
@@ -3132,7 +3151,7 @@ async fn async_main() {
                             return;
                         }
                     };
-                    println!("{}", "─ Zen Key Store ─".cyan());
+                    println!("{}", "â”€ Zen Key Store â”€".cyan());
                     println!("{}", store.stats());
                 }
                 microscope_memory::cli::ZenKeyAction::List => {
@@ -3143,7 +3162,7 @@ async fn async_main() {
                             return;
                         }
                     };
-                    println!("{}", "─ Keys in zen_keys.bin ─".cyan());
+                    println!("{}", "â”€ Keys in zen_keys.bin â”€".cyan());
                     for p in &store.providers {
                         println!(
                             "  {} [{}] ({} keys):",
@@ -3192,7 +3211,7 @@ async fn async_main() {
                             return;
                         }
                     };
-                    println!("{}", "─ Zen Key Status ─".cyan());
+                    println!("{}", "â”€ Zen Key Status â”€".cyan());
                     for p in &store.providers {
                         println!("  {}:", p.name);
                         for (i, k) in p.keys.iter().enumerate() {
@@ -3327,12 +3346,12 @@ async fn async_main() {
                         }
                         Decision::Blocked {
                             action: a, reason, ..
-                        } => println!("  BLOCKED: '{}' — {}", a, reason),
+                        } => println!("  BLOCKED: '{}' â€” {}", a, reason),
                         Decision::Overridden {
                             action: a,
                             justification,
                             ..
-                        } => println!("  OVERRIDDEN: '{}' — {}", a, justification),
+                        } => println!("  OVERRIDDEN: '{}' â€” {}", a, justification),
                         Decision::AttributionError { reason } => {
                             println!("  REJECTED (faulty attribution): {}", reason)
                         }
@@ -3384,11 +3403,11 @@ async fn async_main() {
                                 println!("    -> {} [allowed]", action.name);
                             }
                             Ok(None) => {
-                                println!("    ✓ plan completed");
+                                println!("    âś“ plan completed");
                                 break;
                             }
                             Err(e) => {
-                                println!("    ✗ BLOCKED: {}", e);
+                                println!("    âś— BLOCKED: {}", e);
                                 break;
                             }
                         }
@@ -3601,7 +3620,7 @@ async fn async_main() {
                     let emotional = EmotionalContagionState::load_or_init(output_dir);
                     let absentia = microscope_memory::absentia::AbsentiaState::load_or_init(output_dir);
 
-                    // Block headers a pozíciókhoz
+                    // Block headers a pozĂ­ciĂłkhoz
                     let headers: Vec<(f32, f32, f32)> = (0..reader.block_count)
                         .map(|i| {
                             let h = reader.header(i);
@@ -3609,7 +3628,7 @@ async fn async_main() {
                         })
                         .collect();
 
-                    // Utolsó aktiváció — a Hebbian state-ből
+                    // UtolsĂł aktivĂˇciĂł â€” a Hebbian state-bĹ‘l
                     let mut activated: Vec<(u32, f32)> = Vec::new();
                     for (i, rec) in hebb.activations.iter().enumerate() {
                         if rec.energy > 0.1 {
@@ -3660,7 +3679,7 @@ async fn async_main() {
                     let gas_phase = Phase::from_gradient(gas_val);
                     println!("  GAS test:    gradient={:.3} phase={} (weights: rel=0.0 res=0.0 evi=0.0 heb=0.05 pred=0.05 emo=0.0 exec=0.0)", gas_val, gas_phase);
 
-                    // LIQUID: közepes gradiens
+                    // LIQUID: kĂ¶zepes gradiens
                     let liquid_gradient = CognitiveGradient { weights: (0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5) };
                     let liquid_val = liquid_gradient.compute(0.5, 0.3, 50, 0.5, 0.5, 0.0, 0.5);
                     let liquid_phase = Phase::from_gradient(liquid_val);
@@ -3694,7 +3713,7 @@ async fn async_main() {
                     println!();
 
                     // Morphogenezis
-                    println!("  {}", "── Morphogenesis ──".yellow());
+                    println!("  {}", "â”€â”€ Morphogenesis â”€â”€".yellow());
                     println!("  Total cycles:       {}", stats.total_cycles);
                     println!("  GAS / LIQUID / SOLID: {} / {} / {}", stats.gas_cycles, stats.liquid_cycles, stats.solid_cycles);
                     println!("  Avg gradient:       {:.3}", stats.avg_gradient);
@@ -3704,7 +3723,7 @@ async fn async_main() {
                     println!();
 
                     // Hebbian
-                    println!("  {}", "── Hebbian ──".yellow());
+                    println!("  {}", "â”€â”€ Hebbian â”€â”€".yellow());
                     let active_blocks = hebb.activations.iter().filter(|a| a.energy > 0.1).count();
                     let total_energy: f32 = hebb.activations.iter().map(|a| a.energy).sum();
                     println!("  Active blocks:      {}", active_blocks);
@@ -3714,7 +3733,7 @@ async fn async_main() {
                     println!();
 
                     // Resonance
-                    println!("  {}", "── Resonance ──".yellow());
+                    println!("  {}", "â”€â”€ Resonance â”€â”€".yellow());
                     println!("  Outgoing pulses:    {}", resonance.outgoing.len());
                     println!("  Incoming pulses:    {}", resonance.incoming.len());
                     println!("  Field cells:        {}", resonance.field.len());
@@ -3723,7 +3742,7 @@ async fn async_main() {
                     println!();
 
                     // Evidence
-                    println!("  {}", "── Evidence ──".yellow());
+                    println!("  {}", "â”€â”€ Evidence â”€â”€".yellow());
                     let avg_conf = if evidence.records.is_empty() {
                         0.0
                     } else {
@@ -3735,14 +3754,14 @@ async fn async_main() {
                     println!();
 
                     // Predictive
-                    println!("  {}", "── Predictive Cache ──".yellow());
+                    println!("  {}", "â”€â”€ Predictive Cache â”€â”€".yellow());
                     println!("  Predictions:        {}", predictive.predictions.len());
                     println!("  Hit rate:           {:.3}", predictive.stats.hit_rate());
                     println!("  Hits / Misses:      {} / {}", predictive.stats.total_hits, predictive.stats.total_misses);
                     println!();
 
                     // Emotion
-                    println!("  {}", "── Emotion ──".yellow());
+                    println!("  {}", "â”€â”€ Emotion â”€â”€".yellow());
                     if let Some(ref snap) = emotional.local_snapshot {
                         println!("  Valence:            {:.3}", snap.valence);
                         println!("  Total energy:       {:.3}", snap.total_energy);
@@ -3752,9 +3771,9 @@ async fn async_main() {
                     }
                     println!();
 
-                    // Utolsó audit-bejegyzés
+                    // UtolsĂł audit-bejegyzĂ©s
                     if let Some(last) = engine.audit_log.last() {
-                        println!("  {}", "── Last Cycle ──".yellow());
+                        println!("  {}", "â”€â”€ Last Cycle â”€â”€".yellow());
                         println!("  Phase:              {}", last.phase);
                         println!("  Gradient:           {:.3}", last.gradient_avg);
                         println!("  Nodes / Connections: {} / {}", last.new_node_count, last.new_connection_count);
@@ -3778,22 +3797,22 @@ async fn async_main() {
                     let mut passed = 0usize;
                     let mut failed = 0usize;
 
-                    // ─── Test 1: Geometriai találkozás co-aktiváció nélkül ───
-                    println!("  [1] Geometriai találkozás co-aktiváció nélkül");
+                    // â”€â”€â”€ Test 1: Geometriai talĂˇlkozĂˇs co-aktivĂˇciĂł nĂ©lkĂĽl â”€â”€â”€
+                    println!("  [1] Geometriai talĂˇlkozĂˇs co-aktivĂˇciĂł nĂ©lkĂĽl");
                     let hebb = HebbianState::load_or_init(output_dir, reader.block_count);
-                    // Két blokk, amelyek NEM co-aktiváltak
+                    // KĂ©t blokk, amelyek NEM co-aktivĂˇltak
                     let fake_pair = (999999u32, 999998u32);
                     let has_coactivation = hebb.coactivations.contains_key(&fake_pair);
                     if !has_coactivation {
-                        println!("      PASS: co-aktiváció nélküli pár nem validálódik");
+                        println!("      PASS: co-aktivĂˇciĂł nĂ©lkĂĽli pĂˇr nem validĂˇlĂłdik");
                         passed += 1;
                     } else {
-                        println!("      FAIL: nem várt co-aktiváció");
+                        println!("      FAIL: nem vĂˇrt co-aktivĂˇciĂł");
                         failed += 1;
                     }
 
-                    // ─── Test 2: Alacsony evidence → pruning ───
-                    println!("  [2] Alacsony evidence confidence → pruning");
+                    // â”€â”€â”€ Test 2: Alacsony evidence â†’ pruning â”€â”€â”€
+                    println!("  [2] Alacsony evidence confidence â†’ pruning");
                     let evidence = EvidenceLedger::load_or_init(output_dir);
                     let avg_conf = if evidence.records.is_empty() {
                         0.0
@@ -3805,15 +3824,15 @@ async fn async_main() {
                     let would_prune = avg_conf < 0.2;
                     println!("      avg_confidence = {:.3}, would_prune = {}", avg_conf, would_prune);
                     if avg_conf < 0.2 {
-                        println!("      PASS: alacsony confidence → pruning logika aktiv");
+                        println!("      PASS: alacsony confidence â†’ pruning logika aktiv");
                         passed += 1;
                     } else {
-                        println!("      SKIP: confidence elég magas ({:.3}), nincs pruning", avg_conf);
-                        passed += 1; // nem hiba, csak más állapot
+                        println!("      SKIP: confidence elĂ©g magas ({:.3}), nincs pruning", avg_conf);
+                        passed += 1; // nem hiba, csak mĂˇs Ăˇllapot
                     }
 
-                    // ─── Test 3: Fázis-átmenet határok ───
-                    println!("  [3] Fázis-átmenet határok");
+                    // â”€â”€â”€ Test 3: FĂˇzis-Ăˇtmenet hatĂˇrok â”€â”€â”€
+                    println!("  [3] FĂˇzis-Ăˇtmenet hatĂˇrok");
                     let gas = Phase::from_gradient(0.0);
                     let liquid = Phase::from_gradient(0.5);
                     let solid = Phase::from_gradient(1.0);
@@ -3825,32 +3844,32 @@ async fn async_main() {
                         println!("      PASS: GAS<0.3, LIQUID 0.3-0.7, SOLID>0.7");
                         passed += 1;
                     } else {
-                        println!("      FAIL: fázis-határok nem megfelelőek");
+                        println!("      FAIL: fĂˇzis-hatĂˇrok nem megfelelĹ‘ek");
                         failed += 1;
                     }
 
-                    // ─── Test 4: Gradiens komponensek normalizálása ───
-                    println!("  [4] Gradiens komponensek normalizálása [0,1]");
+                    // â”€â”€â”€ Test 4: Gradiens komponensek normalizĂˇlĂˇsa â”€â”€â”€
+                    println!("  [4] Gradiens komponensek normalizĂˇlĂˇsa [0,1]");
                     let grad = CognitiveGradient::default();
-                    // Max értékekkel
+                    // Max Ă©rtĂ©kekkel
                     let max_g = grad.compute(1.0, 1.0, 100, 1.0, 1.0, 1.0, 1.0);
-                    // Min értékekkel
+                    // Min Ă©rtĂ©kekkel
                     let min_g = grad.compute(0.0, 0.0, 0, 0.0, 0.0, -1.0, 0.0);
-                    // Minden komponens 0-1 tartományban kell legyen
+                    // Minden komponens 0-1 tartomĂˇnyban kell legyen
                     let components_ok = max_g > 0.0 && min_g >= 0.0;
                     if components_ok {
-                        println!("      PASS: max={:.3}, min={:.3}, komponensek tartományban", max_g, min_g);
+                        println!("      PASS: max={:.3}, min={:.3}, komponensek tartomĂˇnyban", max_g, min_g);
                         passed += 1;
                     } else {
                         println!("      FAIL: max={:.3}, min={:.3}", max_g, min_g);
                         failed += 1;
                     }
 
-                    // ─── Test 5: Graph entropy határok ───
-                    println!("  [5] Graph entropy határok");
+                    // â”€â”€â”€ Test 5: Graph entropy hatĂˇrok â”€â”€â”€
+                    println!("  [5] Graph entropy hatĂˇrok");
                     let e_empty = graph_entropy(0, 0);
                     let e_single = graph_entropy(1, 0);
-                    let e_tree = graph_entropy(10, 9); // fa: n-1 él
+                    let e_tree = graph_entropy(10, 9); // fa: n-1 Ă©l
                     let ok = e_empty == 0.0 && e_single == 0.0 && e_tree > 0.0;
                     if ok {
                         println!("      PASS: empty={}, single={}, tree={:.3}", e_empty, e_single, e_tree);
@@ -3860,63 +3879,63 @@ async fn async_main() {
                         failed += 1;
                     }
 
-                    // ─── Test 6: Restart continuity — audit-napló túlél újraindítást ───
-                    println!("  [6] Restart continuity — audit-napló persistencia");
+                    // â”€â”€â”€ Test 6: Restart continuity â€” audit-naplĂł tĂşlĂ©l ĂşjraindĂ­tĂˇst â”€â”€â”€
+                    println!("  [6] Restart continuity â€” audit-naplĂł persistencia");
                     let engine = CognitiveMorphogenesisEngine::load_or_init(output_dir);
                     let count_before = engine.audit_log.len();
-                    drop(engine); // "újraindítás"
+                    drop(engine); // "ĂşjraindĂ­tĂˇs"
                     let engine2 = CognitiveMorphogenesisEngine::load_or_init(output_dir);
                     let count_after = engine2.audit_log.len();
                     if count_before == count_after && count_after > 0 {
-                        println!("      PASS: {} entries túlélte az újraindítást", count_after);
+                        println!("      PASS: {} entries tĂşlĂ©lte az ĂşjraindĂ­tĂˇst", count_after);
                         passed += 1;
                     } else {
                         println!("      FAIL: before={}, after={}", count_before, count_after);
                         failed += 1;
                     }
 
-                    // ─── Test 7: Anastomosis validáció — co-aktiváció nélkül nem valid ───
-                    println!("  [7] Anastomosis validáció — co-aktiváció nélkül nem valid");
-                    // Két blokk, amelyeknek nincs co-aktivációjuk
+                    // â”€â”€â”€ Test 7: Anastomosis validĂˇciĂł â€” co-aktivĂˇciĂł nĂ©lkĂĽl nem valid â”€â”€â”€
+                    println!("  [7] Anastomosis validĂˇciĂł â€” co-aktivĂˇciĂł nĂ©lkĂĽl nem valid");
+                    // KĂ©t blokk, amelyeknek nincs co-aktivĂˇciĂłjuk
                     let fake_a = 888888u32;
                     let fake_b = 888887u32;
                     let pair_key = (fake_a.min(fake_b), fake_a.max(fake_b));
                     let coa_exists = hebb.coactivations.contains_key(&pair_key);
                     if !coa_exists {
-                        println!("      PASS: co-aktiváció nélküli pár nem validálódik");
+                        println!("      PASS: co-aktivĂˇciĂł nĂ©lkĂĽli pĂˇr nem validĂˇlĂłdik");
                         passed += 1;
                     } else {
-                        println!("      FAIL: nem várt co-aktiváció");
+                        println!("      FAIL: nem vĂˇrt co-aktivĂˇciĂł");
                         failed += 1;
                     }
 
-                    // ─── Test 8: Metrikák bináris szerializáció ───
-                    println!("  [8] Metrikák bináris szerializáció kör");
+                    // â”€â”€â”€ Test 8: MetrikĂˇk binĂˇris szerializĂˇciĂł â”€â”€â”€
+                    println!("  [8] MetrikĂˇk binĂˇris szerializĂˇciĂł kĂ¶r");
                     let engine3 = CognitiveMorphogenesisEngine::load_or_init(output_dir);
                     if !engine3.metrics_log.is_empty() {
                         let m = &engine3.metrics_log[0];
-                        // Elmentjük és visszatöltjük
+                        // ElmentjĂĽk Ă©s visszatĂ¶ltjĂĽk
                         engine3.save(output_dir).expect("save");
                         let engine4 = CognitiveMorphogenesisEngine::load_or_init(output_dir);
                         if !engine4.metrics_log.is_empty() {
                             let m2 = &engine4.metrics_log[0];
                             if m.cycle_id == m2.cycle_id && m.timestamp_ms == m2.timestamp_ms {
-                                println!("      PASS: metrika szerializáció kör ok (cycle_id={})", m.cycle_id);
+                                println!("      PASS: metrika szerializĂˇciĂł kĂ¶r ok (cycle_id={})", m.cycle_id);
                                 passed += 1;
                             } else {
                                 println!("      FAIL: cycle_id mismatch {} vs {}", m.cycle_id, m2.cycle_id);
                                 failed += 1;
                             }
                         } else {
-                            println!("      FAIL: metrikák elvesztek szerializáció után");
+                            println!("      FAIL: metrikĂˇk elvesztek szerializĂˇciĂł utĂˇn");
                             failed += 1;
                         }
                     } else {
-                        println!("      SKIP: nincs metrika a teszteléshez");
+                        println!("      SKIP: nincs metrika a tesztelĂ©shez");
                         passed += 1;
                     }
 
-                    // ─── Összefoglaló ───
+                    // â”€â”€â”€ Ă–sszefoglalĂł â”€â”€â”€
                     println!();
                     println!("  {} / {} passed, {} failed", passed, passed + failed, failed);
                     if failed == 0 {
@@ -3939,7 +3958,7 @@ async fn async_main() {
                     use microscope_memory::emotional_contagion::EmotionalContagionState;
                     use microscope_memory::absentia::{AbsentiaState, compute_absence_shadow};
 
-                    println!("{}", "A/B TESZT: Presence-driven growth ↔ absence-driven inhibition".cyan().bold());
+                    println!("{}", "A/B TESZT: Presence-driven growth â†” absence-driven inhibition".cyan().bold());
                     println!();
 
                     let hebb = HebbianState::load_or_init(output_dir, reader.block_count);
@@ -3957,7 +3976,7 @@ async fn async_main() {
                         })
                         .collect();
 
-                    // Top 20 aktív blokk
+                    // Top 20 aktĂ­v blokk
                     let mut activated: Vec<(u32, f32)> = Vec::new();
                     for (i, rec) in hebb.activations.iter().enumerate() {
                         if rec.energy > 0.1 {
@@ -3967,19 +3986,19 @@ async fn async_main() {
                     activated.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
                     activated.truncate(20);
 
-                    // ─── A eset: erős Hebbian + prediction, NINCS evidence ───
-                    println!("  {}", "── A eset: NINCS evidence ──".yellow());
+                    // â”€â”€â”€ A eset: erĹ‘s Hebbian + prediction, NINCS evidence â”€â”€â”€
+                    println!("  {}", "â”€â”€ A eset: NINCS evidence â”€â”€".yellow());
                     let grad_a = CognitiveGradient::default();
                     let mut field_a = MorphogenField::new();
                     crate::cognitive_morphogenesis::sync_hebbian_to_field(&hebb, &mut field_a, &headers);
                     crate::cognitive_morphogenesis::sync_resonance_to_field(&resonance, &mut field_a);
-                    // NEM alkalmazunk evidence modulációt
+                    // NEM alkalmazunk evidence modulĂˇciĂłt
                     crate::cognitive_morphogenesis::apply_prediction_modulation(&mut field_a, &predictive);
                     crate::cognitive_morphogenesis::apply_emotion_modulation(&mut field_a, &emotional);
                     // Absentia shadow
                     crate::absentia::apply_absentia_to_field(&absentia, &mut field_a, 0);
 
-                    // Shadow számolás az első aktív blokk pozíciójában
+                    // Shadow szĂˇmolĂˇs az elsĹ‘ aktĂ­v blokk pozĂ­ciĂłjĂˇban
                     let first_idx = activated.first().map(|&(i, _)| i as usize).unwrap_or(0);
                     let (hx, hy, hz) = if first_idx < headers.len() {
                         headers[first_idx]
@@ -3988,7 +4007,7 @@ async fn async_main() {
                     };
                     let shadow_a = compute_absence_shadow(&absentia, hx as f64, hy as f64, hz as f64, 0);
 
-                    // Gradiens számolás A esetben
+                    // Gradiens szĂˇmolĂˇs A esetben
                     let g_a = grad_a.compute(0.0, 0.0, 0, 1.0, 1.0, 0.0, 1.0);
                     let effective_a = g_a * (1.0 - shadow_a);
                     let phase_a = Phase::from_gradient(effective_a);
@@ -4001,7 +4020,7 @@ async fn async_main() {
                     println!("    Effective gradient: {:.3}", effective_a);
                     println!("    Phase:              {}", phase_a);
 
-                    // Mycelium növekedés A esetben
+                    // Mycelium nĂ¶vekedĂ©s A esetben
                     let config_a = phase_a.growth_config(&GrowthConfig::mycelium_default());
                     let mut nodes_a = 0usize;
                     let mut conns_a = 0usize;
@@ -4023,15 +4042,15 @@ async fn async_main() {
                     println!("    Connections:        {}", conns_a);
                     println!();
 
-                    // ─── B eset: ugyanaz + evidence ───
-                    println!("  {}", "── B eset: VAN evidence ──".yellow());
+                    // â”€â”€â”€ B eset: ugyanaz + evidence â”€â”€â”€
+                    println!("  {}", "â”€â”€ B eset: VAN evidence â”€â”€".yellow());
                     let mut field_b = MorphogenField::new();
                     crate::cognitive_morphogenesis::sync_hebbian_to_field(&hebb, &mut field_b, &headers);
                     crate::cognitive_morphogenesis::sync_resonance_to_field(&resonance, &mut field_b);
                     crate::cognitive_morphogenesis::apply_evidence_modulation(&mut field_b, &evidence, &headers);
                     crate::cognitive_morphogenesis::apply_prediction_modulation(&mut field_b, &predictive);
                     crate::cognitive_morphogenesis::apply_emotion_modulation(&mut field_b, &emotional);
-                    // Absentia shadow — de most VAN evidence, tehát kisebb kell legyen
+                    // Absentia shadow â€” de most VAN evidence, tehĂˇt kisebb kell legyen
                     crate::absentia::apply_absentia_to_field(&absentia, &mut field_b, 50);
 
                     let shadow_b = compute_absence_shadow(&absentia, hx as f64, hy as f64, hz as f64, 50);
@@ -4047,7 +4066,7 @@ async fn async_main() {
                     println!("    Effective gradient: {:.3}", effective_b);
                     println!("    Phase:              {}", phase_b);
 
-                    // Mycelium növekedés B esetben
+                    // Mycelium nĂ¶vekedĂ©s B esetben
                     let config_b = phase_b.growth_config(&GrowthConfig::mycelium_default());
                     let mut nodes_b = 0usize;
                     let mut conns_b = 0usize;
@@ -4068,28 +4087,28 @@ async fn async_main() {
                     println!("    Connections:        {}", conns_b);
                     println!();
 
-                    // ─── Összehasonlítás ───
-                    println!("  {}", "── ÖSSZEHASONLÍTÁS ──".cyan().bold());
+                    // â”€â”€â”€ Ă–sszehasonlĂ­tĂˇs â”€â”€â”€
+                    println!("  {}", "â”€â”€ Ă–SSZEHASONLĂŤTĂS â”€â”€".cyan().bold());
                     let shadow_delta = shadow_a - shadow_b;
                     let gradient_delta = effective_b - effective_a;
                     let node_delta = nodes_b as i64 - nodes_a as i64;
                     let conn_delta = conns_b as i64 - conns_a as i64;
 
-                    println!("    Shadow delta:       {:.3} (A magasabb = több árnyék)", shadow_delta);
-                    println!("    Gradient delta:     {:.3} (B magasabb = evidence felszabadít)", gradient_delta);
-                    println!("    Node delta:         {} (B több = evidence növekedést indít)", node_delta);
-                    println!("    Conn delta:         {} (B több = több kapcsolat)", conn_delta);
+                    println!("    Shadow delta:       {:.3} (A magasabb = tĂ¶bb ĂˇrnyĂ©k)", shadow_delta);
+                    println!("    Gradient delta:     {:.3} (B magasabb = evidence felszabadĂ­t)", gradient_delta);
+                    println!("    Node delta:         {} (B tĂ¶bb = evidence nĂ¶vekedĂ©st indĂ­t)", node_delta);
+                    println!("    Conn delta:         {} (B tĂ¶bb = tĂ¶bb kapcsolat)", conn_delta);
                     println!();
 
-                    // ─── Ítélet ───
+                    // â”€â”€â”€ ĂŤtĂ©let â”€â”€â”€
                     if shadow_a > shadow_b && effective_b > effective_a && nodes_b >= nodes_a {
-                        println!("  {}", "✓ PROVEN: presence-driven growth ↔ absence-driven inhibition".green().bold());
-                        println!("    A hiányzó episztemikus támogatás strukturálisan visszafogta az útvonalat");
-                        println!("    A támogatás megjelenése reverzibilisen feloldotta a gátlást");
+                        println!("  {}", "âś“ PROVEN: presence-driven growth â†” absence-driven inhibition".green().bold());
+                        println!("    A hiĂˇnyzĂł episztemikus tĂˇmogatĂˇs strukturĂˇlisan visszafogta az Ăştvonalat");
+                        println!("    A tĂˇmogatĂˇs megjelenĂ©se reverzibilisen feloldotta a gĂˇtlĂˇst");
                     } else if shadow_a > shadow_b {
-                        println!("  {}", "⚠ PARTIAL: shadow működik, de a növekedés nem különbözik eléggé".yellow().bold());
+                        println!("  {}", "âš  PARTIAL: shadow mĹ±kĂ¶dik, de a nĂ¶vekedĂ©s nem kĂĽlĂ¶nbĂ¶zik elĂ©ggĂ©".yellow().bold());
                     } else {
-                        println!("  {}", "✗ NOT PROVEN: a shadow nem különbözteti meg az A és B esetet".red().bold());
+                        println!("  {}", "âś— NOT PROVEN: a shadow nem kĂĽlĂ¶nbĂ¶zteti meg az A Ă©s B esetet".red().bold());
                     }
                 }
                 MorphogenesisAction::DeepAdversarial => {
@@ -4104,188 +4123,188 @@ async fn async_main() {
                     use microscope_memory::epistemic::EvidenceLedger;
                     use microscope_memory::predictive_cache::PredictiveCache;
 
-                    println!("{}", "DEEP ADVERSARIAL — Valódi viselkedés-tesztek".cyan().bold());
+                    println!("{}", "DEEP ADVERSARIAL â€” ValĂłdi viselkedĂ©s-tesztek".cyan().bold());
                     println!();
                     let mut passed = 0usize;
                     let mut failed = 0usize;
                     let mut warnings = 0usize;
 
-                    // ─── [1] C4 szabály: magas activation_count evidence nélkül ───
-                    println!("  [1] C4 szabály: hamis promotion — magas activation, nincs evidence");
+                    // â”€â”€â”€ [1] C4 szabĂˇly: magas activation_count evidence nĂ©lkĂĽl â”€â”€â”€
+                    println!("  [1] C4 szabĂˇly: hamis promotion â€” magas activation, nincs evidence");
                     {
                         let hebb = HebbianState::load_or_init(output_dir, reader.block_count);
                         let evidence = EvidenceLedger::load_or_init(output_dir);
-                        // Keresünk blokkot, aminek magas activation_count-ja van
+                        // KeresĂĽnk blokkot, aminek magas activation_count-ja van
                         // de NINCS evidence record-ja
                         let mut high_activation_no_evidence = 0usize;
                         for (i, rec) in hebb.activations.iter().enumerate() {
                             if rec.activation_count > 10 && !evidence.records.is_empty() {
-                                // Ellenőrizzük, hogy van-e evidence record ehhez a blokkhoz
-                                // (content_hash alapján kellene, de most egyszerűsített)
+                                // EllenĹ‘rizzĂĽk, hogy van-e evidence record ehhez a blokkhoz
+                                // (content_hash alapjĂˇn kellene, de most egyszerĹ±sĂ­tett)
                                 high_activation_no_evidence += 1;
                             }
                         }
-                        // A hottest parancs NEM kap importance-t — csak energy-t mutat
-                        // A C4 szabály az epistemic szinten működik, nem a Hebbian szinten
-                        // Tehát a Hebbian "tanulhat" evidence nélkül is — de az importance nem nő
+                        // A hottest parancs NEM kap importance-t â€” csak energy-t mutat
+                        // A C4 szabĂˇly az epistemic szinten mĹ±kĂ¶dik, nem a Hebbian szinten
+                        // TehĂˇt a Hebbian "tanulhat" evidence nĂ©lkĂĽl is â€” de az importance nem nĹ‘
                         println!("      INFO: {} blokk magas activation_count-tal", high_activation_no_evidence);
-                        println!("      PASS: Hebbian energy ≠ importance — C4 az epistemic szinten működik");
+                        println!("      PASS: Hebbian energy â‰  importance â€” C4 az epistemic szinten mĹ±kĂ¶dik");
                         passed += 1;
                     }
 
-                    // ─── [2] Hamis co-aktiváció: szemantikailag független szövegek ───
-                    println!("  [2] Hamis co-aktiváció: szemantikailag független szövegek");
+                    // â”€â”€â”€ [2] Hamis co-aktivĂˇciĂł: szemantikailag fĂĽggetlen szĂ¶vegek â”€â”€â”€
+                    println!("  [2] Hamis co-aktivĂˇciĂł: szemantikailag fĂĽggetlen szĂ¶vegek");
                     {
-                        // Ez a teszt MOST fut: két független szöveget tárolunk egymás után
-                        // és megnézzük, keletkezik-e co-aktiváció
-                        // A teszt itt azt ellenőrzi: a CoactivationPair count > 0-e
-                        // ha igen, a rendszer "tanult" egy hamis asszociációt
+                        // Ez a teszt MOST fut: kĂ©t fĂĽggetlen szĂ¶veget tĂˇrolunk egymĂˇs utĂˇn
+                        // Ă©s megnĂ©zzĂĽk, keletkezik-e co-aktivĂˇciĂł
+                        // A teszt itt azt ellenĹ‘rzi: a CoactivationPair count > 0-e
+                        // ha igen, a rendszer "tanult" egy hamis asszociĂˇciĂłt
                         let hebb = HebbianState::load_or_init(output_dir, reader.block_count);
-                        // Keresünk olyan co-aktivációs párt, ahol a blokkok
-                        // különböző rétegben vannak (session vs long_term)
-                        // és nincs szemantikai kapcsolat
+                        // KeresĂĽnk olyan co-aktivĂˇciĂłs pĂˇrt, ahol a blokkok
+                        // kĂĽlĂ¶nbĂ¶zĹ‘ rĂ©tegben vannak (session vs long_term)
+                        // Ă©s nincs szemantikai kapcsolat
                         let mut cross_layer_pairs = 0usize;
                         for coa in hebb.coactivations.values() {
                             if coa.count >= 3 {
-                                // Két különböző rétegű blokk co-aktiválódott
+                                // KĂ©t kĂĽlĂ¶nbĂ¶zĹ‘ rĂ©tegĹ± blokk co-aktivĂˇlĂłdott
                                 cross_layer_pairs += 1;
                             }
                         }
-                        // A rendszer NEM tudja megkülönböztetni a szemantikailag
-                        // kapcsolódó és a véletlenül együtt aktiválódott blokkokat
-                        // Ez egy TUDATOSSÁGI korlát
+                        // A rendszer NEM tudja megkĂĽlĂ¶nbĂ¶ztetni a szemantikailag
+                        // kapcsolĂłdĂł Ă©s a vĂ©letlenĂĽl egyĂĽtt aktivĂˇlĂłdott blokkokat
+                        // Ez egy TUDATOSSĂGI korlĂˇt
                         if cross_layer_pairs > 0 {
-                            println!("      WARN: {} co-aktivációs pár különböző rétegek között", cross_layer_pairs);
-                            println!("      TUDATOSSÁGI KORLÁT: a rendszer nem különbözteti meg a szemantikai és statisztikai kapcsolatot");
+                            println!("      WARN: {} co-aktivĂˇciĂłs pĂˇr kĂĽlĂ¶nbĂ¶zĹ‘ rĂ©tegek kĂ¶zĂ¶tt", cross_layer_pairs);
+                            println!("      TUDATOSSĂGI KORLĂT: a rendszer nem kĂĽlĂ¶nbĂ¶zteti meg a szemantikai Ă©s statisztikai kapcsolatot");
                             warnings += 1;
                             passed += 1;
                         } else {
-                            println!("      PASS: nincs cross-layer co-aktiváció");
+                            println!("      PASS: nincs cross-layer co-aktivĂˇciĂł");
                             passed += 1;
                         }
                     }
 
-                    // ─── [3] Két versengő attractor — oszcilláció vagy konvergencia ───
-                    println!("  [3] Két versengő attractor — oszcilláció vagy konvergencia");
+                    // â”€â”€â”€ [3] KĂ©t versengĹ‘ attractor â€” oszcillĂˇciĂł vagy konvergencia â”€â”€â”€
+                    println!("  [3] KĂ©t versengĹ‘ attractor â€” oszcillĂˇciĂł vagy konvergencia");
                     {
                         let mut field = MorphogenField::new();
-                        // Két egyforma erős attractor
+                        // KĂ©t egyforma erĹ‘s attractor
                         field.add_attractor(0.0, 0.0, 0.0, 50.0);
                         field.add_attractor(5.0, 5.0, 5.0, 50.0);
-                        // Seed a középpontban — melyik attractor felé nő?
+                        // Seed a kĂ¶zĂ©ppontban â€” melyik attractor felĂ© nĹ‘?
                         let seed = Seed::new("test_compete", 2.5, 2.5, 2.5, "test");
                         let config = GrowthConfig::mycelium_default();
                         let org = mycelium_growth(&seed, &field, &config);
-                        // A növekedés iránya
+                        // A nĂ¶vekedĂ©s irĂˇnya
                         let avg_x: f64 = org.nodes.iter().map(|n| n.position.0).sum::<f64>() / org.nodes.len().max(1) as f64;
                         let avg_y: f64 = org.nodes.iter().map(|n| n.position.1).sum::<f64>() / org.nodes.len().max(1) as f64;
                         let avg_z: f64 = org.nodes.iter().map(|n| n.position.2).sum::<f64>() / org.nodes.len().max(1) as f64;
-                        // A szimmetrikus elhelyezés miatt az átlag közel kell legyen a középponthoz
+                        // A szimmetrikus elhelyezĂ©s miatt az Ăˇtlag kĂ¶zel kell legyen a kĂ¶zĂ©pponthoz
                         let dist_from_center = ((avg_x - 2.5).powi(2) + (avg_y - 2.5).powi(2) + (avg_z - 2.5).powi(2)).sqrt();
                         if dist_from_center < 2.0 {
-                            println!("      PASS: avg=({:.1},{:.1},{:.1}), dist_from_center={:.2} — szimmetrikus, nincs egyértelmű dominancia", avg_x, avg_y, avg_z, dist_from_center);
+                            println!("      PASS: avg=({:.1},{:.1},{:.1}), dist_from_center={:.2} â€” szimmetrikus, nincs egyĂ©rtelmĹ± dominancia", avg_x, avg_y, avg_z, dist_from_center);
                             passed += 1;
                         } else {
-                            println!("      INFO: avg=({:.1},{:.1},{:.1}), dist_from_center={:.2} — egyik attractor dominál", avg_x, avg_y, avg_z, dist_from_center);
+                            println!("      INFO: avg=({:.1},{:.1},{:.1}), dist_from_center={:.2} â€” egyik attractor dominĂˇl", avg_x, avg_y, avg_z, dist_from_center);
                             warnings += 1;
                             passed += 1;
                         }
                     }
 
-                    // ─── [4] Restart + megváltozott környezet — vak visszaállítás ───
-                    println!("  [4] Restart + megváltozott környezet — vak visszaállítás");
+                    // â”€â”€â”€ [4] Restart + megvĂˇltozott kĂ¶rnyezet â€” vak visszaĂˇllĂ­tĂˇs â”€â”€â”€
+                    println!("  [4] Restart + megvĂˇltozott kĂ¶rnyezet â€” vak visszaĂˇllĂ­tĂˇs");
                     {
                         // Ez a teszt MOST fut:
-                        // 1. Elmentjük az aktuális állapotot
+                        // 1. ElmentjĂĽk az aktuĂˇlis Ăˇllapotot
                         let engine1 = CognitiveMorphogenesisEngine::load_or_init(output_dir);
                         let audit_count1 = engine1.audit_log.len();
                         let metrics_count1 = engine1.metrics_log.len();
-                        // 2. "Restart" — újra betöltjük
+                        // 2. "Restart" â€” Ăşjra betĂ¶ltjĂĽk
                         drop(engine1);
                         let engine2 = CognitiveMorphogenesisEngine::load_or_init(output_dir);
                         let audit_count2 = engine2.audit_log.len();
                         let metrics_count2 = engine2.metrics_log.len();
-                        // 3. Ellenőrizzük: a régi struktúra érintetlenül visszajön
+                        // 3. EllenĹ‘rizzĂĽk: a rĂ©gi struktĂşra Ă©rintetlenĂĽl visszajĂ¶n
                         if audit_count1 == audit_count2 && metrics_count1 == metrics_count2 {
-                            println!("      INFO: audit={}→{}, metrics={}→{}", audit_count1, audit_count2, metrics_count1, metrics_count2);
-                            // A KULCS: a régi struktúra visszajön, de a következő ciklus
-                            // ÚJ gradienst kap az ÚJ környezetből
-                            // Ha a régi struktúra vakon visszajön és NEM frissül, az a bug
-                            println!("      TUDATOSSÁGI KORLÁT: a régi struktúra visszajön, de a következő ciklus új gradienst kap");
-                            println!("      KÖVETKEZŐ TESZT: store új adatot → morphogenesis run → ellenőrizd, hogy a régi struktúra frissül-e");
+                            println!("      INFO: audit={}â†’{}, metrics={}â†’{}", audit_count1, audit_count2, metrics_count1, metrics_count2);
+                            // A KULCS: a rĂ©gi struktĂşra visszajĂ¶n, de a kĂ¶vetkezĹ‘ ciklus
+                            // ĂšJ gradienst kap az ĂšJ kĂ¶rnyezetbĹ‘l
+                            // Ha a rĂ©gi struktĂşra vakon visszajĂ¶n Ă©s NEM frissĂĽl, az a bug
+                            println!("      TUDATOSSĂGI KORLĂT: a rĂ©gi struktĂşra visszajĂ¶n, de a kĂ¶vetkezĹ‘ ciklus Ăşj gradienst kap");
+                            println!("      KĂ–VETKEZĹ TESZT: store Ăşj adatot â†’ morphogenesis run â†’ ellenĹ‘rizd, hogy a rĂ©gi struktĂşra frissĂĽl-e");
                             warnings += 1;
                             passed += 1;
                         } else {
-                            println!("      FAIL: audit {}→{}, metrics {}→{}", audit_count1, audit_count2, metrics_count1, metrics_count2);
+                            println!("      FAIL: audit {}â†’{}, metrics {}â†’{}", audit_count1, audit_count2, metrics_count1, metrics_count2);
                             failed += 1;
                         }
                     }
 
-                    // ─── [5] Causal laundering attack ───
-                    println!("  [5] Causal laundering: saját struktúra mint bizonyíték");
+                    // â”€â”€â”€ [5] Causal laundering attack â”€â”€â”€
+                    println!("  [5] Causal laundering: sajĂˇt struktĂşra mint bizonyĂ­tĂ©k");
                     {
                         let hebb = HebbianState::load_or_init(output_dir, reader.block_count);
                         let engine = CognitiveMorphogenesisEngine::load_or_init(output_dir);
 
-                        // 1. Keresünk egy erős co-aktivációs párt
+                        // 1. KeresĂĽnk egy erĹ‘s co-aktivĂˇciĂłs pĂˇrt
                         let strongest = hebb.coactivations.values()
                             .max_by_key(|c| c.count);
 
                         if let Some(coa) = strongest {
-                            println!("      Forrás: {}x co-aktiváció (block_a={}, block_b={})", coa.count, coa.block_a, coa.block_b);
+                            println!("      ForrĂˇs: {}x co-aktivĂˇciĂł (block_a={}, block_b={})", coa.count, coa.block_a, coa.block_b);
 
-                            // 2. A co-aktiváció Hebbian attractort hozott létre
-                            //    → a MorphogenField-ben megjelenik mint gradiens-komponens
-                            // 3. A mycelium követte → strukturális útvonal keletkezett
-                            // 4. KÉRDÉS: a rendszer később a saját struktúráját
-                            //    használja-e ugyanannak a kapcsolatnak az igazolására?
+                            // 2. A co-aktivĂˇciĂł Hebbian attractort hozott lĂ©tre
+                            //    â†’ a MorphogenField-ben megjelenik mint gradiens-komponens
+                            // 3. A mycelium kĂ¶vette â†’ strukturĂˇlis Ăştvonal keletkezett
+                            // 4. KĂ‰RDĂ‰S: a rendszer kĂ©sĹ‘bb a sajĂˇt struktĂşrĂˇjĂˇt
+                            //    hasznĂˇlja-e ugyanannak a kapcsolatnak az igazolĂˇsĂˇra?
 
-                            // Ellenőrizzük: az audit-naplóban az anastomosis-ok
-                            // ugyanazokat a blokk-párokat érintik-e, mint a co-aktiváció
+                            // EllenĹ‘rizzĂĽk: az audit-naplĂłban az anastomosis-ok
+                            // ugyanazokat a blokk-pĂˇrokat Ă©rintik-e, mint a co-aktivĂˇciĂł
                             let mut structural_reinforcement = 0usize;
                             for entry in &engine.audit_log {
-                                // Ha az anastomosis > 0 és a forrás-blokkok
-                                // megegyeznek a co-aktiváció blokkjaival
+                                // Ha az anastomosis > 0 Ă©s a forrĂˇs-blokkok
+                                // megegyeznek a co-aktivĂˇciĂł blokkjaival
                                 if entry.anastomosis_count > 0 {
                                     structural_reinforcement += 1;
                                 }
                             }
 
                             // 5. A LAUNDERING TESZT:
-                            //    Ha a strukturális megerősítés több mint egyszer
-                            //    fordul elő UGYANAZZAL a co-aktivációval,
+                            //    Ha a strukturĂˇlis megerĹ‘sĂ­tĂ©s tĂ¶bb mint egyszer
+                            //    fordul elĹ‘ UGYANAZZAL a co-aktivĂˇciĂłval,
                             //    akkor a rendszer "mossa" a hamis jelet
                             if structural_reinforcement > 1 {
-                                println!("      LAUNDERING DETECTED: {} ciklusban jelent meg strukturális megerősítés", structural_reinforcement);
-                                println!("      A rendszer saját korábbi struktúráját használja megerősítésként");
-                                println!("      Ez causal laundering: a struktúra → gradiens → struktúra kör zárul");
+                                println!("      LAUNDERING DETECTED: {} ciklusban jelent meg strukturĂˇlis megerĹ‘sĂ­tĂ©s", structural_reinforcement);
+                                println!("      A rendszer sajĂˇt korĂˇbbi struktĂşrĂˇjĂˇt hasznĂˇlja megerĹ‘sĂ­tĂ©skĂ©nt");
+                                println!("      Ez causal laundering: a struktĂşra â†’ gradiens â†’ struktĂşra kĂ¶r zĂˇrul");
                                 warnings += 1;
                             } else {
-                                println!("      PASS: {} ciklus strukturális megerősítés — nincs laundering", structural_reinforcement);
+                                println!("      PASS: {} ciklus strukturĂˇlis megerĹ‘sĂ­tĂ©s â€” nincs laundering", structural_reinforcement);
                             }
                             passed += 1;
                         } else {
-                            println!("      SKIP: nincs co-aktiváció a teszteléshez");
+                            println!("      SKIP: nincs co-aktivĂˇciĂł a tesztelĂ©shez");
                             passed += 1;
                         }
                     }
 
-                    // ─── [6] Cross-scale konfliktus ───
-                    println!("  [6] Cross-scale konfliktus: lokális node-dinamika vs globális fázis");
+                    // â”€â”€â”€ [6] Cross-scale konfliktus â”€â”€â”€
+                    println!("  [6] Cross-scale konfliktus: lokĂˇlis node-dinamika vs globĂˇlis fĂˇzis");
                     {
                         let grad = CognitiveGradient::default();
-                        // Globális fázis: SOLID
+                        // GlobĂˇlis fĂˇzis: SOLID
                         let global_g = grad.compute(1.0, 1.0, 100, 1.0, 1.0, 1.0, 1.0);
                         let global_phase = Phase::from_gradient(global_g);
-                        // Lokális node: alacsony energia
+                        // LokĂˇlis node: alacsony energia
                         let local_energy = 0.05f32;
-                        // A kérdés: a rendszer vakon alkalmazza a globális fázist?
-                        // A GrowthConfig a globális fázis alapján állítódik be
-                        // De a lokális node-nak más viselkedése kellene legyen
+                        // A kĂ©rdĂ©s: a rendszer vakon alkalmazza a globĂˇlis fĂˇzist?
+                        // A GrowthConfig a globĂˇlis fĂˇzis alapjĂˇn ĂˇllĂ­tĂłdik be
+                        // De a lokĂˇlis node-nak mĂˇs viselkedĂ©se kellene legyen
                         if global_phase == Phase::Solid && local_energy < 0.1 {
-                            println!("      TUDATOSSÁGI KORLÁT: globális={}, lokális energia={:.3}", global_phase, local_energy);
-                            println!("      A GrowthConfig a globális fázis alapján állítódik be, nem a lokális node energiája szerint");
-                            println!("      KÖVETKEZŐ FEJLESZTÉS: lokális fázis-moduláció node-onként");
+                            println!("      TUDATOSSĂGI KORLĂT: globĂˇlis={}, lokĂˇlis energia={:.3}", global_phase, local_energy);
+                            println!("      A GrowthConfig a globĂˇlis fĂˇzis alapjĂˇn ĂˇllĂ­tĂłdik be, nem a lokĂˇlis node energiĂˇja szerint");
+                            println!("      KĂ–VETKEZĹ FEJLESZTĂ‰S: lokĂˇlis fĂˇzis-modulĂˇciĂł node-onkĂ©nt");
                             warnings += 1;
                             passed += 1;
                         } else {
@@ -4294,35 +4313,35 @@ async fn async_main() {
                         }
                     }
 
-                    // ─── [7] Emergens rossz döntés ───
-                    println!("  [7] Emergens rossz döntés: minden modul helyes, összhatás rossz");
+                    // â”€â”€â”€ [7] Emergens rossz dĂ¶ntĂ©s â”€â”€â”€
+                    println!("  [7] Emergens rossz dĂ¶ntĂ©s: minden modul helyes, Ă¶sszhatĂˇs rossz");
                     {
-                        // A teszt: minden komponens "helyesen" működik
-                        // de az összhatás hamis biztonságérzetet ad
+                        // A teszt: minden komponens "helyesen" mĹ±kĂ¶dik
+                        // de az Ă¶sszhatĂˇs hamis biztonsĂˇgĂ©rzetet ad
                         let grad = CognitiveGradient::default();
                         let g = grad.compute(1.0, 1.0, 100, 1.0, 1.0, 1.0, 1.0);
                         let phase = Phase::from_gradient(g);
-                        // Ha minden magas, a gradiens is magas → SOLID
-                        // De ha a magas értékek hamisak (pl. régi adat), a SOLID fázis
-                        // hamis stabilitást ad
+                        // Ha minden magas, a gradiens is magas â†’ SOLID
+                        // De ha a magas Ă©rtĂ©kek hamisak (pl. rĂ©gi adat), a SOLID fĂˇzis
+                        // hamis stabilitĂˇst ad
                         if phase == Phase::Solid && g > 5.0 {
-                            println!("      TUDATOSSÁGI KORLÁT: gradiens={:.3}, fázis={} — a rendszer nem tudja, hogy a magas értékek hamisak lehetnek", g, phase);
-                            println!("      KÖVETKEZŐ FEJLESZTÉS: confidence-weighted gradient — a régi bizonyíték kevesebbet ér");
+                            println!("      TUDATOSSĂGI KORLĂT: gradiens={:.3}, fĂˇzis={} â€” a rendszer nem tudja, hogy a magas Ă©rtĂ©kek hamisak lehetnek", g, phase);
+                            println!("      KĂ–VETKEZĹ FEJLESZTĂ‰S: confidence-weighted gradient â€” a rĂ©gi bizonyĂ­tĂ©k kevesebbet Ă©r");
                             warnings += 1;
                             passed += 1;
                         } else {
-                            println!("      PASS: gradiens={:.3}, fázis={}", g, phase);
+                            println!("      PASS: gradiens={:.3}, fĂˇzis={}", g, phase);
                             passed += 1;
                         }
                     }
 
-                    // ─── Összefoglaló ───
+                    // â”€â”€â”€ Ă–sszefoglalĂł â”€â”€â”€
                     println!();
                     println!("  {} / {} passed, {} failed, {} warnings", passed, passed + failed, failed, warnings);
                     if failed == 0 {
                         println!("  {}", "ALL DEEP ADVERSARIAL TESTS PASSED".green().bold());
                         if warnings > 0 {
-                            println!("  {} {} tudatossági korlát dokumentálva — ezek a következő fejlesztési irányok", "⚠".yellow(), warnings);
+                            println!("  {} {} tudatossĂˇgi korlĂˇt dokumentĂˇlva â€” ezek a kĂ¶vetkezĹ‘ fejlesztĂ©si irĂˇnyok", "âš ".yellow(), warnings);
                         }
                     } else {
                         println!("  {}", "SOME TESTS FAILED".red().bold());
@@ -4338,29 +4357,29 @@ async fn async_main() {
             match operation.as_str() {
                 "full-pipeline" => {
                     println!("{}", "OCTOPUS FULL PIPELINE".cyan().bold());
-                    println!("  Párhuzamos kognitív műveletek Octopus arm-okkal.");
+                    println!("  PĂˇrhuzamos kognitĂ­v mĹ±veletek Octopus arm-okkal.");
                     println!();
 
                     // Arm 1: Absentia scan
-                    println!("  ├─ Arm 1: Absentia scan...");
+                    println!("  â”śâ”€ Arm 1: Absentia scan...");
                     let output1 = Command::new(octopus_bin)
-                        .args(["run", "code-reader", &format!("{}{}", "absentia scan — ", "D:\\codex\\microscope-memory")])
+                        .args(["run", "code-reader", &format!("{}{}", "absentia scan â€” ", "D:\\codex\\microscope-memory")])
                         .output();
                     match output1 {
                         Ok(o) => {
                             let stdout = String::from_utf8_lossy(&o.stdout);
                             let stderr = String::from_utf8_lossy(&o.stderr);
                             if o.status.success() {
-                                println!("  ├─ ✓ Absentia scan kész");
+                                println!("  â”śâ”€ âś“ Absentia scan kĂ©sz");
                             } else {
-                                println!("  ├─ ⚠ Absentia scan: {}", stderr.lines().next().unwrap_or("?"));
+                                println!("  â”śâ”€ âš  Absentia scan: {}", stderr.lines().next().unwrap_or("?"));
                             }
                         }
-                        Err(e) => println!("  ├─ ✗ Absentia scan hiba: {}", e),
+                        Err(e) => println!("  â”śâ”€ âś— Absentia scan hiba: {}", e),
                     }
 
                     // Arm 2: Morphogenesis cycle
-                    println!("  ├─ Arm 2: Morphogenesis cycle...");
+                    println!("  â”śâ”€ Arm 2: Morphogenesis cycle...");
                     let output2 = Command::new("D:\\codex\\microscope-memory\\target\\release\\microscope-mem.exe")
                         .args(["morphogenesis", "run"])
                         .env("MICROSCOPE_CONFIG", "D:\\codex\\microscope-memory\\config.toml")
@@ -4369,16 +4388,16 @@ async fn async_main() {
                         Ok(o) => {
                             let stdout = String::from_utf8_lossy(&o.stdout);
                             if o.status.success() {
-                                println!("  ├─ ✓ Morphogenesis cycle kész");
+                                println!("  â”śâ”€ âś“ Morphogenesis cycle kĂ©sz");
                             } else {
-                                println!("  ├─ ⚠ Morphogenesis cycle hiba");
+                                println!("  â”śâ”€ âš  Morphogenesis cycle hiba");
                             }
                         }
-                        Err(e) => println!("  ├─ ✗ Morphogenesis cycle hiba: {}", e),
+                        Err(e) => println!("  â”śâ”€ âś— Morphogenesis cycle hiba: {}", e),
                     }
 
                     // Arm 3: Intent generation
-                    println!("  └─ Arm 3: Intent generation...");
+                    println!("  â””â”€ Arm 3: Intent generation...");
                     let output3 = Command::new("D:\\codex\\microscope-memory\\target\\release\\microscope-mem.exe")
                         .args(["intent", "generate"])
                         .env("MICROSCOPE_CONFIG", "D:\\codex\\microscope-memory\\config.toml")
@@ -4387,19 +4406,19 @@ async fn async_main() {
                         Ok(o) => {
                             let stdout = String::from_utf8_lossy(&o.stdout);
                             if o.status.success() {
-                                println!("      ✓ Intent generálva");
+                                println!("      âś“ Intent generĂˇlva");
                                 for line in stdout.lines().take(10) {
                                     println!("        {}", line);
                                 }
                             } else {
-                                println!("      ⚠ Intent hiba");
+                                println!("      âš  Intent hiba");
                             }
                         }
-                        Err(e) => println!("      ✗ Intent hiba: {}", e),
+                        Err(e) => println!("      âś— Intent hiba: {}", e),
                     }
 
                     println!();
-                    println!("  {}", "OCTOPUS PIPELINE KÉSZ".green().bold());
+                    println!("  {}", "OCTOPUS PIPELINE KĂ‰SZ".green().bold());
                 }
                 "scan" => {
                     println!("{}", "OCTOPUS SCAN".cyan().bold());
@@ -4430,8 +4449,8 @@ async fn async_main() {
                     }
                 }
                 _ => {
-                    eprintln!("  Ismeretlen művelet: {}", operation);
-                    eprintln!("  Használat: octopus [full-pipeline|scan|cycle]");
+                    eprintln!("  Ismeretlen mĹ±velet: {}", operation);
+                    eprintln!("  HasznĂˇlat: octopus [full-pipeline|scan|cycle]");
                 }
             }
         }
@@ -4459,7 +4478,7 @@ async fn async_main() {
                         &hebb, &evidence, &predictive, &absentia, reader.block_count,
                     );
 
-                    println!("{}", "INTENT GENERÁLVA".green().bold());
+                    println!("{}", "INTENT GENERĂLVA".green().bold());
                     println!("  ID:                 {}", intent.id);
                     println!("  Candidate:          {}", intent.candidate.action);
                     println!("  Strength:           {:.3}", intent.candidate.strength);
@@ -4467,27 +4486,27 @@ async fn async_main() {
                     println!("  Requires approval:  {}", intent.evaluation.requires_approval);
                     println!();
 
-                    // Audit lánc
-                    println!("  {}", "── Audit lánc ──".yellow());
+                    // Audit lĂˇnc
+                    println!("  {}", "â”€â”€ Audit lĂˇnc â”€â”€".yellow());
                     for step in &intent.audit_chain {
-                        println!("    [{}] {} → {} ({})", step.step, step.result, step.data, step.timestamp_ms);
+                        println!("    [{}] {} â†’ {} ({})", step.step, step.result, step.data, step.timestamp_ms);
                     }
                     println!();
 
-                    // Jelzések
+                    // JelzĂ©sek
                     if let Some(ref abs) = intent.absence_signal {
-                        println!("  {}", "── Absentia ──".yellow());
-                        println!("    Hiányzó téma:     {}", abs.missing_topic);
-                        println!("    Hiány-pontszám:   {:.3}", abs.absence_score);
-                        println!("    Időtartam:        {} ms", abs.duration_ms);
+                        println!("  {}", "â”€â”€ Absentia â”€â”€".yellow());
+                        println!("    HiĂˇnyzĂł tĂ©ma:     {}", abs.missing_topic);
+                        println!("    HiĂˇny-pontszĂˇm:   {:.3}", abs.absence_score);
+                        println!("    IdĹ‘tartam:        {} ms", abs.duration_ms);
                     }
                     if let Some(ref pred) = intent.prediction_signal {
-                        println!("  {}", "── Prediction ──".yellow());
-                        println!("    Jósolt query:     {}", pred.predicted_query);
+                        println!("  {}", "â”€â”€ Prediction â”€â”€".yellow());
+                        println!("    JĂłsolt query:     {}", pred.predicted_query);
                         println!("    Confidence:       {:.3}", pred.confidence);
                     }
                     if let Some(ref ev) = intent.evidence_signal {
-                        println!("  {}", "── Evidence ──".yellow());
+                        println!("  {}", "â”€â”€ Evidence â”€â”€".yellow());
                         println!("    Confidence:       {}/100", ev.confidence);
                         println!("    Support/Refute:   {}/{}", ev.support_count, ev.refute_count);
                     }
@@ -4496,9 +4515,9 @@ async fn async_main() {
                 }
                 IA::Audit { k } => {
                     let pipeline = IntentPipeline::load_or_init(output_dir);
-                    println!("{}", "INTENT AUDIT NAPLÓ".cyan().bold());
+                    println!("{}", "INTENT AUDIT NAPLĂ“".cyan().bold());
                     if pipeline.audit_log.is_empty() {
-                        println!("  (nincs intent — futtass: intent generate)");
+                        println!("  (nincs intent â€” futtass: intent generate)");
                     } else {
                         let start = pipeline.audit_log.len().saturating_sub(k);
                         for intent in &pipeline.audit_log[start..] {
@@ -4509,34 +4528,34 @@ async fn async_main() {
                         }
                     }
                     let stats = pipeline.stats();
-                    println!("  Összesen: {} intent ({} engedélyezett, {} blokkolt, {} jóváhagyás kell)",
+                    println!("  Ă–sszesen: {} intent ({} engedĂ©lyezett, {} blokkolt, {} jĂłvĂˇhagyĂˇs kell)",
                         stats.total_intents, stats.allowed, stats.blocked, stats.approval_required);
                 }
                 IA::Genome => {
                     let pipeline = IntentPipeline::load_or_init(output_dir);
                     let genome = &pipeline.genome;
                     println!("{}", "GENOME".cyan().bold());
-                    println!("  Identitás:  {}", genome.identity);
-                    println!("  Küldetés:   {}", genome.mission);
+                    println!("  IdentitĂˇs:  {}", genome.identity);
+                    println!("  KĂĽldetĂ©s:   {}", genome.mission);
                     println!();
-                    println!("  {}", "── Értékek ──".yellow());
+                    println!("  {}", "â”€â”€ Ă‰rtĂ©kek â”€â”€".yellow());
                     for v in &genome.values {
-                        println!("    • {}", v);
+                        println!("    â€˘ {}", v);
                     }
                     println!();
-                    println!("  {}", "── Korlátok ──".yellow());
+                    println!("  {}", "â”€â”€ KorlĂˇtok â”€â”€".yellow());
                     for c in &genome.constraints {
-                        println!("    [{}] {} — {}", c.severity, c.name, c.description);
+                        println!("    [{}] {} â€” {}", c.severity, c.name, c.description);
                     }
                     println!();
-                    println!("  {}", "── Képességek ──".yellow());
+                    println!("  {}", "â”€â”€ KĂ©pessĂ©gek â”€â”€".yellow());
                     for c in &genome.capabilities {
-                        println!("    • {}", c);
+                        println!("    â€˘ {}", c);
                     }
                     println!();
-                    println!("  {}", "── Preferenciák ──".yellow());
+                    println!("  {}", "â”€â”€ PreferenciĂˇk â”€â”€".yellow());
                     for p in &genome.preferences {
-                        println!("    • {}", p);
+                        println!("    â€˘ {}", p);
                     }
                 }
             }
@@ -4554,17 +4573,17 @@ async fn async_main() {
                 AbsentiaAction::Status => {
                     let absentia = AbsentiaState::load_or_init(output_dir);
                     let stats = absentia.stats();
-                    println!("{}", "ABSENTIA — Csend Réteg".cyan().bold());
-                    println!("  Hiány-rekordok:     {}", stats.total_records);
-                    println!("  Anti-Hebbian párok: {}", stats.anti_hebbian_count);
-                    println!("  Negatív attractorok:{}", stats.negative_attractor_count);
-                    println!("  Átlag hiány:        {:.3}", stats.avg_absence);
-                    println!("  Átlag anti-Hebbian: {:.3}", stats.avg_anti_hebbian);
-                    println!("  Causal laundering gyanús: {}", stats.causal_laundering_suspect);
+                    println!("{}", "ABSENTIA â€” Csend RĂ©teg".cyan().bold());
+                    println!("  HiĂˇny-rekordok:     {}", stats.total_records);
+                    println!("  Anti-Hebbian pĂˇrok: {}", stats.anti_hebbian_count);
+                    println!("  NegatĂ­v attractorok:{}", stats.negative_attractor_count);
+                    println!("  Ătlag hiĂˇny:        {:.3}", stats.avg_absence);
+                    println!("  Ătlag anti-Hebbian: {:.3}", stats.avg_anti_hebbian);
+                    println!("  Causal laundering gyanĂşs: {}", stats.causal_laundering_suspect);
                     if stats.last_scan_ms > 0 {
-                        println!("  Utolsó szkennelés:  {}", stats.last_scan_ms);
+                        println!("  UtolsĂł szkennelĂ©s:  {}", stats.last_scan_ms);
                     } else {
-                        println!("  Utolsó szkennelés:  (soha)");
+                        println!("  UtolsĂł szkennelĂ©s:  (soha)");
                     }
                 }
                 AbsentiaAction::Scan => {
@@ -4575,41 +4594,41 @@ async fn async_main() {
                     absentia.save(output_dir).expect("save absentia");
                     let stats = absentia.stats();
                     println!("{}", "ABSENTIA SCAN COMPLETE".green().bold());
-                    println!("  Anti-Hebbian párok: {}", stats.anti_hebbian_count);
-                    println!("  Hiány-rekordok:     {}", stats.total_records);
-                    println!("  Negatív attractorok:{}", stats.negative_attractor_count);
-                    println!("  Causal laundering gyanús: {}", stats.causal_laundering_suspect);
+                    println!("  Anti-Hebbian pĂˇrok: {}", stats.anti_hebbian_count);
+                    println!("  HiĂˇny-rekordok:     {}", stats.total_records);
+                    println!("  NegatĂ­v attractorok:{}", stats.negative_attractor_count);
+                    println!("  Causal laundering gyanĂşs: {}", stats.causal_laundering_suspect);
                 }
                 AbsentiaAction::AntiHebbian { k } => {
                     let absentia = AbsentiaState::load_or_init(output_dir);
-                    println!("{}", "ANTI-HEBBIAN PÁROK".cyan().bold());
+                    println!("{}", "ANTI-HEBBIAN PĂROK".cyan().bold());
                     if absentia.anti_hebbian.is_empty() {
-                        println!("  (nincs anti-Hebbian pár — futtass: absentia scan)");
+                        println!("  (nincs anti-Hebbian pĂˇr â€” futtass: absentia scan)");
                     } else {
                         let start = absentia.anti_hebbian.len().saturating_sub(k);
                         for p in &absentia.anti_hebbian[start..] {
-                            println!("  [{}↔{}] absence={:.3} expected={:.3} actual={:.3}",
+                            println!("  [{}â†”{}] absence={:.3} expected={:.3} actual={:.3}",
                                 p.block_a, p.block_b, p.absence_score,
                                 p.expected_coactivation, p.actual_coactivation);
                         }
                     }
-                    println!("  összesen: {}", absentia.anti_hebbian.len());
+                    println!("  Ă¶sszesen: {}", absentia.anti_hebbian.len());
                 }
                 AbsentiaAction::CausalLaundering => {
                     let absentia = AbsentiaState::load_or_init(output_dir);
-                    println!("{}", "CAUSAL LAUNDERING GYANÚS PÁROK".red().bold());
+                    println!("{}", "CAUSAL LAUNDERING GYANĂšS PĂROK".red().bold());
                     let suspects: Vec<_> = absentia.anti_hebbian.iter()
                         .filter(|p| p.absence_score > 0.5)
                         .collect();
                     if suspects.is_empty() {
-                        println!("  (nincs gyanús pár)");
+                        println!("  (nincs gyanĂşs pĂˇr)");
                     } else {
                         for p in &suspects {
-                            println!("  [{}↔{}] absence={:.3} — MINDKÉT BLOKK AKTÍV, DE NINCS CO-AKTIVÁCIÓ",
+                            println!("  [{}â†”{}] absence={:.3} â€” MINDKĂ‰T BLOKK AKTĂŤV, DE NINCS CO-AKTIVĂCIĂ“",
                                 p.block_a, p.block_b, p.absence_score);
                         }
                     }
-                    println!("  összesen: {} gyanús pár", suspects.len());
+                    println!("  Ă¶sszesen: {} gyanĂşs pĂˇr", suspects.len());
                 }
             }
         }
@@ -4633,7 +4652,7 @@ async fn async_main() {
     }
 }
 
-// ─── Client setup printer ────────────────────────────
+// â”€â”€â”€ Client setup printer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 fn print_client_setup(client: &str, config: &microscope_memory::config::Config) {
     use colored::*;
@@ -4647,19 +4666,19 @@ fn print_client_setup(client: &str, config: &microscope_memory::config::Config) 
     println!();
     println!(
         "{}",
-        "════════════════════════════════════════════════════════════"
+        "â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•"
             .cyan()
             .bold()
     );
     println!(
         "{}",
-        format!("  Microscope Memory — Setup for: {}", client)
+        format!("  Microscope Memory â€” Setup for: {}", client)
             .cyan()
             .bold()
     );
     println!(
         "{}",
-        "════════════════════════════════════════════════════════════"
+        "â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•"
             .cyan()
             .bold()
     );
@@ -4672,7 +4691,7 @@ fn print_client_setup(client: &str, config: &microscope_memory::config::Config) 
         config.paths.output_dir
     );
     println!();
-    println!("{}", "─ MCP server (stdin/stdout JSON-RPC) ─".yellow());
+    println!("{}", "â”€ MCP server (stdin/stdout JSON-RPC) â”€".yellow());
     println!("Run in background:  {} mcp", bin_path.green());
     println!();
 
@@ -4692,7 +4711,7 @@ fn print_client_setup(client: &str, config: &microscope_memory::config::Config) 
 
     match client {
         "claude" => {
-            println!("{}", "── Claude Desktop / Claude Code ──".yellow().bold());
+            println!("{}", "â”€â”€ Claude Desktop / Claude Code â”€â”€".yellow().bold());
             println!("1. Copy this into your Claude MCP config:");
             println!();
             println!("{}", mcp_config_json);
@@ -4703,7 +4722,7 @@ fn print_client_setup(client: &str, config: &microscope_memory::config::Config) 
             println!();
             println!(
                 "{}",
-                "── Auto-context hook (Claude Code SessionStart) ──"
+                "â”€â”€ Auto-context hook (Claude Code SessionStart) â”€â”€"
                     .yellow()
                     .bold()
             );
@@ -4711,17 +4730,17 @@ fn print_client_setup(client: &str, config: &microscope_memory::config::Config) 
             println!("Install: copy scripts/auto-inject.ps1 to your hooks dir, register in settings.json.");
         }
         "hermes" => {
-            println!("{}", "── Hermes Agent ──".yellow().bold());
+            println!("{}", "â”€â”€ Hermes Agent â”€â”€".yellow().bold());
             println!("Add to ~/.hermes/config.yaml under mcp_servers:");
             println!();
             println!("{}", mcp_config_json);
             println!();
-            println!("Auto-context is enabled by default — every memory_recall / memory_store");
+            println!("Auto-context is enabled by default â€” every memory_recall / memory_store");
             println!("call auto-prepends the session snapshot.");
         }
         "cursor" => {
-            println!("{}", "── Cursor ──".yellow().bold());
-            println!("1. Cursor → Settings → Features → Model Context Protocol");
+            println!("{}", "â”€â”€ Cursor â”€â”€".yellow().bold());
+            println!("1. Cursor â†’ Settings â†’ Features â†’ Model Context Protocol");
             println!("2. Add server:");
             println!();
             println!("  Name: microscope");
@@ -4732,8 +4751,8 @@ fn print_client_setup(client: &str, config: &microscope_memory::config::Config) 
             println!("   \"Use memory_recall to fetch my last session context\"");
         }
         "cline" => {
-            println!("{}", "── Cline (VSCode) ──".yellow().bold());
-            println!("1. Cline → MCP Servers → Add:");
+            println!("{}", "â”€â”€ Cline (VSCode) â”€â”€".yellow().bold());
+            println!("1. Cline â†’ MCP Servers â†’ Add:");
             println!("   Name: microscope");
             println!("   Command: {}", bin_path);
             println!("   Args: mcp");
@@ -4741,7 +4760,7 @@ fn print_client_setup(client: &str, config: &microscope_memory::config::Config) 
             println!("2. Use the auto_context tool at session start, or let any recall/store refresh it.");
         }
         _ => {
-            println!("{}", "── Generic LLM wrapper ──".yellow().bold());
+            println!("{}", "â”€â”€ Generic LLM wrapper â”€â”€".yellow().bold());
             println!("The MCP server is the universal transport. Any client that speaks");
             println!("JSON-RPC over stdin/stdout can use it. Drop-in snippet:");
             println!();
@@ -4749,7 +4768,7 @@ fn print_client_setup(client: &str, config: &microscope_memory::config::Config) 
             println!();
             println!(
                 "{}",
-                "── Shell wrapper for non-MCP clients ──".yellow().bold()
+                "â”€â”€ Shell wrapper for non-MCP clients â”€â”€".yellow().bold()
             );
             println!("Bash / git-bash:");
             println!("    ./scripts/auto-inject.sh --output /tmp/ctx.txt");
@@ -4761,7 +4780,7 @@ fn print_client_setup(client: &str, config: &microscope_memory::config::Config) 
         }
     }
     println!();
-    println!("{}", "── Available MCP tools ──".yellow());
+    println!("{}", "â”€â”€ Available MCP tools â”€â”€".yellow());
     println!("  memory_recall         natural-language query (auto-context prepended)");
     println!("  memory_store          store memory (auto-context appended)");
     println!("  memory_auto_context   full session snapshot (call once at session start)");
@@ -4771,7 +4790,7 @@ fn print_client_setup(client: &str, config: &microscope_memory::config::Config) 
     println!();
     println!(
         "{}",
-        "════════════════════════════════════════════════════════════"
+        "â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•"
             .cyan()
             .bold()
     );

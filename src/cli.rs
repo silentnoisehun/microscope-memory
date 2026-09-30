@@ -5,7 +5,7 @@ use clap::{Parser, Subcommand};
 #[derive(Parser)]
 #[command(
     name = "microscope-mem",
-    about = "Zoom-based hierarchical memory — pure binary, zero JSON"
+    about = "Zoom-based hierarchical memory â€” pure binary, zero JSON"
 )]
 pub struct Cli {
     #[command(subcommand)]
@@ -47,7 +47,7 @@ pub enum Cmd {
     },
     /// Mark a loop resolved
     ResolveLoop { id: u64 },
-    /// Universal auto-context snapshot — for any LLM wrapper script.
+    /// Universal auto-context snapshot â€” for any LLM wrapper script.
     /// Writes to stdout (default) or to a file path.
     AutoContext {
         /// Compact mode (no box-drawing)
@@ -57,7 +57,7 @@ pub enum Cmd {
         #[arg(long)]
         output: Option<String>,
     },
-    /// Recall — natural language query, auto-zoom
+    /// Recall â€” natural language query, auto-zoom
     Recall {
         query: String,
         #[arg(default_value = "10")]
@@ -96,6 +96,23 @@ pub enum Cmd {
         gpu: bool,
     },
     /// Benchmark
+    /// Time the recall path in one process, separating first-call setup from
+    /// steady-state calls.
+
+    /// This exists because the end-to-end figure quoted for `recall` (117 ms on
+    /// the evaluation index) is not comparable to the FAISS baselines, which
+    /// report query-time search only against a resident index. Calling `recall`
+    /// in a loop makes the split visible: the first call pays one-time
+    /// initialisation, and later calls are the steady-state cost with the state
+    /// files already warm. Neither is FAISS number, and the gap between them is
+    /// exactly what the end-to-end figure hides.
+    BenchRecall {
+        /// Calls after the first.
+        #[arg(default_value = "20")]
+        n: usize,
+        #[arg(default_value = "the user has a cat named Bella")]
+        query: String,
+    },
     Bench,
     /// Stats
     Stats,
@@ -123,7 +140,7 @@ pub enum Cmd {
         #[arg(default_value = "5")]
         k: usize,
     },
-    /// Rebuild — merge pending observations from append log into the main index
+    /// Rebuild â€” merge pending observations from append log into the main index
     Rebuild,
     /// Semantic search using embeddings
     Embed {
@@ -144,7 +161,7 @@ pub enum Cmd {
         #[arg(help = "Block index")]
         block_index: usize,
     },
-    /// Sequential Thinking — Chain-of-Thought memory sequence
+    /// Sequential Thinking â€” Chain-of-Thought memory sequence
     Think {
         query: String,
         #[arg(default_value = "5")]
@@ -193,7 +210,7 @@ pub enum Cmd {
     },
     /// Show Hebbian learning state (activations, co-activations, energy)
     Hebbian,
-    /// Apply Hebbian drift — co-activated blocks pull coordinates closer
+    /// Apply Hebbian drift â€” co-activated blocks pull coordinates closer
     HebbianDrift,
     /// Show hottest blocks (most recently/frequently activated)
     Hottest {
@@ -343,45 +360,45 @@ pub enum Cmd {
         #[arg(default_value = "research")]
         focus_type: String,
     },
-    /// Key management — binary key store (keys.bin)
+    /// Key management â€” binary key store (keys.bin)
     Keys {
         #[command(subcommand)]
         action: KeyAction,
     },
-    /// Zen key management — binary zen key store (zen_keys.bin)
+    /// Zen key management â€” binary zen key store (zen_keys.bin)
     ZenKeys {
         #[command(subcommand)]
         action: ZenKeyAction,
     },
-    /// Commitment enforcement — the A_t^valid gate, documented override,
+    /// Commitment enforcement â€” the A_t^valid gate, documented override,
     /// and hash-chained audit.
     Enforce {
         #[command(subcommand)]
         action: EnforceAction,
     },
-    /// Evidence layer — epistemic audit, confidence tracking
+    /// Evidence layer â€” epistemic audit, confidence tracking
     Evidence {
         #[command(subcommand)]
         action: EvidenceAction,
     },
-    /// Kognitív Morfogenezis — audit-napló, metrikák, gradiens állapot
+    /// KognitĂ­v Morfogenezis â€” audit-naplĂł, metrikĂˇk, gradiens Ăˇllapot
     Morphogenesis {
         #[command(subcommand)]
         action: MorphogenesisAction,
     },
-    /// Absentia — Csend Réteg: ami NEM történt meg, ami hiányzik
+    /// Absentia â€” Csend RĂ©teg: ami NEM tĂ¶rtĂ©nt meg, ami hiĂˇnyzik
     Absentia {
         #[command(subcommand)]
         action: AbsentiaAction,
     },
-    /// Intent Pipeline — auditálható szándék-generálás
+    /// Intent Pipeline â€” auditĂˇlhatĂł szĂˇndĂ©k-generĂˇlĂˇs
     Intent {
         #[command(subcommand)]
         action: IntentAction,
     },
-    /// Octopus — párhuzamos kognitív műveletek
+    /// Octopus â€” pĂˇrhuzamos kognitĂ­v mĹ±veletek
     Octopus {
-        /// Művelet: full-pipeline | scan | cycle
+        /// MĹ±velet: full-pipeline | scan | cycle
         #[arg(default_value = "full-pipeline")]
         operation: String,
     },
@@ -389,59 +406,59 @@ pub enum Cmd {
 
 #[derive(Subcommand)]
 pub enum IntentAction {
-    /// Intent generálása a jelenlegi állapotból
+    /// Intent generĂˇlĂˇsa a jelenlegi ĂˇllapotbĂłl
     Generate,
-    /// Intent audit-napló megjelenítése
+    /// Intent audit-naplĂł megjelenĂ­tĂ©se
     Audit {
         #[arg(default_value = "10")]
         k: usize,
     },
-    /// Genome megjelenítése
+    /// Genome megjelenĂ­tĂ©se
     Genome,
 }
 
 #[derive(Subcommand)]
 pub enum MorphogenesisAction {
-    /// Audit-napló megjelenítése
+    /// Audit-naplĂł megjelenĂ­tĂ©se
     Audit {
-        /// Hány bejegyzés (legutóbbi)
+        /// HĂˇny bejegyzĂ©s (legutĂłbbi)
         #[arg(default_value = "20")]
         k: usize,
     },
-    /// Metrikák megjelenítése
+    /// MetrikĂˇk megjelenĂ­tĂ©se
     Metrics {
-        /// Hány bejegyzés (legutóbbi)
+        /// HĂˇny bejegyzĂ©s (legutĂłbbi)
         #[arg(default_value = "20")]
         k: usize,
     },
-    /// Aktuális gradiens állapot és fázis
+    /// AktuĂˇlis gradiens Ăˇllapot Ă©s fĂˇzis
     Status,
-    /// Egy teljes kognitív morfogenezis ciklus futtatása
+    /// Egy teljes kognitĂ­v morfogenezis ciklus futtatĂˇsa
     Run,
-    /// Fázis-átmenetek tesztelése különböző gradiens-súlyokkal
+    /// FĂˇzis-Ăˇtmenetek tesztelĂ©se kĂĽlĂ¶nbĂ¶zĹ‘ gradiens-sĂşlyokkal
     TestPhases,
-    /// Teljes integrációs állapot: audit + metrikák + fázis + gradiens
+    /// Teljes integrĂˇciĂłs Ăˇllapot: audit + metrikĂˇk + fĂˇzis + gradiens
     FullStatus,
-    /// Adversarial tesztcsomag — edge case-ek és védett állítások ellenőrzése
+    /// Adversarial tesztcsomag â€” edge case-ek Ă©s vĂ©dett ĂˇllĂ­tĂˇsok ellenĹ‘rzĂ©se
     Adversarial,
-    /// Deep adversarial — célzott stressz-teszt a rendszer absztrakcióinak határain
+    /// Deep adversarial â€” cĂ©lzott stressz-teszt a rendszer absztrakciĂłinak hatĂˇrain
     DeepAdversarial,
-    /// A/B teszt: presence-driven growth ↔ absence-driven inhibition
+    /// A/B teszt: presence-driven growth â†” absence-driven inhibition
     PresenceAbsenceTest,
 }
 
 #[derive(Subcommand)]
 pub enum AbsentiaAction {
-    /// Absentia állapot megjelenítése
+    /// Absentia Ăˇllapot megjelenĂ­tĂ©se
     Status,
-    /// Hiányok szkennelése
+    /// HiĂˇnyok szkennelĂ©se
     Scan,
-    /// Anti-Hebbian párok megjelenítése
+    /// Anti-Hebbian pĂˇrok megjelenĂ­tĂ©se
     AntiHebbian {
         #[arg(default_value = "20")]
         k: usize,
     },
-    /// Causal laundering gyanús párok
+    /// Causal laundering gyanĂşs pĂˇrok
     CausalLaundering,
 }
 
@@ -545,7 +562,7 @@ pub enum KeyAction {
 
 #[derive(Subcommand)]
 pub enum ZenKeyAction {
-    /// Import zen_keys.json → zen_keys.bin
+    /// Import zen_keys.json â†’ zen_keys.bin
     Import {
         /// Path to zen_keys.json
         #[arg(default_value = "zen_keys.json")]

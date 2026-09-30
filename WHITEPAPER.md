@@ -655,7 +655,10 @@ expected ordering. Two limits on what this table supports:
   Bounding the prefilter to blocks matching at least three distinct query terms
   takes SciFact from 83,715 candidates and 600.6 ms to 707 and 156.3 ms with
   recall unchanged at 53.1/74.8/81.8; `MICROSCOPE_LEX_MIN_MATCHES=1` restores the
-  old unbounded behaviour. `BENCHMARKS.md` records the full table.
+  old unbounded behaviour. That 156.3 ms is end-to-end, and about 72% of it is
+  the harness starting a process per query against a 1.3 GB index: the first call
+  is 125.8 ms and the query itself is 45.4 ms. `BENCHMARKS.md` records the full
+  table.
 - **These are recall@k, not the nDCG@10 of the BEIR literature,** so they are
   not comparable to published SciFact results. Only the four rows are comparable
   to each other, and they share a corpus, a query set and a scorer.

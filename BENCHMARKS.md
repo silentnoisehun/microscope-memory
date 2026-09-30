@@ -63,7 +63,9 @@ expected one. Two things this table does **not** say:
   a 306.3 ms query. Its vector search is *faster* (1.0 ms), because only 6,230
   blocks carry embeddings. See the note below. Bounding that prefilter to blocks
   matching at least three distinct query terms is what actually fixed it: 707
-  candidates and 156.3 ms on SciFact, recall unchanged.
+  candidates and 156.3 ms on SciFact, recall unchanged. **That 156.3 ms is
+  end-to-end and about 72% of it is per-query process and model startup**; the
+  query itself is 45.4 ms.
 - **These are recall@k, not the nDCG@10 the BEIR papers report,** so they are not
   comparable to published SciFact numbers. The only comparison here is between
   the four rows, which share a corpus, a query set and a scorer.
@@ -168,6 +170,47 @@ corpus where the answer is reachable through one strong term would lose it, and
 the variable exists for that case.
 
 Tests: 443 lib + 35 integration passing.
+
+### What the 156.3 ms headline is actually made of
+
+The SciFact row in the comparison table is an end-to-end number, and the Python
+harness starts a fresh process per query. Against a 1.3 GB index that setup is
+not small:
+
+| SciFact, same query | ms |
+|---|---:|
+| first call, including process start and model load | 125.8 |
+| steady state p50, the query itself | 45.4 |
+| **end-to-end p50 as the table reports it** | **156.3** |
+
+So roughly **72% of the headline SciFact number is per-query startup**, and the
+query is the remaining 28%. This is the same correction this file already
+applied once to the 116.1 ms evaluation-index figure, arriving at the same
+place from the other direction.
+
+`open_reader` is not the cost: it is 0.34 ms, because the reader mmaps and the
+mapping is cheap to establish. The 125.8 ms is the process, the config, and
+loading the embedding model, none of which a resident server pays per query.
+
+The current phase profile, mean over 21 calls, with the buffered trace:
+
+| phase | SciFact | evaluation index |
+|---|---:|---:|
+| query embed | 18.1 ms | ~15 ms |
+| score candidates | 17.7 ms | 1.35 ms |
+| lexical prefilter | 5.3 ms | ~0.2 ms |
+| print + save | 4.4 ms | ~0.1 ms |
+| vector search | 1.0 ms | 2.1 ms |
+| state load | 0.6 ms | 0.9 ms |
+| open_reader | 0.3 ms | ~0.3 ms |
+
+`score candidates` is 13x the evaluation index's on 6x fewer candidates, and
+the reason is block size rather than block count: a SciFact candidate is a
+whole 16 KiB abstract, an evaluation candidate is a short line. 25 us per
+abstract against 0.3 us per line. That is the shape any further work on this
+phase has to target -- how much of a 16 KiB abstract has to be read to answer
+one query -- and it is not a safe thing to change by truncation without
+measuring R@k, for the same reason the prefilter bound was not.
 
 ### What the trace itself cost, and what buffering it cost
 

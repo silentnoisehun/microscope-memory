@@ -10,7 +10,7 @@ use std::fs;
 use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use crate::hebbian::HebbianState;
+use crate::hebbian::{ActivationRecord, HebbianState};
 use crate::predictive_cache::PredictiveCache;
 use crate::resonance::ResonanceState;
 use crate::thought_graph::ThoughtGraphState;
@@ -209,11 +209,19 @@ pub fn dream_consolidate(
         // Replay: partial energy boost
         for &(block_idx, _score) in &fp.activations {
             let idx = block_idx as usize;
-            if idx < hebb.activations.len() {
-                let rec = &mut hebb.activations[idx];
-                // Boost energy, but lighter than real activation
-                rec.energy = (rec.energy + REPLAY_ENERGY).min(1.0);
+            // Grow, or the replay silently skips every block that has never
+            // been activated. The guard used to be `idx < activations.len()`,
+            // which the corpus-sized vector made always true; under a sparse
+            // prefix it drops exactly the blocks a replay exists to strengthen.
+            if idx >= hebb.activations.len() {
+                if idx >= 4_000_000 {
+                    continue; // u32::MAX dropped-block sentinel
+                }
+                hebb.activations.resize(idx + 1, ActivationRecord::default());
             }
+            let rec = &mut hebb.activations[idx];
+            // Boost energy, but lighter than real activation
+            rec.energy = (rec.energy + REPLAY_ENERGY).min(1.0);
         }
 
         // Track co-activation pair appearances

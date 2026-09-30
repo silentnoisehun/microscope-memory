@@ -399,7 +399,17 @@ pub fn recall(config: &Config, query: &str, k: usize, emotion: Option<[f32; 21]>
         let high_salience = salience_state.filter(
             &activated.iter().map(|&(idx, _)| {
                 // emotional_delta: approximate using hebbian energy, insight: from eureka, recency: 1.0
-                let hebb_e = hebb.activations.get(idx as usize).map(|a| a.energy).unwrap_or(0.5);
+                //
+                // The 0.0 default matters more than it looks. The activation
+                // vector is a sparse prefix -- it covers the stored records, not
+                // every block -- so a block that has never been activated reads
+                // as None rather than as a zeroed record. The previous 0.5 was
+                // unreachable while the vector was corpus-sized; under the
+                // sparse prefix it would have given every never-recalled block a
+                // neutral salience, ranking the untouched corpus above blocks
+                // that were activated and then decayed. dream.rs already reads
+                // this vector with 0.0.
+                let hebb_e = hebb.activations.get(idx as usize).map(|a| a.energy).unwrap_or(0.0);
                 (idx, hebb_e * 0.3, 0.5, 1.0f32)
             }).collect::<Vec<_>>()
         );

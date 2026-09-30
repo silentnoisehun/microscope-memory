@@ -24,6 +24,11 @@ use std::time::{SystemTime, UNIX_EPOCH};
 // ─── Constants ──────────────────────────────────────
 
 const ACTIVATION_RECORD_BYTES: usize = 32; // manual serialization, not sizeof
+/// Upper bound on how far `record_activation` will extend the activation
+/// vector. It exists only to reject the `u32::MAX` "dropped block" sentinel
+/// the retention remap uses -- not to police real block indices, which cannot
+/// reach it. See the call site.
+const ACTIVATION_GROWTH_LIMIT: usize = 4_000_000;
 const COACTIVATION_RECORD_BYTES: usize = 20; // manual serialization, not sizeof
 const ENERGY_HALF_LIFE_MS: f64 = 86_400_000.0; // 24 hours
 const DRIFT_RATE: f32 = 0.01; // how fast coordinates move per Hebbian step
@@ -114,6 +119,21 @@ impl HebbianState {
                 rec.activation_count = rec.activation_count.saturating_add(1);
                 rec.last_activated_ms = now_ms;
                 rec.energy = 1.0; // fresh activation = max energy (already saturated)
+            } else if idx < ACTIVATION_GROWTH_LIMIT {
+                // Grow rather than drop. The vector is a sparse prefix, so an
+                // index past its end is an untouched block, not an invalid one,
+                // and skipping it would lose that block's very first
+                // activation -- silently, with no error anywhere.
+                //
+                // The limit rejects the `u32::MAX` "dropped block" sentinel the
+                // retention remap uses, which here would ask for a 128 GB
+                // allocation. It is four times the largest index this project has
+                // shipped (967,587), so no real block index can reach it.
+                self.activations.resize(idx + 1, ActivationRecord::default());
+                let rec = &mut self.activations[idx];
+                rec.activation_count = 1;
+                rec.last_activated_ms = now_ms;
+                rec.energy = 1.0;
             }
         }
 
@@ -511,7 +531,11 @@ fn is_default_record(rec: &ActivationRecord) -> bool {
 /// bad one ends the scan: a torn tail is dropped, never applied, and the file
 /// is truncated to the last good record so the next append lands on a valid
 /// boundary.
-fn apply_activation_deltas(output_dir: &Path, records: &mut [ActivationRecord]) {
+fn apply_activation_deltas(
+    output_dir: &Path,
+    records: &mut Vec<ActivationRecord>,
+    block_count: usize,
+) {
     let path = output_dir.join(DELTA_FILE);
     let data = match fs::read(&path) {
         Ok(d) => d,
@@ -529,11 +553,19 @@ fn apply_activation_deltas(output_dir: &Path, records: &mut [ActivationRecord]) 
             break;
         }
         let idx = read_u32(&data, pos) as usize;
-        if idx >= records.len() {
+        if idx >= block_count {
             // The record names a block this corpus no longer has. Stop: a
-            // rebuild re-creates the file, and growing the vector here would
-            // resurrect a block the index does not have.
+            // rebuild re-creates the file, and resurrecting a block the index
+            // does not have would be wrong.
             break;
+        }
+        if idx >= records.len() {
+            // Legitimate, and past the base file's last stored index. Grow.
+            // Bounding this by `records.len()` instead of `block_count` -- which
+            // is what the old corpus-sized vector made indistinguishable --
+            // truncates the whole journal at the first record not yet folded
+            // into the base, silently losing every record after it.
+            records.resize(idx + 1, ActivationRecord::default());
         }
         records[idx] = decode_activation_record(&data, pos + 4);
         pos += DELTA_RECORD_BYTES;
@@ -549,20 +581,40 @@ fn apply_activation_deltas(output_dir: &Path, records: &mut [ActivationRecord]) 
 
 fn load_activations(output_dir: &Path, block_count: usize) -> Vec<ActivationRecord> {
     let path = output_dir.join("activations.bin");
-    let mut records = vec![ActivationRecord::default(); block_count];
+    // Sized from the stored records, not from `block_count`. Allocating the
+    // full block count zeroed 30,962,784 bytes on every recall to hold the 197
+    // records in a 7,104-byte file: 6.8 ms of a 37.4 ms query, scaling with the
+    // corpus rather than with what had actually been learned.
+    //
+    // The vector is a sparse prefix: `len()` is the highest stored index plus
+    // one, and an index at or past it has never been activated. For the
+    // evaluation index the highest stored index is 12,625, so 0.4 MB replaces
+    // 31 MB.
+    let mut records: Vec<ActivationRecord> = Vec::new();
     if let Ok(data) = fs::read(&path) {
         if data.len() >= 12 && &data[0..4] == b"HEB2" {
             // [HEB2][u32 block_count][u32 stored][(u32 idx, record)...]
             let stored = read_u32(&data, 4) as usize;
             let count = read_u32(&data, 8) as usize;
             let stride = 4 + ACTIVATION_RECORD_BYTES;
-            let mut needed = block_count.max(stored);
+            // Size from the record indices only.
+            //
+            // The field at offset 4 is named `stored` here but it is the
+            // corpus block_count, not a record count -- the header layout is
+            // [HEB2][u32 block_count][u32 count]. Folding it into `needed` is
+            // what made a first attempt at this change a silent no-op: the
+            // vector stayed at 967,587 entries and the load time did not move
+            // at all.
+            let mut needed = 0usize;
             for i in 0..count {
                 let off = 12 + i * stride;
                 if off + stride > data.len() {
                     break;
                 }
-                needed = needed.max(read_u32(&data, off) as usize + 1);
+                let idx = read_u32(&data, off) as usize;
+                if idx < block_count {
+                    needed = needed.max(idx + 1);
+                }
             }
             records.resize(needed, ActivationRecord::default());
             for i in 0..count {
@@ -593,7 +645,7 @@ fn load_activations(output_dir: &Path, block_count: usize) -> Vec<ActivationReco
             }
         }
     }
-    apply_activation_deltas(output_dir, &mut records);
+    apply_activation_deltas(output_dir, &mut records, block_count);
     records
 }
 
@@ -826,59 +878,82 @@ mod tests {
         d
     }
 
-    /// The activation vector is allocated to the full block count on every load,
-    /// which is 30,962,784 bytes for the 967,587-block evaluation index -- to
-    /// hold the 197 records actually stored in a 7,104-byte file. A sparse
-    /// representation is the obvious fix; this pins what it must preserve.
+    /// The activation vector used to be allocated to the full block count on
+    /// every load: 30,962,784 bytes for the 967,587-block evaluation index, to
+    /// hold the 197 records in a 7,104-byte file. It is now a sparse prefix,
+    /// which changes what a missing entry means and is easy to get wrong.
     ///
-    /// The trap: `ActivationRecord::default()` is all zeros, so "absent" and
-    /// "present but untouched" are indistinguishable by value -- but not by
-    /// `Option`. Two call sites read this vector with different fallbacks:
+    /// The trap this pins: `ActivationRecord::default()` is all zeros, so
+    /// "absent" and "present but untouched" are indistinguishable by value --
+    /// but not by `Option`, and the vector is read with two fallbacks:
     ///
-    ///   recall.rs:402   .get(idx).map(|a| a.energy).unwrap_or(0.5)
-    ///   dream.rs:588    .get(i).map(|r| r.energy).unwrap_or(0.0)
+    ///   commands/recall.rs:402  .get(idx).map(|a| a.energy).unwrap_or(0.0)
+    ///   dream.rs:588            .get(i).map(|r| r.energy).unwrap_or(0.0)
     ///
-    /// Today an untouched index is `Some(zero)`, so recall gets 0.0 and its
-    /// 0.5 fallback is dead code. Under a sparse vector the same index becomes
-    /// `None` and recall scores it 0.5 -- a silent ranking change on every
-    /// block that has never been recalled.
+    /// Both must stay at 0.0. recall.rs used 0.5, which was unreachable while
+    /// the vector was corpus-sized; under the sparse prefix it would have given
+    /// every never-recalled block a neutral salience, ranking the whole
+    /// untouched corpus above blocks that were activated and then decayed.
     #[test]
-    fn untouched_activation_is_some_zero_not_none() {
+    fn untouched_activation_is_absent_and_reads_as_zero() {
         let dir = tmp_dir("hebb_absent_vs_zero");
-        let hebb = HebbianState::load_or_init(&dir, 4);
+        let mut hebb = HebbianState::load_or_init(&dir, 4);
 
-        assert_eq!(
-            hebb.activations.len(),
-            4,
-            "load_or_init must size the vector to block_count today"
+        // A fresh index stores nothing, so nothing is allocated per block.
+        assert!(
+            hebb.activations.is_empty(),
+            "a fresh index must not allocate a record per block, got {}",
+            hebb.activations.len()
         );
 
-        // Index 3 was never activated: a real record of zeros today, and the
-        // two differ for every `.get(..).unwrap_or`.
+        // Index 3 was never activated: absent, not a zeroed record.
         let rec = hebb.activations.get(3);
         assert!(
-            rec.is_some(),
-            "index within block_count must read as Some, not None: a sparse \
-             vector would turn recall.rs:402's dead 0.5 fallback live"
+            rec.is_none(),
+            "an unstored index must read as None under the sparse prefix"
         );
-        assert_eq!(rec.unwrap().energy, 0.0);
+        assert_eq!(rec.map(|a| a.energy).unwrap_or(0.0), 0.0);
+        assert_eq!(rec.map(|r| r.energy).unwrap_or(0.0), 0.0);
 
-        // The asymmetry that makes this dangerous, stated as assertions.
-        let via_recall_rule = rec.map(|a| a.energy).unwrap_or(0.5);
-        let via_dream_rule = rec.map(|r| r.energy).unwrap_or(0.0);
-        assert_eq!(via_recall_rule, 0.0);
-        assert_eq!(via_dream_rule, 0.0);
+        // A stored record is still Some, with its energy intact.
+        hebb.activations.resize(4, ActivationRecord::default());
+        hebb.activations[3].energy = 0.4;
+        assert_eq!(hebb.activations.get(3).map(|a| a.energy), Some(0.4));
+    }
+
+    /// Activating a block for the first time must create its record, not drop
+    /// the activation because the index is past the end of a sparse vector.
+    /// This is what the growth branch in `record_activation` exists to prevent,
+    /// and the failure would be silent: no error, just a block that never learns.
+    #[test]
+    fn first_activation_of_a_high_index_grows_the_vector() {
+        let dir = tmp_dir("hebb_first_activation");
+        let mut hebb = HebbianState::load_or_init(&dir, 10_000);
+        assert!(hebb.activations.is_empty(), "a fresh index starts empty");
+
+        hebb.record_activation(&[(9_000, 0.9)], 0xdead_beef);
+
+        assert!(
+            hebb.activations.len() > 9_000,
+            "the record must be created, len is {}",
+            hebb.activations.len()
+        );
+        assert_eq!(hebb.activations[9_000].activation_count, 1);
+        assert_eq!(hebb.activations[9_000].energy, 1.0);
     }
 
     /// A record stored at a high index must survive a load, and the vector must
-    /// still cover it. Guards the other half of the sparse refactor: sizing the
-    /// vector to the number of stored records would drop index 9,000 of 10,000.
+    /// still cover it. Guards the other half: sizing the vector to the number of
+    /// stored records would drop index 9,000 in a corpus of 10,000.
     #[test]
     fn high_index_record_round_trips() {
         let dir = tmp_dir("hebb_high_index");
         let mut hebb = HebbianState::load_or_init(&dir, 10_000);
+        // Three activations, so the round trip has a count to preserve.
+        for _ in 0..3 {
+            hebb.record_activation(&[(9_000, 0.77)], 1);
+        }
         hebb.activations[9_000].energy = 0.77;
-        hebb.activations[9_000].activation_count = 3;
         hebb.save(&dir).unwrap();
 
         let back = HebbianState::load_or_init(&dir, 10_000);
@@ -909,12 +984,17 @@ mod tests {
         assert!(file.len() < 8 + n * ACTIVATION_RECORD_BYTES);
 
         let back = load_activations(&dir, n);
-        assert_eq!(back.len(), n);
+        // Sized to the highest stored index, not to the block count: 901
+        // entries cover this 1,000-block corpus, which is the whole point of
+        // the change. The base file was already sparse on disk; now memory
+        // matches it.
+        assert_eq!(back.len(), 901, "sized to the highest stored index, not n");
         assert_eq!(back[7].activation_count, 3);
         assert_eq!(back[7].energy, 1.0);
         assert_eq!(back[900].drift_x, 0.05);
         assert!(is_default_record(&back[11]));
-        assert!(is_default_record(&back[901]));
+        // `back[901]` no longer exists, and that is the change: the vector
+        // stops at the highest stored index rather than at the block count.
         let _ = fs::remove_dir_all(&dir);
     }
 

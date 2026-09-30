@@ -14,7 +14,9 @@
 //! `embedding(block_idx)` returns None for blocks without a stored vector.
 
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex};
+use std::time::SystemTime;
 
 use rayon::prelude::*;
 
@@ -27,6 +29,49 @@ pub struct EmbeddingIndex {
     embedded_count: usize,
     dim: usize,
     max_depth: u32,
+}
+
+/// Process-wide cache of the mapped embedding index, keyed on path, file length
+/// and modification time.
+///
+/// `recall` opened this per query: `EmbeddingIndex::open` mmaps `embeddings.bin`
+/// and the mapping is dropped when the enclosing block ends, so every recall
+/// mapped and unmapped the file. On the 967,587-block evaluation index that is a
+/// 20 MB mapping, and leaving the scope measured 2.6 ms -- 8% of a 30 ms query,
+/// spent entirely in teardown rather than in any named work.
+///
+/// Length and mtime detect a rebuild. That matters because the index is
+/// regenerated whenever the corpus is rebuilt, and a cache that outlived one
+/// would search vectors that no longer exist. Rebuilds write to a temp file and
+/// rename, so a changed index always changes the length, the mtime, or both.
+static EMBED_INDEX_CACHE: Mutex<Option<(PathBuf, u64, Option<SystemTime>, Arc<EmbeddingIndex>)>> =
+    Mutex::new(None);
+
+/// [`EmbeddingIndex::open`] through the process-wide cache.
+///
+/// Returns a shared handle; the mapping stays alive for as long as any caller
+/// holds it, which is the point. A `None` result means the file is absent or
+/// malformed, exactly as with `open`.
+pub fn open_embedding_cached(path: &Path) -> Option<Arc<EmbeddingIndex>> {
+    let meta = fs::metadata(path).ok()?;
+    let key = (meta.len(), meta.modified().ok());
+
+    let mut guard = EMBED_INDEX_CACHE.lock().ok()?;
+    let hit = match guard.as_ref() {
+        Some((cached_path, len, mtime, cached))
+            if cached_path == path && *len == key.0 && *mtime == key.1 =>
+        {
+            Some(Arc::clone(cached))
+        }
+        _ => None,
+    };
+    if let Some(hit) = hit {
+        return Some(hit);
+    }
+    let parsed = Arc::new(EmbeddingIndex::open(path)?);
+    let handle = Arc::clone(&parsed);
+    *guard = Some((path.to_path_buf(), key.0, key.1, parsed));
+    Some(handle)
 }
 
 const HEADER_SIZE: usize = 12; // 3 × u32
@@ -302,6 +347,61 @@ impl AppendEmbeddings {
     pub fn push(&mut self, append_index: u32, vector: Vec<f32>) {
         self.entries.push((append_index, vector));
     }
+}
+
+/// Process-wide cache of the parsed append sidecar, keyed on file length and
+/// modification time.
+///
+/// `open` re-reads the whole file and re-allocates a `Vec<f32>` per entry on
+/// every call, and `recall` called it on every query: 2.3 ms per recall on the
+/// evaluation index, paid even though the file cannot change between two
+/// queries in the same process. Length and mtime together are enough to detect
+/// a rewrite, because `save` writes a temp file and renames over the target, so
+/// a changed sidecar always lands as a new length, mtime, or both.
+///
+/// A cached miss is kept too, so a missing or wrongly-sized sidecar does not
+/// re-read on every query either. The only case this cannot help is a sidecar
+/// that is rewritten within the filesystem's mtime resolution *and* to the same
+/// length; that is a narrower window than the one this closes, and it was
+/// previously no safer, because the old code re-read within that window too but
+/// also paid 2.3 ms to do it.
+///
+/// The path is part of the key, not just the length and mtime: two sidecars in
+/// different output directories can be the same length and the same age, and
+/// keying without it would hand one index's vectors to the other.
+static APPEND_CACHE: Mutex<Option<(PathBuf, u64, Option<SystemTime>, usize, Arc<AppendEmbeddings>)>> =
+    Mutex::new(None);
+
+/// [`AppendEmbeddings::open`] through the process-wide cache.
+///
+/// Returns a shared handle; callers must not mutate it. A `None` result means
+/// the sidecar is absent, malformed, or a different vector width, exactly as
+/// with `open`.
+pub fn open_append_cached(path: &Path, dim: usize) -> Option<Arc<AppendEmbeddings>> {
+    // A missing file is answered from a stat rather than a read attempt.
+    let meta = fs::metadata(path).ok()?;
+    let key = (meta.len(), meta.modified().ok());
+
+    let mut guard = APPEND_CACHE.lock().ok()?;
+    // Scoped so the immutable borrow of the slot ends before it is overwritten.
+    let hit = match guard.as_ref() {
+        Some((cached_path, len, mtime, cached_dim, cached))
+            if cached_path == path
+                && *len == key.0
+                && *mtime == key.1
+                && *cached_dim == dim =>
+        {
+            Some(Arc::clone(cached))
+        }
+        _ => None,
+    };
+    if let Some(hit) = hit {
+        return Some(hit);
+    }
+    let parsed = Arc::new(AppendEmbeddings::open(path, dim)?);
+    let handle = Arc::clone(&parsed);
+    *guard = Some((path.to_path_buf(), key.0, key.1, dim, parsed));
+    Some(handle)
 }
 
 impl AppendEmbeddings {
@@ -657,6 +757,170 @@ mod tests {
 
         // A width-mismatched query never scores.
         assert!(partial.search(&[1.0, 0.0], 10).is_empty());
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn append_cache_returns_the_same_content_as_a_fresh_open() {
+        // The cache must not be a second, subtly different parser. Every shape
+        // the plain open accepts has to come back identical through it.
+        let dir = std::env::temp_dir().join("mscope_append_cache_parity");
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        let path = dir.join(APPEND_EMBEDDINGS_FILE);
+
+        let mut side = AppendEmbeddings::new(4);
+        side.push(0, vec![1.0, 0.0, 0.0, 0.0]);
+        side.push(3, vec![0.0, 0.5, 0.0, 0.0]);
+        side.save(&path).unwrap();
+
+        let fresh = AppendEmbeddings::open(&path, 4).unwrap();
+        let cached = open_append_cached(&path, 4).unwrap();
+        assert_eq!(fresh.entries, cached.entries, "cache must match open()");
+        assert_eq!(cached.dim, 4);
+
+        // A second call is served from the cache and must agree with the first.
+        let again = open_append_cached(&path, 4).unwrap();
+        assert_eq!(again.entries, fresh.entries);
+
+        // Guard parity: the width refusal and the missing-file case both hold.
+        assert!(open_append_cached(&path, 8).is_none());
+        assert!(open_append_cached(&dir.join("absent.bin"), 4).is_none());
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn append_cache_invalidates_when_the_file_changes() {
+        // This is the test that matters. A cache that never notices a rewrite
+        // would silently serve a stale vector for a memory that has since been
+        // replaced, and no other test in this file would catch it.
+        let dir = std::env::temp_dir().join("mscope_append_cache_inval");
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        let path = dir.join(APPEND_EMBEDDINGS_FILE);
+
+        let mut first = AppendEmbeddings::new(4);
+        first.push(11, vec![1.0, 0.0, 0.0, 0.0]);
+        first.save(&path).unwrap();
+        assert_eq!(open_append_cached(&path, 4).unwrap().entries[0].0, 11);
+
+        // Rewrite with a different, longer payload. `save` renames a temp file
+        // over the target, so both the length and the mtime change.
+        let mut second = AppendEmbeddings::new(4);
+        second.push(22, vec![0.0, 1.0, 0.0, 0.0]);
+        second.push(33, vec![0.0, 0.0, 1.0, 0.0]);
+        second.push(44, vec![0.0, 0.0, 0.0, 1.0]);
+        second.save(&path).unwrap();
+
+        let after = open_append_cached(&path, 4).unwrap();
+        assert_eq!(after.entries.len(), 3, "a rewrite must be observed, not cached");
+        assert_eq!(after.entries[0].0, 22);
+        let fresh = AppendEmbeddings::open(&path, 4).unwrap();
+        assert_eq!(after.entries, fresh.entries, "and must match a fresh open");
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn embedding_index_cache_matches_open() {
+        // The cache must not become a second, subtly different reader.
+        let dir = std::env::temp_dir().join("mscope_embed_cache_parity");
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("embeddings.bin");
+
+        let n = build_index(&dir, 3);
+        let fresh = EmbeddingIndex::open(&path).expect("open");
+        let cached = open_embedding_cached(&path).expect("cached open");
+        assert_eq!(cached.block_count(), n);
+        assert_eq!(cached.dim(), fresh.dim());
+        // A second call is served from the cache and agrees with the first.
+        assert_eq!(open_embedding_cached(&path).unwrap().block_count(), n);
+        // A missing file is a miss, not a panic and not a stale hit.
+        assert!(open_embedding_cached(&dir.join("nope.bin")).is_none());
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// The index is regenerated whenever the corpus is, so a cache that
+    /// outlives a rebuild would search vectors that no longer exist.
+    ///
+    /// Unix only, and not because the logic differs. Windows refuses to
+    /// overwrite a file that has an open section mapped onto it (error 1224),
+    /// so a rebuild cannot land while this process holds the mapping at all.
+    /// That is a property of the cache worth knowing rather than a reason to
+    /// skip the check: the key is identical on both platforms, and on Unix the
+    /// rewrite reaches `open_embedding_cached` and has to be seen.
+    #[cfg(unix)]
+    #[test]
+    fn embedding_index_cache_notices_a_rebuild() {
+        let dir = std::env::temp_dir().join("mscope_embed_cache_rebuild");
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("embeddings.bin");
+
+        let first = build_index(&dir, 2);
+        assert_eq!(open_embedding_cached(&path).unwrap().block_count(), first);
+
+        let bigger = build_index(&dir, 5);
+        assert_ne!(bigger, first, "the rebuild must actually differ");
+        let after = open_embedding_cached(&path).expect("reopen after rebuild");
+        assert_eq!(
+            after.block_count(),
+            bigger,
+            "a rebuilt index must not be served from the stale mapping"
+        );
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// Writes a valid `embeddings.bin` holding `n` 4-dim vectors and returns the
+    /// block count, in the same sparse layout the index builder emits.
+    fn build_index(dir: &Path, n: u32) -> usize {
+        let dim = 4usize;
+        let mut buf = Vec::new();
+        buf.extend_from_slice(&n.to_le_bytes());
+        buf.extend_from_slice(&(dim as u32).to_le_bytes());
+        buf.extend_from_slice(&3u32.to_le_bytes());
+        for i in 0..n {
+            buf.extend_from_slice(&i.to_le_bytes());
+            let mut v = vec![0.0f32; dim];
+            v[(i as usize) % dim] = 1.0;
+            for f in v {
+                buf.extend_from_slice(&f.to_le_bytes());
+            }
+        }
+        fs::write(dir.join("embeddings.bin"), &buf).unwrap();
+        n as usize
+    }
+
+    #[test]
+    fn append_cache_keeps_two_paths_apart() {
+        // Two sidecars that are the same length and the same width must not be
+        // confused for one another. Keying on length and mtime alone would fail
+        // this whenever the two files land inside one mtime tick.
+        let dir = std::env::temp_dir().join("mscope_append_cache_paths");
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        let a = dir.join("a.bin");
+        let b = dir.join("b.bin");
+
+        let mut sa = AppendEmbeddings::new(4);
+        sa.push(101, vec![1.0, 0.0, 0.0, 0.0]);
+        sa.save(&a).unwrap();
+        let mut sb = AppendEmbeddings::new(4);
+        sb.push(202, vec![1.0, 0.0, 0.0, 0.0]);
+        sb.save(&b).unwrap();
+
+        // Identical length, identical width, possibly identical mtime.
+        let ca = open_append_cached(&a, 4).unwrap();
+        let cb = open_append_cached(&b, 4).unwrap();
+        assert_eq!(ca.entries[0].0, 101, "a must not be served b's vector");
+        assert_eq!(cb.entries[0].0, 202, "b must not be served a's vector");
+        // And re-reading a after b still gives a.
+        assert_eq!(open_append_cached(&a, 4).unwrap().entries[0].0, 101);
 
         let _ = fs::remove_dir_all(&dir);
     }

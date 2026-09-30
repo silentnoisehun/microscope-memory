@@ -204,12 +204,46 @@ fn stats(config: &Config, reader: &MicroscopeReader) {
 /// and the previous attribution of the gap to process start and index load was
 /// wrong. Cheap when off: one `OnceLock` read, and nothing else.
 
-fn trace_phase(name: &str, ms: f64) {
+/// Per-phase timing accumulators, so a trace is read as a distribution over the
+/// warm calls rather than as one sample.
+///
+/// A single sample is not enough to decide anything here. The phases sum to the
+/// measured total, so a segment that looks large is only large in that one call:
+/// on a 29 ms query a scheduling blip is 2 ms, and reading one sample repeatedly
+/// produced a "2.5 ms in side embeddings" that was not there. `bench-recall`
+/// prints the accumulated table so the number that gets argued about is a mean
+/// over the run, with the sample count next to it.
+static PHASE_STATS: std::sync::Mutex<Vec<(&'static str, f64, u32)>> =
+    std::sync::Mutex::new(Vec::new());
+
+fn trace_phase(name: &'static str, ms: f64) {
     use std::sync::OnceLock;
     static ON: OnceLock<bool> = OnceLock::new();
     if *ON.get_or_init(|| std::env::var("MICROSCOPE_RECALL_TRACE").is_ok()) {
-        eprintln!("[trace] {:<22} {:>8.2} ms", name, ms);
+        eprintln!("[trace] {:<24} {:>8.2} ms", name, ms);
+        if let Ok(mut stats) = PHASE_STATS.lock() {
+            match stats.iter_mut().find(|(n, _, _)| *n == name) {
+                Some((_, sum, n)) => {
+                    *sum += ms;
+                    *n += 1;
+                }
+                None => stats.push((name, ms, 1)),
+            }
+        }
     }
+}
+
+/// The accumulated phase table, mean per phase, busiest first.
+fn phase_summary() -> Vec<(&'static str, f64, u32)> {
+    let Ok(mut stats) = PHASE_STATS.lock() else {
+        return Vec::new();
+    };
+    let mut out: Vec<(&'static str, f64, u32)> = stats
+        .iter()
+        .map(|(n, sum, c)| (*n, *sum / *c as f64, *c))
+        .collect();
+    out.sort_by(|a, b| b.1.total_cmp(&a.1));
+    out
 }
 
 
@@ -321,7 +355,7 @@ fn recall(config: &Config, query: &str, k: usize) {
         use microscope_memory::embeddings::EmbeddingProvider;
 
         let emb_path = Path::new(&config.paths.output_dir).join("embeddings.bin");
-        if let Some(eidx) = EmbeddingIndex::open(&emb_path) {
+        if let Some(eidx) = microscope_memory::embedding_index::open_embedding_cached(&emb_path) {
             // The provider must be cached, not rebuilt. Constructing one loads the
             // whole MiniLM model from disk, and doing that per query made it the
             // single largest cost in a recall: the phases below it add up to about
@@ -404,8 +438,13 @@ fn recall(config: &Config, query: &str, k: usize) {
                             semantic_hits.insert(block_idx, sim);
                         }
                     }
+                    trace_phase(
+                        "  collect semantic hits",
+                        t0.elapsed().as_secs_f64() * 1000.0 - t_mark,
+                    );
+                    t_mark = t0.elapsed().as_secs_f64() * 1000.0;
                     if let Some(side) =
-                        microscope_memory::embedding_index::AppendEmbeddings::open(
+                        microscope_memory::embedding_index::open_append_cached(
                             &Path::new(&config.paths.output_dir).join(
                                 microscope_memory::embedding_index::APPEND_EMBEDDINGS_FILE,
                             ),
@@ -416,6 +455,17 @@ fn recall(config: &Config, query: &str, k: usize) {
                             appended_sem.insert(ai as usize, sim);
                         }
                     }
+                    t_mark = t0.elapsed().as_secs_f64() * 1000.0;
+                    trace_phase(
+                        "  side index open + search",
+                        t0.elapsed().as_secs_f64() * 1000.0 - t_mark,
+                    );
+                    t_mark = t0.elapsed().as_secs_f64() * 1000.0;
+                    trace_phase(
+                        "  embedding scope tail",
+                        t0.elapsed().as_secs_f64() * 1000.0 - t_mark,
+                    );
+                    t_mark = t0.elapsed().as_secs_f64() * 1000.0;
                 }
                 Ok(_) => {
                     eprintln!("  semantic: provider returned a different width than the index; skipped");
@@ -428,7 +478,7 @@ fn recall(config: &Config, query: &str, k: usize) {
     }
 
     trace_phase(
-        "side embeddings",
+        "embedding scope teardown",
         t0.elapsed().as_secs_f64() * 1000.0 - t_mark,
     );
     t_mark = t0.elapsed().as_secs_f64() * 1000.0;
@@ -1745,6 +1795,21 @@ async fn async_main() {
             println!("steady state  p50           {:>8.1} ms", pick(0.50));
             println!("steady state  p95           {:>8.1} ms", pick(0.95));
             println!("steady state  max           {:>8.1} ms", warm[warm.len() - 1]);
+
+            // Phase breakdown averaged over every call, warm ones included.
+            let summary = phase_summary();
+            if !summary.is_empty() {
+                let total: f64 = summary.iter().map(|(_, ms, _)| ms).sum();
+                println!("\n  mean per call over {} samples, busiest first:", summary[0].2);
+                for (name, ms, count) in &summary {
+                    let share = if total > 0.0 { ms / total * 100.0 } else { 0.0 };
+                    println!(
+                        "    {:<26} {:>7.2} ms  {:>5.1}%  ({} samples)",
+                        name, ms, share, count
+                    );
+                }
+                println!("    {:<26} {:>7.2} ms", "sum of phases", total);
+            }
         }
         Cmd::Radial {
             x,

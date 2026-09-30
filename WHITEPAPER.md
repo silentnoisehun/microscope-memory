@@ -639,16 +639,16 @@ expected ordering. Two limits on what this table supports:
   either.** It was previously explained here as "process start, config load and
   opening a 1.3 GB index". `bench-recall` shows that is wrong: in a resident
   process with everything warm, one recall on the 967,587-block evaluation index
-  costs **28.8 ms at p50** against a first call of 105.1 ms, so process start
+  costs **26.5 ms at p50** against a first call of 95.1 ms, so process start
   and index load are worth about 13 ms of the *first* call and nothing per
-  query. The per-query cost is real work, and by phase it is 11.9 ms embedding
-  the query, 8.9 ms scoring the candidate set, 3.0 ms vector search, 2.3 ms on
-  the appended-embedding side index, and under 2 ms for everything else --
-  16 traced phases summing to 29.0 ms against 29.7 measured, so there is no
-  unexplained remainder left. The gap to FAISS's 0.41 ms therefore stays real,
-  and the query embedding alone is 29x it -- and FAISS does not pay that,
-  because it searches pre-computed query vectors. The split has not been
-  measured on the SciFact index, so the 600 ms there is not decomposed.
+  query. The per-query cost is real work, and by phase (mean over 31 calls) it is
+  14.4 ms embedding the query, 8.8 ms scoring the candidate set, 2.1 ms vector
+  search, 0.9 ms loading state, and under 1.5 ms for everything else -- 19 traced
+  phases summing to 28.1 ms, so there is no unexplained remainder left. The gap
+  to FAISS's 0.41 ms therefore stays real, and the query embedding alone is 35x
+  it -- and FAISS does not pay that, because it searches pre-computed query
+  vectors. The split has not been measured on the SciFact index, so the 600 ms
+  there is not decomposed.
 - **These are recall@k, not the nDCG@10 of the BEIR literature,** so they are
   not comparable to published SciFact results. Only the four rows are comparable
   to each other, and they share a corpus, a query set and a scorer.

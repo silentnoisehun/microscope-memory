@@ -51,13 +51,13 @@ expected one. Two things this table does **not** say:
   warm, one recall on the 967,587-block evaluation index costs **20.9 ms at
   p50** against a first call of 94.9 ms, so process start and index load are
   worth about 13 ms of the *first* call and nothing per query. The per-query
-  cost is real work, and by phase it is 15.0 ms embedding
-  the query, 5.7 ms scoring 4,310 candidate blocks, 2.1 ms vector search, 1.0 ms
-  loading state, and under 1.5 ms for everything else. Those phase figures come
-  from `MICROSCOPE_RECALL_TRACE=1`, which costs the query about 2.6 ms of its
-  own; the 20.9 ms p50 beside them is measured with the trace off. The gap to FAISS's
-  0.41 ms stays real, and the query embedding alone is 36x it -- which FAISS
-  does not pay, because it searches pre-computed query vectors. The SciFact
+  cost is real work, and by phase it is dominated by one thing: embedding the
+  query. `score candidates` over 4,310 blocks is 1.35 ms, not the 5.7 ms this
+  file used to claim -- that figure was mostly the trace's own stderr I/O,
+  charged to the wrong window (see the note below). Vector search is 2.1 ms and
+  loading state 0.9 ms. The gap to FAISS's 0.41 ms therefore stays real, and
+  the query embedding alone is many times it -- which FAISS does not pay,
+  because it searches pre-computed query vectors. The SciFact
   split **is** measured too, and it is dominated by the candidate count: 83,703
   lexical candidates against 4,306 here, and `score candidates` is 277.7 ms of
   a 306.3 ms query. Its vector search is *faster* (1.0 ms), because only 6,230
@@ -169,34 +169,42 @@ the variable exists for that case.
 
 Tests: 443 lib + 35 integration passing.
 
-### What the trace itself costs, and why no number above uses it
+### What the trace itself cost, and what buffering it cost
 
-`MICROSCOPE_RECALL_TRACE=1` writes one line to stderr per phase per query. The
-same query, same index, same binary, one run apart:
+`MICROSCOPE_RECALL_TRACE=1` wrote one line to stderr per phase per query, inside
+the measurement window of the *following* phase. On the SciFact index that made
+a traced query measure 89.6 ms against 44.8 ms with the trace off -- half of
+the instrumented number was the instrument. `state load` showed it most
+plainly: four named sub-phases summing to 0.70 ms inside a phase reporting
+9.22 ms, with nothing between them but the four trace calls.
 
-| | trace on | trace off |
-|---|---:|---:|
-| SciFact, in-process p50 | 89.6 ms | **44.8 ms** |
-| evaluation index, in-process p50 | 23.5 ms | **20.9 ms** |
+`trace_phase` and `trace_note` now buffer their lines and `trace_flush` emits
+them once the last `Instant::now()` has been consumed. The same queries again:
 
-So roughly half of the traced SciFact number was the tracing. The mechanism is
-structural, not incidental: `trace_phase` runs *after* the `Instant::now()` that
-bounds the phase it is reporting and *before* the `Instant::now()` that starts
-the next one, so each phase's stderr write lands inside the following phase's
-measurement window. `state load` is where it is easiest to see -- its four
-named sub-phases sum to 0.70 ms and it reports 9.22 ms, because the four
-`trace_phase` calls between them are measured by nothing.
+| | traced, before | traced, after | trace off |
+|---|---:|---:|---:|
+| SciFact p50 | 89.6 ms | **49.5 ms** | 44.8 ms |
+| evaluation index p50 | 23.5 ms | **31.1 ms** | 20.9 ms |
+| `state load`, SciFact | 9.22 ms | **0.60 ms** | - |
+| `score candidates`, eval | 5.7 ms | **1.35 ms** | - |
 
-**Every in-process figure in this file is a trace-off number, and the end-to-end
-SciFact and evaluation-index rows are unaffected because the Python harness
-never sets the variable.** The phase tables are still useful for *ranking* the
-phases against each other, which is what they were built for, but their
-absolute values carry this overhead and should not be quoted as query latency.
+Two things to read here, one good and one not.
 
-The honest fix is to re-mark the baseline inside `trace_phase` so the write
-falls outside every window, and that is not done here; the measurement is
-recorded so the number above is not mistaken for the system being twice as slow
-as it is.
+**`score candidates` was 5.7 ms and is 1.35 ms.** Four fifths of the cost this
+series spent two commits optimising was the instrument. The `965621a` rewrite
+was still a real improvement -- it took the evaluation index from 23.5 ms to
+20.9 ms and SciFact from 600.6 ms to 156.3 ms end-to-end, neither of which
+involved the trace -- but its per-phase attribution was badly wrong, and the
+evaluation index's candidate scoring was never the problem it looked like.
+
+**The evaluation index's traced p50 went *up*, 23.5 to 31.1 ms.** That is the
+residual and it is not noise: `bench-recall` times the whole `recall()` call,
+and `trace_flush` runs at the end of that call, so thirty flushes of nineteen
+lines each land inside the number being reported. The phases are honest now;
+the harness's own p50 still carries the cost of printing. Read the trace-off
+figure beside the phase table and not instead of it.
+
+Tests: 443 lib + 35 integration passing.
 
 ### Getting here: three runs, and the first two were wrong
 

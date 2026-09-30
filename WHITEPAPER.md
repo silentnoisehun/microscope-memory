@@ -649,7 +649,7 @@ expected ordering. Two limits on what this table supports:
   pre-computed query vectors. The SciFact split **is** measured now: the lexical
   prefilter returns 83,703 candidates on 5,633,165 blocks against 4,306 on the
   evaluation index, and scoring them is 277.7 ms of a 306.3 ms query (90.5%),
-  where the whole `score candidates` phase is 5.7 ms of 23.5 ms on the smaller
+  where the whole `score candidates` phase is 1.35 ms of 20.9 ms on the smaller
   index. Its vector search is *faster* -- 1.0 ms, because only 6,230 blocks
   carry embeddings. The cost is the candidate count, not the index size.
   Bounding the prefilter to blocks matching at least three distinct query terms

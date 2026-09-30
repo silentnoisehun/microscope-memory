@@ -216,11 +216,27 @@ fn stats(config: &Config, reader: &MicroscopeReader) {
 static PHASE_STATS: std::sync::Mutex<Vec<(&'static str, f64, u32)>> =
     std::sync::Mutex::new(Vec::new());
 
+/// Buffered trace lines, written out by [`trace_flush`].
+///
+/// The buffer is the fix, not a convenience. `trace_phase` runs after the
+/// `Instant::now()` that bounds the phase it reports and before the
+/// `Instant::now()` that starts the next one, so writing there charged every
+/// phase's stderr line to the phase that followed it. On the SciFact index that
+/// made a traced query measure 89.6 ms against 44.8 ms with the trace off --
+/// half of the instrumented number was the instrument.
+///
+/// Accumulating the lines and emitting them once, after the last measurement
+/// has been taken, puts the writes outside every window without touching the
+/// nineteen call sites that would otherwise each need a re-mark.
+static TRACE_BUF: std::sync::Mutex<Vec<String>> = std::sync::Mutex::new(Vec::new());
+
 fn trace_phase(name: &'static str, ms: f64) {
     use std::sync::OnceLock;
     static ON: OnceLock<bool> = OnceLock::new();
     if *ON.get_or_init(|| std::env::var("MICROSCOPE_RECALL_TRACE").is_ok()) {
-        eprintln!("[trace] {:<24} {:>8.2} ms", name, ms);
+        if let Ok(mut buf) = TRACE_BUF.lock() {
+            buf.push(format!("[trace] {:<24} {:>8.2} ms", name, ms));
+        }
         if let Ok(mut stats) = PHASE_STATS.lock() {
             match stats.iter_mut().find(|(n, _, _)| *n == name) {
                 Some((_, sum, n)) => {
@@ -229,6 +245,16 @@ fn trace_phase(name: &'static str, ms: f64) {
                 }
                 None => stats.push((name, ms, 1)),
             }
+        }
+    }
+}
+
+/// Emit every buffered trace line. Call this where the I/O cannot contaminate a
+/// measurement -- after the last phase of a recall, and after a benchmark loop.
+fn trace_flush() {
+    if let Ok(mut buf) = TRACE_BUF.lock() {
+        for line in buf.drain(..) {
+            eprintln!("{line}");
         }
     }
 }
@@ -243,7 +269,11 @@ fn trace_note(name: &'static str, value: String) {
     use std::sync::OnceLock;
     static ON: OnceLock<bool> = OnceLock::new();
     if *ON.get_or_init(|| std::env::var("MICROSCOPE_RECALL_TRACE").is_ok()) {
-        eprintln!("[trace] {:<24} {:>8}", name, value);
+        // Buffered for the same reason as `trace_phase`: a note written inside a
+        // measurement window costs the phase that follows it.
+        if let Ok(mut buf) = TRACE_BUF.lock() {
+            buf.push(format!("[trace] {:<24} {:>8}", name, value));
+        }
         if let Ok(mut notes) = PHASE_NOTES.lock() {
             match notes.iter_mut().find(|(n, _)| *n == name) {
                 Some((_, last)) => *last = value,
@@ -787,6 +817,8 @@ fn recall(config: &Config, query: &str, k: usize) {
             "print + save",
             elapsed.as_secs_f64() * 1000.0 - t_mark,
         );
+        // After `elapsed` is taken, so the writes are outside every window.
+        trace_flush();
         println!("\n  {} results in {:.0} us", shown, elapsed.as_micros());
         println!(
             "  {} read-only: learning state not written",
@@ -1013,6 +1045,8 @@ fn recall(config: &Config, query: &str, k: usize) {
         "print + save",
         elapsed.as_secs_f64() * 1000.0 - t_mark,
     );
+    // After `elapsed` is taken, so the writes are outside every window.
+    trace_flush();
     println!("\n  {} results in {:.0} us", shown, elapsed.as_micros());
 }
 
@@ -1859,6 +1893,9 @@ async fn async_main() {
                 }
                 println!("    {:<26} {:>7.2} ms", "sum of phases", total);
             }
+            // The loop is done and every `Instant::now()` has been consumed, so
+            // the buffered lines can go out without landing in a measurement.
+            trace_flush();
         }
         Cmd::Radial {
             x,

@@ -55,9 +55,11 @@ expected one. Two things this table does **not** say:
   the query, 5.7 ms scoring 4,310 candidate blocks, 2.1 ms vector search, 1.0 ms
   loading state, and under 1.5 ms for everything else. The gap to FAISS's
   0.41 ms stays real, and the query embedding alone is 36x it -- which FAISS
-  does not pay, because it searches pre-computed query vectors. The split has
-  not been measured on the SciFact index -- see the note below for why that row
-  cannot presently be reproduced.
+  does not pay, because it searches pre-computed query vectors. The SciFact
+  split **is** measured too, and it is dominated by the candidate count: 83,703
+  lexical candidates against 4,306 here, and `score candidates` is 277.7 ms of
+  a 306.3 ms query. Its vector search is *faster* (1.0 ms), because only 6,230
+  blocks carry embeddings. See the note below.
 - **These are recall@k, not the nDCG@10 the BEIR papers report,** so they are not
   comparable to published SciFact numbers. The only comparison here is between
   the four rows, which share a corpus, a query set and a scorer.
@@ -104,12 +106,37 @@ Two things follow, and neither is a latency claim:
 - **The headline SciFact number is a measurement from a machine state that no
   longer exists here.** It should be read as "measured once, not re-runnable
   without more disk", not as a current figure.
-- **The 25x gap against the evaluation index is not explained.** 5,183
-  documents answering in 600 ms while 967,587 blocks answer in 23.5 ms is not
-  a size effect, because the smaller corpus should be the faster one. The
-  phase trace exists and would answer it in one run; it needs ~1.4 GB to do
-  so. Until then the honest statement is that the gap is unexplained, not that
-  it is anything in particular.
+- The 25x gap against the evaluation index is explained, and it is not size.
+
+### The gap is the lexical prefilter, and it is unbounded
+
+With enough disk (`target/debug` removed: 3.3 GB, no restore points touched,
+no elevation needed) the index builds at 1.3 GB and the split falls out in one
+run. Mean over 11 calls, `MICROSCOPE_NO_LEARN=1`:
+
+| | eval index (967,587 blocks) | SciFact (5,633,165 blocks) |
+|---|---:|---:|
+| lexical candidates | 4,306 | **83,703** |
+| semantic candidates | 256 | 256 |
+| **total scored** | **4,310** | **83,715** |
+| query embed | 15.0 ms | 19.8 ms |
+| **score candidates** | **5.7 ms (24%)** | **277.7 ms (90.5%)** |
+| vector search | 2.1 ms | 1.0 ms |
+| steady state p50 | 23.5 ms | 306.3 ms |
+
+The vector search is *faster* on the larger index, because only 6,230 blocks
+carry embeddings against 13,640 on the eval index. Everything else follows from
+one number: the inverted text index returns every block containing any query
+token, and on 5.6 million blocks of long scientific abstracts that is 83,703
+of them. Scoring those is 90% of the query.
+
+This is the same shape as the 8.8 ms candidate-scoring cost fixed in
+`965621a`, at 19x the scale -- tokenising each block once instead of once per
+query token already took this corpus from the recorded 600.6 ms to 306.3 ms.
+The remaining cost is the candidate *count*, not the per-candidate work, and
+cutting it means bounding the prefilter, which changes what the ranking sees
+and therefore has to be measured against R@k rather than argued about. Not
+done here.
 
 ### Getting here: three runs, and the first two were wrong
 

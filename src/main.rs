@@ -215,6 +215,9 @@ fn trace_phase(name: &str, ms: f64) {
 
 fn recall(config: &Config, query: &str, k: usize) {
     let t0 = Instant::now();
+    // Cumulative elapsed time at the last traced phase, so the tail of the
+    // function can be measured as a remainder at the end.
+    let mut t_mark = 0.0f64;
     let t_open = Instant::now();
     let reader = open_reader(config);
     trace_phase("open_reader", t_open.elapsed().as_secs_f64() * 1000.0);
@@ -392,6 +395,7 @@ fn recall(config: &Config, query: &str, k: usize) {
     let t_search = Instant::now();
                     let hits = eidx.search(&qe, fetch);
     trace_phase("vector search", t_search.elapsed().as_secs_f64() * 1000.0);
+    t_mark = t0.elapsed().as_secs_f64() * 1000.0;
                     if let Some(matches) = &diag {
                         report_vector_diag(&reader, &eidx, &qe, &hits, matches, want);
                     }
@@ -863,6 +867,14 @@ fn recall(config: &Config, query: &str, k: usize) {
     }
 
     let elapsed = t0.elapsed();
+    // Everything from the end of the vector search to here: ranking, the
+    // result printing, and the state writes. It is the largest single
+    // unattributed block left in a recall, and it is only visible as a
+    // remainder -- which is why it is worth naming.
+    trace_phase(
+        "rank + print + save",
+        elapsed.as_secs_f64() * 1000.0 - t_mark,
+    );
     println!("\n  {} results in {:.0} us", shown, elapsed.as_micros());
 }
 

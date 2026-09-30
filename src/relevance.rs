@@ -53,11 +53,30 @@ impl RelevanceQuery {
             return 0.0;
         }
 
+        // The word list is built once per block, not once per query token.
+        //
+        // The original was `for query_token { text.split(..).map(similarity)
+        // .fold(max) }`, which re-walked and re-split the whole block for every
+        // query token. Blocks hold a whole document (16 KiB after the
+        // BLOCK_DATA_SIZE change) and the lexical prefilter admits ~4,300 of
+        // them, so an 8-token query spent its time re-tokenising 69 MB of text
+        // eight times over: roughly 86 million `token_similarity` calls and
+        // eight full scans per block.
+        //
+        // Tokenising once and then folding the query tokens over the same words
+        // visits exactly the same (query_token, word) pairs in the same order,
+        // so the maximum per token is unchanged. `split_once_per_block` is
+        // asserted against the original formulation in the tests below rather
+        // than assumed.
+        let words: Vec<&str> = lowercase_text
+            .split(|ch: char| !ch.is_alphanumeric())
+            .filter(|token| !token.is_empty())
+            .collect();
+
         let mut matched = 0.0f32;
         for query_token in &self.tokens {
-            let best = lowercase_text
-                .split(|ch: char| !ch.is_alphanumeric())
-                .filter(|token| !token.is_empty())
+            let best = words
+                .iter()
                 .map(|text_token| token_similarity(query_token, text_token))
                 .fold(0.0f32, f32::max);
             matched += best;
@@ -161,6 +180,75 @@ fn token_similarity(query: &str, text: &str) -> f32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The original `lexical_score`, kept verbatim as a reference oracle.
+    ///
+    /// The rewrite tokenises a block once instead of once per query token. That
+    /// is only legitimate if it produces the same number, and "it obviously
+    /// does" is exactly the kind of claim that should not be believed on a hot
+    /// path that decides ranking, so the old formulation lives here and the new
+    /// one is checked against it.
+    fn lexical_score_reference(q: &RelevanceQuery, text: &str) -> f32 {
+        if q.tokens.is_empty() {
+            return 0.0;
+        }
+        let lowercase_text = text.to_lowercase();
+        if lowercase_text.is_empty() {
+            return 0.0;
+        }
+        let mut matched = 0.0f32;
+        for query_token in &q.tokens {
+            let best = lowercase_text
+                .split(|ch: char| !ch.is_alphanumeric())
+                .filter(|token| !token.is_empty())
+                .map(|text_token| token_similarity(query_token, text_token))
+                .fold(0.0f32, f32::max);
+            matched += best;
+        }
+        let coverage = matched / q.tokens.len() as f32;
+        let phrase =
+            (!q.normalized.is_empty() && lowercase_text.contains(&q.normalized)) as u8 as f32;
+        (coverage * 0.95 + phrase * 0.05).clamp(0.0, 1.0)
+    }
+
+    #[test]
+    fn split_once_per_block_matches_the_per_token_split() {
+        // Deliberately awkward inputs: empty text, text with no word characters
+        // at all, repeated punctuation, accented characters, a query token that
+        // appears twice, and a phrase that does and does not occur.
+        let texts = [
+            "",
+            "   ",
+            "!!! ??? ---",
+            "the user has a cat named Bella",
+            "Bella, bella, BELLA; the-user/has\ta\tcat",
+            "visszakeresési minőség",
+            "A visszakeresési-minőség mérhető.",
+            "aBc DeF 123 x9  456",
+            "rebuild rollback rollback rollback",
+            "Transactional rebuild uses a rollback snapshot",
+        ];
+        let queries = [
+            "",
+            "cat",
+            "the user has a cat named Bella",
+            "rebuild rollback",
+            "visszakeresési minőség",
+            "123 x9",
+            "a",
+        ];
+        for q in &queries {
+            let query = RelevanceQuery::new(q);
+            for t in &texts {
+                let got = query.lexical_score(t);
+                let want = lexical_score_reference(&query, t);
+                assert!(
+                    (got - want).abs() < 1e-6,
+                    "query {q:?} text {t:?}: got {got}, reference {want}"
+                );
+            }
+        }
+    }
 
     #[test]
     fn complete_query_coverage_beats_partial_match() {

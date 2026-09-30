@@ -233,6 +233,26 @@ fn trace_phase(name: &'static str, ms: f64) {
     }
 }
 
+/// A scalar note attached to a phase, e.g. how many candidates a phase scored.
+/// Printed beside the trace but kept out of the timing sums, because it is not
+/// a duration and averaging it would be meaningless.
+static PHASE_NOTES: std::sync::Mutex<Vec<(&'static str, String)>> =
+    std::sync::Mutex::new(Vec::new());
+
+fn trace_note(name: &'static str, value: String) {
+    use std::sync::OnceLock;
+    static ON: OnceLock<bool> = OnceLock::new();
+    if *ON.get_or_init(|| std::env::var("MICROSCOPE_RECALL_TRACE").is_ok()) {
+        eprintln!("[trace] {:<24} {:>8}", name, value);
+        if let Ok(mut notes) = PHASE_NOTES.lock() {
+            match notes.iter_mut().find(|(n, _)| *n == name) {
+                Some((_, last)) => *last = value,
+                None => notes.push((name, value)),
+            }
+        }
+    }
+}
+
 /// The accumulated phase table, mean per phase, busiest first.
 fn phase_summary() -> Vec<(&'static str, f64, u32)> {
     let Ok(mut stats) = PHASE_STATS.lock() else {
@@ -510,6 +530,15 @@ fn recall(config: &Config, query: &str, k: usize) {
         lex_cands.clone(),
         semantic_hits.keys().copied(),
         reader.block_count,
+    );
+    trace_note(
+        "candidate sources",
+        format!(
+            "lexical {} + semantic {} -> {}",
+            lex_cands.len(),
+            semantic_hits.len(),
+            candidates.len()
+        ),
     );
 
     for i in candidates {

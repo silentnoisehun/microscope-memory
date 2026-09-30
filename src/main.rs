@@ -317,6 +317,12 @@ fn recall(config: &Config, query: &str, k: usize) {
             // 12 ms of a 102 ms steady-state call, so the remainder was here.
             // `with_cached_provider` is the same helper the store path was routed
             // through when that cost was found there.
+            // Timed separately because it is the largest remaining phase and the
+            // FAISS baselines do not include query encoding at all -- they search
+            // pre-computed query vectors -- so without this number the 37 ms
+            // steady state and the 0.41 ms baseline cannot be compared honestly.
+            let t_qemb = Instant::now();
+
             let r = microscope_memory::embeddings::with_cached_provider(
                 &config.embedding,
                 eidx.dim(),
@@ -326,6 +332,7 @@ fn recall(config: &Config, query: &str, k: usize) {
                     Err(e) => Err(e.to_string()),
                 },
             );
+            trace_phase("query embed", t_qemb.elapsed().as_secs_f64() * 1000.0);
             match r {
                 Ok(qe) if qe.len() == eidx.dim() => {
                     // Over-fetch, then let the final ranking do the ordering.

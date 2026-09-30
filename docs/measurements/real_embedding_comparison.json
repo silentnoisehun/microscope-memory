@@ -1,6 +1,6 @@
 {
   "corpus": "synthetic-60-facts",
-  "config_file": "eval_config.toml",
+  "config_file": "bench_config_semantic.toml",
   "config": "provider=candle model=all-MiniLM-L6-v2 semantic_weight=1.0",
   "indexed_documents": 60,
   "queries": 60,
@@ -14,30 +14,30 @@
       "system": "microscope (recall, end-to-end)",
       "note": "includes process start, config load and state load",
       "latency": {
-        "p50_ms": 107.9208,
-        "p95_ms": 119.5791,
-        "p99_ms": 128.3264,
-        "mean_ms": 110.408
+        "p50_ms": 98.8458,
+        "p95_ms": 108.6096,
+        "p99_ms": 110.081,
+        "mean_ms": 100.8216
       },
       "recall_at_k": {
-        "1": 47,
-        "5": 48,
-        "10": 48
+        "1": 52,
+        "5": 58,
+        "10": 58
       },
       "recall_rate": {
-        "1": 78.3,
-        "5": 80.0,
-        "10": 80.0
+        "1": 86.7,
+        "5": 96.7,
+        "10": 96.7
       }
     },
     {
       "system": "faiss IndexFlatIP (MiniLM)",
       "note": "all-MiniLM-L6-v2, d=384; 1 thread; query only",
       "latency": {
-        "p50_ms": 0.0083,
-        "p95_ms": 0.0103,
-        "p99_ms": 0.0151,
-        "mean_ms": 0.0092
+        "p50_ms": 0.0111,
+        "p95_ms": 0.0156,
+        "p99_ms": 0.0195,
+        "mean_ms": 0.0123
       },
       "recall_at_k": {
         "1": 54,
@@ -54,10 +54,10 @@
       "system": "faiss IndexHNSWFlat (MiniLM)",
       "note": "all-MiniLM-L6-v2, d=384; 1 thread; query only",
       "latency": {
-        "p50_ms": 0.0173,
-        "p95_ms": 0.0224,
-        "p99_ms": 0.0288,
-        "mean_ms": 0.0186
+        "p50_ms": 0.0169,
+        "p95_ms": 0.0228,
+        "p99_ms": 0.0293,
+        "mean_ms": 0.0168
       },
       "recall_at_k": {
         "1": 54,
@@ -74,10 +74,10 @@
       "system": "sqlite fts5 (bm25)",
       "note": "in-memory; query time only, no index build",
       "latency": {
-        "p50_ms": 0.0309,
-        "p95_ms": 0.1774,
-        "p99_ms": 0.198,
-        "mean_ms": 0.0446
+        "p50_ms": 0.0226,
+        "p95_ms": 0.0979,
+        "p99_ms": 0.1086,
+        "mean_ms": 0.0289
       },
       "recall_at_k": {
         "1": 32,

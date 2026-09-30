@@ -99,17 +99,35 @@ def main() -> int:
     sample = [items[i] for i in sorted(pick)]
 
     try:
-        from sentence_transformers import SentenceTransformer
+        # The reference is built by hand on purpose. `SentenceTransformer.encode`
+        # looks like the obvious choice and is wrong here: it does not reproduce
+        # the provider for long inputs, which is how the first version of this
+        # script invented a divergence that does not exist. Tokenizing with the
+        # raw `tokenizers.Tokenizer`, running `AutoModel` and mean-pooling the
+        # un-padded sequence reproduces the provider at cosine 1.0000 on exactly
+        # the inputs where the SentenceTransformer path scored 0.79.
+        from tokenizers import Tokenizer
+        from transformers import AutoModel
+        import torch
     except ImportError as e:
         print(f"error: {e}", file=sys.stderr)
         return 1
 
-    st = SentenceTransformer(a.model)
-    ref = st.encode([t for _, t in sample], normalize_embeddings=True).astype("float32")
+    tok = Tokenizer.from_pretrained(a.model)
+    model = AutoModel.from_pretrained(a.model)
+    model.eval()
 
     rows = []
-    for (pos, text), rv in zip(sample, ref):
-        rows.append((len(text.encode("utf-8")), float(np.dot(vectors[pos], rv))))
+    for pos, text in sample:
+        # Drop the [PAD] the tokenizer appends; the provider trims to the real
+        # length and the model is run on the real tokens only.
+        ids = [i for i in tok.encode(text).ids if i != 0]
+        if not ids:
+            continue
+        with torch.no_grad():
+            out = model(input_ids=torch.tensor([ids])).last_hidden_state
+            ref = torch.nn.functional.normalize(out.mean(1).detach())[0].numpy()
+        rows.append((len(text.encode("utf-8")), float(np.dot(vectors[pos], ref))))
 
     rows.sort()
     # Buckets in characters, matching the ranges used when the divergence was

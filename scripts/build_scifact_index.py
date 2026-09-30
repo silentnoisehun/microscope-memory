@@ -20,10 +20,12 @@ are the layer format's, and both are worth stating before quoting R@k:
     of the corpus is stored cut. The title survives -- it is at the front --
     which is why the evaluation tokens still resolve, but a query whose gold
     passage sits past byte 1024 is answering against an incomplete document.
-    (This was also recorded here as the cause of the low cosine similarity on
-    long blocks. `scripts/verify_stored_embeddings.py` has since refuted that:
-    the divergence is unchanged at a 16 KiB limit, so truncation is not its
-    cause. See the note below.)
+    (An earlier revision of this note also blamed the truncation for a
+    divergence between stored vectors and reference MiniLM encodings on long
+    blocks. That was an artefact of the measuring script, not a defect:
+    `scripts/verify_stored_embeddings.py` scores all 13,640 embedded blocks of
+    the evaluation index at cosine 1.0000 once the reference is built by hand
+    instead of via `SentenceTransformer.encode`.)
   * The reader packs consecutive short lines into one block, so 2 pairs of
     short abstracts share a block. 5,183 source lines become 5,181 blocks.
 

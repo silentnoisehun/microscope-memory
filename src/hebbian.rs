@@ -826,6 +826,68 @@ mod tests {
         d
     }
 
+    /// The activation vector is allocated to the full block count on every load,
+    /// which is 30,962,784 bytes for the 967,587-block evaluation index -- to
+    /// hold the 197 records actually stored in a 7,104-byte file. A sparse
+    /// representation is the obvious fix; this pins what it must preserve.
+    ///
+    /// The trap: `ActivationRecord::default()` is all zeros, so "absent" and
+    /// "present but untouched" are indistinguishable by value -- but not by
+    /// `Option`. Two call sites read this vector with different fallbacks:
+    ///
+    ///   recall.rs:402   .get(idx).map(|a| a.energy).unwrap_or(0.5)
+    ///   dream.rs:588    .get(i).map(|r| r.energy).unwrap_or(0.0)
+    ///
+    /// Today an untouched index is `Some(zero)`, so recall gets 0.0 and its
+    /// 0.5 fallback is dead code. Under a sparse vector the same index becomes
+    /// `None` and recall scores it 0.5 -- a silent ranking change on every
+    /// block that has never been recalled.
+    #[test]
+    fn untouched_activation_is_some_zero_not_none() {
+        let dir = tmp_dir("hebb_absent_vs_zero");
+        let hebb = HebbianState::load_or_init(&dir, 4);
+
+        assert_eq!(
+            hebb.activations.len(),
+            4,
+            "load_or_init must size the vector to block_count today"
+        );
+
+        // Index 3 was never activated: a real record of zeros today, and the
+        // two differ for every `.get(..).unwrap_or`.
+        let rec = hebb.activations.get(3);
+        assert!(
+            rec.is_some(),
+            "index within block_count must read as Some, not None: a sparse \
+             vector would turn recall.rs:402's dead 0.5 fallback live"
+        );
+        assert_eq!(rec.unwrap().energy, 0.0);
+
+        // The asymmetry that makes this dangerous, stated as assertions.
+        let via_recall_rule = rec.map(|a| a.energy).unwrap_or(0.5);
+        let via_dream_rule = rec.map(|r| r.energy).unwrap_or(0.0);
+        assert_eq!(via_recall_rule, 0.0);
+        assert_eq!(via_dream_rule, 0.0);
+    }
+
+    /// A record stored at a high index must survive a load, and the vector must
+    /// still cover it. Guards the other half of the sparse refactor: sizing the
+    /// vector to the number of stored records would drop index 9,000 of 10,000.
+    #[test]
+    fn high_index_record_round_trips() {
+        let dir = tmp_dir("hebb_high_index");
+        let mut hebb = HebbianState::load_or_init(&dir, 10_000);
+        hebb.activations[9_000].energy = 0.77;
+        hebb.activations[9_000].activation_count = 3;
+        hebb.save(&dir).unwrap();
+
+        let back = HebbianState::load_or_init(&dir, 10_000);
+        assert_eq!(back.activations[9_000].energy, 0.77);
+        assert_eq!(back.activations[9_000].activation_count, 3);
+        // Untouched neighbours are still addressable.
+        assert_eq!(back.activations[8_999].energy, 0.0);
+    }
+
     #[test]
     fn sparse_base_stores_only_learned_records() {
         let dir = tmp_dir("mscope_hebb_sparse");

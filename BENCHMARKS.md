@@ -213,12 +213,33 @@ this and the number should not be quoted as a general one:
 - The run also mutates the index, so the synthetic R@k figures quoted elsewhere
   were taken before this and are not re-measured against a learned index.
 
-Nothing here has been optimised, and the obvious first step -- the state files
-are read and written whole on every query, which is the same anti-pattern as
-the embedding index and the append sidecar already fixed in this series -- is
-recorded as the next target rather than attempted blind. The `NO_LEARN` flag
-exists because the learning path is not idempotent, so any change to it has to
-be checked for behaviour as well as for latency.
+Nothing here has been optimised yet, and the first guess about what to optimise
+was wrong, which is the useful part. The obvious target was the eight state
+saves at the end of the learn block. Timed individually:
+
+| save | ms |
+|---|---:|
+| hebbian (already a partial write) | 1.92 |
+| thought graph | 1.09 |
+| mirror | 0.60 |
+| resonance | 0.55 |
+| predictive cache | 0.53 |
+| attention | 0.53 |
+| temporal archetypes | 0.51 |
+| archetypes | 0.49 |
+| **total** | **6.22 of a 47.00 ms phase** |
+
+Six per cent. Doing to the other seven what `save_dirty` already does for the
+Hebbian activation base would be work spent on 1.4% of the query.
+
+That leaves roughly 41 ms unattributed, and the place to look is the rest of
+the block rather than its tail: the gated sections each call `load_or_init` on
+every recall -- eureka, spaced repetition, narrative, emotional state,
+self-model, curiosity, narrative memory, inner monologue. That is eight more
+whole-file reads per query, none of them traced yet. Instrumenting those is the
+next step, recorded rather than guessed at, because the two prior guesses in
+this series were both wrong and one of them was a change that would otherwise
+have shipped.
 
 ### Disk: what it takes to build and measure this
 

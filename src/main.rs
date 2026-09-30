@@ -956,6 +956,8 @@ fn recall(config: &Config, query: &str, k: usize) {
         // --- Eureka: detect unexpected connections ---
         let eureka_events =
             microscope_memory::eureka::detect_eureka(config, &reader, query, None, &all_results);
+        trace_phase("  learn: eureka detect", t0.elapsed().as_secs_f64() * 1000.0 - t_mark);
+        t_mark = t0.elapsed().as_secs_f64() * 1000.0;
         if !eureka_events.is_empty() {
             let mut eureka_log = microscope_memory::eureka::EurekaLog::load_or_init(output_dir);
             for ev in &eureka_events {
@@ -969,16 +971,25 @@ fn recall(config: &Config, query: &str, k: usize) {
         }
 
         // --- Spaced repetition: record recall for each activated block ---
+        let t_sp = Instant::now();
         let mut spaced =
             microscope_memory::spaced_repetition::SpacedRepetition::load_or_init(output_dir);
+        trace_phase("  learn: spaced load", t_sp.elapsed().as_secs_f64() * 1000.0);
+        let t_sr = Instant::now();
         for &(idx, _) in &activated {
             spaced.record_recall(idx, 5, 3);
         }
+        trace_phase("  learn: spaced record", t_sr.elapsed().as_secs_f64() * 1000.0);
+        let t_ss = Instant::now();
         let _ = spaced.save(output_dir);
+        trace_phase("  learn: spaced save", t_ss.elapsed().as_secs_f64() * 1000.0);
 
         // --- Narrative: update the system's self-narrative ---
+        let t_nv = Instant::now();
         let mut narrative = microscope_memory::narrative::NarrativeState::load_or_init(output_dir);
         let esr = microscope_memory::emotional_state::EmotionalStateRing::load_or_init(output_dir);
+        trace_phase("  learn: narrative load", t_nv.elapsed().as_secs_f64() * 1000.0);
+        let t_nu = Instant::now();
         let due_count = Some(spaced.due_count());
         let thought_count = Some(thought_graph.crystallized_count());
         let wm_items: Vec<String> = activated
@@ -1005,6 +1016,7 @@ fn recall(config: &Config, query: &str, k: usize) {
         if narrative.session_count <= 3 || narrative.session_count.is_multiple_of(10) {
             println!("  {} {}", "NARRATIVE:".cyan(), narrative.narrative);
         }
+        trace_phase("  learn: narrative update", t_nu.elapsed().as_secs_f64() * 1000.0);
 
         // --- Auto-reflect: every N recalls, the system thinks about itself ---
         if narrative.session_count > 0
@@ -1045,8 +1057,11 @@ fn recall(config: &Config, query: &str, k: usize) {
 
         // --- Narrative Memory: build story episode from every recall ---
         {
+            let t_nm = Instant::now();
             let mut nm =
                 microscope_memory::narrative_memory::NarrativeMemory::load_or_init(output_dir);
+            trace_phase("  learn: narrative memory load", t_nm.elapsed().as_secs_f64() * 1000.0);
+            let t_be = Instant::now();
             if let Some(ep) = nm.build_episode(config, &reader, output_dir, query, &all_results) {
                 if nm.episodes.len() <= 3 || nm.episodes.len().is_multiple_of(5) {
                     println!(
@@ -1055,6 +1070,7 @@ fn recall(config: &Config, query: &str, k: usize) {
                     );
                 }
             }
+            trace_phase("  learn: narrative memory build", t_be.elapsed().as_secs_f64() * 1000.0);
         }
 
         // --- Auto inner monologue: every 15th recall ---

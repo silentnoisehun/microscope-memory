@@ -911,15 +911,37 @@ fn recall(config: &Config, query: &str, k: usize) {
         // eval index, almost all of it default records), and rewriting it in
         // full on every recall cost ~20 ms idle and ~60 ms on a loaded disk --
         // measured, not estimated.
+        // Each save is timed separately. Hebbian already got a partial write
+        // (`save_dirty`) for exactly this reason -- rewriting its whole
+        // activation base cost ~20 ms idle and ~60 ms on a loaded disk -- and
+        // the seven below still rewrite whole files on every recall. Which of
+        // them actually pays is a measurement, not a guess, and guessing here
+        // is what produced the wrong answers earlier in this series.
+        let t_w = Instant::now();
         let _ = hebb.save_dirty(output_dir, &activated.iter().map(|(i, _)| *i).collect::<Vec<_>>());
+        trace_phase("  save: hebbian (dirty)", t_w.elapsed().as_secs_f64() * 1000.0);
+        t_mark = t0.elapsed().as_secs_f64() * 1000.0;
         let _ = mirror.save(output_dir);
+        trace_phase("  save: mirror", t0.elapsed().as_secs_f64() * 1000.0 - t_mark);
+        t_mark = t0.elapsed().as_secs_f64() * 1000.0;
         let _ = resonance.save(output_dir);
+        trace_phase("  save: resonance", t0.elapsed().as_secs_f64() * 1000.0 - t_mark);
+        t_mark = t0.elapsed().as_secs_f64() * 1000.0;
         let _ = archetypes.save(output_dir);
+        trace_phase("  save: archetypes", t0.elapsed().as_secs_f64() * 1000.0 - t_mark);
+        t_mark = t0.elapsed().as_secs_f64() * 1000.0;
         let _ = temporal.save(output_dir);
+        trace_phase("  save: temporal archetypes", t0.elapsed().as_secs_f64() * 1000.0 - t_mark);
+        t_mark = t0.elapsed().as_secs_f64() * 1000.0;
         let _ = thought_graph.save(output_dir);
+        trace_phase("  save: thought graph", t0.elapsed().as_secs_f64() * 1000.0 - t_mark);
+        t_mark = t0.elapsed().as_secs_f64() * 1000.0;
         let _ = pred_cache.save(output_dir);
+        trace_phase("  save: predictive cache", t0.elapsed().as_secs_f64() * 1000.0 - t_mark);
+        t_mark = t0.elapsed().as_secs_f64() * 1000.0;
         let _ = attention.save(output_dir);
-
+        trace_phase("  save: attention", t0.elapsed().as_secs_f64() * 1000.0 - t_mark);
+        t_mark = t0.elapsed().as_secs_f64() * 1000.0;
         // --- Eureka: detect unexpected connections ---
         let eureka_events =
             microscope_memory::eureka::detect_eureka(config, &reader, query, None, &all_results);

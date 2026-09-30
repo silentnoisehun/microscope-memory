@@ -59,7 +59,9 @@ expected one. Two things this table does **not** say:
   split **is** measured too, and it is dominated by the candidate count: 83,703
   lexical candidates against 4,306 here, and `score candidates` is 277.7 ms of
   a 306.3 ms query. Its vector search is *faster* (1.0 ms), because only 6,230
-  blocks carry embeddings. See the note below.
+  blocks carry embeddings. See the note below. Bounding that prefilter to blocks
+  matching at least three distinct query terms is what actually fixed it: 707
+  candidates and 156.3 ms on SciFact, recall unchanged.
 - **These are recall@k, not the nDCG@10 the BEIR papers report,** so they are not
   comparable to published SciFact numbers. The only comparison here is between
   the four rows, which share a corpus, a query set and a scorer.
@@ -133,10 +135,37 @@ of them. Scoring those is 90% of the query.
 This is the same shape as the 8.8 ms candidate-scoring cost fixed in
 `965621a`, at 19x the scale -- tokenising each block once instead of once per
 query token already took this corpus from the recorded 600.6 ms to 306.3 ms.
-The remaining cost is the candidate *count*, not the per-candidate work, and
-cutting it means bounding the prefilter, which changes what the ranking sees
-and therefore has to be measured against R@k rather than argued about. Not
-done here.
+The remaining cost is the candidate *count*, not the per-candidate work.
+
+### Bounding the prefilter: same recall, 3.8x faster
+
+The inverted index returns the union of every posting list a query token expands
+to, and a token of five or more characters expands to *every* dictionary word
+sharing those five characters. On this corpus that is 83,703 blocks, and most
+of them matched one incidental word.
+
+`TextIndex::candidates_lexical_min_matches` keeps only blocks matching at least
+`MICROSCOPE_LEX_MIN_MATCHES` **distinct query terms** (default 3), counted while
+the postings are already being walked. Setting it to 1 reproduces the old union
+exactly, and a test pins that equivalence rather than assuming it, because a
+default that changed behaviour on upgrade would be a silent ranking change.
+
+| SciFact, 286 queries, `NO_LEARN=1` | candidates | p50 | R@1 | R@5 | R@10 |
+|---|---:|---:|---:|---:|---:|
+| unbounded (recorded) | 83,715 | 600.6 ms | 53.1% | 74.8% | 81.8% |
+| `min_matches=3` | **707** | **156.3 ms** | **53.1%** | **74.8%** | **81.8%** |
+| in-process, before | 83,715 | 306.3 ms | - | - | - |
+| in-process, after | 707 | 89.9 ms | - | - | - |
+
+**Recall is unchanged on both corpora this project measures** -- SciFact
+53.1/74.8/81.8 and the evaluation index 78.3/80.0/80.0, both re-measured at
+`min_matches=3`, and the default verified with the variable unset. So the speed
+is not bought with recall here, which is the only reason the default moved.
+That is a statement about these two corpora and not a general guarantee: a
+corpus where the answer is reachable through one strong term would lose it, and
+the variable exists for that case.
+
+Tests: 443 lib + 35 integration passing.
 
 ### Getting here: three runs, and the first two were wrong
 

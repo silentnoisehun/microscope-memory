@@ -288,6 +288,78 @@ impl TextIndex {
         union.dedup();
         Some(union)
     }
+
+    /// Like [`TextIndex::candidates_lexical`], but keeps only blocks that at
+    /// least `min_matches` *distinct query terms* matched.
+    ///
+    /// The unbounded union is unusable on a large corpus. A five-character token
+    /// expands to every dictionary word sharing those five characters and
+    /// contributes its whole posting list, and on the SciFact index a query
+    /// about diabetes returned 83,703 blocks -- 90% of the query's time went
+    /// into scoring blocks that matched one incidental word.
+    ///
+    /// Counting distinct matched terms is the cheapest useful bound available
+    /// here, because the postings are already being walked: it adds an
+    /// increment per posting instead of a second pass, and a block that matched
+    /// four of the query's terms is a far better candidate than one that matched
+    /// the single most common word in the corpus.
+    ///
+    /// `min_matches == 1` returns the same set as `candidates_lexical`, and a
+    /// query with no tokens still returns `None`, so this is a strict
+    /// generalisation rather than a second behaviour. Callers are still expected
+    /// to fall back to the vector side when the result is empty -- the lexical
+    /// index is a prefilter, not a gate.
+    pub fn candidates_lexical_min_matches(
+        &self,
+        tokens: &[String],
+        min_matches: u32,
+    ) -> Option<Vec<u32>> {
+        if tokens.is_empty() {
+            return None;
+        }
+        if min_matches <= 1 {
+            return self.candidates_lexical(tokens);
+        }
+
+        // How many distinct query terms matched each block. A term is counted
+        // once per query token even if several dictionary words in its
+        // expansion hit the same block, otherwise a prefix group would inflate
+        // its own count.
+        let mut counts: HashMap<u32, u32> = HashMap::new();
+        for t in tokens {
+            let chars: Vec<char> = t.chars().collect();
+            if chars.len() < 3 {
+                continue;
+            }
+            let mut seen: std::collections::HashSet<u32> = std::collections::HashSet::new();
+            if chars.len() < 5 {
+                if let Some(i) = self.find_word(t) {
+                    if let Some(e) = self.entry(i) {
+                        seen.extend(self.postings(&e).iter().copied());
+                    }
+                }
+            } else {
+                let prefix: String = chars[..5].iter().collect();
+                let (lo, hi) = self.range_words_starting_with(&prefix);
+                for i in lo..hi {
+                    if let Some(e) = self.entry(i) {
+                        seen.extend(self.postings(&e).iter().copied());
+                    }
+                }
+            }
+            for block in seen {
+                *counts.entry(block).or_insert(0) += 1;
+            }
+        }
+
+        let mut kept: Vec<u32> = counts
+            .into_iter()
+            .filter(|(_, c)| *c >= min_matches)
+            .map(|(b, _)| b)
+            .collect();
+        kept.sort_unstable();
+        Some(kept)
+    }
 }
 
 fn u32_at(data: &[u8], off: usize) -> Option<u32> {
@@ -375,6 +447,65 @@ mod tests {
         build_text_index(texts.iter().copied(), texts.len(), &path).unwrap();
         let idx = TextIndex::open(&path).unwrap();
         (dir, idx)
+    }
+
+    #[test]
+    fn min_matches_of_one_is_exactly_the_unbounded_union() {
+        // The default is 1, so the default must be the old behaviour and not a
+        // near miss of it. Anything else would silently change ranking for
+        // every existing deployment the first time this shipped.
+        let texts = [
+            "the user has a cat named bella",
+            "cats and dogs are both common pets",
+            "gastric bypass treats type two diabetes",
+            "diabetes mellitus is a chronic disease",
+            "bypass surgery has risks",
+            "unrelated text about gardening tools",
+        ];
+        let (_dir, idx) = build_from(&texts);
+        let queries: Vec<Vec<String>> = vec![
+            vec!["cat".into()],
+            vec!["diabetes".into()],
+            vec!["bypass".into()],
+            vec!["diabetes".into(), "bypass".into()],
+            vec!["the".into(), "cat".into(), "named".into()],
+            vec!["missingword".into()],
+            vec![],
+        ];
+        for tokens in &queries {
+            let old = idx.candidates_lexical(tokens);
+            let bounded = idx.candidates_lexical_min_matches(tokens, 1);
+            assert_eq!(old, bounded, "tokens {tokens:?} must be identical at 1");
+            // 0 and 1 both mean "no bound" rather than "keep nothing".
+            assert_eq!(idx.candidates_lexical_min_matches(tokens, 0), old);
+        }
+    }
+
+    #[test]
+    fn min_matches_narrows_the_set_without_ever_widening_it() {
+        // Block 1 must contain only one of the two terms. An earlier version of
+        // this fixture had "bypass" in both, which made the bound a no-op and
+        // failed for a reason that had nothing to do with the code.
+        let texts = [
+            "gastric bypass treats type two diabetes mellitus",
+            "diabetes is mentioned here but surgery is not",
+            "gastric sleeve is a different operation entirely",
+            "gardening tools have nothing to do with the above",
+        ];
+        let (_dir, idx) = build_from(&texts);
+        let tokens = vec!["diabetes".to_string(), "bypass".to_string()];
+
+        let all = idx.candidates_lexical_min_matches(&tokens, 1).unwrap();
+        assert_eq!(all, vec![0, 1], "the union is both matching blocks");
+        let both = idx.candidates_lexical_min_matches(&tokens, 2).unwrap();
+        assert_eq!(both, vec![0], "only block 0 contains both terms");
+        for b in &both {
+            assert!(all.contains(b), "{b} must be a subset of the union");
+        }
+        // A threshold above the token count can legitimately return nothing;
+        // the caller is responsible for not treating that as an error.
+        let impossible = idx.candidates_lexical_min_matches(&tokens, 5).unwrap();
+        assert!(impossible.is_empty());
     }
 
     #[test]

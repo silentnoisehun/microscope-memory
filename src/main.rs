@@ -512,10 +512,30 @@ fn recall(config: &Config, query: &str, k: usize) {
     // nothing at all -- which is precisely the case the embedding path exists
     // to serve. Merge both sources into one sorted, deduplicated list and let
     // the ranking below see it.
+    // A token with five or more characters expands to every dictionary word
+    // sharing those characters, each contributing its whole posting list. On
+    // 5.6M SciFact blocks that produced 83,703 candidates and 90% of the query
+    // went into scoring blocks that matched one incidental word.
+    //
+    // The prefilter keeps blocks matching at least 3 distinct query terms. It
+    // stays a prefilter and not a gate: the vector candidates are merged in
+    // either way, and an empty lexical result is not an error.
+    //
+    // 3 is measured, not guessed. R@k is unchanged on both corpora this project
+    // measures -- SciFact 53.1/74.8/81.8 over 286 queries, evaluation index
+    // 78.3/80.0/80.0 -- while SciFact p50 fell 600.6 -> 156.3 ms and the
+    // in-process query went 306.3 -> 89.9 ms. Set the variable to 1 to restore
+    // the old unbounded union exactly; that path is pinned by a test.
+    let min_matches: u32 = std::env::var("MICROSCOPE_LEX_MIN_MATCHES")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(3);
     let lex_cands: Vec<u32> = reader
         .text_index
         .as_ref()
-        .and_then(|idx| idx.candidates_lexical(relevance_query.tokens()))
+        .and_then(|idx| {
+            idx.candidates_lexical_min_matches(relevance_query.tokens(), min_matches)
+        })
         .unwrap_or_default();
 
     trace_phase(

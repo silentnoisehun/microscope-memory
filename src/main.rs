@@ -1681,19 +1681,26 @@ async fn async_main() {
         Cmd::Recall { query, k } => {
             recall(&config, &query, k);
         }
-        Cmd::BenchRecall { n, query } => {
+        Cmd::BenchRecall { n, query, k } => {
             // First call pays one-time setup; later calls are steady state.
+            //
+            // `k` is exposed because the result printing is part of the measured
+            // window, and that cost is the harness's, not the system's. Running
+            // with k=1 and k=10 in the same process separates them: the difference
+            // is what the benchmark spends writing results nobody asked for, and
+            // it should not be quoted as query latency.
             let t0 = Instant::now();
-            recall(&config, &query, 10);
+            recall(&config, &query, k);
             let first = t0.elapsed().as_secs_f64() * 1000.0;
             let mut warm: Vec<f64> = Vec::with_capacity(n);
             for _ in 0..n {
                 let t = Instant::now();
-                recall(&config, &query, 10);
+                recall(&config, &query, k);
                 warm.push(t.elapsed().as_secs_f64() * 1000.0);
             }
             warm.sort_by(|a, b| a.partial_cmp(b).unwrap());
             let pick = |q: f64| warm[((warm.len() as f64 * q).ceil() as usize).saturating_sub(1)];
+            println!("k = {} results returned", k);
             println!("first call (one-time setup)  {:>8.1} ms", first);
             println!("steady state  min           {:>8.1} ms", warm[0]);
             println!("steady state  p50           {:>8.1} ms", pick(0.50));

@@ -48,11 +48,15 @@ expected one. Two things this table does **not** say:
 - **The latency column is not a speed comparison.** It was previously explained
   here as "process start, config load and opening a 1.3 GB index".
   `bench-recall` shows that is wrong: in a resident process with everything
-  warm, one recall on the 967,587-block evaluation index costs **116.1 ms at
-  p50** against a first call of 128.7 ms, so process start and index load are
-  worth about 13 ms of it. The per-query cost is real work, and the gap to
-  FAISS's 0.41 ms is a genuine ~290× on the query itself. The split has not
-  been measured on the SciFact index, so the 600 ms there is not decomposed.
+  warm, one recall on the 967,587-block evaluation index costs **28.8 ms at
+  p50** against a first call of 105.1 ms, so process start and index load are
+  worth about 13 ms of the *first* call and nothing per query. The per-query
+  cost is real work, and by phase it is 11.5 ms embedding the query, 3.1 ms
+  vector search, 0.7 ms loading state, and roughly 13 ms in ranking and result
+  assembly. The gap to FAISS's 0.41 ms stays real, and the query embedding
+  alone is 28x it -- which FAISS does not pay, because it searches
+  pre-computed query vectors. The split has not been measured on the SciFact
+  index, so the 600 ms there is not decomposed.
 - **These are recall@k, not the nDCG@10 the BEIR papers report,** so they are not
   comparable to published SciFact numbers. The only comparison here is between
   the four rows, which share a corpus, a query set and a scorer.

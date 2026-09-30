@@ -112,6 +112,10 @@ pub enum Cmd {
         n: usize,
         #[arg(default_value = "the user has a cat named Bella")]
         query: String,
+        /// Results returned per call. Exposed so the cost of printing results
+        /// can be separated from the cost of finding them.
+        #[arg(default_value = "10")]
+        k: usize,
     },
     Bench,
     /// Stats

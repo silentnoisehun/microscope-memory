@@ -37,7 +37,7 @@ one document would credit a retrieval that found the wrong document.
 
 | System | p50 ms | R@1 | R@5 | R@10 |
 |---|---|---|---|---|
-| **microscope (recall, end-to-end)** | 600.6 | **53.1%** | **74.8%** | **81.8%** |
+| **microscope (recall, end-to-end)** | 156.3 | **53.1%** | **74.8%** | **81.8%** |
 | faiss IndexFlatIP (MiniLM) | 0.41 | 48.3% | 73.4% | 78.3% |
 | faiss IndexHNSWFlat (MiniLM) | 0.06 | 47.6% | 72.0% | 76.6% |
 | sqlite fts5 (bm25) | 8.06 | 45.8% | 66.8% | 74.8% |
@@ -48,12 +48,14 @@ expected one. Two things this table does **not** say:
 - **The latency column is not a speed comparison.** It was previously explained
   here as "process start, config load and opening a 1.3 GB index".
   `bench-recall` shows that is wrong: in a resident process with everything
-  warm, one recall on the 967,587-block evaluation index costs **23.5 ms at
-  p50** against a first call of 95.1 ms, so process start and index load are
+  warm, one recall on the 967,587-block evaluation index costs **20.9 ms at
+  p50** against a first call of 94.9 ms, so process start and index load are
   worth about 13 ms of the *first* call and nothing per query. The per-query
-  cost is real work, and by phase (mean over 31 calls) it is 15.0 ms embedding
+  cost is real work, and by phase it is 15.0 ms embedding
   the query, 5.7 ms scoring 4,310 candidate blocks, 2.1 ms vector search, 1.0 ms
-  loading state, and under 1.5 ms for everything else. The gap to FAISS's
+  loading state, and under 1.5 ms for everything else. Those phase figures come
+  from `MICROSCOPE_RECALL_TRACE=1`, which costs the query about 2.6 ms of its
+  own; the 20.9 ms p50 beside them is measured with the trace off. The gap to FAISS's
   0.41 ms stays real, and the query embedding alone is 36x it -- which FAISS
   does not pay, because it searches pre-computed query vectors. The SciFact
   split **is** measured too, and it is dominated by the candidate count: 83,703
@@ -167,6 +169,35 @@ the variable exists for that case.
 
 Tests: 443 lib + 35 integration passing.
 
+### What the trace itself costs, and why no number above uses it
+
+`MICROSCOPE_RECALL_TRACE=1` writes one line to stderr per phase per query. The
+same query, same index, same binary, one run apart:
+
+| | trace on | trace off |
+|---|---:|---:|
+| SciFact, in-process p50 | 89.6 ms | **44.8 ms** |
+| evaluation index, in-process p50 | 23.5 ms | **20.9 ms** |
+
+So roughly half of the traced SciFact number was the tracing. The mechanism is
+structural, not incidental: `trace_phase` runs *after* the `Instant::now()` that
+bounds the phase it is reporting and *before* the `Instant::now()` that starts
+the next one, so each phase's stderr write lands inside the following phase's
+measurement window. `state load` is where it is easiest to see -- its four
+named sub-phases sum to 0.70 ms and it reports 9.22 ms, because the four
+`trace_phase` calls between them are measured by nothing.
+
+**Every in-process figure in this file is a trace-off number, and the end-to-end
+SciFact and evaluation-index rows are unaffected because the Python harness
+never sets the variable.** The phase tables are still useful for *ranking* the
+phases against each other, which is what they were built for, but their
+absolute values carry this overhead and should not be quoted as query latency.
+
+The honest fix is to re-mark the baseline inside `trace_phase` so the write
+falls outside every window, and that is not done here; the measurement is
+recorded so the number above is not mistaken for the system being twice as slow
+as it is.
+
 ### Getting here: three runs, and the first two were wrong
 
 This is recorded because the error is instructive and because two earlier
@@ -179,6 +210,10 @@ commit messages in this repository state the opposite conclusion.
 | R@5 | 74.8% | 67.5% | **74.8%** |
 | R@10 | 80.4% | 76.2% | **81.8%** |
 | p50 ms | 434.3 | 605.4 | 600.6 |
+
+*These three p50 values are the pre-bound history and are kept as measured.
+The current run is 156.3 ms; the third column is the configuration this section
+traced, not the current one.*
 
 **Run 1 (51.0%) led FAISS while discarding 83% of the corpus.** `BLOCK_DATA_SIZE`
 was 1,024 bytes and `to_block` truncated 4,300 of the 5,183 abstracts at byte

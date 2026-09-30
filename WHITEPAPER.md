@@ -627,7 +627,7 @@ credit a retrieval that found the wrong document.
 
 | System | p50 ms | R@1 | R@5 | R@10 |
 |---|---|---|---|---|
-| **Microscope (recall, end-to-end)** | 600.6 | **53.1%** | **74.8%** | **81.8%** |
+| **Microscope (recall, end-to-end)** | 156.3 | **53.1%** | **74.8%** | **81.8%** |
 | FAISS `IndexFlatIP` (MiniLM) | 0.41 | 48.3% | 73.4% | 78.3% |
 | FAISS `IndexHNSWFlat` (MiniLM) | 0.06 | 47.6% | 72.0% | 76.6% |
 | SQLite FTS5 (BM25) | 8.06 | 45.8% | 66.8% | 74.8% |
@@ -639,7 +639,7 @@ expected ordering. Two limits on what this table supports:
   either.** It was previously explained here as "process start, config load and
   opening a 1.3 GB index". `bench-recall` shows that is wrong: in a resident
   process with everything warm, one recall on the 967,587-block evaluation index
-  costs **23.5 ms at p50** against a first call of 95.1 ms, so process start
+  costs **20.9 ms at p50** against a first call of 94.9 ms, so process start
   and index load are worth about 13 ms of the *first* call and nothing per
   query. The per-query cost is real work, and by phase (mean over 31 calls) it is
   15.0 ms embedding the query, 5.7 ms scoring 4,310 candidate blocks, 2.1 ms

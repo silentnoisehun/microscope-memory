@@ -101,6 +101,11 @@ console_error_panic_hook = []
 tempfile = "3.8"
 criterion = "0.5"
 tower = { version = "0.5", features = ["util"] }
+# For tests/mcp_stdio.rs: the test spawns the real binary and parses its framed
+# output, and writes the config it points the child at. Both crates are already
+# in the tree as normal dependencies, so this adds no build cost.
+serde_json = "1.0"
+toml = "0.8"
 
 [[bench]]
 name = "microscope_bench"

@@ -27,6 +27,7 @@ jobs:
         with:
           toolchain: "1.98.1"
           components: rustfmt, clippy
+          targets: wasm32-unknown-unknown
 
       - name: Formatting
         run: cargo fmt --all -- --check
@@ -38,7 +39,15 @@ jobs:
         run: python3 scripts/check_mojibake.py --worktree
 
       - name: Clippy
-        run: cargo clippy --all-targets -- -D warnings
+        run: cargo clippy --all-targets --locked -- -D warnings
+
+      - name: WASM target
+        # The library has to build for the browser too. --no-default-features
+        # keeps the native binary out of it; that binary needs the `native`
+        # feature, and axum, tokio and clap do not compile for wasm32.
+        run: |
+          cargo check --target wasm32-unknown-unknown --locked --no-default-features \
+            --features wasm
 
   build-and-test:
     runs-on: ubuntu-latest
@@ -48,16 +57,16 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
 
       - name: Build all targets
-        run: cargo build --all-targets
+        run: cargo build --all-targets --locked
 
       - name: Clippy
-        run: cargo clippy --all-targets
+        run: cargo clippy --all-targets --locked
 
       - name: Library tests
-        run: cargo test --lib
+        run: cargo test --lib --locked
 
       - name: Enforcement integration tests (A_t^valid gate)
-        run: cargo test --test enforcement_gate
+        run: cargo test --test enforcement_gate --locked
 
       - name: Core integration tests
-        run: cargo test --test integration
+        run: cargo test --test integration --locked

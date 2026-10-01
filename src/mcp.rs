@@ -1494,7 +1494,7 @@ fn tool_recall(config: &Config, args: &Value) -> Result<String, String> {
             // this is the vector of results itself -- no Result to unwrap.
             let vectors: Vec<Result<Vec<f32>, crate::embeddings::EmbeddingError>> =
                 crate::embeddings::with_cached_provider(&config.embedding, dim, |p| {
-                    use rayon::prelude::*;
+                    use crate::parallel::*;
                     links
                         .par_iter()
                         .map(|t| p.embed(t))

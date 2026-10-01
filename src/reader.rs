@@ -1,7 +1,7 @@
 //! MicroscopeReader — high-performance memory-mapped reader for the binary index.
 
+use crate::parallel::*;
 use colored::Colorize;
-use rayon::prelude::*;
 use std::fs;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};

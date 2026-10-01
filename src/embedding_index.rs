@@ -18,7 +18,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::SystemTime;
 
-use rayon::prelude::*;
+use crate::parallel::*;
 
 use crate::embeddings::{cosine_similarity_simd, EmbeddingProvider};
 

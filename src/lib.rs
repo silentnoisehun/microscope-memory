@@ -23,6 +23,7 @@ pub mod federation;
 pub mod fingerprint;
 pub mod hebbian;
 pub mod no_learn;
+pub mod parallel;
 pub mod sync_guard;
 pub mod types;
 

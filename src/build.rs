@@ -10,8 +10,8 @@ use crate::{
     BLOCK_DATA_SIZE, DEPTH_ENTRY_SIZE, HEADER_SIZE, META_HEADER_SIZE,
 };
 
+use crate::parallel::*;
 use colored::Colorize;
-use rayon::prelude::*;
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::fs;

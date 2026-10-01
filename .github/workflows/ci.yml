@@ -38,6 +38,11 @@ jobs:
         # and how the damage got committed, pushed and shipped in the binary.
         run: python3 scripts/check_mojibake.py --worktree
 
+      - name: Dependency policy
+        # Licences and package sources. There is no advisory database available
+        # in this job, so this does NOT check for CVEs; CLAIMS.md says so.
+        run: python3 scripts/check_dependencies.py --quiet
+
       - name: Clippy
         run: cargo clippy --all-targets --locked -- -D warnings
 

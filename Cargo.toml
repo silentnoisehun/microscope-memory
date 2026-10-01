@@ -2,6 +2,12 @@
 name = "microscope-memory"
 
 version = "0.8.2"
+# Derived by letting clippy check it, not by guessing: raising this until
+# `cargo clippy -- -D warnings` stops reporting incompatible_msrv is how 1.91 was
+# found, after a hand-derived 1.88 was wrong about str::floor_char_boundary in
+# src/narrative.rs. The dependency floor is lower (1.87.0, wasip2); this crate is
+# what sets it. CI tests 1.98.1, so this is still derived rather than built on.
+rust-version = "1.91"
 edition = "2021"
 authors = ["Microscope Contributors"]
 description = "Pure binary cognitive memory engine with REST API bridge for LLM integration. Zero-JSON core, mmap-based, hierarchical, sub-microsecond search."

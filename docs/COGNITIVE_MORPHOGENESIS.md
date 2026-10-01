@@ -1,5 +1,12 @@
 # Kognitív Morfogenezis Architektúra
 
+> **Point-in-time document.** This describes the architecture as of v0.1.
+> The tree is now `v0.9.2-115-ge0cea99`. Nothing in here has been re-derived against it;
+> CLAIMS.md at the repository root records which claims here are currently
+> verified, which are historical, and which are unverified. Treat the figures
+> below as belonging to v0.1, not to master.
+
+
 **v0.1 — 2026-08-09**
 
 *Auditálható emergens viselkedés egy élő memóriahálózaton.*
@@ -694,7 +701,7 @@ T5 → útvonal [0,1,3,5] konszolidálva
 
 A kognitív morfogenezis a HOPE Ecosystem harmadik rétege:
 
-1. **Microscope Memory** — perzisztens memória, bináris mmap, 13 réteg
+1. **Microscope Memory** — perzisztens memória, bináris mmap, 12 réteg
 2. **Octopus Runtime** — párhuzamos végrehajtás, arm-ok, snapshot-ok
 3. **Kognitív Morfogenezis** — élő hálózat, gradiens-követés, auditálható emergencia
 

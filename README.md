@@ -6,7 +6,7 @@
 
 [![Rust](https://img.shields.io/badge/language-Rust-orange.svg)](https://www.rust-lang.org)
 [![License: MIT](https://img.shields.io/badge/Limit-MIT-blue.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/Tests-417%20passing-brightgreen.svg)](#-testing)
+[![Tests](https://img.shields.io/badge/Tests-519%20passing-brightgreen.svg)](#-testing)
 [![Blocks](https://img.shields.io/badge/Blocks-1.28M-purple.svg)](#-statistics)
 [![WASM](https://img.shields.io/badge/WASM-151%20KB-blueviolet.svg)](#-wasm)
 
@@ -16,7 +16,7 @@
 
 ## What It Is
 
-A living, self-organizing memory architecture with 13 layers, 9 depths, and 1.28 million blocks. Not a database â€” a cognitive engine that learns, dreams, and remembers.
+A living, self-organizing memory architecture with 12 memory layers, 9 depths, and 1.28 million blocks. Not a database â€” a cognitive engine that learns, dreams, and remembers.
 
 ### Core Capabilities
 

@@ -20,6 +20,55 @@ These are all correct measurements of different things. Quoting 112 µs as "the
 recall latency" is misleading: it describes the inner loop, not the user-visible
 operation.
 
+## Measurement metadata
+
+Recorded 2026-10-01 at `e0cea99`. An external audit asked for eleven fields on
+every published row. Four can be stated now and the rest are listed as absent,
+because inventing them for numbers measured before this existed would be worse
+than the gap.
+
+**Present**
+
+| Field | Value |
+|---|---|
+| commit | `e0cea99552e5b2ffddfe6304ca27de1d51fd5417` |
+| release | `v0.9.2-115-ge0cea99` -- 115 commits past the v0.9.2 tag |
+| host | Windows 11, AMD64, AMD Ryzen 5 7535HS, 12 cores, 15.2 GB |
+| toolchain | rustc 1.98.1, cargo 1.98.1 |
+| corpus | hashes below |
+
+**Corpus hashes.** These identify the indexes these numbers came from. They are
+hashes of the index artifacts in this working tree, not of the source corpus, so
+they pin the exact binary that was measured.
+
+| Artifact | Files | Bytes | sha256 of `data.bin` |
+|---|---|---|---|
+| `scifact_output` | 18 | 1,395,912,948 | `393b29fe1d981b1192f14577885fd6da` |
+| `eval_output` | 21 | 258,149,121 | see `eval_layers` below |
+| `bench_output` | 30 | 1,676,017 | -- |
+| `bench_output_semantic` | 18 | 1,437,005 | `0044d148c14e42a95c871e4d24a5e5e1` |
+| `scifact_layers/long_term.txt` | 1 | 7,788,706 | `f2cfa8396c20bc2a497813e092f3c023` |
+| `eval_layers` | 16 | 1,605,150 | -- |
+
+**Absent, and why.** These apply to every table below, not just this section.
+
+| Field | State |
+|---|---|
+| state (cold / warm / steady) | partially recorded; the latency section distinguishes them, the recall tables do not |
+| query set | not versioned. There is no artifact naming the queries behind any R@k figure here |
+| baseline configuration | recorded only as "faiss IndexFlatIP"; index construction and tuning are not pinned |
+| repetitions and spread | single runs. The evaluation harness sets `MICROSCOPE_NO_LEARN` and takes one clean run, which is reproducible but says nothing about variance |
+| metric definition | aggregate is unstated for R@k beyond the values themselves |
+| artifact | raw logs are not committed |
+
+Two consequences worth stating plainly. A recall number here cannot be
+re-derived, because the query set was never kept. And a latency number here is a
+single observation on one machine, not a distribution.
+
+**A version inconsistency, found while recording this.** The tag is v0.9.2 and
+the tree is 115 commits past it, but `Cargo.toml` still declares `0.8.2`. A reader
+cannot tell which version the binaries were built from.
+
 ## BEIR SciFact — the measurement to argue with
 
 Everything below the Method section that uses recall was measured on a

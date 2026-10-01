@@ -1,5 +1,12 @@
 # Microscope Memory — Teljes Rendszerleírás
 
+> **Point-in-time document.** This describes the architecture as of v0.8.2.
+> The tree is now `v0.9.2-115-ge0cea99`. Nothing in here has been re-derived against it;
+> CLAIMS.md at the repository root records which claims here are currently
+> verified, which are historical, and which are unverified. Treat the figures
+> below as belonging to v0.8.2, not to master.
+
+
 **v0.8.2 — 2026-08-09**
 
 *Mért adatok és pontos kódstruktúra alapján. Minden szám, minden modul, minden kódútvonal a tényleges kódból származik.*
@@ -8,11 +15,11 @@
 
 ## 1. Rendszeráttekintés
 
-A Microscope Memory egy kognitív memória engine — 13 réteg, 9 mélység, bináris mmap. Nem napló, nem adatbázis — élő emlékezet.
+A Microscope Memory egy kognitív memória engine — 12 réteg, 9 mélység, bináris mmap. Nem napló, nem adatbázis — élő emlékezet.
 
 A rendszer három fő architekturális rétegből áll:
 
-1. **Microscope Memory** — perzisztens memória, bináris mmap, 13 réteg, 9 mélység
+1. **Microscope Memory** — perzisztens memória, bináris mmap, 12 réteg, 9 mélység
 2. **Kognitív Modulok** — Hebbian, Resonance, Epistemic, Predictive Cache, Emotion, Attention, Pattern Recognition
 3. **Kognitív Morfogenezis** — élő hálózat, gradiens-követés, auditálható emergencia (Nested Fractal Cognitive Morphogenesis Architecture)
 
@@ -90,7 +97,7 @@ A rendszer három fő architekturális rétegből áll:
 
 ## 3. Memória rétegek
 
-A Microscope Memory 13 réteget kezel:
+A Microscope Memory 12 réteget kezel:
 
 | Réteg | Azonosító | Oda kerül |
 |---|---|---|
@@ -668,7 +675,7 @@ gradient = 1.0*0.0 + 1.0*0.0 + 1.0*0.24 + 1.0*1.0 + 1.0*1.0 + 1.0*0.5 + 1.0*1.0 
 | `emotional-field` | Érzelmi kontagió állapota |
 | `emotional-exchange` | Érzelmi sznapshotok megosztása |
 | `modalities` | Multimodális index statisztikák |
-| `cognitive-map` | Teljes kognitív térkép (13 réteg) |
+| `cognitive-map` | Teljes kognitív térkép (12 réteg) |
 | `think <query> [max_steps]` | Szekvenciális gondolkodás |
 | `spine` | Binary Spine IPC |
 
@@ -799,7 +806,7 @@ A Nested Fractal Cognitive Morphogenesis Architecture biztosítja, hogy a magasa
 
 A Microscope Memory egy kognitív memória engine, amely:
 
-- **1,253,006 blokkot** kezel 9 mélységben, 13 rétegben
+- **1,253,006 blokkot** kezel 9 mélységben, 12 rétegben
 - **281.6 MB** adatot tárol bináris mmap formátumban
 - **399 tesztet** futtat sikeresen
 - **95 Rust fájlt** tartalmaz (1.88 MB, ~35,000 sor)

@@ -1,4 +1,11 @@
 # ▓▒░ MICROSCOPE MEMORY v0.8.0
+> **Point-in-time document.** This describes the architecture as of v0.8.0.
+> The tree is now `v0.9.2-115-ge0cea99`. Nothing in here has been re-derived against it;
+> CLAIMS.md at the repository root records which claims here are currently
+> verified, which are historical, and which are unverified. Treat the figures
+> below as belonging to v0.8.0, not to master.
+
+
 ## ░▒▓ Cognitív Evolúció — Teljes Rendszerarchitektúra ▓▒░
 
 ---
@@ -477,7 +484,7 @@ KERESÉS MÓDUSA:
 
 ## ▣ 6. KOGNITÍV ENHANCEMENTEK — Extended modulok
 
-A core 13 réteg mellett további kognitív modulok:
+A core 12 réteg mellett további kognitív modulok:
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐

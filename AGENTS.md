@@ -1,6 +1,6 @@
 ﻿# Microscope Memory
 
-A Microscope Memory egy kognitív memória engine — 13 réteg, 9 mélység, bináris mmap. Nem napló, nem adatbázis — élő emlékezet.
+A Microscope Memory egy kognitív memória engine — 12 réteg, 9 mélység, bináris mmap. Nem napló, nem adatbázis — élő emlékezet.
 
 ## Hogyan működik
 
@@ -82,7 +82,7 @@ cargo build --release --features "gpu embeddings"
 | `chatgpt.rs` | ChatGPT export parser and import |
 
 ### Memory Stack
-- **13 layers**: identity, long_term, short_term, associative, emotional, relational, reflections, crypto_chain, echo_cache, rust_state, code, session
+- **12 layers**: identity, long_term, short_term, associative, emotional, relational, reflections, crypto_chain, echo_cache, rust_state, code, session
 - **9 depths** (D0-D8): hierarchical zoom-based indexing
 - **Binary mmap**: zero-JSON hot path, sub-microsecond recall
 

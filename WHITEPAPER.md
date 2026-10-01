@@ -14,6 +14,12 @@
 
 ## Abstract
 
+A note on the word "layers": the thirteen in section 3 are reinforcement
+mechanisms, one per feedback loop. They are not the memory layers a block
+carries -- there are twelve of those, listed in LAYER_NAMES in src/lib.rs,
+and attention weights seven. Where a depth count or a block count appears
+next to "layers", the storage sense is meant.
+
 This paper presents Microscope Memory, a hierarchical memory index implemented in Rust that models information retrieval as magnification: data is organised into nine depth levels (D0--D8), from identity summaries to raw bytes, with every block constrained to a 256-byte viewport. Beyond the core indexing engine, the system implements thirteen adaptive-ranking layers that let retrieval outcomes feed back into the index. These are described in engineering terms throughout: Hebbian reinforcement (block-level activation and coordinate drift), activation-fingerprint matching, spatial pulse propagation, archetype extraction from recurring activation patterns, query-space warping, recall-path tracking, predictive prefetch with reinforcement feedback, time-windowed activation profiles, a learned attention weight vector, cross-instance pattern exchange, offline consolidation with pruning, shared state propagation across instances, and multi-modal memory (images, audio, structured data). The system achieves sub-microsecond in-process query latencies at shallow depths while maintaining reinforcement loops at multiple levels -- predictions, attention weights, and temporal profiles all adapt from observed usage. Pure binary, zero JSON, 54,053 lines of Rust.
 
 **Scope of the claims.** This paper describes an engineering artefact and its measured behaviour. It makes no claim about consciousness, sentience, or cognition in the strong sense; "memory" throughout means an index with learned relevance signals. Every performance number is tied to a stated measurement path; see Section 11 and the Limitations section for what is *not* claimed.

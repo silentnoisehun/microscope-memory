@@ -1,5 +1,12 @@
 # HOPE Ecosystem — Teljes Rendszerleírás
 
+> **Point-in-time document.** This describes the architecture as of the v0.8.x line.
+> The tree is now `v0.9.2-115-ge0cea99`. Nothing in here has been re-derived against it;
+> CLAIMS.md at the repository root records which claims here are currently
+> verified, which are historical, and which are unverified. Treat the figures
+> below as belonging to the v0.8.x line, not to master.
+
+
 **v2.0.0 — 2026-08-09**
 
 *Mért adatok és pontos kódstruktúra alapján. Minden szám, minden modul, minden kódútvonal a tényleges kódból származik.*
@@ -40,7 +47,7 @@ A rendszer lényege: **ugyanaz a Rust kód fut natívan (CLI) és WASM-ban (brow
 │              │   MEMORY CORE     │                                 │
 │              │                   │                                 │
 │              │  1.27M blocks     │                                 │
-│              │  13 layers        │                                 │
+│              │  12 layers        │                                 │
 │              │  9 depths         │                                 │
 │              │  284.7 MB data    │                                 │
 │              │                   │                                 │
@@ -476,7 +483,7 @@ Seed (kiindulási blokk)
 
 A HOPE Ecosystem egy kognitív memória és intelligencia platform, amely:
 
-- **1,253,006 blokkot** kezel 9 mélységben, 13 rétegben
+- **1,253,006 blokkot** kezel 9 mélységben, 12 rétegben
 - **284.7 MB** adatot tárol bináris mmap formátumban
 - **399 tesztet** futtat sikeresen
 - **97 Rust fájlt** tartalmaz (2.0 MB, ~52,000 sor)

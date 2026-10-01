@@ -447,14 +447,11 @@ impl CognitiveMorphogenesisEngine {
         let mut all_nodes: Vec<MorphNode> = Vec::new();
         let mut all_connections: Vec<MorphConnection> = Vec::new();
         let mut anastomosis_count = 0usize;
-        let mut anastomosis_validated = 0usize;
         let mut solidified_paths = 0usize;
-        let mut pruned_paths = 0usize;
 
         // Top 3 blokk → 3 seed → 3 párhuzamos mycelium
         // Minden organizmus forrás-blokkjait tároljuk a co-aktiváció ellenőrzéshez
         struct OrganismContext {
-            source_block: u32,
             nodes: Vec<MorphNode>,
             connections: Vec<MorphConnection>,
             avg_confidence: f64,
@@ -486,21 +483,20 @@ impl CognitiveMorphogenesisEngine {
             };
 
             organisms.push(OrganismContext {
-                source_block: block_idx,
                 nodes: organism.nodes,
                 connections: organism.connections,
                 avg_confidence: avg_conf,
             });
         }
 
-        // ─── T3: Anastomosis validáció co-aktiváció alapján ───
-        // Két organizmus akkor anastomosizálhat, ha a forrás-blokkjaik
-        // co-aktiváltak a Hebbian state-ben
+        // ─── T3: Geometriai anastomosis ─────
+        // Két organizmus akkor anastomosizál, ha van közös node-ja 0.5
+        // egységen belül. A co-aktivació alapú validáció
+        // Phase 1-ben nem volt megkülönböztethető — az audit bejegyzés
+        // minden találkozást validnak rögzíti —, és az itt számlált
+        // validált darabszámnak nem volt olvasója.
         for i in 0..organisms.len() {
             for j in (i + 1)..organisms.len() {
-                let a = organisms[i].source_block.min(organisms[j].source_block);
-                let b = organisms[i].source_block.max(organisms[j].source_block);
-                let pair_key = (a, b);
 
                 // Geometriai anastomosis: node-ok közötti távolság < 0.5
                 let mut geo_anastomosis = 0usize;
@@ -519,23 +515,18 @@ impl CognitiveMorphogenesisEngine {
                 if geo_anastomosis > 0 {
                     anastomosis_count += geo_anastomosis;
 
-                    // Co-aktiváció validáció
-                    if let Some(coa) = hebb.coactivations.get(&pair_key) {
-                        // Van co-aktiváció → valid anastomosis
-                        anastomosis_validated += geo_anastomosis;
-                    }
-                    // Nincs co-aktiváció → geometriai találkozás, de nem valid
+                    // Every meeting counts as validated in Phase 1, which is
+                    // why the audit entry below repeats anastomosis_count.
                 }
             }
         }
 
-        // ─── T4: Epistemic gate — útvonalak szilárdítása/pruning ───
-        // Magas confidence → solidified, alacsony → pruned
+        // ─── T4: Epistemic gate — útvonalak szilárdítása ───
+        // Magas confidence → solidified. Az alacsony confidence-ig nem számlált
+        // különbszám: a pruned_paths számlálónak nem volt olvasója.
         for org in &organisms {
             if org.avg_confidence > 0.5 {
                 solidified_paths += 1;
-            } else if org.avg_confidence < 0.2 {
-                pruned_paths += 1;
             }
         }
 

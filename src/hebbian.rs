@@ -594,7 +594,7 @@ fn load_activations(output_dir: &Path, block_count: usize) -> Vec<ActivationReco
     if let Ok(data) = fs::read(&path) {
         if data.len() >= 12 && &data[0..4] == b"HEB2" {
             // [HEB2][u32 block_count][u32 stored][(u32 idx, record)...]
-            let stored = read_u32(&data, 4) as usize;
+            let _stored = read_u32(&data, 4) as usize;
             let count = read_u32(&data, 8) as usize;
             let stride = 4 + ACTIVATION_RECORD_BYTES;
             // Size from the record indices only.
@@ -1116,7 +1116,7 @@ mod tests {
         assert!(delta_journal_records(&dir) >= JOURNAL_MAX_RECORDS);
 
         // A load folds the journal into memory; the next save must checkpoint.
-        let mut state = HebbianState::load_or_init(&dir, n);
+        let state = HebbianState::load_or_init(&dir, n);
         state.save_dirty(&dir, &[1]).unwrap();
         assert_eq!(
             delta_journal_records(&dir),

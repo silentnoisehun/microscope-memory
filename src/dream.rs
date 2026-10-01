@@ -712,7 +712,7 @@ pub fn promote_recalled_blocks(
     promote_energy: f32,
     protect_min_importance: u8,
 ) -> Result<u32, String> {
-    use crate::{BLOCK_DATA_SIZE, HEADER_SIZE};
+    use crate::HEADER_SIZE;
 
     let hdr_path = output_dir.join("microscope.bin");
     if !hdr_path.exists() {

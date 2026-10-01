@@ -285,7 +285,7 @@ fn trace_note(name: &'static str, value: String) {
 
 /// The accumulated phase table, mean per phase, busiest first.
 fn phase_summary() -> Vec<(&'static str, f64, u32)> {
-    let Ok(mut stats) = PHASE_STATS.lock() else {
+    let Ok(stats) = PHASE_STATS.lock() else {
         return Vec::new();
     };
     let mut out: Vec<(&'static str, f64, u32)> = stats
@@ -401,9 +401,7 @@ fn recall(config: &Config, query: &str, k: usize) {
     let mut appended_sem: std::collections::HashMap<usize, f32> =
         std::collections::HashMap::new();
     {
-        use microscope_memory::embedding_index::EmbeddingIndex;
-        use microscope_memory::embeddings::EmbeddingProvider;
-
+        
         let emb_path = Path::new(&config.paths.output_dir).join("embeddings.bin");
         if let Some(eidx) = microscope_memory::embedding_index::open_embedding_cached(&emb_path) {
             // The provider must be cached, not rebuilt. Constructing one loads the
@@ -505,7 +503,6 @@ fn recall(config: &Config, query: &str, k: usize) {
                             appended_sem.insert(ai as usize, sim);
                         }
                     }
-                    t_mark = t0.elapsed().as_secs_f64() * 1000.0;
                     trace_phase(
                         "  side index open + search",
                         t0.elapsed().as_secs_f64() * 1000.0 - t_mark,
@@ -927,7 +924,6 @@ fn recall(config: &Config, query: &str, k: usize) {
             "  learn: activation + pairs + resonance",
             t0.elapsed().as_secs_f64() * 1000.0 - t_mark,
         );
-        t_mark = t0.elapsed().as_secs_f64() * 1000.0;
         let t_w = Instant::now();
         let _ = hebb.save_dirty(output_dir, &activated.iter().map(|(i, _)| *i).collect::<Vec<_>>());
         trace_phase("  save: hebbian (dirty)", t_w.elapsed().as_secs_f64() * 1000.0);
@@ -4118,11 +4114,11 @@ async fn async_main() {
                         CognitiveGradient, Phase, CognitiveMorphogenesisEngine,
                         graph_entropy,
                     };
-                    use microscope_memory::morphogenesis::MorphogenField;
+                    
                     use microscope_memory::hebbian::HebbianState;
-                    use microscope_memory::resonance::ResonanceState;
+                    
                     use microscope_memory::epistemic::EvidenceLedger;
-                    use microscope_memory::predictive_cache::PredictiveCache;
+                    
 
                     println!("{}", "ADVERSARIAL TEST SUITE".cyan().bold());
                     println!();
@@ -4278,8 +4274,7 @@ async fn async_main() {
                 }
                 MorphogenesisAction::PresenceAbsenceTest => {
                     use microscope_memory::cognitive_morphogenesis::{
-                        CognitiveGradient, Phase, CognitiveMorphogenesisEngine,
-                        graph_entropy,
+                        CognitiveGradient, Phase,
                     };
                     use microscope_memory::morphogenesis::{
                         GrowthConfig, Seed, mycelium_growth, MorphogenField,
@@ -4356,7 +4351,7 @@ async fn async_main() {
                     let config_a = phase_a.growth_config(&GrowthConfig::mycelium_default());
                     let mut nodes_a = 0usize;
                     let mut conns_a = 0usize;
-                    let mut anast_a = 0usize;
+                    let _anast_a = 0usize;
                     for (i, &(block_idx, score)) in activated.iter().take(3).enumerate() {
                         let idx = block_idx as usize;
                         if idx >= headers.len() { continue; }
@@ -4446,14 +4441,13 @@ async fn async_main() {
                 MorphogenesisAction::DeepAdversarial => {
                     use microscope_memory::cognitive_morphogenesis::{
                         CognitiveGradient, Phase, CognitiveMorphogenesisEngine,
-                        graph_entropy,
                     };
                     use microscope_memory::morphogenesis::{
                         GrowthConfig, Seed, mycelium_growth, MorphogenField,
                     };
                     use microscope_memory::hebbian::HebbianState;
                     use microscope_memory::epistemic::EvidenceLedger;
-                    use microscope_memory::predictive_cache::PredictiveCache;
+                    
 
                     println!("{}", "DEEP ADVERSARIAL — Valódi viselkedés-tesztek".cyan().bold());
                     println!();
@@ -4469,7 +4463,7 @@ async fn async_main() {
                         // Keresünk blokkot, aminek magas activation_count-ja van
                         // de NINCS evidence record-ja
                         let mut high_activation_no_evidence = 0usize;
-                        for (i, rec) in hebb.activations.iter().enumerate() {
+                        for (_i, rec) in hebb.activations.iter().enumerate() {
                             if rec.activation_count > 10 && !evidence.records.is_empty() {
                                 // Ellenőrizzük, hogy van-e evidence record ehhez a blokkhoz
                                 // (content_hash alapján kellene, de most egyszerűsített)
@@ -4699,7 +4693,7 @@ async fn async_main() {
                         .output();
                     match output1 {
                         Ok(o) => {
-                            let stdout = String::from_utf8_lossy(&o.stdout);
+                            let _stdout = String::from_utf8_lossy(&o.stdout);
                             let stderr = String::from_utf8_lossy(&o.stderr);
                             if o.status.success() {
                                 println!("  ├─ ✓ Absentia scan kész");
@@ -4718,7 +4712,7 @@ async fn async_main() {
                         .output();
                     match output2 {
                         Ok(o) => {
-                            let stdout = String::from_utf8_lossy(&o.stdout);
+                            let _stdout = String::from_utf8_lossy(&o.stdout);
                             if o.status.success() {
                                 println!("  ├─ ✓ Morphogenesis cycle kész");
                             } else {

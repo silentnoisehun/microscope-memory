@@ -22,7 +22,6 @@ use crate::hebbian::HebbianState;
 use crate::epistemic::EvidenceLedger;
 use crate::predictive_cache::PredictiveCache;
 use crate::absentia::AbsentiaState;
-use crate::morphogenesis::{GrowthConfig, MorphogenField, Seed, mycelium_growth};
 
 fn now_ms() -> u64 {
     SystemTime::now()
@@ -431,8 +430,8 @@ impl IntentPipeline {
 
         // ─── T6: Epistemic Evaluation ─────────────────
         // Megnézzük, hogy a Genome korlátai engedik-e
-        let mut allowed = true;
-        let mut reason = "Engedélyezett.".to_string();
+        let allowed = true;
+        let reason = "Engedélyezett.".to_string();
         let mut constraint_name = None;
         let mut requires_approval = false;
 

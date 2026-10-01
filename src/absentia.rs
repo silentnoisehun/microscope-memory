@@ -8,7 +8,6 @@
 //!
 //! Bináris fájl: absentia.bin (ABS1)
 
-use std::collections::HashMap;
 use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -166,7 +165,7 @@ impl AbsentiaState {
     pub fn scan(
         &mut self,
         hebb: &HebbianState,
-        evidence: &EvidenceLedger,
+        _evidence: &EvidenceLedger,
         _block_count: usize,
     ) {
         let now = now_ms();

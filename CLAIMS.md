@@ -178,6 +178,16 @@ which is which.
   description or repetition count is recorded with them yet.
 
 ## Still open
+- Three flags in the restored commands parse and do nothing:
+  `knowledge --add-practice`, `knowledge --export` and `morph --mutation-rate`.
+  They were always like this in the original code, which is how they survived
+  being removed and put back. The list is derived from the arms by finding a
+  destructured binding that is never read in the body, not read off the lint
+  output -- an earlier count taken from clippy said nine and was wrong, because
+  the other silenced bindings (`_seed`, `_engine_ref`, `_plast`) are dead local
+  bindings inside the arm bodies rather than flags. Left in place: removing a
+  flag a command documents is a separate decision from restoring the command.
+
 
 - The dependency gate checks licences and package sources, not advisories.
   `scripts/check_dependencies.py` reads `cargo metadata` and refuses a licence

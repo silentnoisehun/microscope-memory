@@ -32,6 +32,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
 import subprocess
 import sys
 
@@ -40,8 +41,21 @@ sys.stdout.reconfigure(encoding="utf-8", errors="backslashreplace")
 # U+00C2 "A-circumflex", U+00C3 "A-tilde" -- escapes on purpose, so that this
 # file does not trip the check it performs.
 MARKERS = ("\u00c2", "\u00c3")
+
+# A second corruption shape, which the MARKERS above does not reach. A UTF-8
+# stream read through a single-byte code page leaves Latin Extended characters
+# behind -- U+0102 and U+0103 from CP1250's A-breve and a-breve, plus U+0139,
+# U+013D, U+0141, U+0165, U+017E and U+0179 -- and none of them occurs in
+# Hungarian or English source. They also defeat the run check below, because each
+# artefact sits between characters that ARE legitimate (the euro sign, the
+# section sign), so no run ever accumulates. That is how 1,467 of them survived
+# in three files while this checker reported the tree clean.
+# U+013D (c-caron), U+0141 (L-stroke) and U+017E (z-caron) are deliberately
+# ABSENT. They are ordinary letters in Czech and Polish, and a codebase may
+# quote them; flagging one would be a false positive. The run check and the
+# repetition check still see them in context.
+LATIN_EXTENDED = ("\u0102", "\u0103", "\u0139", "\u0165", "\u0179")
 MOJIBAKE_OK = "mojibake-ok"
-RUN_LIMIT = 40
 
 TEXTY = (".rs", ".md", ".toml", ".py", ".sh", ".bash", ".ps1", ".bat",
          ".json", ".yml", ".yaml", ".html", ".ts", ".tsx", ".js", ".jsx",
@@ -169,6 +183,43 @@ def junk_run(text):
     return best, best_at
 
 
+def repeated_unit(line):
+    """(period, repetitions) for a multi-character unit repeated back to back.
+
+    A legitimate rule of section characters is ONE character repeated -- U+2500,
+    U+2550 -- so a period of two or more means something else produced it. That
+    is the third corruption shape, and neither MARKERS nor the run check can see
+    it: each character in the unit is individually legitimate, so the run reads
+    clean.
+    """
+    best = None
+    for m in re.finditer(r"[^\x00-\x7f]+", line):
+        run = m.group(0)
+        # A rule of section characters is ONE character repeated, and such a run
+        # also divides by 3, 4, 5 ... so requiring more than one distinct
+        # character is what separates a real banner from a mangled unit.
+        if len(set(run)) < 2:
+            continue
+        for p in range(2, 9):
+            if len(run) >= 2 * p and len(run) % p == 0:
+                if run[:p] * (len(run) // p) == run:
+                    reps = len(run) // p
+                    if best is None or p < best[0]:
+                        best = (p, reps)
+                    break
+    return best if best else (0, 0)
+
+
+def marker_covers(line, prev):
+    """True when a `mojibake-ok` marker sits on this line or the one above it.
+
+    The preceding line counts because that is where an explanatory comment
+    belongs when the offending text is a long literal, and refusing to span two
+    lines only pushes people to write the marker inline anyway.
+    """
+    return MOJIBAKE_OK in line or (prev is not None and MOJIBAKE_OK in prev)
+
+
 def scan(name, data):
     """Return a list of complaints for one file."""
     if b"\x00" in data[:8192]:
@@ -179,15 +230,24 @@ def scan(name, data):
         return ["%s: not valid UTF-8 (%s)" % (name, exc)]
 
     problems = []
+    prev = None
     for lineno, line in enumerate(text.split("\n"), 1):
-        if MOJIBAKE_OK in line:
-            continue
-        hits = [m for m in MARKERS if m in line]
-        if hits:
-            names = ", ".join("U+%04X" % ord(m) for m in hits)
-            problems.append(
-                "%s:%d: %s (%s) -- text was read through a single-byte codepage"
-                % (name, lineno, names, line.strip()[:70]))
+        if not marker_covers(line, prev):
+            hits = [m for m in MARKERS if m in line]
+            ext = [m for m in LATIN_EXTENDED if m in line]
+            if hits or ext:
+                names = ", ".join("U+%04X" % ord(m) for m in hits + ext)
+                problems.append(
+                    "%s:%d: %s (%s) -- text was read through a single-byte codepage"
+                    % (name, lineno, names, line.strip()[:70]))
+            period, reps = repeated_unit(line)
+            if period:
+                problems.append(
+                    "%s:%d: a %d-character unit repeated %d times -- repetition "
+                    "is what gives the third corruption shape away; put `%s` on "
+                    "the line to allow it"
+                    % (name, lineno, period, reps, MOJIBAKE_OK))
+        prev = line
 
     best, best_at = junk_run(text)
     if best > RUN_LIMIT:

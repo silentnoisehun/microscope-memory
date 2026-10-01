@@ -37,7 +37,7 @@ fn setup_built_env() -> (
     (tmp, config, reader)
 }
 
-// â”€â”€â”€ Build pipeline â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Build pipeline ──────────────────────────────────────
 
 fn bench_build_pipeline(c: &mut Criterion) {
     c.bench_function("build_pipeline", |b| {
@@ -47,7 +47,7 @@ fn bench_build_pipeline(c: &mut Criterion) {
     });
 }
 
-// â”€â”€â”€ Text search (find_text) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Text search (find_text) ─────────────────────────────
 
 fn bench_find_text(c: &mut Criterion) {
     let (_tmp, _config, reader) = setup_built_env();
@@ -62,7 +62,7 @@ fn bench_find_text(c: &mut Criterion) {
     group.finish();
 }
 
-// â”€â”€â”€ Spatial lookup (reader.look) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Spatial lookup (reader.look) ────────────────────────
 
 fn bench_look(c: &mut Criterion) {
     let (_tmp, config, reader) = setup_built_env();
@@ -85,7 +85,7 @@ fn bench_look(c: &mut Criterion) {
     group.finish();
 }
 
-// â”€â”€â”€ MQL query (parse + execute) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── MQL query (parse + execute) ─────────────────────────
 
 fn bench_mql_query(c: &mut Criterion) {
     let (_tmp, config, reader) = setup_built_env();
@@ -108,7 +108,7 @@ fn bench_mql_query(c: &mut Criterion) {
     group.finish();
 }
 
-// â”€â”€â”€ CRC16 computation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── CRC16 computation ──────────────────────────────────
 
 fn bench_crc16(c: &mut Criterion) {
     let short_data = b"hello world";
@@ -128,7 +128,7 @@ fn bench_crc16(c: &mut Criterion) {
     group.finish();
 }
 
-// â”€â”€â”€ Content coords â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Content coords ─────────────────────────────────────
 
 fn bench_content_coords(c: &mut Criterion) {
     let mut group = c.benchmark_group("content_coords");
@@ -161,7 +161,7 @@ fn bench_content_coords(c: &mut Criterion) {
     group.finish();
 }
 
-// â”€â”€â”€ Append log read/write â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Append log read/write ──────────────────────────────
 
 fn bench_append_log(c: &mut Criterion) {
     let mut group = c.benchmark_group("append_log");
@@ -210,7 +210,7 @@ fn bench_append_log(c: &mut Criterion) {
     group.finish();
 }
 
-// â”€â”€â”€ Candle embedding device selection â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Candle embedding device selection ─────────────────
 
 #[cfg(all(not(target_arch = "wasm32"), feature = "embeddings"))]
 fn bench_embedding_device(c: &mut Criterion) {
@@ -261,7 +261,7 @@ criterion_group!(
 );
 criterion_main!(benches, cognitive_benches);
 
-// â”€â”€â”€ Morphogenesis benchmarks â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Morphogenesis benchmarks ────────────────────────────
 
 fn bench_morphogenesis_growth(c: &mut Criterion) {
     use microscope_memory::morphogenesis::*;
@@ -328,7 +328,7 @@ fn bench_morphogenesis_evaluate_fitness(c: &mut Criterion) {
     });
 }
 
-// â”€â”€â”€ Executive benchmarks â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Executive benchmarks ────────────────────────────────
 
 fn bench_executive_schedule(c: &mut Criterion) {
     use microscope_memory::executive::Executive;
@@ -353,7 +353,7 @@ fn bench_executive_schedule(c: &mut Criterion) {
     });
 }
 
-// â”€â”€â”€ Pattern Recognition benchmarks â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Pattern Recognition benchmarks ──────────────────────
 
 fn bench_pattern_recognition(c: &mut Criterion) {
     use microscope_memory::pattern_recognition::*;
@@ -388,7 +388,7 @@ fn bench_pattern_recognition(c: &mut Criterion) {
     });
 }
 
-// â”€â”€â”€ Planner benchmarks â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Planner benchmarks ──────────────────────────────────
 
 fn bench_planning(c: &mut Criterion) {
     use microscope_memory::planning::Planner;
@@ -411,7 +411,7 @@ fn bench_planning(c: &mut Criterion) {
     });
 }
 
-// â”€â”€â”€ Autopoiesis benchmarks â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Autopoiesis benchmarks ──────────────────────────────
 
 fn bench_autopoiesis(c: &mut Criterion) {
     use microscope_memory::autopoiesis::AutopoiesisEngine;

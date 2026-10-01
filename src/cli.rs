@@ -387,24 +387,24 @@ pub enum Cmd {
         #[command(subcommand)]
         action: EvidenceAction,
     },
-    /// KognitĂ­v Morfogenezis â€” audit-naplĂł, metrikĂˇk, gradiens Ăˇllapot
+    /// Kognitív Morfogenezis â€” audit-napló, metrikák, gradiens állapot
     Morphogenesis {
         #[command(subcommand)]
         action: MorphogenesisAction,
     },
-    /// Absentia â€” Csend RĂ©teg: ami NEM tĂ¶rtĂ©nt meg, ami hiĂˇnyzik
+    /// Absentia â€” Csend Réteg: ami NEM történt meg, ami hiányzik
     Absentia {
         #[command(subcommand)]
         action: AbsentiaAction,
     },
-    /// Intent Pipeline â€” auditĂˇlhatĂł szĂˇndĂ©k-generĂˇlĂˇs
+    /// Intent Pipeline â€” auditálható szándék-generálás
     Intent {
         #[command(subcommand)]
         action: IntentAction,
     },
-    /// Octopus â€” pĂˇrhuzamos kognitĂ­v mĹ±veletek
+    /// Octopus â€” párhuzamos kognitív műveletek
     Octopus {
-        /// MĹ±velet: full-pipeline | scan | cycle
+        /// Művelet: full-pipeline | scan | cycle
         #[arg(default_value = "full-pipeline")]
         operation: String,
     },
@@ -412,42 +412,42 @@ pub enum Cmd {
 
 #[derive(Subcommand)]
 pub enum IntentAction {
-    /// Intent generĂˇlĂˇsa a jelenlegi ĂˇllapotbĂłl
+    /// Intent generálása a jelenlegi állapotból
     Generate,
-    /// Intent audit-naplĂł megjelenĂ­tĂ©se
+    /// Intent audit-napló megjelenítése
     Audit {
         #[arg(default_value = "10")]
         k: usize,
     },
-    /// Genome megjelenĂ­tĂ©se
+    /// Genome megjelenítése
     Genome,
 }
 
 #[derive(Subcommand)]
 pub enum MorphogenesisAction {
-    /// Audit-naplĂł megjelenĂ­tĂ©se
+    /// Audit-napló megjelenítése
     Audit {
-        /// HĂˇny bejegyzĂ©s (legutĂłbbi)
+        /// Hány bejegyzés (legutóbbi)
         #[arg(default_value = "20")]
         k: usize,
     },
-    /// MetrikĂˇk megjelenĂ­tĂ©se
+    /// Metrikák megjelenítése
     Metrics {
-        /// HĂˇny bejegyzĂ©s (legutĂłbbi)
+        /// Hány bejegyzés (legutóbbi)
         #[arg(default_value = "20")]
         k: usize,
     },
-    /// AktuĂˇlis gradiens Ăˇllapot Ă©s fĂˇzis
+    /// Aktuális gradiens állapot és fázis
     Status,
-    /// Egy teljes kognitĂ­v morfogenezis ciklus futtatĂˇsa
+    /// Egy teljes kognitív morfogenezis ciklus futtatása
     Run,
-    /// FĂˇzis-Ăˇtmenetek tesztelĂ©se kĂĽlĂ¶nbĂ¶zĹ‘ gradiens-sĂşlyokkal
+    /// Fázis-átmenetek tesztelése különböző gradiens-súlyokkal
     TestPhases,
-    /// Teljes integrĂˇciĂłs Ăˇllapot: audit + metrikĂˇk + fĂˇzis + gradiens
+    /// Teljes integrációs állapot: audit + metrikák + fázis + gradiens
     FullStatus,
-    /// Adversarial tesztcsomag â€” edge case-ek Ă©s vĂ©dett ĂˇllĂ­tĂˇsok ellenĹ‘rzĂ©se
+    /// Adversarial tesztcsomag â€” edge case-ek és védett állítások ellenőrzése
     Adversarial,
-    /// Deep adversarial â€” cĂ©lzott stressz-teszt a rendszer absztrakciĂłinak hatĂˇrain
+    /// Deep adversarial â€” célzott stressz-teszt a rendszer absztrakcióinak határain
     DeepAdversarial,
     /// A/B teszt: presence-driven growth â†” absence-driven inhibition
     PresenceAbsenceTest,
@@ -455,16 +455,16 @@ pub enum MorphogenesisAction {
 
 #[derive(Subcommand)]
 pub enum AbsentiaAction {
-    /// Absentia Ăˇllapot megjelenĂ­tĂ©se
+    /// Absentia állapot megjelenítése
     Status,
-    /// HiĂˇnyok szkennelĂ©se
+    /// Hiányok szkennelése
     Scan,
-    /// Anti-Hebbian pĂˇrok megjelenĂ­tĂ©se
+    /// Anti-Hebbian párok megjelenítése
     AntiHebbian {
         #[arg(default_value = "20")]
         k: usize,
     },
-    /// Causal laundering gyanĂşs pĂˇrok
+    /// Causal laundering gyanús párok
     CausalLaundering,
 }
 

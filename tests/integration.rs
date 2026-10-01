@@ -620,7 +620,7 @@ fn test_embedding_index_search() {
     }
 }
 
-// â”€â”€â”€ Morphogenesis Integration â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Morphogenesis Integration ───────────────────────────
 
 #[test]
 fn test_morphogenesis_mycelium_growth_integration() {
@@ -641,7 +641,7 @@ fn test_morphogenesis_engine_evolve() {
     assert!(!results.is_empty(), "Should produce organisms");
 }
 
-// â”€â”€â”€ Pattern Recognition Integration â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Pattern Recognition Integration ─────────────────────
 
 #[test]
 fn test_pattern_recognition_sequences() {
@@ -675,7 +675,7 @@ fn test_pattern_recognition_motifs() {
     assert!(!patterns.is_empty(), "Should have structural patterns");
 }
 
-// â”€â”€â”€ Executive Integration â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Executive Integration ───────────────────────────────
 
 #[test]
 fn test_executive_schedule_and_cycle() {
@@ -699,7 +699,7 @@ fn test_executive_homeostasis() {
     assert!(actions.contains(&"energy_conservation".to_string()));
 }
 
-// â”€â”€â”€ Planning Integration â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Planning Integration ────────────────────────────────
 
 #[test]
 fn test_planning_goal_decomposition() {
@@ -722,7 +722,7 @@ fn test_planning_create_and_execute() {
     assert!(step.is_some(), "Should execute first step");
 }
 
-// â”€â”€â”€ Autopoiesis Integration â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Autopoiesis Integration ─────────────────────────────
 
 #[test]
 fn test_autopoiesis_template_and_mutation() {
@@ -757,7 +757,7 @@ fn test_autopoiesis_mutation_lifecycle() {
     assert!(!engine.list_mutations(None).is_empty());
 }
 
-// â”€â”€â”€ Code Memory Integration â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Code Memory Integration ─────────────────────────────
 
 #[test]
 fn test_code_memory_store_and_recall() {

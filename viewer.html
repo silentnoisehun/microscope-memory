@@ -8,7 +8,7 @@
 body { background: #0a0a0f; color: #ccc; font-family: 'Courier New', monospace; overflow: hidden; }
 canvas { display: block; }
 
-/* â”€â”€ Sidebar â”€â”€ */
+/* ── Sidebar ── */
 #sidebar {
   position: fixed; top: 0; left: 0; width: 260px; height: 100vh; z-index: 20;
   background: rgba(8,8,16,0.95); border-right: 1px solid #222;
@@ -76,7 +76,7 @@ canvas { display: block; }
   background: #fff; border-radius: 2px;
 }
 
-/* â”€â”€ Microscope Zoom HUD â”€â”€ */
+/* ── Microscope Zoom HUD ── */
 #microscope {
   position: fixed; right: 20px; top: 50%; transform: translateY(-50%); z-index: 20;
   display: none; flex-direction: column; align-items: center; gap: 0;
@@ -548,7 +548,7 @@ function initThree() {
   });
 }
 
-// â”€â”€â”€ Microscope Zoom â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Microscope Zoom ───────────────────────────────
 function initMicroscope() {
   document.getElementById('microscope').style.display = 'flex';
 
@@ -648,7 +648,7 @@ function updateMicroscope() {
   updateAtmosphere(smoothedDepth);
 }
 
-// â”€â”€â”€ Build all 3D groups â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Build all 3D groups ───────────────────────────
 function buildAll() {
   buildBlocks();
   buildRoomBoundaries();
@@ -1033,7 +1033,7 @@ function buildEmotionalCentroid() {
   scene.add(groups.emotional);
 }
 
-// â”€â”€â”€ Sidebar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Sidebar ───────────────────────────────────────
 function buildSidebar() {
   buildFeatureToggles();
   buildLayerToggles();
@@ -1157,7 +1157,7 @@ function buildPredictions() {
   el.innerHTML = rows.map(([k, v]) => `<div class="stat-row"><span class="k">${k}</span><span class="v">${v}</span></div>`).join('');
 }
 
-// â”€â”€â”€ Section collapse â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Section collapse ──────────────────────────────
 document.querySelectorAll('.section-header').forEach(header => {
   header.addEventListener('click', () => {
     const body = header.nextElementSibling;
@@ -1165,7 +1165,7 @@ document.querySelectorAll('.section-header').forEach(header => {
   });
 });
 
-// â”€â”€â”€ Animate â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Animate ───────────────────────────────────────
 function animate() {
   requestAnimationFrame(animate);
   const t = clock.getElapsedTime();

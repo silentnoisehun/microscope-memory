@@ -55,28 +55,53 @@ removed -- that commit changed it by 11 lines. `microscope-mem bridge
 something to guard. `tests/rest_behaviour.rs` starts the real binary and covers
 the spec endpoint, the /v1 routes, 400/404/405, the CORS default, and that guard.
 
-**The other 31 commands are not restored.** Their bodies went with the CLI arm
-and reimplementing consolidation, salience decay and the rest would mean
-inventing semantics. Seven of them were still documented as runnable, found on
-2026-10-01 by extracting every `microscope-mem <word>` out of the tracked
-markdown and running each one against the binary:
+**The other 31 commands are now restored.** They were bound again from
+`a962ad1^` rather than rewritten, so the flag names, defaults and bodies are the
+original ones. a962ad1 touched none of the modules -- `git show --stat` on
+morphogenesis.rs, mental_sandbox.rs, impulse_control.rs, meta_supervision.rs,
+code_memory.rs and chatgpt.rs returns nothing -- so the module APIs the old arms
+were written against are the APIs that are there now.
 
-| Documented | Where | Status |
+Seven were documented as runnable when this was found, and six work again:
+
+| Command | Where documented | Now |
 |---|---|---|
-| `morph` (6 mentions) | docs/ARCHITECTURE.md | module `morphogenesis.rs` compiled, no CLI |
-| `remember` | docs/ARCHITECTURE.md | redirected to `store`, which exists and is the same thing |
-| `import-chat-gpt` | docs/ARCHITECTURE.md | module `chatgpt.rs` compiled, no CLI; `import` is a different command and reads `.mscope` |
-| `sandbox` | examples/cognitive_enhancement.md | module `mental_sandbox.rs` compiled, no CLI |
-| `impulse` | examples/cognitive_enhancement.md | module `impulse_control.rs` compiled, no CLI |
-| `meta` | examples/cognitive_enhancement.md | module `meta_supervision.rs` compiled, no CLI |
-| `code` | COGNITIVE_ENHANCEMENTS.md | module `code_memory.rs` compiled, no CLI |
+| `morph` (6 mentions) | docs/ARCHITECTURE.md | restored, 18 flags |
+| `import-chat-gpt` | docs/ARCHITECTURE.md | restored, 4 flags |
+| `sandbox` | examples/cognitive_enhancement.md | restored, 4 flags |
+| `impulse` | examples/cognitive_enhancement.md | restored, 6 flags |
+| `meta` | examples/cognitive_enhancement.md | restored, 5 flags |
+| `code` | COGNITIVE_ENHANCEMENTS.md | restored, 9 flags |
+| `remember` | docs/ARCHITECTURE.md | never existed under that name; docs point at `store` |
 
-**The modules are alive; only the CLI bindings are gone.** All six were checked
-for the source file and for a `mod` line in lib.rs, and all six are present, so
-the capability descriptions in those documents are true -- it is the invocation
-that is not. Each document now says so where the command used to be rather than
-the section being deleted, because "this module exists and has no command line"
-is more useful to a reader than a missing section.
+The full set is 26 top-level commands plus the four `WmAction` sub-commands
+(`wm show`, `wm push`, `wm decay`, `wm consolidate`), verified by running each
+one: 26/26 answer `--help`. `Daydream` appeared in the removed list but is alive
+in HEAD with different fields, so it was left alone; re-adding the old
+definition is what produced "the name `Daydream` is defined multiple times" and
+"has no field named `verbose`".
+
+Three things did not come back verbatim, each a difference between then and now
+rather than a rewrite:
+
+- `timestamp_to_str`, a date-formatting helper the ImportChatGpt arm calls, went
+  with everything else. Pure arithmetic, no dependencies, so it came back as it
+  was.
+- `store_memory` lost a fifth argument; the signature is now
+  `store_memory_pipeline(config, text, layer, importance)`. The old trailing
+  `None` was dropped rather than replaced with a guess.
+- The old file was itself mojibake -- Hungarian accents through cp1250. Restoring
+  it verbatim brought 48 of them back and `check_mojibake.py` caught every one.
+  The repair is mechanical: a mangled pair is a leading U+0102, U+0139 or U+0042
+  plus the cp1250 rendering of the second UTF-8 byte, so re-encode and decode as
+  UTF-8 to recover the character, iterated to a fixed point because the damage is
+  two levels deep in places. Checked against the words themselves -- Növekedési,
+  konfiguráció, evolúciós, listázása, természetes, küszöb, idővel,
+  alapértelmezett. One glyph the rule cannot invert is a stray U+00B3 in the
+  density banner, present since 2bcc01d where the line was written; the same
+  format string uses ASCII `->` for the same purpose further along, so it became
+  `->`.
+
 
 The method is worth recording because the first attempt at it was wrong. A
 regex over the documentation suggested 8 bad commands; running each one showed

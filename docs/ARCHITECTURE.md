@@ -528,9 +528,24 @@ A core 12 réteg mellett további kognitív modulok:
 ### Morphogenesis — részletes funkciók
 
 A `morphogenesis.rs` modul (2200 sor) a könyvtár része és `lib.rs`-en
-deklarálva van, de **nincs hozzá CLI-parancs**: a `morph` alparancs az `a962ad1`
-commitban tűnt el és nem lett pótolva. A modul közvetlenül a Rust API-n
-keresztül érhető el.
+deklarálva van, és a `morph` alparancs ismét elérhető:
+
+```bash
+# Mycelium — gombahálózat növekedés (P2P topológia)
+microscope-mem morph --grow "api" --pattern mycelium
+
+# Capillary — fraktál elágazás (hierarchikus cache)
+microscope-mem morph --grow "cache" --pattern capillary
+
+# Slime Mold — Physarum-inspired útvonal-keresés
+microscope-mem morph --evolve 10 --objective latency
+
+# Fractal L-System — önhasonló struktúra
+microscope-mem morph --grow "network" --pattern fractal_lsystem
+
+# Genetic Algorithm over growth parameters
+microscope-mem morph --daemon --interval 5 --threshold 0.5
+```
 
 ---
 
@@ -606,7 +621,9 @@ microscope-mem bridge --port 6060         # Bridge API indítása
 microscope-mem recall "query" --k 10     # Visszakeresés
 microscope-mem store "text"              # Új memória
 microscope-mem dream                      # Offline konszolidáció
+microscope-mem morph --grow "api"         # Architektúra növesztés
 microscope-mem pattern-exchange           # Föderációs csere
+microscope-mem import-chat-gpt            # ChatGPT import
 ```
 
 ### Feature flag-ek

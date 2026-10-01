@@ -106,36 +106,59 @@ impl Default for CognitiveGradient {
     }
 }
 
+/// The seven components one gradient cycle weighs.
+///
+/// A struct because they are seven same-typed scalars. At the call sites a
+/// positional `compute(0.5, 0.3, 50, 0.5, 0.5, 0.0, 0.5)` says nothing about
+/// which is which, and in this file `hebbian_energy` and `prediction_hit_rate`
+/// held the same value at every call site, so a transposed pair would have
+/// changed no result and no test would have said so.
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+pub struct GradientInputs {
+    pub lexical_score: f32,
+    pub resonance_strength: f32,
+    /// 0-100. Divided by 100 before it is weighted.
+    pub evidence_confidence: u8,
+    pub hebbian_energy: f32,
+    pub prediction_hit_rate: f32,
+    /// -1.0 to 1.0. Mapped onto 0-1 before it is weighted.
+    pub emotional_valence: f32,
+    pub execution_success: f32,
+}
+
+impl GradientInputs {
+    /// Every component at its maximum: the strongest support a cycle can be
+    /// given. Four call sites want exactly this, and the shadow comparisons read
+    /// better against a name than against seven repeated literals.
+    pub fn saturated() -> Self {
+        Self {
+            lexical_score: 1.0,
+            resonance_strength: 1.0,
+            evidence_confidence: 100,
+            hebbian_energy: 1.0,
+            prediction_hit_rate: 1.0,
+            emotional_valence: 1.0,
+            execution_success: 1.0,
+        }
+    }
+}
+
 impl CognitiveGradient {
     /// Kiszámolja a kognitív gradienst egy adott blokkhoz.
-    /// Seven same-typed scalars, positional and documented here rather than at
-    /// each of the ten call sites. Bundling them into an inputs struct would read
-    /// better, but most call sites pass the same value for every component, so a
-    /// transposed field would change no result and no test would catch it.
-    #[allow(clippy::too_many_arguments)]
-    pub fn compute(
-        &self,
-        lexical_score: f32,
-        resonance_strength: f32,
-        evidence_confidence: u8,
-        hebbian_energy: f32,
-        prediction_hit_rate: f32,
-        emotional_valence: f32,
-        execution_success: f32,
-    ) -> f64 {
+    pub fn compute(&self, inputs: GradientInputs) -> f64 {
         let (w1, w2, w3, w4, w5, w6, w7) = self.weights;
 
         // clamp, not max().min(): the old pattern turned a NaN score into 0.0
         // and hid it. clamp propagates it, so a broken score surfaces here
         // instead of being silently zero-weighted in the sum below. The f32
         // arithmetic is left as it was, so non-NaN inputs are bit-identical.
-        let relevance = lexical_score.clamp(0.0, 1.0) as f64;
-        let resonance = resonance_strength.clamp(0.0, 1.0) as f64;
-        let evidence = (evidence_confidence as f64 / 100.0).clamp(0.0, 1.0);
-        let hebbian = hebbian_energy.clamp(0.0, 1.0) as f64;
-        let prediction = prediction_hit_rate.clamp(0.0, 1.0) as f64;
-        let emotion = ((emotional_valence + 1.0) / 2.0).clamp(0.0, 1.0) as f64;
-        let execution = execution_success.clamp(0.0, 1.0) as f64;
+        let relevance = inputs.lexical_score.clamp(0.0, 1.0) as f64;
+        let resonance = inputs.resonance_strength.clamp(0.0, 1.0) as f64;
+        let evidence = (inputs.evidence_confidence as f64 / 100.0).clamp(0.0, 1.0);
+        let hebbian = inputs.hebbian_energy.clamp(0.0, 1.0) as f64;
+        let prediction = inputs.prediction_hit_rate.clamp(0.0, 1.0) as f64;
+        let emotion = ((inputs.emotional_valence + 1.0) / 2.0).clamp(0.0, 1.0) as f64;
+        let execution = inputs.execution_success.clamp(0.0, 1.0) as f64;
 
         w1 * relevance
             + w2 * resonance
@@ -422,15 +445,15 @@ impl CognitiveMorphogenesisEngine {
             // Execution — alapértelmezett sikeres
             let exec = 1.0f32;
 
-            let g = self.gradient.compute(
-                lexical,
-                res_strength,
-                evi_conf_u8,
-                hebb_energy,
-                pred_hr,
-                emo_valence,
-                exec,
-            );
+            let g = self.gradient.compute(GradientInputs {
+                lexical_score: lexical,
+                resonance_strength: res_strength,
+                evidence_confidence: evi_conf_u8,
+                hebbian_energy: hebb_energy,
+                prediction_hit_rate: pred_hr,
+                emotional_valence: emo_valence,
+                execution_success: exec,
+            });
             gradient_sum += g;
             gradient_count += 1;
 

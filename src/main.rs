@@ -4052,7 +4052,9 @@ async fn async_main() {
                     println!("  Components:         {}", entry.component_scores);
                 }
                 MorphogenesisAction::TestPhases => {
-                    use microscope_memory::cognitive_morphogenesis::{CognitiveGradient, Phase};
+                    use microscope_memory::cognitive_morphogenesis::{
+                        CognitiveGradient, GradientInputs, Phase,
+                    };
 
                     println!("{}", "PHASE TRANSITION TEST".cyan().bold());
                     println!();
@@ -4061,7 +4063,11 @@ async fn async_main() {
                     let gas_gradient = CognitiveGradient {
                         weights: (0.0, 0.0, 0.0, 0.05, 0.05, 0.0, 0.0),
                     };
-                    let gas_val = gas_gradient.compute(0.0, 0.0, 0, 0.1, 0.1, 0.0, 0.0);
+                    let gas_val = gas_gradient.compute(GradientInputs {
+                        hebbian_energy: 0.1,
+                        prediction_hit_rate: 0.1,
+                        ..Default::default()
+                    });
                     let gas_phase = Phase::from_gradient(gas_val);
                     println!("  GAS test:    gradient={:.3} phase={} (weights: rel=0.0 res=0.0 evi=0.0 heb=0.05 pred=0.05 emo=0.0 exec=0.0)", gas_val, gas_phase);
 
@@ -4069,7 +4075,15 @@ async fn async_main() {
                     let liquid_gradient = CognitiveGradient {
                         weights: (0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5),
                     };
-                    let liquid_val = liquid_gradient.compute(0.5, 0.3, 50, 0.5, 0.5, 0.0, 0.5);
+                    let liquid_val = liquid_gradient.compute(GradientInputs {
+                        lexical_score: 0.5,
+                        resonance_strength: 0.3,
+                        evidence_confidence: 50,
+                        hebbian_energy: 0.5,
+                        prediction_hit_rate: 0.5,
+                        execution_success: 0.5,
+                        ..Default::default()
+                    });
                     let liquid_phase = Phase::from_gradient(liquid_val);
                     println!(
                         "  LIQUID test: gradient={:.3} phase={} (weights: all=0.5, scores: mid)",
@@ -4080,7 +4094,7 @@ async fn async_main() {
                     let solid_gradient = CognitiveGradient {
                         weights: (1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0),
                     };
-                    let solid_val = solid_gradient.compute(1.0, 1.0, 100, 1.0, 1.0, 1.0, 1.0);
+                    let solid_val = solid_gradient.compute(GradientInputs::saturated());
                     let solid_phase = Phase::from_gradient(solid_val);
                     println!(
                         "  SOLID test:  gradient={:.3} phase={} (weights: all=1.0, scores: high)",
@@ -4202,7 +4216,8 @@ async fn async_main() {
                 }
                 MorphogenesisAction::Adversarial => {
                     use microscope_memory::cognitive_morphogenesis::{
-                        graph_entropy, CognitiveGradient, CognitiveMorphogenesisEngine, Phase,
+                        graph_entropy, CognitiveGradient, CognitiveMorphogenesisEngine,
+                        GradientInputs, Phase,
                     };
 
                     use microscope_memory::hebbian::HebbianState;
@@ -4283,9 +4298,12 @@ async fn async_main() {
                     println!("  [4] Gradiens komponensek normalizálása [0,1]");
                     let grad = CognitiveGradient::default();
                     // Max értékekkel
-                    let max_g = grad.compute(1.0, 1.0, 100, 1.0, 1.0, 1.0, 1.0);
+                    let max_g = grad.compute(GradientInputs::saturated());
                     // Min értékekkel
-                    let min_g = grad.compute(0.0, 0.0, 0, 0.0, 0.0, -1.0, 0.0);
+                    let min_g = grad.compute(GradientInputs {
+                        emotional_valence: -1.0,
+                        ..Default::default()
+                    });
                     // Minden komponens 0-1 tartományban kell legyen
                     let components_ok = max_g > 0.0 && min_g >= 0.0;
                     if components_ok {
@@ -4400,7 +4418,9 @@ async fn async_main() {
                 }
                 MorphogenesisAction::PresenceAbsenceTest => {
                     use microscope_memory::absentia::{compute_absence_shadow, AbsentiaState};
-                    use microscope_memory::cognitive_morphogenesis::{CognitiveGradient, Phase};
+                    use microscope_memory::cognitive_morphogenesis::{
+                        CognitiveGradient, GradientInputs, Phase,
+                    };
                     use microscope_memory::emotional_contagion::EmotionalContagionState;
                     use microscope_memory::epistemic::EvidenceLedger;
                     use microscope_memory::hebbian::HebbianState;
@@ -4478,7 +4498,12 @@ async fn async_main() {
                         compute_absence_shadow(&absentia, hx as f64, hy as f64, hz as f64, 0);
 
                     // Gradiens számolás A esetben
-                    let g_a = grad_a.compute(0.0, 0.0, 0, 1.0, 1.0, 0.0, 1.0);
+                    let g_a = grad_a.compute(GradientInputs {
+                        hebbian_energy: 1.0,
+                        prediction_hit_rate: 1.0,
+                        execution_success: 1.0,
+                        ..Default::default()
+                    });
                     let effective_a = g_a * (1.0 - shadow_a);
                     let phase_a = Phase::from_gradient(effective_a);
 
@@ -4547,7 +4572,13 @@ async fn async_main() {
 
                     let shadow_b =
                         compute_absence_shadow(&absentia, hx as f64, hy as f64, hz as f64, 50);
-                    let g_b = grad_a.compute(0.0, 0.0, 50, 1.0, 1.0, 0.0, 1.0); // evidence = 50
+                    let g_b = grad_a.compute(GradientInputs {
+                        evidence_confidence: 50,
+                        hebbian_energy: 1.0,
+                        prediction_hit_rate: 1.0,
+                        execution_success: 1.0,
+                        ..Default::default()
+                    });
                     let effective_b = g_b * (1.0 - shadow_b);
                     let phase_b = Phase::from_gradient(effective_b);
 
@@ -4638,7 +4669,7 @@ async fn async_main() {
                 }
                 MorphogenesisAction::DeepAdversarial => {
                     use microscope_memory::cognitive_morphogenesis::{
-                        CognitiveGradient, CognitiveMorphogenesisEngine, Phase,
+                        CognitiveGradient, CognitiveMorphogenesisEngine, GradientInputs, Phase,
                     };
                     use microscope_memory::epistemic::EvidenceLedger;
                     use microscope_memory::hebbian::HebbianState;
@@ -4843,7 +4874,7 @@ async fn async_main() {
                     {
                         let grad = CognitiveGradient::default();
                         // Globális fázis: SOLID
-                        let global_g = grad.compute(1.0, 1.0, 100, 1.0, 1.0, 1.0, 1.0);
+                        let global_g = grad.compute(GradientInputs::saturated());
                         let global_phase = Phase::from_gradient(global_g);
                         // Lokális node: alacsony energia
                         let local_energy = 0.05f32;
@@ -4873,7 +4904,7 @@ async fn async_main() {
                         // A teszt: minden komponens "helyesen" működik
                         // de az összhatás hamis biztonságérzetet ad
                         let grad = CognitiveGradient::default();
-                        let g = grad.compute(1.0, 1.0, 100, 1.0, 1.0, 1.0, 1.0);
+                        let g = grad.compute(GradientInputs::saturated());
                         let phase = Phase::from_gradient(g);
                         // Ha minden magas, a gradiens is magas → SOLID
                         // De ha a magas értékek hamisak (pl. régi adat), a SOLID fázis

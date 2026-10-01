@@ -29,9 +29,11 @@ public claim-verification corpus, so the number is one anybody can rerun and
 disagree with.
 
 **Setup.** All 5,183 abstracts stored, 286 test queries, `MICROSCOPE_NO_LEARN=1`,
-one clean run, `scifact_config.toml` with `max_depth = 3` so the embedded set is
-one vector per abstract — the same count FAISS embeds. Index: 5,183 blocks, 6,230
-embedded, 1,331 MB. 14 of the 300 queries are dropped because no unique
+one clean run, `scifact_config.toml` with `max_depth = 3`. The D3 level holds one
+block per abstract, 5,183 of them, which is the count FAISS embeds. The index as
+a whole is 5,633,165 blocks, because every depth level is materialised, and it
+carries 6,230 embedded vectors with a 1,319 MB footprint. 14 of the 300 queries
+are dropped because no unique
 3–12 word phrase could be found for them; a match token occurring in more than
 one document would credit a retrieval that found the wrong document.
 
@@ -354,7 +356,7 @@ commit messages in this repository state the opposite conclusion.
 
 | | truncated | split | **current** |
 |---|---|---|---|
-| blocks | 5,181 | 10,518 | **5,183** |
+| D3 blocks (one per abstract) | 5,181 | 10,518 | **5,183** |
 | R@1 | 51.0% | 41.6% | **53.1%** |
 | R@5 | 74.8% | 67.5% | **74.8%** |
 | R@10 | 80.4% | 76.2% | **81.8%** |
@@ -490,14 +492,17 @@ would be needed to state this precisely.
 |------|------|
 | 4D soft (all 28679 blocks) | 380 µs/query |
 
-## Comparison with lexical and vector baselines — partially measured, not yet a fair comparison
+## Comparison with lexical and vector baselines — quality measured, latency not like-for-like
 
 > **Warning: the numbers previously published in this section have been
 > removed.** They were produced with `embedding.provider = "mock"` and
 > `semantic_weight = 0.0` -- the shipped default, documented in
 > `config.example.toml` as disabling semantic ranking in `recall` -- and against
-> a 60-fact index (4,853 blocks) two orders of magnitude smaller than the real
-> 695,868-block corpus. Under those settings the system reduces to
+> a 60-fact index (4,853 blocks) two orders of magnitude smaller than the corpus
+> they were meant to describe. The 695,868-block figure quoted here previously
+> is a historical measurement, taken before the block limit was raised; the same
+> corpus rebuilt at 16 KiB blocks is 967,587 blocks, as recorded below. Under
+> those settings the system reduces to
 > nearest-neighbour over text hashes. Conclusions drawn from that configuration
 > describe the configuration, not the architecture, and have been withdrawn.
 
@@ -609,16 +614,21 @@ The harness is committed so a reader can run the comparison correctly:
 
 ```bash
 # required: a real embedding provider, and semantic_weight > 0
-python scripts/build_real_index.sh        # 695,868 blocks from layers/
-python scripts/compare_scale.py           # same corpus, same queries, recall@k
+
+# layers/ corpus, real embeddings
+bash scripts/build_real_index.sh          # builds the index from layers/ into real_output/
 bash scripts/eval_real.sh                 # asserts provider/model/weight/depth
+
+# SciFact, the public corpus compared at the top of this file
+python scripts/build_scifact_index.py     # 5,183 abstracts into scifact_output/
+python scripts/compare_baselines.py       # vs FAISS and FTS5, latency + recall@k
 ```
 
 `scripts/eval_real.sh` now parses the config it generates and aborts unless
 `provider`, `model`, `semantic_weight` and `max_depth` are the expected values,
 because a malformed TOML makes the binary fall back to built-in defaults
-silently, and it no longer rewrites the embedding depth. `compare_scale.py`
-reports p50/p95/p99 together with hit@k. A valid comparison additionally
+silently, and it no longer rewrites the embedding depth. `compare_baselines.py`
+reports p50/p95/p99 together with recall@k. A valid comparison additionally
 requires the same corpus and the same searchable vector set on both sides, with
 end-to-end time and query-only time reported separately.
 
@@ -629,8 +639,11 @@ measured on a vectorless index. It now asserts `embeddings.bin` exists after
 the build, re-checks the index after measuring, and fails if a sanity recall
 returns nothing.
 
-Until such a run exists, no claim is made about relative retrieval quality or
-speed against any other system.
+That run now exists: the SciFact comparison at the top of this file is the
+quality measurement, on a public corpus with the same documents and the same
+queries on both sides. It does not make the latency column a speed comparison --
+FAISS searches precomputed query vectors while Microscope embeds the query on
+every call -- so no claim is made here about relative speed.
 
 
 
@@ -651,7 +664,7 @@ speed against any other system.
 
 ## Tests
 
-- **Library tests:** 413 passed, 0 failed (`cargo test --lib`, 2026-09-27)
+- **Library tests:** 443 passed, 0 failed, 1 ignored (`cargo test --lib`, 2026-10-01)
 - **Hook tests:** 16 (`cargo test -p microscope-hooks`)
 - **Build:** release mode, LTO thin, panic=abort
 

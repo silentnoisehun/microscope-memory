@@ -6,32 +6,39 @@ easy. This stores all 5,183 abstracts, so the gold documents are a small
 minority of what the ranking has to survive -- which is the point of running a
 public corpus at all.
 
-`max_depth` is set to 3, so the embedded set is the documents themselves (one
-vector per abstract) rather than every sentence inside them. That is what makes
-the comparison to FAISS fair: FAISS embeds 5,183 documents, and so does this.
-Embedding every D4 sentence would be ~60,000 vectors and a different system,
-not a faster one.
+`max_depth` is set to 3, so the embedded set is the corpus down to the documents
+themselves rather than every sentence inside them. Embedding every D4 sentence
+would be ~60,000 vectors and a different system, not a faster one.
 
-Two storage limits shape the index, and neither is a SciFact property -- both
-are the layer format's, and both are worth stating before quoting R@k:
+That fixes the vector count at 6,230: the 1,047 blocks at D0-D2 (1 + 9 + 1,037)
+plus the 5,183 abstracts at D3. FAISS is given those same 5,183 abstracts, so
+the document vectors are like for like; the extra 1,047 are the summaries above
+them, which can only help Microscope, and that is worth stating before a table
+that Microscope wins.
 
-  * BLOCK_DATA_SIZE is 1024 bytes, and the layer reader truncates any entry
-    longer than that. 4,300 of the 5,183 abstracts are over the limit, so most
-    of the corpus is stored cut. The title survives -- it is at the front --
-    which is why the evaluation tokens still resolve, but a query whose gold
-    passage sits past byte 1024 is answering against an incomplete document.
-    (An earlier revision of this note also blamed the truncation for a
-    divergence between stored vectors and reference MiniLM encodings on long
-    blocks. That was an artefact of the measuring script, not a defect:
-    `scripts/verify_stored_embeddings.py` scores all 13,640 embedded blocks of
-    the evaluation index at cosine 1.0000 once the reference is built by hand
-    instead of via `SentenceTransformer.encode`.)
-  * The reader packs consecutive short lines into one block, so 2 pairs of
-    short abstracts share a block. 5,183 source lines become 5,181 blocks.
+Two storage limits shaped the index in earlier revisions. Both have since been
+removed, and the numbers they distorted are recorded here because they are the
+ones the R@k figures describe:
 
-Neither affects the 286 evaluation tokens (verified: every one of them is
-present in the stored blocks), but both mean the numbers describe a truncated
-corpus, and that has to be said alongside them.
+  * Each layer line is one entry, and an entry longer than BLOCK_DATA_SIZE is
+    split on sentence boundaries rather than truncated, so no bytes are lost.
+    BLOCK_DATA_SIZE is now 16 KiB. At the old 1,024-byte limit the reader cut
+    4,300 of the 5,183 abstracts, and the clipped tail was neither retrievable,
+    nor embedded, nor present in the text the evaluation scores.
+  * Consecutive abstracts are never merged into a shared block. Earlier
+    revisions packed short lines together; at 16 KiB that turned these same
+    5,183 abstracts into 504 blocks of roughly ten documents each, which would
+    have measured retrieval over merged documents.
+
+The index therefore stores the corpus whole, and the D3 level holds exactly one
+block per abstract: 5,183 abstracts in 5,183 D3 blocks. The index as a whole is
+larger -- 5,633,165 blocks, because every depth level is materialised -- and it
+carries 6,230 embedded vectors. Every one of the 286 evaluation tokens is
+present in the stored blocks. The earlier divergence between stored vectors and
+reference MiniLM encodings on long blocks was an artefact of the measuring
+script, not a defect: `scripts/verify_stored_embeddings.py` scores all 13,640
+embedded blocks of the evaluation index at cosine 1.0000 once the reference is
+built by hand instead of via `SentenceTransformer.encode`.
 
 Usage:  python scripts/build_scifact_index.py [--force] [--limit N]
 """

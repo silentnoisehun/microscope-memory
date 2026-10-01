@@ -12,6 +12,33 @@ document that asserts it.
 Scope of the checking: commit `fd345d5` onward, on Windows, Rust 1.98.1, release
 profile. The Linux and wasm32 builds were not exercised by hand; CI covers Linux.
 
+## Read this first: the REST bridge cannot be started
+
+`bridge::run` in src/bridge.rs has **no call site anywhere in src/**. Nothing in
+the 118 CLI commands starts it, and the command documented at
+docs/ARCHITECTURE.md:617 to start it does not exist:
+
+```
+> microscope-mem bridge --port 6060
+error: unrecognized subcommand 'bridge'
+```
+
+The MCP layer is wired in at main.rs:1804,2356,2360 and the mermaid layer at
+main.rs:3256. The bridge is the one layer in this project with no entry point, so
+**openapi.json describes a service no shipped binary serves.**
+
+This is the one finding here that changes how the rest of the file should be
+read, and the external audit did not name it. It also bounds what the audit's
+item 13 could achieve: tests/rest_contract.rs compares the spec against the
+source, which is why it passed while the server it describes was unreachable --
+and why the auth, CORS and status-code behaviour the audit asked for is still
+missing. Behavioural testing needs a running listener.
+
+Wiring it up is a small change -- a `Cmd::Bridge { port }` arm in main.rs calling
+`bridge::run`, alongside the `Cmd::Serve` that already starts the viewer. It is
+not in the tree because it is a feature rather than a fix, and it would open a
+network listener that is currently closed, so it waits for a decision.
+
 ## Architecture
 
 | Claim | Source | Status |

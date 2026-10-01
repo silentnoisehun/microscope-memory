@@ -1,4 +1,4 @@
-//! MicroscopeReader Ă˘Â€Â” high-performance memory-mapped reader for the binary index.
+//! MicroscopeReader — high-performance memory-mapped reader for the binary index.
 
 use colored::Colorize;
 use rayon::prelude::*;
@@ -63,7 +63,7 @@ fn l2_dist_sq_simd(h: &BlockHeader, x: f32, y: f32, z: f32, qz: f32, zw: f32) ->
     }
 }
 
-/// Backing store for block data Ă˘Â€Â” either memory-mapped or decompressed in-memory.
+/// Backing store for block data — either memory-mapped or decompressed in-memory.
 pub enum DataStore {
     /// Normal mmap path (uncompressed data.bin)
     Mmap(memmap2::Mmap),
@@ -105,7 +105,7 @@ impl MicroscopeReader {
         let dat_path = output_dir.join("data.bin");
 
         let meta = fs::read(&meta_path)
-            .map_err(|e| format!("open meta.bin Ă˘Â€Â” run 'build' first: {}", e))?;
+            .map_err(|e| format!("open meta.bin — run 'build' first: {}", e))?;
         if meta.len() < 12 {
             return Err("meta.bin too small".to_string());
         }
@@ -644,7 +644,7 @@ impl MicroscopeReader {
     }
 }
 
-// Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€ APPEND LOG Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€
+// ─── APPEND LOG ──────────────────────────────────────
 
 #[inline(always)]
 fn entry_visible(entry: &AppendEntry, active: ProjectId, include_global: bool) -> bool {
@@ -1034,7 +1034,7 @@ pub fn print_append_result(appended: &[AppendEntry], idx: usize, dist: f32) {
     }
 }
 
-// Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€ RADIAL SEARCH TYPES Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€
+// ─── RADIAL SEARCH TYPES ─────────────────────────────
 
 /// A single result from radial search.
 #[derive(Debug, Clone)]
@@ -1648,7 +1648,7 @@ fn store_memory_with_status_inner(
         eprintln!("  {} persist to layer file: {}", "WARN".yellow(), e);
     }
 
-    // Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€ Timeline log (always) Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€
+    // ─── Timeline log (always) ────────────────────────────
     let output_dir = Path::new(&config.paths.output_dir);
     let timeline_status = match status.unwrap_or("normal") {
         "open" => crate::timeline::STATUS_OPEN,
@@ -1668,7 +1668,7 @@ fn store_memory_with_status_inner(
         eprintln!("  {} append timeline: {}", "WARN".yellow(), e);
     }
 
-    // Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€ Open loops (only when status=open) Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€Ă˘Â”Â€
+    // ─── Open loops (only when status=open) ────────────────
     if status == Some("open") {
         match crate::open_loops::append_open(output_dir, text, importance) {
             Ok(loop_id) => {
@@ -1680,7 +1680,7 @@ fn store_memory_with_status_inner(
         }
     }
 
-    // â”€â”€â”€ Emotion log (when provided) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── Emotion log (when provided) ─────────────────────────
     // Previously the emotion vector was accepted but never written anywhere,
     // silently dropping all 21D emotion data. Now we persist it to emotion_log.bin
     // (rebuilt into emotions.bin during `build_emotions_from_log`).
@@ -1730,7 +1730,7 @@ fn store_memory_with_status_inner(
     Ok(())
 }
 
-// Â¦Â¦Â¦ Emotion constants Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦Â¦
+// ¦¦¦ Emotion constants ¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦
 pub const EMOTION_VECTOR_SIZE: usize = 21;
 
 /// Emotion dimension labels for the 21D emotion vector.

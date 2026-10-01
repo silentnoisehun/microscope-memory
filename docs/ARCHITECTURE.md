@@ -605,7 +605,6 @@ microscope-mem morph --daemon --interval 5 --threshold 0.5
 │  POST /v1/mobile/chat      User-scoped mobile chat              │
 │                                                                   │
 │  Port:  6060 (bridge)  ·  8080 (PWA chat)                       │
-│  Note:   the 6060 bridge has no CLI entry point -- see CLAIMS.md   │
 │  Transport: JSON-RPC 2.0 stdio / HTTP                           │
 │                                                                   │
 └─────────────────────────────────────────────────────────────────┘

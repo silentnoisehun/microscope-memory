@@ -1811,6 +1811,15 @@ async fn async_main() {
         Cmd::Serve { port } => {
             serve_viewer(port);
         }
+        // The REST API had no entry point from a962ad1 onward, which left
+        // openapi.json describing a service no binary served. The
+        // implementation in bridge.rs was never removed, only this arm.
+        Cmd::Bridge { host, port } => {
+            if let Err(e) = microscope_memory::bridge::run(config, host, port).await {
+                eprintln!("  {} Bridge error: {}", "ERROR:".red(), e);
+                std::process::exit(1);
+            }
+        }
         Cmd::Token { user_id } => {
             match microscope_memory::bridge::user_token(
                 config.server.api_key.as_deref().unwrap_or(""),

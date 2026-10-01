@@ -300,6 +300,14 @@ pub enum Cmd {
         #[arg(short, long, default_value = "8080")]
         port: u16,
     },
+    /// Start the REST Bridge API (OpenAPI spec at /openapi.json)
+    Bridge {
+        /// Interface to bind. A non-loopback host requires [server] api_key.
+        #[arg(long, default_value = "127.0.0.1")]
+        host: String,
+        #[arg(short, long, default_value = "6060")]
+        port: u16,
+    },
     /// Start the MCP (Model Context Protocol) server for Claude Desktop integration
     Mcp,
     /// Print drop-in MCP server config + auto-context wrapper instructions

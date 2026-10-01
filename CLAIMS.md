@@ -12,32 +12,65 @@ document that asserts it.
 Scope of the checking: commit `fd345d5` onward, on Windows, Rust 1.98.1, release
 profile. The Linux and wasm32 builds were not exercised by hand; CI covers Linux.
 
-## Read this first: the REST bridge cannot be started
+## The REST bridge had no entry point, and 31 other commands are still gone
 
-`bridge::run` in src/bridge.rs has **no call site anywhere in src/**. Nothing in
-the 118 CLI commands starts it, and the command documented at
-docs/ARCHITECTURE.md:617 to start it does not exist:
+Found on 2026-10-01, while chasing the auth and CORS behaviour the audit's
+item 13 asks for. Both halves of this were absent from the audit.
+
+`bridge::run` in src/bridge.rs had **no call site anywhere in src/**. None of the
+118 CLI commands started it, and the command documented at
+docs/ARCHITECTURE.md:617 to start it did not exist:
 
 ```
 > microscope-mem bridge --port 6060
 error: unrecognized subcommand 'bridge'
 ```
 
-The MCP layer is wired in at main.rs:1804,2356,2360 and the mermaid layer at
-main.rs:3256. The bridge is the one layer in this project with no entry point, so
-**openapi.json describes a service no shipped binary serves.**
+openapi.json therefore described a service no shipped binary served. The
+existing REST contract test could not catch this: it compares the spec against
+the route list in the source, so it confirms the document matches the code while
+saying nothing about whether the code is reachable. That is a class of test
+worth naming -- a contract test between a document and an unreachable
+implementation passes forever.
 
-This is the one finding here that changes how the rest of the file should be
-read, and the external audit did not name it. It also bounds what the audit's
-item 13 could achieve: tests/rest_contract.rs compares the spec against the
-source, which is why it passed while the server it describes was unreachable --
-and why the auth, CORS and status-code behaviour the audit asked for is still
-missing. Behavioural testing needs a running listener.
+**The cause was not an oversight.** `a962ad1`, titled "fix: resolve 33 build
+errors", removed 32 command variants from src/cli.rs and left this comment at
+main.rs:
 
-Wiring it up is a small change -- a `Cmd::Bridge { port }` arm in main.rs calling
-`bridge::run`, alongside the `Cmd::Serve` that already starts the viewer. It is
-not in the tree because it is a feature rather than a fix, and it would open a
-network listener that is currently closed, so it waits for a decision.
+```rust
+// Cmd::Bridge removed — replaced by napi-rs native addon
+// See native/src/lib.rs for the #[napi] equivalent
+```
+
+That replacement was never built. `native/` contains only the auto-generated
+`index.js` loader and `index.d.ts`; there is no `native/src/lib.rs`, no `.node`
+binary, and no `napi` entry in Cargo.toml or Cargo.lock. The comment points at a
+file that does not exist, and the shim that was committed would throw on
+`require()`.
+
+**`Cmd::Bridge` is restored**, because the implementation in bridge.rs was never
+removed -- that commit changed it by 11 lines. `microscope-mem bridge
+[--host] [--port]` now starts it, defaulting to loopback, and the guard in
+`bridge.rs:run` that refuses a non-loopback bind without an api_key now has
+something to guard. `tests/rest_behaviour.rs` starts the real binary and covers
+the spec endpoint, the /v1 routes, 400/404/405, the CORS default, and that guard.
+
+**The other 31 commands are not restored.** Their bodies went with the CLI arm
+and reimplementing consolidation, salience decay and the rest would mean
+inventing semantics. Six of them are still documented as runnable:
+
+| Command | Claimed in |
+|---|---|
+| `morph` | docs/ARCHITECTURE.md (6 mentions) |
+| `meta`, `impulse`, `sandbox` | docs/cognitive_enhancement.md |
+| `code` | docs/COGNITIVE_ENHANCEMENTS.md |
+| `bridge` | docs/ARCHITECTURE.md -- now true again |
+
+Also found while writing the routing test: `/v1/status` answers **500** when the
+configured data directory does not exist, so the first request against a fresh
+clone that has not been built yet is a server error rather than "no data yet".
+Pinned by `status_on_uninitialised_store_is_500`; whether to change it is a
+product decision.
 
 ## Architecture
 

@@ -148,6 +148,29 @@ impl MicroscopeReader {
         let headers =
             unsafe { memmap2::Mmap::map(&hdr_file).map_err(|e| format!("mmap headers: {}", e))? };
 
+        // meta.bin states how many headers there should be; the mapping is how
+        // many there actually are. Nothing else connects the two, and the
+        // precondition on `header_unchecked` is only checked against the claimed
+        // count, so a header file truncated after the build would be read past
+        // the end of the mapping. Refuse here, where the error can name the
+        // cause, rather than there, where it is undefined behaviour.
+        let needed = block_count.checked_mul(header_stride).ok_or_else(|| {
+            format!(
+                "meta.bin claims {} blocks, which overflows the {} byte header",
+                block_count, header_stride
+            )
+        })?;
+        if headers.len() < needed {
+            return Err(format!(
+                "microscope.bin is {} bytes but meta.bin claims {} blocks of {} \
+                 bytes each, which needs {}",
+                headers.len(),
+                block_count,
+                header_stride,
+                needed
+            ));
+        }
+
         // Red Audit: Stability check for headers mmap
         #[cfg(windows)]
         if let Err(e) = Self::verify_mmap_protection(headers.as_ptr(), headers.len()) {

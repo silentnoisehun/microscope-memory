@@ -138,3 +138,4 @@ eval_tmp/
 eval_config.toml
 perf_corpus/
 cmsg.txt
+cm*.txt

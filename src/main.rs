@@ -1061,6 +1061,19 @@ fn recall(config: &Config, query: &str, k: usize) {
             let mut nm =
                 microscope_memory::narrative_memory::NarrativeMemory::load_or_init(output_dir);
             trace_phase("  learn: narrative memory load", t_nm.elapsed().as_secs_f64() * 1000.0);
+            trace_note(
+                "narrative memory resyncs",
+                format!(
+                    "{} total, {} in last load (file {} bytes)",
+                    microscope_memory::narrative_memory::RESYNC_STEPS
+                        .load(std::sync::atomic::Ordering::Relaxed),
+                    microscope_memory::narrative_memory::LAST_RESCANS
+                        .load(std::sync::atomic::Ordering::Relaxed),
+                    std::fs::metadata(output_dir.join("narrative_memory.bin"))
+                        .map(|m| m.len())
+                        .unwrap_or(0),
+                ),
+            );
             let t_be = Instant::now();
             if let Some(ep) = nm.build_episode(config, &reader, output_dir, query, &all_results) {
                 if nm.episodes.len() <= 3 || nm.episodes.len().is_multiple_of(5) {

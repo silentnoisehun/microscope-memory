@@ -114,13 +114,28 @@ pub struct NarrativeMemory {
     pub next_id: u32,
 }
 
+/// Byte-at-a-time resynchronisation steps taken by `NarrativeMemory::load_or_init`
+/// across the process, and the count from the most recent load that took any.
+///
+/// Exposed because the cost is otherwise invisible: reading
+/// `narrative_memory.bin` is 0.22 ms, and a layout disagreement between
+/// `NarrativeEpisode::to_bytes` and `from_bytes` turns the load into a scan
+/// over the whole file, a byte at a time. A count in the low hundreds means
+/// the two layouts agree and the cost really is the read; a count near the
+/// file size means they do not, and the parser walks the file every recall.
+pub static RESYNC_STEPS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+/// Byte-at-a-time steps in the last load that took any. Zero means that load
+/// parsed cleanly; it does not mean the counter was never armed.
+pub static LAST_RESCANS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
 impl NarrativeMemory {
-    pub fn load_or_init(output_dir: &Path) -> Self {
+pub fn load_or_init(output_dir: &Path) -> Self {
         let path = output_dir.join("narrative_memory.bin");
         let mut episodes = Vec::new();
         let mut next_id = 1u32;
         if let Ok(data) = fs::read(&path) {
             let mut pos = 0;
+            let mut rescans = 0u64;
             while pos + 120 <= data.len() {
                 if let Some(ep) = NarrativeEpisode::from_bytes(&data[pos..]) {
                     let size = 4
@@ -139,8 +154,19 @@ impl NarrativeMemory {
                     }
                     episodes.push(ep);
                 } else {
+                    // One byte at a time, re-parsing a whole episode each time.
+                    // On a file whose reader and writer layouts disagree this is
+                    // a linear scan over the entire file on every recall. It is
+                    // counted because the cost is invisible otherwise: the file
+                    // read itself is 0.22 ms and this can be an order of
+                    // magnitude more.
+                    RESYNC_STEPS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                    rescans += 1;
                     pos += 1;
                 }
+            }
+            if rescans > 0 {
+                LAST_RESCANS.store(rescans, std::sync::atomic::Ordering::Relaxed);
             }
         }
         Self { episodes, next_id }

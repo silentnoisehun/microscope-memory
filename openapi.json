@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Microscope Memory — Spine Bridge API",
-    "description": "AI-native cognitive memory interface for ChatGPT, Claude, and other LLMs.\n\nMicroscope Memory is a **sub-microsecond**, zoom-based hierarchical memory engine.\nThis API lets AI models **store** and **recall** memories using natural language.\n\n## How it works\n- Memories are stored in a 3D coordinate space using semantic hashing\n- Recall uses SIMD-accelerated radial search at the correct depth layer\n- Layers: identity, long_term, short_term, associative, emotional, relational,\n  reflections, crypto_chain, echo_cache, rust_state\n\n## Usage tips\n- Use `recall` before answering to check if relevant context exists\n- Use `remember` to commit important facts for future sessions\n- Set `layer` to `associative` for links between concepts\n- Set `layer` to `emotional` for emotional context\n- Higher `importance` (1–10) = prioritized in future recall\n\n## Namespacing\nMost endpoints accept optional `user_id`, `memory_backend` (local|cloud), and\n`memory_scope` (personal|shared|both) parameters for multi-user isolation.\n",
+    "description": "AI-native cognitive memory interface for ChatGPT, Claude, and other LLMs.\n\nMicroscope Memory is a **sub-microsecond**, zoom-based hierarchical memory engine.\nThis API lets AI models **store** and **recall** memories using natural language.\n\n## How it works\n- Memories are stored in a 3D coordinate space using semantic hashing\n- Recall uses SIMD-accelerated radial search at the correct depth layer\n- Layers: identity, long_term, short_term, associative, emotional, relational,\n  reflections, crypto_chain, echo_cache, rust_state\n\n## Usage tips\n- Use `recall` before answering to check if relevant context exists\n- Use `remember` to commit important facts for future sessions\n- Set `layer` to `associative` for links between concepts\n- Set `layer` to `emotional` for emotional context\n- Higher `importance` (1–10) = prioritized in future recall\n\n## Namespacing\nMost endpoints accept optional `user_id`, `memory_backend` (local|cloud), and\n`memory_scope` (personal|shared|both) parameters for multi-user isolation.\n\nPath prefix: every endpoint is served under /v1. The bridge also mounts eleven of these at the root as unversioned aliases kept for backward compatibility; they are not listed here and may be removed.",
     "version": "0.8.0",
     "contact": {
       "name": "Microscope Memory",
@@ -24,7 +24,7 @@
     }
   ],
   "paths": {
-    "/status": {
+    "/v1/status": {
       "get": {
         "operationId": "getMemoryStatus",
         "summary": "Get memory engine status",
@@ -46,7 +46,7 @@
         }
       }
     },
-    "/session": {
+    "/v1/session": {
       "get": {
         "operationId": "getSession",
         "summary": "Resolve namespace paths for a user/backend/scope combination",
@@ -78,7 +78,7 @@
         }
       }
     },
-    "/recall": {
+    "/v1/recall": {
       "get": {
         "operationId": "recallMemory",
         "summary": "Recall relevant memories by natural language query",
@@ -140,7 +140,7 @@
         }
       }
     },
-    "/remember": {
+    "/v1/remember": {
       "post": {
         "operationId": "rememberMemory",
         "summary": "Store a new memory",
@@ -175,7 +175,7 @@
         }
       }
     },
-    "/find": {
+    "/v1/find": {
       "get": {
         "operationId": "findMemory",
         "summary": "Find memories by text substring / keyword",
@@ -227,7 +227,7 @@
         }
       }
     },
-    "/look": {
+    "/v1/look": {
       "get": {
         "operationId": "lookMemory",
         "summary": "Look at a specific 3D coordinate in memory space",
@@ -306,7 +306,7 @@
         }
       }
     },
-    "/mql": {
+    "/v1/mql": {
       "get": {
         "operationId": "mqlQuery",
         "summary": "Query memory using MQL (Microscope Query Language)",
@@ -346,7 +346,7 @@
         }
       }
     },
-    "/build": {
+    "/v1/build": {
       "post": {
         "operationId": "buildIndex",
         "summary": "Rebuild the memory index from the append log",
@@ -400,7 +400,7 @@
         }
       }
     },
-    "/session_log": {
+    "/v1/session_log": {
       "get": {
         "operationId": "getSessionLog",
         "summary": "Get recent session layer entries",
@@ -438,7 +438,7 @@
         }
       }
     },
-    "/consolidate": {
+    "/v1/consolidate": {
       "post": {
         "operationId": "consolidateSessions",
         "summary": "Consolidate session entries into long-term memory",
@@ -473,7 +473,7 @@
         }
       }
     },
-    "/dream": {
+    "/v1/dream": {
       "post": {
         "operationId": "dreamConsolidation",
         "summary": "Run a dream consolidation cycle",
@@ -495,7 +495,7 @@
         }
       }
     },
-    "/mobile/recall": {
+    "/v1/mobile/recall": {
       "post": {
         "operationId": "mobileRecall",
         "summary": "Recall memories (mobile POST variant)",
@@ -546,7 +546,7 @@
         }
       }
     },
-    "/mobile/remember": {
+    "/v1/mobile/remember": {
       "post": {
         "operationId": "mobileRemember",
         "summary": "Store a memory (mobile variant, user-scoped)",
@@ -609,7 +609,7 @@
         }
       }
     },
-    "/mobile/chat": {
+    "/v1/mobile/chat": {
       "post": {
         "operationId": "mobileChat",
         "summary": "Provider-agnostic chat with automatic memory recall + store",
@@ -649,6 +649,43 @@
             }
           },
           "500": {
+            "$ref": "#/components/responses/EngineError"
+          }
+        }
+      }
+    },
+    "/v1/project/switch": {
+      "post": {
+        "operationId": "switchProject",
+        "summary": "Switch the active project",
+        "description": "Sets the project that subsequent unscoped requests resolve against. Recorded in the audit trail.",
+        "responses": {
+          "200": {
+            "description": "Active project changed"
+          },
+          "400": {
+            "$ref": "#/components/responses/EngineError"
+          }
+        }
+      }
+    },
+    "/v1/project/recall": {
+      "post": {
+        "operationId": "projectRecall",
+        "summary": "Recall within an explicit project",
+        "description": "Recall that names its project in the body rather than relying on the active one.",
+        "responses": {
+          "200": {
+            "description": "Matching memories",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecallResponse"
+                }
+              }
+            }
+          },
+          "400": {
             "$ref": "#/components/responses/EngineError"
           }
         }

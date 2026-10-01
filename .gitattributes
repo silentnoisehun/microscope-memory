@@ -13,6 +13,10 @@
 # hit exactly this.
 *.sh text eol=lf
 *.bash text eol=lf
+# The pre-commit hook has no extension, so the two rules above do not reach it,
+# and core.autocrlf would otherwise hand a fresh Windows clone a CRLF hook --
+# the same "fi\r" syntax error, one directory over.
+scripts/hooks/pre-commit text eol=lf
 *.yml text eol=lf
 *.yaml text eol=lf
 *.ts text eol=lf

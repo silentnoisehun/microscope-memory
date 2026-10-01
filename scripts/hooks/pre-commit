@@ -1,0 +1,30 @@
+#!/bin/sh
+# Refuse a commit that carries single-byte-codepage mojibake.
+#
+# The rule itself is versioned in scripts/check_mojibake.py, so CI can run the
+# same check and this hook is only the local trigger for it.
+#
+# To bypass once, on purpose:  git commit --no-verify
+
+ROOT=$(git rev-parse --show-toplevel)
+SCRIPT="$ROOT/scripts/check_mojibake.py"
+
+if [ ! -f "$SCRIPT" ]; then
+    echo "pre-commit: $SCRIPT not found; skipping the mojibake check." >&2
+    exit 0
+fi
+
+PY=""
+for candidate in python python3 py; do
+    if command -v "$candidate" >/dev/null 2>&1; then
+        PY="$candidate"
+        break
+    fi
+done
+
+if [ -z "$PY" ]; then
+    echo "pre-commit: no python on PATH; skipping the mojibake check." >&2
+    exit 0
+fi
+
+exec "$PY" "$SCRIPT" --staged

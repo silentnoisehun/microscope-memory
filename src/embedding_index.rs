@@ -682,7 +682,9 @@ mod tests {
         );
         // Mojibake: long enough to clear the floor, every character in the band.
         assert_eq!(
-            quality_gate("đź§đź§đź§đź§đź§đź§đź§đź§", 24),
+                        // mojibake-ok: deliberate fixture, this is the input the
+            // gate is required to reject.
+quality_gate("đź§đź§đź§đź§đź§đź§đź§đź§", 24),
             EmbedVerdict::Mojibake
         );
         // The floor is a parameter, not a constant baked into the rule.

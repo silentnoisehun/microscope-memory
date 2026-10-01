@@ -118,6 +118,10 @@ fn verify_user_token(master: &str, token: &str) -> Option<String> {
 /// Without a configured key the bridge runs open (single-user localhost
 /// default); `run()` refuses to start on a non-loopback host without a key,
 /// so the open mode can never be accidentally exposed.
+// axum middleware must be able to return a Response from the Err arm -- that is
+// the shape `from_fn` expects, and it is how a middleware short-circuits before
+// calling `next`. Boxing it would break the trait, so the lint does not apply.
+#[allow(clippy::result_large_err)]
 async fn api_key_auth(
     State(state): State<Arc<AppState>>,
     mut req: axum::extract::Request,

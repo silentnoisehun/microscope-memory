@@ -44,8 +44,11 @@ pub struct EmbeddingIndex {
 /// regenerated whenever the corpus is rebuilt, and a cache that outlived one
 /// would search vectors that no longer exist. Rebuilds write to a temp file and
 /// rename, so a changed index always changes the length, the mtime, or both.
-static EMBED_INDEX_CACHE: Mutex<Option<(PathBuf, u64, Option<SystemTime>, Arc<EmbeddingIndex>)>> =
-    Mutex::new(None);
+/// What the cache keys on and hands back: the path it was opened for, the
+/// length and mtime that say whether it is still current, and the open index.
+type CachedEmbeddingIndex = (PathBuf, u64, Option<SystemTime>, Arc<EmbeddingIndex>);
+
+static EMBED_INDEX_CACHE: Mutex<Option<CachedEmbeddingIndex>> = Mutex::new(None);
 
 /// [`EmbeddingIndex::open`] through the process-wide cache.
 ///
@@ -139,7 +142,7 @@ impl EmbeddingIndex {
     /// Search for top-k most similar blocks to query embedding.
     /// Returns Vec<(similarity, block_index)> sorted descending.
     pub fn search(&self, query_emb: &[f32], k: usize) -> Vec<(f32, usize)> {
-        search_with_floor(query_emb, k, self.dim, &self.data, HEADER_SIZE, self.embedded_count, &self.block_ids())
+        search_with_floor(query_emb, k, self.dim, &self.data, HEADER_SIZE, self.embedded_count, self.block_ids())
     }
 
     /// Every stored block id, in ascending order.
@@ -369,8 +372,11 @@ impl AppendEmbeddings {
 /// The path is part of the key, not just the length and mtime: two sidecars in
 /// different output directories can be the same length and the same age, and
 /// keying without it would hand one index's vectors to the other.
-static APPEND_CACHE: Mutex<Option<(PathBuf, u64, Option<SystemTime>, usize, Arc<AppendEmbeddings>)>> =
-    Mutex::new(None);
+/// As above; the usize is the vector width the sidecar was opened at, which
+/// has to match the query or the search is comparing different dimensions.
+type CachedAppendIndex = (PathBuf, u64, Option<SystemTime>, usize, Arc<AppendEmbeddings>);
+
+static APPEND_CACHE: Mutex<Option<CachedAppendIndex>> = Mutex::new(None);
 
 /// [`AppendEmbeddings::open`] through the process-wide cache.
 ///

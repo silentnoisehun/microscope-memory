@@ -559,9 +559,7 @@ mod tests {
         // left 3 candidates -- too few for the partial path to run at all, so it
         // measured nothing and the speedup it printed was noise.
         let n = 200_000usize;
-        let template: String = std::iter::repeat("abcdefghijklmnopqrstuvwxyz ")
-            .take(24)
-            .collect();
+        let template: String = "abcdefghijklmnopqrstuvwxyz ".repeat(24);
         let texts: Vec<String> = (0..n)
             .map(|i| format!("{template} ref {i}"))
             .collect();

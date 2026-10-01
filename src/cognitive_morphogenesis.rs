@@ -110,6 +110,11 @@ impl Default for CognitiveGradient {
 
 impl CognitiveGradient {
     /// Kiszámolja a kognitív gradienst egy adott blokkhoz.
+    /// Seven same-typed scalars, positional and documented here rather than at
+    /// each of the ten call sites. Bundling them into an inputs struct would read
+    /// better, but most call sites pass the same value for every component, so a
+    /// transposed field would change no result and no test would catch it.
+    #[allow(clippy::too_many_arguments)]
     pub fn compute(
         &self,
         lexical_score: f32,
@@ -122,13 +127,17 @@ impl CognitiveGradient {
     ) -> f64 {
         let (w1, w2, w3, w4, w5, w6, w7) = self.weights;
 
-        let relevance = lexical_score.max(0.0).min(1.0) as f64;
-        let resonance = resonance_strength.max(0.0).min(1.0) as f64;
-        let evidence = (evidence_confidence as f64 / 100.0).max(0.0).min(1.0);
-        let hebbian = hebbian_energy.max(0.0).min(1.0) as f64;
-        let prediction = prediction_hit_rate.max(0.0).min(1.0) as f64;
-        let emotion = ((emotional_valence + 1.0) / 2.0).max(0.0).min(1.0) as f64;
-        let execution = execution_success.max(0.0).min(1.0) as f64;
+        // clamp, not max().min(): the old pattern turned a NaN score into 0.0
+        // and hid it. clamp propagates it, so a broken score surfaces here
+        // instead of being silently zero-weighted in the sum below. The f32
+        // arithmetic is left as it was, so non-NaN inputs are bit-identical.
+        let relevance = lexical_score.clamp(0.0, 1.0) as f64;
+        let resonance = resonance_strength.clamp(0.0, 1.0) as f64;
+        let evidence = (evidence_confidence as f64 / 100.0).clamp(0.0, 1.0);
+        let hebbian = hebbian_energy.clamp(0.0, 1.0) as f64;
+        let prediction = prediction_hit_rate.clamp(0.0, 1.0) as f64;
+        let emotion = ((emotional_valence + 1.0) / 2.0).clamp(0.0, 1.0) as f64;
+        let execution = execution_success.clamp(0.0, 1.0) as f64;
 
         w1 * relevance + w2 * resonance + w3 * evidence + w4 * hebbian
             + w5 * prediction + w6 * emotion + w7 * execution
@@ -271,6 +280,7 @@ const AUDIT_ENTRY_FIXED: usize = 8 + 8 + 8 + 8 + 8 + 8 + 8 + 8 + 8 + 8 + 8 + 8;
 // ─── CognitiveMorphogenesisEngine ───────────────────
 
 /// A kognitív morfogenezis integrációs motor.
+#[derive(Default)]
 pub struct CognitiveMorphogenesisEngine {
     pub audit_log: Vec<MorphogenesisAuditEntry>,
     pub metrics_log: Vec<MorphogenesisMetrics>,
@@ -279,11 +289,7 @@ pub struct CognitiveMorphogenesisEngine {
 
 impl CognitiveMorphogenesisEngine {
     pub fn new() -> Self {
-        Self {
-            audit_log: Vec::new(),
-            metrics_log: Vec::new(),
-            gradient: CognitiveGradient::default(),
-        }
+        Self::default()
     }
 
     /// Betölti a meglévő audit-naplót a fájlból (ha van).
@@ -330,6 +336,12 @@ impl CognitiveMorphogenesisEngine {
     /// Egy teljes kognitív morfogenezis ciklus végrehajtása.
     ///
     /// T0→T5: aktiváció → gradiens → növekedés → anastomosis → megerősítés → konszolidáció
+    ///
+    /// The count is the lint's, not the code's: nine of these eleven parameters are
+    /// references to different subsystem states, so the types already say which is
+    /// which and a wrong order does not compile. A bundled inputs struct would add
+    /// a type without removing a mistake.
+    #[allow(clippy::too_many_arguments)]
     pub fn run_cycle(
         &mut self,
         activated_blocks: &[(u32, f32)],

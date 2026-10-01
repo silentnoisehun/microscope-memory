@@ -199,11 +199,9 @@ fn stats(config: &Config, reader: &MicroscopeReader) {
 
 
 /// Per-phase timing for `recall`, enabled with MICROSCOPE_RECALL_TRACE=1.
-
 /// Added because the end-to-end figure alone does not say where the time goes,
 /// and the previous attribution of the gap to process start and index load was
 /// wrong. Cheap when off: one `OnceLock` read, and nothing else.
-
 /// Per-phase timing accumulators, so a trace is read as a distribution over the
 /// warm calls rather than as one sample.
 ///
@@ -1720,7 +1718,7 @@ fn report_vector_diag(
         &depth_hist[0..6],
         &all_hist[0..6],
         verdict,
-        answer_sim.map(|(s, d, r)| (s, d, r)),
+        answer_sim,
     );
 }
 
@@ -4463,7 +4461,7 @@ async fn async_main() {
                         // Keresünk blokkot, aminek magas activation_count-ja van
                         // de NINCS evidence record-ja
                         let mut high_activation_no_evidence = 0usize;
-                        for (_i, rec) in hebb.activations.iter().enumerate() {
+                        for rec in hebb.activations.iter() {
                             if rec.activation_count > 10 && !evidence.records.is_empty() {
                                 // Ellenőrizzük, hogy van-e evidence record ehhez a blokkhoz
                                 // (content_hash alapján kellene, de most egyszerűsített)

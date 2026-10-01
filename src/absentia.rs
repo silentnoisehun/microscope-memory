@@ -116,6 +116,7 @@ pub struct AntiHebbianPair {
 // ─── AbsentiaState ──────────────────────────────────
 
 /// Az Absentia réteg állapota.
+#[derive(Default)]
 pub struct AbsentiaState {
     /// Hiány-rekordok.
     pub records: Vec<AbsentiaRecord>,
@@ -129,12 +130,7 @@ pub struct AbsentiaState {
 
 impl AbsentiaState {
     pub fn new() -> Self {
-        Self {
-            records: Vec::new(),
-            anti_hebbian: Vec::new(),
-            negative_attractors: Vec::new(),
-            last_scan_ms: 0,
-        }
+        Self::default()
     }
 
     /// Betölti vagy inicializálja az Absentia állapotot.
@@ -246,7 +242,7 @@ impl AbsentiaState {
         for pair in &self.anti_hebbian {
             // A negatív attractor a két blokk közötti térben helyezkedik el
             // Ez "árnyékot vet" a gradiensre
-            let weight = pair.absence_score as f64 * -1.0;
+            let weight = -(pair.absence_score as f64);
             self.negative_attractors.push((
                 pair.block_a as f64 * 0.1,
                 pair.block_b as f64 * 0.1,

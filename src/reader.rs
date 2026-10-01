@@ -564,7 +564,6 @@ impl MicroscopeReader {
         let mut main: Vec<(u8, usize, f32)> = self
             .find_text_ranked(query, k)
             .into_iter()
-            .map(|(d, i, s)| (d, i, s))
             .collect();
 
         let append_path = Path::new(&config.paths.output_dir).join("append.bin");

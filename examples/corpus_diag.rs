@@ -193,9 +193,9 @@ fn report_neighbours(reader: &MicroscopeReader, eidx: &EmbeddingIndex) {
     }
 
     println!("\n== neighbour depth profile of sampled D5 probes (n={}) ==", d5_probes);
-    for d in 0..9 {
-        if nbr_depth[d] > 0 {
-            println!("  D{}: {:8}", d, nbr_depth[d]);
+    for (d, &n) in nbr_depth.iter().take(9).enumerate() {
+        if n > 0 {
+            println!("  D{}: {:8}", d, n);
         }
     }
     println!("\n== mean cosine by (probe depth, neighbour depth) ==");

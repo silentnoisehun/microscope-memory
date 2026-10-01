@@ -217,7 +217,8 @@ pub fn dream_consolidate(
                 if idx >= 4_000_000 {
                     continue; // u32::MAX dropped-block sentinel
                 }
-                hebb.activations.resize(idx + 1, ActivationRecord::default());
+                hebb.activations
+                    .resize(idx + 1, ActivationRecord::default());
             }
             let rec = &mut hebb.activations[idx];
             // Boost energy, but lighter than real activation
@@ -761,9 +762,7 @@ pub fn promote_recalled_blocks(
                         let end = start.saturating_add(len).min(data.len());
                         if start < end {
                             let block = &data[start..end];
-                            crate::epistemic::content_hash(
-                                String::from_utf8_lossy(block).trim(),
-                            )
+                            crate::epistemic::content_hash(String::from_utf8_lossy(block).trim())
                         } else {
                             0
                         }

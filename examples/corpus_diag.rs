@@ -45,7 +45,10 @@ fn number_conflicts(a: &str, b: &str) -> Vec<String> {
 
 fn has_negation(s: &str) -> bool {
     tokenize(s).iter().any(|w| {
-        matches!(w.as_str(), "not" | "no" | "never" | "none" | "nor" | "without")
+        matches!(
+            w.as_str(),
+            "not" | "no" | "never" | "none" | "nor" | "without"
+        )
     })
 }
 
@@ -140,13 +143,13 @@ fn report_degenerate(reader: &MicroscopeReader, eidx: &EmbeddingIndex) {
             }
         }
     }
-    println!("  blocks with <=16 chars: {} (D5: {})", short_total, short_d5);
+    println!(
+        "  blocks with <=16 chars: {} (D5: {})",
+        short_total, short_d5
+    );
     println!("\n  len : count : examples");
     for (len, count) in per_len.iter() {
-        let ex = examples
-            .get(len)
-            .map(|v| v.join(" | "))
-            .unwrap_or_default();
+        let ex = examples.get(len).map(|v| v.join(" | ")).unwrap_or_default();
         println!("  {:3} : {:5} : {}", len, count, ex);
     }
 }
@@ -174,7 +177,9 @@ fn report_neighbours(reader: &MicroscopeReader, eidx: &EmbeddingIndex) {
             continue;
         }
         d5_probes += 1;
-        let Some(qe) = eidx.embedding(qid) else { continue };
+        let Some(qe) = eidx.embedding(qid) else {
+            continue;
+        };
         for (sim, nid) in eidx.search(qe, 256) {
             if nid >= reader.block_count || nid == qid {
                 continue;
@@ -192,7 +197,10 @@ fn report_neighbours(reader: &MicroscopeReader, eidx: &EmbeddingIndex) {
         }
     }
 
-    println!("\n== neighbour depth profile of sampled D5 probes (n={}) ==", d5_probes);
+    println!(
+        "\n== neighbour depth profile of sampled D5 probes (n={}) ==",
+        d5_probes
+    );
     for (d, &n) in nbr_depth.iter().take(9).enumerate() {
         if n > 0 {
             println!("  D{}: {:8}", d, n);
@@ -203,7 +211,13 @@ fn report_neighbours(reader: &MicroscopeReader, eidx: &EmbeddingIndex) {
     keys.sort_unstable();
     for k in keys {
         let (sum, n) = sim_by_pair[&k];
-        println!("  D{} -> D{}: mean {:.4}  (n={})", k.0, k.1, sum / n as f64, n);
+        println!(
+            "  D{} -> D{}: mean {:.4}  (n={})",
+            k.0,
+            k.1,
+            sum / n as f64,
+            n
+        );
     }
 
     println!("\n== high-cosine pairs (>=0.95): text agreement ==");
@@ -229,8 +243,16 @@ fn report_neighbours(reader: &MicroscopeReader, eidx: &EmbeddingIndex) {
         }
         if *sim >= 0.98 && shown < 12 {
             println!("  sim={:.4} jaccard={:.2}", sim, ja);
-            println!("     A[{}]: {}", reader.header(*a).depth, truncate(reader.text(*a)));
-            println!("     B[{}]: {}", reader.header(*b).depth, truncate(reader.text(*b)));
+            println!(
+                "     A[{}]: {}",
+                reader.header(*a).depth,
+                truncate(reader.text(*a))
+            );
+            println!(
+                "     B[{}]: {}",
+                reader.header(*b).depth,
+                truncate(reader.text(*b))
+            );
             if !only_a.is_empty() {
                 println!("     only-in-A: {:?}", &only_a[..only_a.len().min(8)]);
             }

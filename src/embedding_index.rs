@@ -142,7 +142,15 @@ impl EmbeddingIndex {
     /// Search for top-k most similar blocks to query embedding.
     /// Returns Vec<(similarity, block_index)> sorted descending.
     pub fn search(&self, query_emb: &[f32], k: usize) -> Vec<(f32, usize)> {
-        search_with_floor(query_emb, k, self.dim, &self.data, HEADER_SIZE, self.embedded_count, self.block_ids())
+        search_with_floor(
+            query_emb,
+            k,
+            self.dim,
+            &self.data,
+            HEADER_SIZE,
+            self.embedded_count,
+            self.block_ids(),
+        )
     }
 
     /// Every stored block id, in ascending order.
@@ -374,7 +382,13 @@ impl AppendEmbeddings {
 /// keying without it would hand one index's vectors to the other.
 /// As above; the usize is the vector width the sidecar was opened at, which
 /// has to match the query or the search is comparing different dimensions.
-type CachedAppendIndex = (PathBuf, u64, Option<SystemTime>, usize, Arc<AppendEmbeddings>);
+type CachedAppendIndex = (
+    PathBuf,
+    u64,
+    Option<SystemTime>,
+    usize,
+    Arc<AppendEmbeddings>,
+);
 
 static APPEND_CACHE: Mutex<Option<CachedAppendIndex>> = Mutex::new(None);
 
@@ -392,10 +406,7 @@ pub fn open_append_cached(path: &Path, dim: usize) -> Option<Arc<AppendEmbedding
     // Scoped so the immutable borrow of the slot ends before it is overwritten.
     let hit = match guard.as_ref() {
         Some((cached_path, len, mtime, cached_dim, cached))
-            if cached_path == path
-                && *len == key.0
-                && *mtime == key.1
-                && *cached_dim == dim =>
+            if cached_path == path && *len == key.0 && *mtime == key.1 && *cached_dim == dim =>
         {
             Some(Arc::clone(cached))
         }
@@ -688,9 +699,9 @@ mod tests {
         );
         // Mojibake: long enough to clear the floor, every character in the band.
         assert_eq!(
-                        // mojibake-ok: deliberate fixture, this is the input the
+            // mojibake-ok: deliberate fixture, this is the input the
             // gate is required to reject.
-quality_gate("đź§đź§đź§đź§đź§đź§đź§đź§", 24),
+            quality_gate("đź§đź§đź§đź§đź§đź§đź§đź§", 24),
             EmbedVerdict::Mojibake
         );
         // The floor is a parameter, not a constant baked into the rule.
@@ -727,7 +738,10 @@ quality_gate("đź§đź§đź§đź§đź§đź§đź§đź§", 24),
         let opened = AppendEmbeddings::open(&path, 4).expect("open");
         assert_eq!(opened.dim, 4);
         assert_eq!(opened.entries.len(), 3);
-        assert_eq!(opened.entries[2].0, 7, "append index survives the round trip");
+        assert_eq!(
+            opened.entries[2].0, 7,
+            "append index survives the round trip"
+        );
 
         // A query equal to the first stored vector ranks it first.
         let hits = opened.search(&[1.0, 0.0, 0.0, 0.0], 10);
@@ -823,7 +837,11 @@ quality_gate("đź§đź§đź§đź§đź§đź§đź§đź§", 24),
         second.save(&path).unwrap();
 
         let after = open_append_cached(&path, 4).unwrap();
-        assert_eq!(after.entries.len(), 3, "a rewrite must be observed, not cached");
+        assert_eq!(
+            after.entries.len(),
+            3,
+            "a rewrite must be observed, not cached"
+        );
         assert_eq!(after.entries[0].0, 22);
         let fresh = AppendEmbeddings::open(&path, 4).unwrap();
         assert_eq!(after.entries, fresh.entries, "and must match a fresh open");

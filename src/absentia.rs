@@ -11,8 +11,8 @@
 use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use crate::hebbian::HebbianState;
 use crate::epistemic::EvidenceLedger;
+use crate::hebbian::HebbianState;
 
 // ─── Helpers ────────────────────────────────────────
 
@@ -158,12 +158,7 @@ impl AbsentiaState {
     ///
     /// Anti-Hebbian detektálás: két blokk, aminek együtt KELLENE aktiválódnia
     /// (struktúra alapján), de a co-aktivációs rekordjuk alacsony vagy nulla.
-    pub fn scan(
-        &mut self,
-        hebb: &HebbianState,
-        _evidence: &EvidenceLedger,
-        _block_count: usize,
-    ) {
+    pub fn scan(&mut self, hebb: &HebbianState, _evidence: &EvidenceLedger, _block_count: usize) {
         let now = now_ms();
         self.last_scan_ms = now;
 
@@ -267,14 +262,20 @@ impl AbsentiaState {
         let negative_attractor_count = self.negative_attractors.len();
 
         let avg_absence = if total_records > 0 {
-            self.records.iter().map(|r| r.absence_score as f64).sum::<f64>()
+            self.records
+                .iter()
+                .map(|r| r.absence_score as f64)
+                .sum::<f64>()
                 / total_records as f64
         } else {
             0.0
         };
 
         let avg_anti_hebbian = if anti_hebbian_count > 0 {
-            self.anti_hebbian.iter().map(|p| p.absence_score as f64).sum::<f64>()
+            self.anti_hebbian
+                .iter()
+                .map(|p| p.absence_score as f64)
+                .sum::<f64>()
                 / anti_hebbian_count as f64
         } else {
             0.0
@@ -282,7 +283,9 @@ impl AbsentiaState {
 
         // Causal laundering gyanús: anti-Hebbian párok, ahol a co-aktiváció 0
         // de mindkét blokk aktív
-        let causal_laundering_suspect = self.anti_hebbian.iter()
+        let causal_laundering_suspect = self
+            .anti_hebbian
+            .iter()
             .filter(|p| p.absence_score > 0.5)
             .count();
 
@@ -353,16 +356,27 @@ impl AbsentiaState {
         let mut off = 24;
         let mut records = Vec::with_capacity(record_count);
         for _ in 0..record_count {
-            if off + 41 > data.len() { break; }
-            let expected_context_hash = u64::from_le_bytes(data[off..off+8].try_into().unwrap()); off += 8;
-            let missing_entity_hash = u64::from_le_bytes(data[off..off+8].try_into().unwrap()); off += 8;
-            let expected_frequency = f32::from_le_bytes(data[off..off+4].try_into().unwrap()); off += 4;
-            let actual_frequency = f32::from_le_bytes(data[off..off+4].try_into().unwrap()); off += 4;
-            let absence_score = f32::from_le_bytes(data[off..off+4].try_into().unwrap()); off += 4;
-            let first_detected_ms = u64::from_le_bytes(data[off..off+8].try_into().unwrap()); off += 8;
-            let duration_ms = u64::from_le_bytes(data[off..off+8].try_into().unwrap()); off += 8;
-            let pattern_byte = data[off]; off += 1;
-            let gradient_weight = f32::from_le_bytes(data[off..off+4].try_into().unwrap()); off += 4;
+            if off + 41 > data.len() {
+                break;
+            }
+            let expected_context_hash = u64::from_le_bytes(data[off..off + 8].try_into().unwrap());
+            off += 8;
+            let missing_entity_hash = u64::from_le_bytes(data[off..off + 8].try_into().unwrap());
+            off += 8;
+            let expected_frequency = f32::from_le_bytes(data[off..off + 4].try_into().unwrap());
+            off += 4;
+            let actual_frequency = f32::from_le_bytes(data[off..off + 4].try_into().unwrap());
+            off += 4;
+            let absence_score = f32::from_le_bytes(data[off..off + 4].try_into().unwrap());
+            off += 4;
+            let first_detected_ms = u64::from_le_bytes(data[off..off + 8].try_into().unwrap());
+            off += 8;
+            let duration_ms = u64::from_le_bytes(data[off..off + 8].try_into().unwrap());
+            off += 8;
+            let pattern_byte = data[off];
+            off += 1;
+            let gradient_weight = f32::from_le_bytes(data[off..off + 4].try_into().unwrap());
+            off += 4;
             records.push(AbsentiaRecord {
                 expected_context_hash,
                 missing_entity_hash,
@@ -378,13 +392,21 @@ impl AbsentiaState {
 
         let mut anti_hebbian = Vec::with_capacity(anti_count);
         for _ in 0..anti_count {
-            if off + 28 > data.len() { break; }
-            let block_a = u32::from_le_bytes(data[off..off+4].try_into().unwrap()); off += 4;
-            let block_b = u32::from_le_bytes(data[off..off+4].try_into().unwrap()); off += 4;
-            let expected_coactivation = f32::from_le_bytes(data[off..off+4].try_into().unwrap()); off += 4;
-            let actual_coactivation = f32::from_le_bytes(data[off..off+4].try_into().unwrap()); off += 4;
-            let absence_score = f32::from_le_bytes(data[off..off+4].try_into().unwrap()); off += 4;
-            let first_detected_ms = u64::from_le_bytes(data[off..off+8].try_into().unwrap()); off += 8;
+            if off + 28 > data.len() {
+                break;
+            }
+            let block_a = u32::from_le_bytes(data[off..off + 4].try_into().unwrap());
+            off += 4;
+            let block_b = u32::from_le_bytes(data[off..off + 4].try_into().unwrap());
+            off += 4;
+            let expected_coactivation = f32::from_le_bytes(data[off..off + 4].try_into().unwrap());
+            off += 4;
+            let actual_coactivation = f32::from_le_bytes(data[off..off + 4].try_into().unwrap());
+            off += 4;
+            let absence_score = f32::from_le_bytes(data[off..off + 4].try_into().unwrap());
+            off += 4;
+            let first_detected_ms = u64::from_le_bytes(data[off..off + 8].try_into().unwrap());
+            off += 8;
             anti_hebbian.push(AntiHebbianPair {
                 block_a,
                 block_b,
@@ -397,11 +419,17 @@ impl AbsentiaState {
 
         let mut negative_attractors = Vec::with_capacity(neg_count);
         for _ in 0..neg_count {
-            if off + 32 > data.len() { break; }
-            let x = f64::from_le_bytes(data[off..off+8].try_into().unwrap()); off += 8;
-            let y = f64::from_le_bytes(data[off..off+8].try_into().unwrap()); off += 8;
-            let z = f64::from_le_bytes(data[off..off+8].try_into().unwrap()); off += 8;
-            let w = f64::from_le_bytes(data[off..off+8].try_into().unwrap()); off += 8;
+            if off + 32 > data.len() {
+                break;
+            }
+            let x = f64::from_le_bytes(data[off..off + 8].try_into().unwrap());
+            off += 8;
+            let y = f64::from_le_bytes(data[off..off + 8].try_into().unwrap());
+            off += 8;
+            let z = f64::from_le_bytes(data[off..off + 8].try_into().unwrap());
+            off += 8;
+            let w = f64::from_le_bytes(data[off..off + 8].try_into().unwrap());
+            off += 8;
             negative_attractors.push((x, y, z, w));
         }
 
@@ -444,7 +472,13 @@ pub fn apply_absentia_to_field(
     // és megszorozzuk a gradienst (1 - shadow)-val
     let keys: Vec<(i32, i32, i32)> = field.gradients.keys().cloned().collect();
     for key in keys {
-        let shadow = compute_absence_shadow(absentia, key.0 as f64, key.1 as f64, key.2 as f64, evidence_confidence);
+        let shadow = compute_absence_shadow(
+            absentia,
+            key.0 as f64,
+            key.1 as f64,
+            key.2 as f64,
+            evidence_confidence,
+        );
         if shadow > 0.01 {
             if let Some(val) = field.gradients.get_mut(&key) {
                 *val *= 1.0 - shadow;

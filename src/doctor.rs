@@ -163,8 +163,7 @@ pub fn run_doctor(config: &Config, fix: bool) -> Result<(), String> {
                     // Append vectors are keyed by position in the log we just
                     // truncated, so they must go with the tail that was lost --
                     // otherwise a vector would answer for a different memory.
-                    let sidecar =
-                        output_dir.join(crate::embedding_index::APPEND_EMBEDDINGS_FILE);
+                    let sidecar = output_dir.join(crate::embedding_index::APPEND_EMBEDDINGS_FILE);
                     if sidecar.exists() {
                         fs::remove_file(&sidecar).map_err(|e| e.to_string())?;
                         println!(

@@ -517,7 +517,8 @@ mod tests {
 
             let got = table.find_similar(query, k);
             assert_eq!(
-                got, full,
+                got,
+                full,
                 "partial selection differs from a full sort at k={k} ({} candidates)",
                 full.len()
             );
@@ -560,9 +561,7 @@ mod tests {
         // measured nothing and the speedup it printed was noise.
         let n = 200_000usize;
         let template: String = "abcdefghijklmnopqrstuvwxyz ".repeat(24);
-        let texts: Vec<String> = (0..n)
-            .map(|i| format!("{template} ref {i}"))
-            .collect();
+        let texts: Vec<String> = (0..n).map(|i| format!("{template} ref {i}")).collect();
         let owned: Vec<&str> = texts.iter().map(|s| s.as_str()).collect();
         let table = LinkTable::build(&owned);
         let query = owned[123];
@@ -592,7 +591,10 @@ mod tests {
         println!("candidates over the 0.5 floor: {candidates}");
         println!("partial selection : {partial:?}");
         println!("full sort         : {sorted:?}");
-        println!("speedup           : {:.1}x", sorted.as_secs_f64() / partial.as_secs_f64());
+        println!(
+            "speedup           : {:.1}x",
+            sorted.as_secs_f64() / partial.as_secs_f64()
+        );
         assert_eq!(got, full, "the two orderings must agree");
     }
 

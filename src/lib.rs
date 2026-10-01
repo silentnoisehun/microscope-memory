@@ -22,8 +22,8 @@ pub mod emotional_state;
 pub mod federation;
 pub mod fingerprint;
 pub mod hebbian;
-pub mod sync_guard;
 pub mod no_learn;
+pub mod sync_guard;
 pub mod types;
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -78,6 +78,8 @@ pub mod working_memory;
 
 // New cognitive enhancement modules
 #[cfg(not(target_arch = "wasm32"))]
+pub mod absentia;
+#[cfg(not(target_arch = "wasm32"))]
 pub mod advanced_cognition;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod architecture_generator;
@@ -89,6 +91,8 @@ pub mod autopoiesis;
 pub mod chatgpt;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod code_memory;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod cognitive_morphogenesis;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod enforcement;
 #[cfg(not(target_arch = "wasm32"))]
@@ -107,6 +111,8 @@ pub mod hyperfocus;
 pub mod implicit_memory;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod impulse_control;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod intent;
 pub mod keystore;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod knowledge_base;
@@ -117,12 +123,6 @@ pub mod mental_stimulation;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod meta_supervision;
 pub mod morphogenesis;
-#[cfg(not(target_arch = "wasm32"))]
-pub mod cognitive_morphogenesis;
-#[cfg(not(target_arch = "wasm32"))]
-pub mod absentia;
-#[cfg(not(target_arch = "wasm32"))]
-pub mod intent;
 pub mod multimodal;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod neuroplasticity;
@@ -167,8 +167,7 @@ pub use reader::{
     append_emotion_log, build_emotions_from_log, emotional_similarity, format_emotion,
     load_emotion_lookup, read_append_log, store_memory, store_memory_temporary,
     store_memory_with_embedding, store_memory_with_emotion, DataStore, MicroscopeReader,
-    RadialResult, ResultSet, EMOTION_DIMS,
-    EMOTION_VECTOR_SIZE,
+    RadialResult, ResultSet, EMOTION_DIMS, EMOTION_VECTOR_SIZE,
 };
 #[cfg(not(target_arch = "wasm32"))]
 pub use types::{AppendEntry, BlockHeader, MemoryBlockHeader, MemoryQueryOptions, ProjectId};

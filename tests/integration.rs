@@ -159,7 +159,8 @@ fn emotional_field_candidate_set_matches_a_full_scan() {
     microscope_memory::build::build(&config, true, true).unwrap();
 
     let reader = microscope_memory::reader::MicroscopeReader::open(&config).unwrap();
-    let mut hebb = HebbianState::load_or_init(Path::new(&config.paths.output_dir), reader.block_count);
+    let mut hebb =
+        HebbianState::load_or_init(Path::new(&config.paths.output_dir), reader.block_count);
 
     // Activate the first 40 blocks plus every emotional-layer block, so both
     // the candidate set and the layer filter matter.

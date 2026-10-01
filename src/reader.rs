@@ -561,10 +561,7 @@ impl MicroscopeReader {
         let q = query.to_lowercase();
         let q_terms: Vec<&str> = q.split_whitespace().filter(|t| t.len() > 1).collect();
 
-        let mut main: Vec<(u8, usize, f32)> = self
-            .find_text_ranked(query, k)
-            .into_iter()
-            .collect();
+        let mut main: Vec<(u8, usize, f32)> = self.find_text_ranked(query, k).into_iter().collect();
 
         let append_path = Path::new(&config.paths.output_dir).join("append.bin");
         let appended = read_append_log(&append_path);
@@ -587,7 +584,9 @@ impl MicroscopeReader {
                 .then_with(|| a.0.cmp(&b.0))
         });
         main.truncate(k);
-        main.into_iter().map(|(d, i, s)| (d, i, i < 1_000_000, s)).collect()
+        main.into_iter()
+            .map(|(d, i, s)| (d, i, i < 1_000_000, s))
+            .collect()
     }
 
     /// Text search across both the immutable main index and the hot append log.
@@ -1804,10 +1803,7 @@ pub fn load_emotion_lookup(output_dir: &Path) -> Option<EmotionLookup> {
 /// blocks therefore moved about 1.2 GB, which measured as 4.2 s. The file is
 /// read once, every update is applied in memory, and the result is written once
 /// -- same bytes, same atomic temp+rename guarantee, a tenth of the I/O.
-pub fn write_emotions_batch(
-    path: &Path,
-    updates: &[(usize, [f32; 21])],
-) -> Result<(), String> {
+pub fn write_emotions_batch(path: &Path, updates: &[(usize, [f32; 21])]) -> Result<(), String> {
     if updates.is_empty() {
         return Ok(());
     }
@@ -2086,12 +2082,7 @@ mod tests {
 /// * **Importance** — the block's recorded importance (0-10), lightly weighted.
 /// * **Specificity** — a short block that is mostly the query beats a long block
 ///   that merely mentions it somewhere.
-pub fn relevance_score(
-    query: &str,
-    query_terms: &[&str],
-    text_lower: &str,
-    importance: u8,
-) -> f32 {
+pub fn relevance_score(query: &str, query_terms: &[&str], text_lower: &str, importance: u8) -> f32 {
     if text_lower.is_empty() {
         return 0.0;
     }
@@ -2161,4 +2152,3 @@ mod relevance_tests {
         assert!(full > partial);
     }
 }
-

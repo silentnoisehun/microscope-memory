@@ -18,10 +18,10 @@
 use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use crate::hebbian::HebbianState;
-use crate::epistemic::EvidenceLedger;
-use crate::predictive_cache::PredictiveCache;
 use crate::absentia::AbsentiaState;
+use crate::epistemic::EvidenceLedger;
+use crate::hebbian::HebbianState;
+use crate::predictive_cache::PredictiveCache;
 
 fn now_ms() -> u64 {
     SystemTime::now()
@@ -83,7 +83,8 @@ impl Genome {
     pub fn default_hope() -> Self {
         Self {
             identity: "HOPE".to_string(),
-            mission: "Segíteni a felhasználónak a gondolkodásban, döntésekben és építkezésben.".to_string(),
+            mission: "Segíteni a felhasználónak a gondolkodásban, döntésekben és építkezésben."
+                .to_string(),
             values: vec![
                 "Auditálhatóság".to_string(),
                 "Transzparencia".to_string(),
@@ -293,12 +294,17 @@ impl IntentPipeline {
             timestamp_ms: ts,
             step: "GENOME".to_string(),
             result: "loaded".to_string(),
-            data: format!("identity={}, mission={}", self.genome.identity, self.genome.mission),
+            data: format!(
+                "identity={}, mission={}",
+                self.genome.identity, self.genome.mission
+            ),
         });
 
         // ─── T1: Absentia jel ─────────────────────────
         let absence_signal = if !absentia.records.is_empty() {
-            let strongest = absentia.records.iter()
+            let strongest = absentia
+                .records
+                .iter()
                 .max_by(|a, b| a.absence_score.partial_cmp(&b.absence_score).unwrap());
             if let Some(rec) = strongest {
                 audit_chain.push(IntentAuditStep {
@@ -337,21 +343,22 @@ impl IntentPipeline {
 
         // ─── T3: Evidence jel ─────────────────────────
         let evidence_signal = if !evidence.records.is_empty() {
-            let avg_conf: f64 = evidence.records.values()
+            let avg_conf: f64 = evidence
+                .records
+                .values()
                 .map(|r| r.confidence as f64)
                 .sum::<f64>()
                 / evidence.records.len() as f64;
-            let total_support: u32 = evidence.records.values()
-                .map(|r| r.support_count)
-                .sum();
-            let total_refute: u32 = evidence.records.values()
-                .map(|r| r.refute_count)
-                .sum();
+            let total_support: u32 = evidence.records.values().map(|r| r.support_count).sum();
+            let total_refute: u32 = evidence.records.values().map(|r| r.refute_count).sum();
             audit_chain.push(IntentAuditStep {
                 timestamp_ms: ts,
                 step: "EVIDENCE".to_string(),
                 result: "evaluated".to_string(),
-                data: format!("avg_conf={:.1}, support={}, refute={}", avg_conf, total_support, total_refute),
+                data: format!(
+                    "avg_conf={:.1}, support={}, refute={}",
+                    avg_conf, total_support, total_refute
+                ),
             });
             Some(EvidenceSignal {
                 topic: "aggregate".to_string(),
@@ -365,7 +372,10 @@ impl IntentPipeline {
 
         // ─── T4: Growth jel ───────────────────────────
         let growth_signal = {
-            let active_blocks: Vec<(u32, f32)> = hebb.activations.iter().enumerate()
+            let active_blocks: Vec<(u32, f32)> = hebb
+                .activations
+                .iter()
+                .enumerate()
                 .filter(|(_, r)| r.energy > 0.3)
                 .map(|(i, r)| (i as u32, r.energy))
                 .collect();
@@ -401,7 +411,11 @@ impl IntentPipeline {
                     abs.absence_score,
                 )
             } else {
-                (IntentAction::Observe, vec!["Alacsony hiány-jel.".to_string()], 0.2)
+                (
+                    IntentAction::Observe,
+                    vec!["Alacsony hiány-jel.".to_string()],
+                    0.2,
+                )
             }
         } else if let Some(ref pred) = prediction_signal {
             if pred.confidence > 0.5 {
@@ -409,16 +423,22 @@ impl IntentPipeline {
                     IntentAction::SearchMemory {
                         query: pred.predicted_query.clone(),
                     },
-                    vec![
-                        format!("Prediction: {:.3} confidence", pred.confidence),
-                    ],
+                    vec![format!("Prediction: {:.3} confidence", pred.confidence)],
                     pred.confidence,
                 )
             } else {
-                (IntentAction::Observe, vec!["Alacsony predikció.".to_string()], 0.2)
+                (
+                    IntentAction::Observe,
+                    vec!["Alacsony predikció.".to_string()],
+                    0.2,
+                )
             }
         } else {
-            (IntentAction::Observe, vec!["Nincs jelzés.".to_string()], 0.1)
+            (
+                IntentAction::Observe,
+                vec!["Nincs jelzés.".to_string()],
+                0.1,
+            )
         };
 
         audit_chain.push(IntentAuditStep {
@@ -454,7 +474,11 @@ impl IntentPipeline {
         audit_chain.push(IntentAuditStep {
             timestamp_ms: ts,
             step: "EVALUATION".to_string(),
-            result: if allowed { "allowed".to_string() } else { "blocked".to_string() },
+            result: if allowed {
+                "allowed".to_string()
+            } else {
+                "blocked".to_string()
+            },
             data: format!("requires_approval={}", requires_approval),
         });
 
@@ -488,9 +512,17 @@ impl IntentPipeline {
 
     pub fn stats(&self) -> IntentStats {
         let total = self.audit_log.len();
-        let allowed = self.audit_log.iter().filter(|i| i.evaluation.allowed).count();
+        let allowed = self
+            .audit_log
+            .iter()
+            .filter(|i| i.evaluation.allowed)
+            .count();
         let blocked = total - allowed;
-        let approval_required = self.audit_log.iter().filter(|i| i.evaluation.requires_approval).count();
+        let approval_required = self
+            .audit_log
+            .iter()
+            .filter(|i| i.evaluation.requires_approval)
+            .count();
 
         IntentStats {
             total_intents: total,
@@ -507,4 +539,3 @@ pub struct IntentStats {
     pub blocked: usize,
     pub approval_required: usize,
 }
-

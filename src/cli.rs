@@ -46,7 +46,9 @@ pub enum Cmd {
         k: usize,
     },
     /// Mark a loop resolved
-    ResolveLoop { id: u64 },
+    ResolveLoop {
+        id: u64,
+    },
     /// Universal auto-context snapshot â€” for any LLM wrapper script.
     /// Writes to stdout (default) or to a file path.
     AutoContext {

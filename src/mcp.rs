@@ -1168,12 +1168,10 @@ fn tool_recall(config: &Config, args: &Value) -> Result<String, String> {
     // no shared token can still become a candidate. See the equivalent path in
     // main::recall; previously this gate was `lexical > 0.0` alone, which made
     // the embedding index unreachable from the agent-facing tool.
-    let mut semantic_hits: std::collections::HashMap<usize, f32> =
-        std::collections::HashMap::new();
+    let mut semantic_hits: std::collections::HashMap<usize, f32> = std::collections::HashMap::new();
     // Vectors of memories still in the append log, keyed by append position;
     // see the equivalent block in main::recall.
-    let mut appended_sem: std::collections::HashMap<usize, f32> =
-        std::collections::HashMap::new();
+    let mut appended_sem: std::collections::HashMap<usize, f32> = std::collections::HashMap::new();
     {
         use crate::embedding_index::EmbeddingIndex;
 
@@ -1181,11 +1179,10 @@ fn tool_recall(config: &Config, args: &Value) -> Result<String, String> {
         if let Some(eidx) = EmbeddingIndex::open(&emb_path) {
             // Cached: a long-lived server used to rebuild the provider -- and
             // re-fault the model weights -- on every single query.
-            let embedded = crate::embeddings::with_cached_provider(
-                &config.embedding,
-                eidx.dim(),
-                |p| p.embed(query),
-            );
+            let embedded =
+                crate::embeddings::with_cached_provider(&config.embedding, eidx.dim(), |p| {
+                    p.embed(query)
+                });
             match embedded {
                 Ok(qe) if qe.len() == eidx.dim() => {
                     for (sim, block_idx) in eidx.search(&qe, (k * 8).max(64)) {

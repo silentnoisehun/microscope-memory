@@ -197,7 +197,6 @@ fn stats(config: &Config, reader: &MicroscopeReader) {
     println!("{}", "=".repeat(50));
 }
 
-
 /// Per-phase timing for `recall`, enabled with MICROSCOPE_RECALL_TRACE=1.
 /// Added because the end-to-end figure alone does not say where the time goes,
 /// and the previous attribution of the gap to process start and index load was
@@ -294,7 +293,6 @@ fn phase_summary() -> Vec<(&'static str, f64, u32)> {
     out
 }
 
-
 fn recall(config: &Config, query: &str, k: usize) {
     let t0 = Instant::now();
     // Cumulative elapsed time at the last traced phase, so the tail of the
@@ -320,7 +318,10 @@ fn recall(config: &Config, query: &str, k: usize) {
     trace_phase("  state: hebbian", t_s1.elapsed().as_secs_f64() * 1000.0);
     let t_s2 = Instant::now();
     let tg_pre = microscope_memory::thought_graph::ThoughtGraphState::load_or_init(output_dir_att);
-    trace_phase("  state: thought graph", t_s2.elapsed().as_secs_f64() * 1000.0);
+    trace_phase(
+        "  state: thought graph",
+        t_s2.elapsed().as_secs_f64() * 1000.0,
+    );
     let t_s3 = Instant::now();
     let pc_pre = microscope_memory::predictive_cache::PredictiveCache::load_or_init(output_dir_att);
     trace_phase("  state: pred cache", t_s3.elapsed().as_secs_f64() * 1000.0);
@@ -328,7 +329,10 @@ fn recall(config: &Config, query: &str, k: usize) {
     trace_phase("state load", t_state.elapsed().as_secs_f64() * 1000.0);
     let t_emofield = Instant::now();
     let emotional_field = microscope_memory::emotional::emotional_field(&reader, &hebb);
-    trace_phase("emotional field scan", t_emofield.elapsed().as_secs_f64() * 1000.0);
+    trace_phase(
+        "emotional field scan",
+        t_emofield.elapsed().as_secs_f64() * 1000.0,
+    );
     let emotional_energy = emotional_field
         .as_ref()
         .map(|f| f.total_energy)
@@ -390,16 +394,13 @@ fn recall(config: &Config, query: &str, k: usize) {
     // not be retrieved at all, and the embedding index was never opened. Embed
     // the query with the configured provider and take the nearest blocks from
     // the stored vectors, then let those compete with the lexical hits.
-    let mut semantic_hits: std::collections::HashMap<usize, f32> =
-        std::collections::HashMap::new();
+    let mut semantic_hits: std::collections::HashMap<usize, f32> = std::collections::HashMap::new();
     // Vectors of memories still in the append log, keyed by append position.
     // They are not in embeddings.bin (which is built from the consolidated
     // index) but they are real, stored memories, and until this existed they
     // were reachable only by exact token overlap.
-    let mut appended_sem: std::collections::HashMap<usize, f32> =
-        std::collections::HashMap::new();
+    let mut appended_sem: std::collections::HashMap<usize, f32> = std::collections::HashMap::new();
     {
-        
         let emb_path = Path::new(&config.paths.output_dir).join("embeddings.bin");
         if let Some(eidx) = microscope_memory::embedding_index::open_embedding_cached(&emb_path) {
             // The provider must be cached, not rebuilt. Constructing one loads the
@@ -419,7 +420,11 @@ fn recall(config: &Config, query: &str, k: usize) {
                 eidx.dim(),
                 |provider| match provider.embed(query) {
                     Ok(qe) if qe.len() == eidx.dim() => Ok(qe),
-                    Ok(v) => Err(format!("provider returned {} dims, index expects {}", v.len(), eidx.dim())),
+                    Ok(v) => Err(format!(
+                        "provider returned {} dims, index expects {}",
+                        v.len(),
+                        eidx.dim()
+                    )),
                     Err(e) => Err(e.to_string()),
                 },
             );
@@ -472,10 +477,10 @@ fn recall(config: &Config, query: &str, k: usize) {
                     // (depth histogram [0,0,0,0,3,1021] -> [0,0,0,0,7,1017]).
                     // The real obstacle is near-duplicate crowding, which needs
                     // similarity-based diversity, not a bit comparison.
-    let t_search = Instant::now();
+                    let t_search = Instant::now();
                     let hits = eidx.search(&qe, fetch);
-    trace_phase("vector search", t_search.elapsed().as_secs_f64() * 1000.0);
-    t_mark = t0.elapsed().as_secs_f64() * 1000.0;
+                    trace_phase("vector search", t_search.elapsed().as_secs_f64() * 1000.0);
+                    t_mark = t0.elapsed().as_secs_f64() * 1000.0;
                     if let Some(matches) = &diag {
                         report_vector_diag(&reader, &eidx, &qe, &hits, matches, want);
                     }
@@ -489,14 +494,11 @@ fn recall(config: &Config, query: &str, k: usize) {
                         t0.elapsed().as_secs_f64() * 1000.0 - t_mark,
                     );
                     t_mark = t0.elapsed().as_secs_f64() * 1000.0;
-                    if let Some(side) =
-                        microscope_memory::embedding_index::open_append_cached(
-                            &Path::new(&config.paths.output_dir).join(
-                                microscope_memory::embedding_index::APPEND_EMBEDDINGS_FILE,
-                            ),
-                            eidx.dim(),
-                        )
-                    {
+                    if let Some(side) = microscope_memory::embedding_index::open_append_cached(
+                        &Path::new(&config.paths.output_dir)
+                            .join(microscope_memory::embedding_index::APPEND_EMBEDDINGS_FILE),
+                        eidx.dim(),
+                    ) {
                         for (sim, ai) in side.search(&qe, want) {
                             appended_sem.insert(ai as usize, sim);
                         }
@@ -513,7 +515,9 @@ fn recall(config: &Config, query: &str, k: usize) {
                     t_mark = t0.elapsed().as_secs_f64() * 1000.0;
                 }
                 Ok(_) => {
-                    eprintln!("  semantic: provider returned a different width than the index; skipped");
+                    eprintln!(
+                        "  semantic: provider returned a different width than the index; skipped"
+                    );
                 }
                 Err(e) => {
                     eprintln!("  semantic: embedding failed ({}); lexical path only", e);
@@ -558,9 +562,7 @@ fn recall(config: &Config, query: &str, k: usize) {
     let lex_cands: Vec<u32> = reader
         .text_index
         .as_ref()
-        .and_then(|idx| {
-            idx.candidates_lexical_min_matches(relevance_query.tokens(), min_matches)
-        })
+        .and_then(|idx| idx.candidates_lexical_min_matches(relevance_query.tokens(), min_matches))
         .unwrap_or_default();
 
     trace_phase(
@@ -587,43 +589,43 @@ fn recall(config: &Config, query: &str, k: usize) {
     );
 
     for i in candidates {
-            let text = reader.text(i);
-            let lexical = relevance_query.lexical_score(text);
-            // A block qualifies if it matches lexically OR is one of the
-            // nearest blocks by embedding. Previously the gate was
-            // `lexical > 0.0` alone, which made every semantic candidate
-            // unreachable: a paraphrase sharing no token scored zero and was
-            // dropped before ranking ever saw it.
-            let semantic = semantic_hits.get(&i).copied();
-            if lexical > 0.0 || semantic.is_some() {
-                let h = reader.header(i);
-                let dx = h.x - qx;
-                let dy = h.y - qy;
-                let dz = h.z - qz;
-                let spatial_dist = dx * dx + dy * dy + dz * dz;
-                let mut combined = microscope_memory::relevance::rank_distance_from_score(
-                    lexical,
-                    spatial_dist,
-                    config.search.keyword_boost,
-                    h.importance,
-                );
-                // Cosine similarity is a score, not a distance: fold it in as a
-                // bonus so a strong semantic match can outrank a weak lexical
-                // one. The gain is `search.semantic_rank_gain`, not
-                // `search.semantic_weight`: the latter is a 0..1 blend for the
-                // query's coordinates and was previously doubling as this,
-                // which meant raising it to test the ranking also moved the
-                // coordinates, and the two effects could not be told apart.
-                // The upper bound was 1.0, which made that unmeasurable: every
-                // value above 1 collapsed to the same score, so sweeping
-                // 1.0..10.0 returned identical recall and the term looked
-                // irrelevant. It was clamped, not irrelevant.
-                if let Some(sim) = semantic {
-                    let w = config.search.semantic_rank_gain.clamp(0.0, 8.0);
-                    combined -= sim * w;
-                }
-                all_results.push((combined, i, true));
+        let text = reader.text(i);
+        let lexical = relevance_query.lexical_score(text);
+        // A block qualifies if it matches lexically OR is one of the
+        // nearest blocks by embedding. Previously the gate was
+        // `lexical > 0.0` alone, which made every semantic candidate
+        // unreachable: a paraphrase sharing no token scored zero and was
+        // dropped before ranking ever saw it.
+        let semantic = semantic_hits.get(&i).copied();
+        if lexical > 0.0 || semantic.is_some() {
+            let h = reader.header(i);
+            let dx = h.x - qx;
+            let dy = h.y - qy;
+            let dz = h.z - qz;
+            let spatial_dist = dx * dx + dy * dy + dz * dz;
+            let mut combined = microscope_memory::relevance::rank_distance_from_score(
+                lexical,
+                spatial_dist,
+                config.search.keyword_boost,
+                h.importance,
+            );
+            // Cosine similarity is a score, not a distance: fold it in as a
+            // bonus so a strong semantic match can outrank a weak lexical
+            // one. The gain is `search.semantic_rank_gain`, not
+            // `search.semantic_weight`: the latter is a 0..1 blend for the
+            // query's coordinates and was previously doubling as this,
+            // which meant raising it to test the ranking also moved the
+            // coordinates, and the two effects could not be told apart.
+            // The upper bound was 1.0, which made that unmeasurable: every
+            // value above 1 collapsed to the same score, so sweeping
+            // 1.0..10.0 returned identical recall and the term looked
+            // irrelevant. It was clamped, not irrelevant.
+            if let Some(sim) = semantic {
+                let w = config.search.semantic_rank_gain.clamp(0.0, 8.0);
+                combined -= sim * w;
             }
+            all_results.push((combined, i, true));
+        }
     }
 
     trace_phase(
@@ -660,10 +662,7 @@ fn recall(config: &Config, query: &str, k: usize) {
     }
 
     // ─── ThoughtGraph + Predictive Cache ──
-    trace_phase(
-        "append log",
-        t0.elapsed().as_secs_f64() * 1000.0 - t_mark,
-    );
+    trace_phase("append log", t0.elapsed().as_secs_f64() * 1000.0 - t_mark);
     t_mark = t0.elapsed().as_secs_f64() * 1000.0;
 
     let output_dir_tg = Path::new(&config.paths.output_dir);
@@ -727,54 +726,58 @@ fn recall(config: &Config, query: &str, k: usize) {
     // Runs only when MICROSCOPE_EVAL_MATCH is set; never influences ranking.
     if std::env::var("MICROSCOPE_EVAL_DIAG").ok().as_deref() == Some("1") {
         if let Ok(m) = std::env::var("MICROSCOPE_EVAL_MATCH") {
-        let needles: Vec<String> = m
-            .split('|')
-            .map(|s| s.trim().to_lowercase())
-            .filter(|s| !s.is_empty())
-            .collect();
-        if !needles.is_empty() {
-            let lex: std::collections::HashSet<usize> = lex_cands
-                .iter()
-                .map(|c| *c as usize)
-                .filter(|i| *i < reader.block_count)
+            let needles: Vec<String> = m
+                .split('|')
+                .map(|s| s.trim().to_lowercase())
+                .filter(|s| !s.is_empty())
                 .collect();
-            let mut pos: Option<(usize, bool, bool)> = None;
-            let mut dedup_pos = 0usize;
-            let mut dedup_seen = std::collections::HashSet::new();
-            for (_d, idx, is_main) in all_results.iter() {
-                if !dedup_seen.insert((*idx, *is_main)) {
-                    continue;
+            if !needles.is_empty() {
+                let lex: std::collections::HashSet<usize> = lex_cands
+                    .iter()
+                    .map(|c| *c as usize)
+                    .filter(|i| *i < reader.block_count)
+                    .collect();
+                let mut pos: Option<(usize, bool, bool)> = None;
+                let mut dedup_pos = 0usize;
+                let mut dedup_seen = std::collections::HashSet::new();
+                for (_d, idx, is_main) in all_results.iter() {
+                    if !dedup_seen.insert((*idx, *is_main)) {
+                        continue;
+                    }
+                    let text = if *is_main {
+                        reader.text(*idx)
+                    } else {
+                        appended.get(*idx).map(|e| e.text.as_str()).unwrap_or("")
+                    }
+                    .to_lowercase();
+                    if pos.is_none() && needles.iter().any(|n| text.contains(n)) {
+                        pos = Some((
+                            dedup_pos,
+                            lex.contains(idx),
+                            semantic_hits.contains_key(idx),
+                        ));
+                    }
+                    dedup_pos += 1;
                 }
-                let text = if *is_main {
-                    reader.text(*idx)
-                } else {
-                    appended.get(*idx).map(|e| e.text.as_str()).unwrap_or("")
-                }
-                .to_lowercase();
-                if pos.is_none() && needles.iter().any(|n| text.contains(n)) {
-                    pos = Some((dedup_pos, lex.contains(idx), semantic_hits.contains_key(idx)));
-                }
-                dedup_pos += 1;
+                eprintln!(
+                    "EVALDIAG final={}",
+                    match pos {
+                        None => "MISS_not_in_ranked_list".to_string(),
+                        Some((p, l, s)) => format!(
+                            "pos={} lexical={} vector={} source={}",
+                            p,
+                            l,
+                            s,
+                            match (l, s) {
+                                (true, true) => "both",
+                                (true, false) => "lexical",
+                                (false, true) => "vector",
+                                (false, false) => "none",
+                            }
+                        ),
+                    }
+                );
             }
-            eprintln!(
-                "EVALDIAG final={}",
-                match pos {
-                    None => "MISS_not_in_ranked_list".to_string(),
-                    Some((p, l, s)) => format!(
-                        "pos={} lexical={} vector={} source={}",
-                        p,
-                        l,
-                        s,
-                        match (l, s) {
-                            (true, true) => "both",
-                            (true, false) => "lexical",
-                            (false, true) => "vector",
-                            (false, false) => "none",
-                        }
-                    ),
-                }
-            );
-        }
         }
     }
 
@@ -808,10 +811,7 @@ fn recall(config: &Config, query: &str, k: usize) {
         // Same final trace as the learn path below. Without this the segment is
         // unmeasured in exactly the mode every benchmark runs, because this
         // branch returns before reaching it.
-        trace_phase(
-            "print + save",
-            elapsed.as_secs_f64() * 1000.0 - t_mark,
-        );
+        trace_phase("print + save", elapsed.as_secs_f64() * 1000.0 - t_mark);
         // After `elapsed` is taken, so the writes are outside every window.
         trace_flush();
         println!("\n  {} results in {:.0} us", shown, elapsed.as_micros());
@@ -923,34 +923,64 @@ fn recall(config: &Config, query: &str, k: usize) {
             t0.elapsed().as_secs_f64() * 1000.0 - t_mark,
         );
         let t_w = Instant::now();
-        let _ = hebb.save_dirty(output_dir, &activated.iter().map(|(i, _)| *i).collect::<Vec<_>>());
-        trace_phase("  save: hebbian (dirty)", t_w.elapsed().as_secs_f64() * 1000.0);
+        let _ = hebb.save_dirty(
+            output_dir,
+            &activated.iter().map(|(i, _)| *i).collect::<Vec<_>>(),
+        );
+        trace_phase(
+            "  save: hebbian (dirty)",
+            t_w.elapsed().as_secs_f64() * 1000.0,
+        );
         t_mark = t0.elapsed().as_secs_f64() * 1000.0;
         let _ = mirror.save(output_dir);
-        trace_phase("  save: mirror", t0.elapsed().as_secs_f64() * 1000.0 - t_mark);
+        trace_phase(
+            "  save: mirror",
+            t0.elapsed().as_secs_f64() * 1000.0 - t_mark,
+        );
         t_mark = t0.elapsed().as_secs_f64() * 1000.0;
         let _ = resonance.save(output_dir);
-        trace_phase("  save: resonance", t0.elapsed().as_secs_f64() * 1000.0 - t_mark);
+        trace_phase(
+            "  save: resonance",
+            t0.elapsed().as_secs_f64() * 1000.0 - t_mark,
+        );
         t_mark = t0.elapsed().as_secs_f64() * 1000.0;
         let _ = archetypes.save(output_dir);
-        trace_phase("  save: archetypes", t0.elapsed().as_secs_f64() * 1000.0 - t_mark);
+        trace_phase(
+            "  save: archetypes",
+            t0.elapsed().as_secs_f64() * 1000.0 - t_mark,
+        );
         t_mark = t0.elapsed().as_secs_f64() * 1000.0;
         let _ = temporal.save(output_dir);
-        trace_phase("  save: temporal archetypes", t0.elapsed().as_secs_f64() * 1000.0 - t_mark);
+        trace_phase(
+            "  save: temporal archetypes",
+            t0.elapsed().as_secs_f64() * 1000.0 - t_mark,
+        );
         t_mark = t0.elapsed().as_secs_f64() * 1000.0;
         let _ = thought_graph.save(output_dir);
-        trace_phase("  save: thought graph", t0.elapsed().as_secs_f64() * 1000.0 - t_mark);
+        trace_phase(
+            "  save: thought graph",
+            t0.elapsed().as_secs_f64() * 1000.0 - t_mark,
+        );
         t_mark = t0.elapsed().as_secs_f64() * 1000.0;
         let _ = pred_cache.save(output_dir);
-        trace_phase("  save: predictive cache", t0.elapsed().as_secs_f64() * 1000.0 - t_mark);
+        trace_phase(
+            "  save: predictive cache",
+            t0.elapsed().as_secs_f64() * 1000.0 - t_mark,
+        );
         t_mark = t0.elapsed().as_secs_f64() * 1000.0;
         let _ = attention.save(output_dir);
-        trace_phase("  save: attention", t0.elapsed().as_secs_f64() * 1000.0 - t_mark);
+        trace_phase(
+            "  save: attention",
+            t0.elapsed().as_secs_f64() * 1000.0 - t_mark,
+        );
         t_mark = t0.elapsed().as_secs_f64() * 1000.0;
         // --- Eureka: detect unexpected connections ---
         let eureka_events =
             microscope_memory::eureka::detect_eureka(config, &reader, query, None, &all_results);
-        trace_phase("  learn: eureka detect", t0.elapsed().as_secs_f64() * 1000.0 - t_mark);
+        trace_phase(
+            "  learn: eureka detect",
+            t0.elapsed().as_secs_f64() * 1000.0 - t_mark,
+        );
         t_mark = t0.elapsed().as_secs_f64() * 1000.0;
         if !eureka_events.is_empty() {
             let mut eureka_log = microscope_memory::eureka::EurekaLog::load_or_init(output_dir);
@@ -968,21 +998,33 @@ fn recall(config: &Config, query: &str, k: usize) {
         let t_sp = Instant::now();
         let mut spaced =
             microscope_memory::spaced_repetition::SpacedRepetition::load_or_init(output_dir);
-        trace_phase("  learn: spaced load", t_sp.elapsed().as_secs_f64() * 1000.0);
+        trace_phase(
+            "  learn: spaced load",
+            t_sp.elapsed().as_secs_f64() * 1000.0,
+        );
         let t_sr = Instant::now();
         for &(idx, _) in &activated {
             spaced.record_recall(idx, 5, 3);
         }
-        trace_phase("  learn: spaced record", t_sr.elapsed().as_secs_f64() * 1000.0);
+        trace_phase(
+            "  learn: spaced record",
+            t_sr.elapsed().as_secs_f64() * 1000.0,
+        );
         let t_ss = Instant::now();
         let _ = spaced.save(output_dir);
-        trace_phase("  learn: spaced save", t_ss.elapsed().as_secs_f64() * 1000.0);
+        trace_phase(
+            "  learn: spaced save",
+            t_ss.elapsed().as_secs_f64() * 1000.0,
+        );
 
         // --- Narrative: update the system's self-narrative ---
         let t_nv = Instant::now();
         let mut narrative = microscope_memory::narrative::NarrativeState::load_or_init(output_dir);
         let esr = microscope_memory::emotional_state::EmotionalStateRing::load_or_init(output_dir);
-        trace_phase("  learn: narrative load", t_nv.elapsed().as_secs_f64() * 1000.0);
+        trace_phase(
+            "  learn: narrative load",
+            t_nv.elapsed().as_secs_f64() * 1000.0,
+        );
         let t_nu = Instant::now();
         let due_count = Some(spaced.due_count());
         let thought_count = Some(thought_graph.crystallized_count());
@@ -1010,7 +1052,10 @@ fn recall(config: &Config, query: &str, k: usize) {
         if narrative.session_count <= 3 || narrative.session_count.is_multiple_of(10) {
             println!("  {} {}", "NARRATIVE:".cyan(), narrative.narrative);
         }
-        trace_phase("  learn: narrative update", t_nu.elapsed().as_secs_f64() * 1000.0);
+        trace_phase(
+            "  learn: narrative update",
+            t_nu.elapsed().as_secs_f64() * 1000.0,
+        );
 
         // --- Auto-reflect: every N recalls, the system thinks about itself ---
         if narrative.session_count > 0
@@ -1054,7 +1099,10 @@ fn recall(config: &Config, query: &str, k: usize) {
             let t_nm = Instant::now();
             let mut nm =
                 microscope_memory::narrative_memory::NarrativeMemory::load_or_init(output_dir);
-            trace_phase("  learn: narrative memory load", t_nm.elapsed().as_secs_f64() * 1000.0);
+            trace_phase(
+                "  learn: narrative memory load",
+                t_nm.elapsed().as_secs_f64() * 1000.0,
+            );
             trace_note(
                 "narrative memory resyncs",
                 format!(
@@ -1077,7 +1125,10 @@ fn recall(config: &Config, query: &str, k: usize) {
                     );
                 }
             }
-            trace_phase("  learn: narrative memory build", t_be.elapsed().as_secs_f64() * 1000.0);
+            trace_phase(
+                "  learn: narrative memory build",
+                t_be.elapsed().as_secs_f64() * 1000.0,
+            );
         }
 
         // --- Auto inner monologue: every 15th recall ---
@@ -1107,10 +1158,7 @@ fn recall(config: &Config, query: &str, k: usize) {
     // the state writes. Every earlier phase now sets `t_mark`, so this number
     // is a real segment rather than an accumulation of everything downstream
     // of the vector search, which is what made it uninterpretable before.
-    trace_phase(
-        "print + save",
-        elapsed.as_secs_f64() * 1000.0 - t_mark,
-    );
+    trace_phase("print + save", elapsed.as_secs_f64() * 1000.0 - t_mark);
     // After `elapsed` is taken, so the writes are outside every window.
     trace_flush();
     println!("\n  {} results in {:.0} us", shown, elapsed.as_micros());
@@ -1943,13 +1991,19 @@ async fn async_main() {
             println!("steady state  min           {:>8.1} ms", warm[0]);
             println!("steady state  p50           {:>8.1} ms", pick(0.50));
             println!("steady state  p95           {:>8.1} ms", pick(0.95));
-            println!("steady state  max           {:>8.1} ms", warm[warm.len() - 1]);
+            println!(
+                "steady state  max           {:>8.1} ms",
+                warm[warm.len() - 1]
+            );
 
             // Phase breakdown averaged over every call, warm ones included.
             let summary = phase_summary();
             if !summary.is_empty() {
                 let total: f64 = summary.iter().map(|(_, ms, _)| ms).sum();
-                println!("\n  mean per call over {} samples, busiest first:", summary[0].2);
+                println!(
+                    "\n  mean per call over {} samples, busiest first:",
+                    summary[0].2
+                );
                 for (name, ms, count) in &summary {
                     let share = if total > 0.0 { ms / total * 100.0 } else { 0.0 };
                     println!(
@@ -3870,11 +3924,11 @@ async fn async_main() {
         Cmd::Morphogenesis { action } => {
             use microscope_memory::cli::MorphogenesisAction;
             use microscope_memory::cognitive_morphogenesis::CognitiveMorphogenesisEngine;
-            use microscope_memory::hebbian::HebbianState;
-            use microscope_memory::resonance::ResonanceState;
-            use microscope_memory::epistemic::EvidenceLedger;
-            use microscope_memory::predictive_cache::PredictiveCache;
             use microscope_memory::emotional_contagion::EmotionalContagionState;
+            use microscope_memory::epistemic::EvidenceLedger;
+            use microscope_memory::hebbian::HebbianState;
+            use microscope_memory::predictive_cache::PredictiveCache;
+            use microscope_memory::resonance::ResonanceState;
 
             let output_dir = std::path::Path::new(&config.paths.output_dir);
             let reader = open_reader(&config);
@@ -3944,7 +3998,8 @@ async fn async_main() {
                     let evidence = EvidenceLedger::load_or_init(output_dir);
                     let predictive = PredictiveCache::load_or_init(output_dir);
                     let emotional = EmotionalContagionState::load_or_init(output_dir);
-                    let absentia = microscope_memory::absentia::AbsentiaState::load_or_init(output_dir);
+                    let absentia =
+                        microscope_memory::absentia::AbsentiaState::load_or_init(output_dir);
 
                     // Block headers a pozíciókhoz
                     let headers: Vec<(f32, f32, f32)> = (0..reader.block_count)
@@ -3988,7 +4043,10 @@ async fn async_main() {
                     println!("  Activated blocks:   {}", entry.activated_blocks.len());
                     println!("  New nodes:          {}", entry.new_node_count);
                     println!("  New connections:    {}", entry.new_connection_count);
-                    println!("  Anastomosis:        {} (validated: {})", entry.anastomosis_count, entry.anastomosis_validated);
+                    println!(
+                        "  Anastomosis:        {} (validated: {})",
+                        entry.anastomosis_count, entry.anastomosis_validated
+                    );
                     println!("  Solidified paths:   {}", entry.solidified_paths);
                     println!("  Pruned paths:       {}", entry.pruned_paths);
                     println!("  Components:         {}", entry.component_scores);
@@ -4000,32 +4058,44 @@ async fn async_main() {
                     println!();
 
                     // GAS: alacsony gradiens
-                    let gas_gradient = CognitiveGradient { weights: (0.0, 0.0, 0.0, 0.05, 0.05, 0.0, 0.0) };
+                    let gas_gradient = CognitiveGradient {
+                        weights: (0.0, 0.0, 0.0, 0.05, 0.05, 0.0, 0.0),
+                    };
                     let gas_val = gas_gradient.compute(0.0, 0.0, 0, 0.1, 0.1, 0.0, 0.0);
                     let gas_phase = Phase::from_gradient(gas_val);
                     println!("  GAS test:    gradient={:.3} phase={} (weights: rel=0.0 res=0.0 evi=0.0 heb=0.05 pred=0.05 emo=0.0 exec=0.0)", gas_val, gas_phase);
 
                     // LIQUID: közepes gradiens
-                    let liquid_gradient = CognitiveGradient { weights: (0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5) };
+                    let liquid_gradient = CognitiveGradient {
+                        weights: (0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5),
+                    };
                     let liquid_val = liquid_gradient.compute(0.5, 0.3, 50, 0.5, 0.5, 0.0, 0.5);
                     let liquid_phase = Phase::from_gradient(liquid_val);
-                    println!("  LIQUID test: gradient={:.3} phase={} (weights: all=0.5, scores: mid)", liquid_val, liquid_phase);
+                    println!(
+                        "  LIQUID test: gradient={:.3} phase={} (weights: all=0.5, scores: mid)",
+                        liquid_val, liquid_phase
+                    );
 
                     // SOLID: magas gradiens
-                    let solid_gradient = CognitiveGradient { weights: (1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0) };
+                    let solid_gradient = CognitiveGradient {
+                        weights: (1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0),
+                    };
                     let solid_val = solid_gradient.compute(1.0, 1.0, 100, 1.0, 1.0, 1.0, 1.0);
                     let solid_phase = Phase::from_gradient(solid_val);
-                    println!("  SOLID test:  gradient={:.3} phase={} (weights: all=1.0, scores: high)", solid_val, solid_phase);
+                    println!(
+                        "  SOLID test:  gradient={:.3} phase={} (weights: all=1.0, scores: high)",
+                        solid_val, solid_phase
+                    );
 
                     println!();
                     println!("  Phase boundaries: GAS < 0.3 | LIQUID 0.3-0.7 | SOLID > 0.7");
                 }
                 MorphogenesisAction::FullStatus => {
-                    use crate::hebbian::HebbianState;
-                    use crate::resonance::ResonanceState;
-                    use crate::epistemic::EvidenceLedger;
-                    use crate::predictive_cache::PredictiveCache;
                     use crate::emotional_contagion::EmotionalContagionState;
+                    use crate::epistemic::EvidenceLedger;
+                    use crate::hebbian::HebbianState;
+                    use crate::predictive_cache::PredictiveCache;
+                    use crate::resonance::ResonanceState;
 
                     let engine = CognitiveMorphogenesisEngine::load_or_init(output_dir);
                     let stats = engine.stats();
@@ -4041,9 +4111,15 @@ async fn async_main() {
                     // Morphogenezis
                     println!("  {}", "── Morphogenesis ──".yellow());
                     println!("  Total cycles:       {}", stats.total_cycles);
-                    println!("  GAS / LIQUID / SOLID: {} / {} / {}", stats.gas_cycles, stats.liquid_cycles, stats.solid_cycles);
+                    println!(
+                        "  GAS / LIQUID / SOLID: {} / {} / {}",
+                        stats.gas_cycles, stats.liquid_cycles, stats.solid_cycles
+                    );
                     println!("  Avg gradient:       {:.3}", stats.avg_gradient);
-                    println!("  Anastomosis:        {} / {} (total/validated)", stats.total_anastomosis, stats.validated_anastomosis);
+                    println!(
+                        "  Anastomosis:        {} / {} (total/validated)",
+                        stats.total_anastomosis, stats.validated_anastomosis
+                    );
                     println!("  Audit entries:      {}", stats.total_audit_entries);
                     println!("  Metrics entries:    {}", stats.total_metrics_entries);
                     println!();
@@ -4072,18 +4148,29 @@ async fn async_main() {
                     let avg_conf = if evidence.records.is_empty() {
                         0.0
                     } else {
-                        evidence.records.values().map(|r| r.confidence as f64).sum::<f64>()
+                        evidence
+                            .records
+                            .values()
+                            .map(|r| r.confidence as f64)
+                            .sum::<f64>()
                             / evidence.records.len() as f64
                     };
                     println!("  Records:            {}", evidence.records.len());
-                    println!("  Avg confidence:     {:.1} / 100 ({:.2})", avg_conf, avg_conf / 100.0);
+                    println!(
+                        "  Avg confidence:     {:.1} / 100 ({:.2})",
+                        avg_conf,
+                        avg_conf / 100.0
+                    );
                     println!();
 
                     // Predictive
                     println!("  {}", "── Predictive Cache ──".yellow());
                     println!("  Predictions:        {}", predictive.predictions.len());
                     println!("  Hit rate:           {:.3}", predictive.stats.hit_rate());
-                    println!("  Hits / Misses:      {} / {}", predictive.stats.total_hits, predictive.stats.total_misses);
+                    println!(
+                        "  Hits / Misses:      {} / {}",
+                        predictive.stats.total_hits, predictive.stats.total_misses
+                    );
                     println!();
 
                     // Emotion
@@ -4102,21 +4189,25 @@ async fn async_main() {
                         println!("  {}", "── Last Cycle ──".yellow());
                         println!("  Phase:              {}", last.phase);
                         println!("  Gradient:           {:.3}", last.gradient_avg);
-                        println!("  Nodes / Connections: {} / {}", last.new_node_count, last.new_connection_count);
-                        println!("  Anastomosis:        {} / {}", last.anastomosis_count, last.anastomosis_validated);
+                        println!(
+                            "  Nodes / Connections: {} / {}",
+                            last.new_node_count, last.new_connection_count
+                        );
+                        println!(
+                            "  Anastomosis:        {} / {}",
+                            last.anastomosis_count, last.anastomosis_validated
+                        );
                         println!("  Components:         {}", last.component_scores);
                     }
                 }
                 MorphogenesisAction::Adversarial => {
                     use microscope_memory::cognitive_morphogenesis::{
-                        CognitiveGradient, Phase, CognitiveMorphogenesisEngine,
-                        graph_entropy,
+                        graph_entropy, CognitiveGradient, CognitiveMorphogenesisEngine, Phase,
                     };
-                    
+
                     use microscope_memory::hebbian::HebbianState;
-                    
+
                     use microscope_memory::epistemic::EvidenceLedger;
-                    
 
                     println!("{}", "ADVERSARIAL TEST SUITE".cyan().bold());
                     println!();
@@ -4143,17 +4234,28 @@ async fn async_main() {
                     let avg_conf = if evidence.records.is_empty() {
                         0.0
                     } else {
-                        evidence.records.values().map(|r| r.confidence as f64).sum::<f64>()
-                            / evidence.records.len() as f64 / 100.0
+                        evidence
+                            .records
+                            .values()
+                            .map(|r| r.confidence as f64)
+                            .sum::<f64>()
+                            / evidence.records.len() as f64
+                            / 100.0
                     };
                     // Ha avg_conf < 0.2, akkor pruned kellene legyen
                     let would_prune = avg_conf < 0.2;
-                    println!("      avg_confidence = {:.3}, would_prune = {}", avg_conf, would_prune);
+                    println!(
+                        "      avg_confidence = {:.3}, would_prune = {}",
+                        avg_conf, would_prune
+                    );
                     if avg_conf < 0.2 {
                         println!("      PASS: alacsony confidence → pruning logika aktiv");
                         passed += 1;
                     } else {
-                        println!("      SKIP: confidence elég magas ({:.3}), nincs pruning", avg_conf);
+                        println!(
+                            "      SKIP: confidence elég magas ({:.3}), nincs pruning",
+                            avg_conf
+                        );
                         passed += 1; // nem hiba, csak más állapot
                     }
 
@@ -4164,8 +4266,11 @@ async fn async_main() {
                     let solid = Phase::from_gradient(1.0);
                     let boundary_low = Phase::from_gradient(0.299);
                     let boundary_high = Phase::from_gradient(0.701);
-                    let ok = gas == Phase::Gas && liquid == Phase::Liquid && solid == Phase::Solid
-                        && boundary_low == Phase::Gas && boundary_high == Phase::Solid;
+                    let ok = gas == Phase::Gas
+                        && liquid == Phase::Liquid
+                        && solid == Phase::Solid
+                        && boundary_low == Phase::Gas
+                        && boundary_high == Phase::Solid;
                     if ok {
                         println!("      PASS: GAS<0.3, LIQUID 0.3-0.7, SOLID>0.7");
                         passed += 1;
@@ -4184,7 +4289,10 @@ async fn async_main() {
                     // Minden komponens 0-1 tartományban kell legyen
                     let components_ok = max_g > 0.0 && min_g >= 0.0;
                     if components_ok {
-                        println!("      PASS: max={:.3}, min={:.3}, komponensek tartományban", max_g, min_g);
+                        println!(
+                            "      PASS: max={:.3}, min={:.3}, komponensek tartományban",
+                            max_g, min_g
+                        );
                         passed += 1;
                     } else {
                         println!("      FAIL: max={:.3}, min={:.3}", max_g, min_g);
@@ -4198,10 +4306,16 @@ async fn async_main() {
                     let e_tree = graph_entropy(10, 9); // fa: n-1 él
                     let ok = e_empty == 0.0 && e_single == 0.0 && e_tree > 0.0;
                     if ok {
-                        println!("      PASS: empty={}, single={}, tree={:.3}", e_empty, e_single, e_tree);
+                        println!(
+                            "      PASS: empty={}, single={}, tree={:.3}",
+                            e_empty, e_single, e_tree
+                        );
                         passed += 1;
                     } else {
-                        println!("      FAIL: empty={}, single={}, tree={:.3}", e_empty, e_single, e_tree);
+                        println!(
+                            "      FAIL: empty={}, single={}, tree={:.3}",
+                            e_empty, e_single, e_tree
+                        );
                         failed += 1;
                     }
 
@@ -4213,7 +4327,10 @@ async fn async_main() {
                     let engine2 = CognitiveMorphogenesisEngine::load_or_init(output_dir);
                     let count_after = engine2.audit_log.len();
                     if count_before == count_after && count_after > 0 {
-                        println!("      PASS: {} entries túlélte az újraindítást", count_after);
+                        println!(
+                            "      PASS: {} entries túlélte az újraindítást",
+                            count_after
+                        );
                         passed += 1;
                     } else {
                         println!("      FAIL: before={}, after={}", count_before, count_after);
@@ -4246,10 +4363,16 @@ async fn async_main() {
                         if !engine4.metrics_log.is_empty() {
                             let m2 = &engine4.metrics_log[0];
                             if m.cycle_id == m2.cycle_id && m.timestamp_ms == m2.timestamp_ms {
-                                println!("      PASS: metrika szerializáció kör ok (cycle_id={})", m.cycle_id);
+                                println!(
+                                    "      PASS: metrika szerializáció kör ok (cycle_id={})",
+                                    m.cycle_id
+                                );
                                 passed += 1;
                             } else {
-                                println!("      FAIL: cycle_id mismatch {} vs {}", m.cycle_id, m2.cycle_id);
+                                println!(
+                                    "      FAIL: cycle_id mismatch {} vs {}",
+                                    m.cycle_id, m2.cycle_id
+                                );
                                 failed += 1;
                             }
                         } else {
@@ -4263,7 +4386,12 @@ async fn async_main() {
 
                     // ─── Összefoglaló ───
                     println!();
-                    println!("  {} / {} passed, {} failed", passed, passed + failed, failed);
+                    println!(
+                        "  {} / {} passed, {} failed",
+                        passed,
+                        passed + failed,
+                        failed
+                    );
                     if failed == 0 {
                         println!("  {}", "ALL ADVERSARIAL TESTS PASSED".green().bold());
                     } else {
@@ -4271,19 +4399,22 @@ async fn async_main() {
                     }
                 }
                 MorphogenesisAction::PresenceAbsenceTest => {
-                    use microscope_memory::cognitive_morphogenesis::{
-                        CognitiveGradient, Phase,
-                    };
-                    use microscope_memory::morphogenesis::{
-                        GrowthConfig, Seed, mycelium_growth, MorphogenField,
-                    };
-                    use microscope_memory::hebbian::HebbianState;
-                    use microscope_memory::epistemic::EvidenceLedger;
-                    use microscope_memory::predictive_cache::PredictiveCache;
+                    use microscope_memory::absentia::{compute_absence_shadow, AbsentiaState};
+                    use microscope_memory::cognitive_morphogenesis::{CognitiveGradient, Phase};
                     use microscope_memory::emotional_contagion::EmotionalContagionState;
-                    use microscope_memory::absentia::{AbsentiaState, compute_absence_shadow};
+                    use microscope_memory::epistemic::EvidenceLedger;
+                    use microscope_memory::hebbian::HebbianState;
+                    use microscope_memory::morphogenesis::{
+                        mycelium_growth, GrowthConfig, MorphogenField, Seed,
+                    };
+                    use microscope_memory::predictive_cache::PredictiveCache;
 
-                    println!("{}", "A/B TESZT: Presence-driven growth ↔ absence-driven inhibition".cyan().bold());
+                    println!(
+                        "{}",
+                        "A/B TESZT: Presence-driven growth ↔ absence-driven inhibition"
+                            .cyan()
+                            .bold()
+                    );
                     println!();
 
                     let hebb = HebbianState::load_or_init(output_dir, reader.block_count);
@@ -4315,11 +4446,24 @@ async fn async_main() {
                     println!("  {}", "── A eset: NINCS evidence ──".yellow());
                     let grad_a = CognitiveGradient::default();
                     let mut field_a = MorphogenField::new();
-                    crate::cognitive_morphogenesis::sync_hebbian_to_field(&hebb, &mut field_a, &headers);
-                    crate::cognitive_morphogenesis::sync_resonance_to_field(&resonance, &mut field_a);
+                    crate::cognitive_morphogenesis::sync_hebbian_to_field(
+                        &hebb,
+                        &mut field_a,
+                        &headers,
+                    );
+                    crate::cognitive_morphogenesis::sync_resonance_to_field(
+                        &resonance,
+                        &mut field_a,
+                    );
                     // NEM alkalmazunk evidence modulációt
-                    crate::cognitive_morphogenesis::apply_prediction_modulation(&mut field_a, &predictive);
-                    crate::cognitive_morphogenesis::apply_emotion_modulation(&mut field_a, &emotional);
+                    crate::cognitive_morphogenesis::apply_prediction_modulation(
+                        &mut field_a,
+                        &predictive,
+                    );
+                    crate::cognitive_morphogenesis::apply_emotion_modulation(
+                        &mut field_a,
+                        &emotional,
+                    );
                     // Absentia shadow
                     crate::absentia::apply_absentia_to_field(&absentia, &mut field_a, 0);
 
@@ -4330,7 +4474,8 @@ async fn async_main() {
                     } else {
                         (0.0, 0.0, 0.0)
                     };
-                    let shadow_a = compute_absence_shadow(&absentia, hx as f64, hy as f64, hz as f64, 0);
+                    let shadow_a =
+                        compute_absence_shadow(&absentia, hx as f64, hy as f64, hz as f64, 0);
 
                     // Gradiens számolás A esetben
                     let g_a = grad_a.compute(0.0, 0.0, 0, 1.0, 1.0, 0.0, 1.0);
@@ -4352,13 +4497,18 @@ async fn async_main() {
                     let _anast_a = 0usize;
                     for (i, &(block_idx, score)) in activated.iter().take(3).enumerate() {
                         let idx = block_idx as usize;
-                        if idx >= headers.len() { continue; }
+                        if idx >= headers.len() {
+                            continue;
+                        }
                         let (bx, by, bz) = headers[idx];
                         let seed = Seed::new(
                             &format!("test_a_{}", i),
-                            bx as f64, by as f64, bz as f64,
+                            bx as f64,
+                            by as f64,
+                            bz as f64,
                             &format!("block_{}", idx),
-                        ).with_energy((score as f64 * 100.0).max(10.0));
+                        )
+                        .with_energy((score as f64 * 100.0).max(10.0));
                         let org = mycelium_growth(&seed, &field_a, &config_a);
                         nodes_a += org.nodes.len();
                         conns_a += org.connections.len();
@@ -4370,15 +4520,33 @@ async fn async_main() {
                     // ─── B eset: ugyanaz + evidence ───
                     println!("  {}", "── B eset: VAN evidence ──".yellow());
                     let mut field_b = MorphogenField::new();
-                    crate::cognitive_morphogenesis::sync_hebbian_to_field(&hebb, &mut field_b, &headers);
-                    crate::cognitive_morphogenesis::sync_resonance_to_field(&resonance, &mut field_b);
-                    crate::cognitive_morphogenesis::apply_evidence_modulation(&mut field_b, &evidence, &headers);
-                    crate::cognitive_morphogenesis::apply_prediction_modulation(&mut field_b, &predictive);
-                    crate::cognitive_morphogenesis::apply_emotion_modulation(&mut field_b, &emotional);
+                    crate::cognitive_morphogenesis::sync_hebbian_to_field(
+                        &hebb,
+                        &mut field_b,
+                        &headers,
+                    );
+                    crate::cognitive_morphogenesis::sync_resonance_to_field(
+                        &resonance,
+                        &mut field_b,
+                    );
+                    crate::cognitive_morphogenesis::apply_evidence_modulation(
+                        &mut field_b,
+                        &evidence,
+                        &headers,
+                    );
+                    crate::cognitive_morphogenesis::apply_prediction_modulation(
+                        &mut field_b,
+                        &predictive,
+                    );
+                    crate::cognitive_morphogenesis::apply_emotion_modulation(
+                        &mut field_b,
+                        &emotional,
+                    );
                     // Absentia shadow — de most VAN evidence, tehát kisebb kell legyen
                     crate::absentia::apply_absentia_to_field(&absentia, &mut field_b, 50);
 
-                    let shadow_b = compute_absence_shadow(&absentia, hx as f64, hy as f64, hz as f64, 50);
+                    let shadow_b =
+                        compute_absence_shadow(&absentia, hx as f64, hy as f64, hz as f64, 50);
                     let g_b = grad_a.compute(0.0, 0.0, 50, 1.0, 1.0, 0.0, 1.0); // evidence = 50
                     let effective_b = g_b * (1.0 - shadow_b);
                     let phase_b = Phase::from_gradient(effective_b);
@@ -4397,13 +4565,18 @@ async fn async_main() {
                     let mut conns_b = 0usize;
                     for (i, &(block_idx, score)) in activated.iter().take(3).enumerate() {
                         let idx = block_idx as usize;
-                        if idx >= headers.len() { continue; }
+                        if idx >= headers.len() {
+                            continue;
+                        }
                         let (bx, by, bz) = headers[idx];
                         let seed = Seed::new(
                             &format!("test_b_{}", i),
-                            bx as f64, by as f64, bz as f64,
+                            bx as f64,
+                            by as f64,
+                            bz as f64,
                             &format!("block_{}", idx),
-                        ).with_energy((score as f64 * 100.0).max(10.0));
+                        )
+                        .with_energy((score as f64 * 100.0).max(10.0));
                         let org = mycelium_growth(&seed, &field_b, &config_b);
                         nodes_b += org.nodes.len();
                         conns_b += org.connections.len();
@@ -4419,42 +4592,73 @@ async fn async_main() {
                     let node_delta = nodes_b as i64 - nodes_a as i64;
                     let conn_delta = conns_b as i64 - conns_a as i64;
 
-                    println!("    Shadow delta:       {:.3} (A magasabb = több árnyék)", shadow_delta);
-                    println!("    Gradient delta:     {:.3} (B magasabb = evidence felszabadít)", gradient_delta);
-                    println!("    Node delta:         {} (B több = evidence növekedést indít)", node_delta);
-                    println!("    Conn delta:         {} (B több = több kapcsolat)", conn_delta);
+                    println!(
+                        "    Shadow delta:       {:.3} (A magasabb = több árnyék)",
+                        shadow_delta
+                    );
+                    println!(
+                        "    Gradient delta:     {:.3} (B magasabb = evidence felszabadít)",
+                        gradient_delta
+                    );
+                    println!(
+                        "    Node delta:         {} (B több = evidence növekedést indít)",
+                        node_delta
+                    );
+                    println!(
+                        "    Conn delta:         {} (B több = több kapcsolat)",
+                        conn_delta
+                    );
                     println!();
 
                     // ─── Ítélet ───
                     if shadow_a > shadow_b && effective_b > effective_a && nodes_b >= nodes_a {
-                        println!("  {}", "✓ PROVEN: presence-driven growth ↔ absence-driven inhibition".green().bold());
+                        println!(
+                            "  {}",
+                            "✓ PROVEN: presence-driven growth ↔ absence-driven inhibition"
+                                .green()
+                                .bold()
+                        );
                         println!("    A hiányzó episztemikus támogatás strukturálisan visszafogta az útvonalat");
                         println!("    A támogatás megjelenése reverzibilisen feloldotta a gátlást");
                     } else if shadow_a > shadow_b {
-                        println!("  {}", "⚠ PARTIAL: shadow működik, de a növekedés nem különbözik eléggé".yellow().bold());
+                        println!(
+                            "  {}",
+                            "⚠ PARTIAL: shadow működik, de a növekedés nem különbözik eléggé"
+                                .yellow()
+                                .bold()
+                        );
                     } else {
-                        println!("  {}", "✗ NOT PROVEN: a shadow nem különbözteti meg az A és B esetet".red().bold());
+                        println!(
+                            "  {}",
+                            "✗ NOT PROVEN: a shadow nem különbözteti meg az A és B esetet"
+                                .red()
+                                .bold()
+                        );
                     }
                 }
                 MorphogenesisAction::DeepAdversarial => {
                     use microscope_memory::cognitive_morphogenesis::{
-                        CognitiveGradient, Phase, CognitiveMorphogenesisEngine,
+                        CognitiveGradient, CognitiveMorphogenesisEngine, Phase,
                     };
-                    use microscope_memory::morphogenesis::{
-                        GrowthConfig, Seed, mycelium_growth, MorphogenField,
-                    };
-                    use microscope_memory::hebbian::HebbianState;
                     use microscope_memory::epistemic::EvidenceLedger;
-                    
+                    use microscope_memory::hebbian::HebbianState;
+                    use microscope_memory::morphogenesis::{
+                        mycelium_growth, GrowthConfig, MorphogenField, Seed,
+                    };
 
-                    println!("{}", "DEEP ADVERSARIAL — Valódi viselkedés-tesztek".cyan().bold());
+                    println!(
+                        "{}",
+                        "DEEP ADVERSARIAL — Valódi viselkedés-tesztek".cyan().bold()
+                    );
                     println!();
                     let mut passed = 0usize;
                     let mut failed = 0usize;
                     let mut warnings = 0usize;
 
                     // ─── [1] C4 szabály: magas activation_count evidence nélkül ───
-                    println!("  [1] C4 szabály: hamis promotion — magas activation, nincs evidence");
+                    println!(
+                        "  [1] C4 szabály: hamis promotion — magas activation, nincs evidence"
+                    );
                     {
                         let hebb = HebbianState::load_or_init(output_dir, reader.block_count);
                         let evidence = EvidenceLedger::load_or_init(output_dir);
@@ -4471,7 +4675,10 @@ async fn async_main() {
                         // A hottest parancs NEM kap importance-t — csak energy-t mutat
                         // A C4 szabály az epistemic szinten működik, nem a Hebbian szinten
                         // Tehát a Hebbian "tanulhat" evidence nélkül is — de az importance nem nő
-                        println!("      INFO: {} blokk magas activation_count-tal", high_activation_no_evidence);
+                        println!(
+                            "      INFO: {} blokk magas activation_count-tal",
+                            high_activation_no_evidence
+                        );
                         println!("      PASS: Hebbian energy ≠ importance — C4 az epistemic szinten működik");
                         passed += 1;
                     }
@@ -4498,7 +4705,10 @@ async fn async_main() {
                         // kapcsolódó és a véletlenül együtt aktiválódott blokkokat
                         // Ez egy TUDATOSSÁGI korlát
                         if cross_layer_pairs > 0 {
-                            println!("      WARN: {} co-aktivációs pár különböző rétegek között", cross_layer_pairs);
+                            println!(
+                                "      WARN: {} co-aktivációs pár különböző rétegek között",
+                                cross_layer_pairs
+                            );
                             println!("      TUDATOSSÁGI KORLÁT: a rendszer nem különbözteti meg a szemantikai és statisztikai kapcsolatot");
                             warnings += 1;
                             passed += 1;
@@ -4520,11 +4730,16 @@ async fn async_main() {
                         let config = GrowthConfig::mycelium_default();
                         let org = mycelium_growth(&seed, &field, &config);
                         // A növekedés iránya
-                        let avg_x: f64 = org.nodes.iter().map(|n| n.position.0).sum::<f64>() / org.nodes.len().max(1) as f64;
-                        let avg_y: f64 = org.nodes.iter().map(|n| n.position.1).sum::<f64>() / org.nodes.len().max(1) as f64;
-                        let avg_z: f64 = org.nodes.iter().map(|n| n.position.2).sum::<f64>() / org.nodes.len().max(1) as f64;
+                        let avg_x: f64 = org.nodes.iter().map(|n| n.position.0).sum::<f64>()
+                            / org.nodes.len().max(1) as f64;
+                        let avg_y: f64 = org.nodes.iter().map(|n| n.position.1).sum::<f64>()
+                            / org.nodes.len().max(1) as f64;
+                        let avg_z: f64 = org.nodes.iter().map(|n| n.position.2).sum::<f64>()
+                            / org.nodes.len().max(1) as f64;
                         // A szimmetrikus elhelyezés miatt az átlag közel kell legyen a középponthoz
-                        let dist_from_center = ((avg_x - 2.5).powi(2) + (avg_y - 2.5).powi(2) + (avg_z - 2.5).powi(2)).sqrt();
+                        let dist_from_center =
+                            ((avg_x - 2.5).powi(2) + (avg_y - 2.5).powi(2) + (avg_z - 2.5).powi(2))
+                                .sqrt();
                         if dist_from_center < 2.0 {
                             println!("      PASS: avg=({:.1},{:.1},{:.1}), dist_from_center={:.2} — szimmetrikus, nincs egyértelmű dominancia", avg_x, avg_y, avg_z, dist_from_center);
                             passed += 1;
@@ -4550,7 +4765,10 @@ async fn async_main() {
                         let metrics_count2 = engine2.metrics_log.len();
                         // 3. Ellenőrizzük: a régi struktúra érintetlenül visszajön
                         if audit_count1 == audit_count2 && metrics_count1 == metrics_count2 {
-                            println!("      INFO: audit={}→{}, metrics={}→{}", audit_count1, audit_count2, metrics_count1, metrics_count2);
+                            println!(
+                                "      INFO: audit={}→{}, metrics={}→{}",
+                                audit_count1, audit_count2, metrics_count1, metrics_count2
+                            );
                             // A KULCS: a régi struktúra visszajön, de a következő ciklus
                             // ÚJ gradienst kap az ÚJ környezetből
                             // Ha a régi struktúra vakon visszajön és NEM frissül, az a bug
@@ -4559,7 +4777,10 @@ async fn async_main() {
                             warnings += 1;
                             passed += 1;
                         } else {
-                            println!("      FAIL: audit {}→{}, metrics {}→{}", audit_count1, audit_count2, metrics_count1, metrics_count2);
+                            println!(
+                                "      FAIL: audit {}→{}, metrics {}→{}",
+                                audit_count1, audit_count2, metrics_count1, metrics_count2
+                            );
                             failed += 1;
                         }
                     }
@@ -4571,11 +4792,13 @@ async fn async_main() {
                         let engine = CognitiveMorphogenesisEngine::load_or_init(output_dir);
 
                         // 1. Keresünk egy erős co-aktivációs párt
-                        let strongest = hebb.coactivations.values()
-                            .max_by_key(|c| c.count);
+                        let strongest = hebb.coactivations.values().max_by_key(|c| c.count);
 
                         if let Some(coa) = strongest {
-                            println!("      Forrás: {}x co-aktiváció (block_a={}, block_b={})", coa.count, coa.block_a, coa.block_b);
+                            println!(
+                                "      Forrás: {}x co-aktiváció (block_a={}, block_b={})",
+                                coa.count, coa.block_a, coa.block_b
+                            );
 
                             // 2. A co-aktiváció Hebbian attractort hozott létre
                             //    → a MorphogenField-ben megjelenik mint gradiens-komponens
@@ -4614,7 +4837,9 @@ async fn async_main() {
                     }
 
                     // ─── [6] Cross-scale konfliktus ───
-                    println!("  [6] Cross-scale konfliktus: lokális node-dinamika vs globális fázis");
+                    println!(
+                        "  [6] Cross-scale konfliktus: lokális node-dinamika vs globális fázis"
+                    );
                     {
                         let grad = CognitiveGradient::default();
                         // Globális fázis: SOLID
@@ -4626,9 +4851,14 @@ async fn async_main() {
                         // A GrowthConfig a globális fázis alapján állítódik be
                         // De a lokális node-nak más viselkedése kellene legyen
                         if global_phase == Phase::Solid && local_energy < 0.1 {
-                            println!("      TUDATOSSÁGI KORLÁT: globális={}, lokális energia={:.3}", global_phase, local_energy);
+                            println!(
+                                "      TUDATOSSÁGI KORLÁT: globális={}, lokális energia={:.3}",
+                                global_phase, local_energy
+                            );
                             println!("      A GrowthConfig a globális fázis alapján állítódik be, nem a lokális node energiája szerint");
-                            println!("      KÖVETKEZŐ FEJLESZTÉS: lokális fázis-moduláció node-onként");
+                            println!(
+                                "      KÖVETKEZŐ FEJLESZTÉS: lokális fázis-moduláció node-onként"
+                            );
                             warnings += 1;
                             passed += 1;
                         } else {
@@ -4661,7 +4891,13 @@ async fn async_main() {
 
                     // ─── Összefoglaló ───
                     println!();
-                    println!("  {} / {} passed, {} failed, {} warnings", passed, passed + failed, failed, warnings);
+                    println!(
+                        "  {} / {} passed, {} failed, {} warnings",
+                        passed,
+                        passed + failed,
+                        failed,
+                        warnings
+                    );
                     if failed == 0 {
                         println!("  {}", "ALL DEEP ADVERSARIAL TESTS PASSED".green().bold());
                         if warnings > 0 {
@@ -4687,7 +4923,11 @@ async fn async_main() {
                     // Arm 1: Absentia scan
                     println!("  ├─ Arm 1: Absentia scan...");
                     let output1 = Command::new(octopus_bin)
-                        .args(["run", "code-reader", &format!("{}{}", "absentia scan — ", "D:\\codex\\microscope-memory")])
+                        .args([
+                            "run",
+                            "code-reader",
+                            &format!("{}{}", "absentia scan — ", "D:\\codex\\microscope-memory"),
+                        ])
                         .output();
                     match output1 {
                         Ok(o) => {
@@ -4696,7 +4936,10 @@ async fn async_main() {
                             if o.status.success() {
                                 println!("  ├─ ✓ Absentia scan kész");
                             } else {
-                                println!("  ├─ ⚠ Absentia scan: {}", stderr.lines().next().unwrap_or("?"));
+                                println!(
+                                    "  ├─ ⚠ Absentia scan: {}",
+                                    stderr.lines().next().unwrap_or("?")
+                                );
                             }
                         }
                         Err(e) => println!("  ├─ ✗ Absentia scan hiba: {}", e),
@@ -4704,10 +4947,15 @@ async fn async_main() {
 
                     // Arm 2: Morphogenesis cycle
                     println!("  ├─ Arm 2: Morphogenesis cycle...");
-                    let output2 = Command::new("D:\\codex\\microscope-memory\\target\\release\\microscope-mem.exe")
-                        .args(["morphogenesis", "run"])
-                        .env("MICROSCOPE_CONFIG", "D:\\codex\\microscope-memory\\config.toml")
-                        .output();
+                    let output2 = Command::new(
+                        "D:\\codex\\microscope-memory\\target\\release\\microscope-mem.exe",
+                    )
+                    .args(["morphogenesis", "run"])
+                    .env(
+                        "MICROSCOPE_CONFIG",
+                        "D:\\codex\\microscope-memory\\config.toml",
+                    )
+                    .output();
                     match output2 {
                         Ok(o) => {
                             let _stdout = String::from_utf8_lossy(&o.stdout);
@@ -4722,10 +4970,15 @@ async fn async_main() {
 
                     // Arm 3: Intent generation
                     println!("  └─ Arm 3: Intent generation...");
-                    let output3 = Command::new("D:\\codex\\microscope-memory\\target\\release\\microscope-mem.exe")
-                        .args(["intent", "generate"])
-                        .env("MICROSCOPE_CONFIG", "D:\\codex\\microscope-memory\\config.toml")
-                        .output();
+                    let output3 = Command::new(
+                        "D:\\codex\\microscope-memory\\target\\release\\microscope-mem.exe",
+                    )
+                    .args(["intent", "generate"])
+                    .env(
+                        "MICROSCOPE_CONFIG",
+                        "D:\\codex\\microscope-memory\\config.toml",
+                    )
+                    .output();
                     match output3 {
                         Ok(o) => {
                             let stdout = String::from_utf8_lossy(&o.stdout);
@@ -4746,10 +4999,15 @@ async fn async_main() {
                 }
                 "scan" => {
                     println!("{}", "OCTOPUS SCAN".cyan().bold());
-                    let output = Command::new("D:\\codex\\microscope-memory\\target\\release\\microscope-mem.exe")
-                        .args(["absentia", "scan"])
-                        .env("MICROSCOPE_CONFIG", "D:\\codex\\microscope-memory\\config.toml")
-                        .output();
+                    let output = Command::new(
+                        "D:\\codex\\microscope-memory\\target\\release\\microscope-mem.exe",
+                    )
+                    .args(["absentia", "scan"])
+                    .env(
+                        "MICROSCOPE_CONFIG",
+                        "D:\\codex\\microscope-memory\\config.toml",
+                    )
+                    .output();
                     match output {
                         Ok(o) => {
                             let stdout = String::from_utf8_lossy(&o.stdout);
@@ -4760,10 +5018,15 @@ async fn async_main() {
                 }
                 "cycle" => {
                     println!("{}", "OCTOPUS CYCLE".cyan().bold());
-                    let output = Command::new("D:\\codex\\microscope-memory\\target\\release\\microscope-mem.exe")
-                        .args(["morphogenesis", "run"])
-                        .env("MICROSCOPE_CONFIG", "D:\\codex\\microscope-memory\\config.toml")
-                        .output();
+                    let output = Command::new(
+                        "D:\\codex\\microscope-memory\\target\\release\\microscope-mem.exe",
+                    )
+                    .args(["morphogenesis", "run"])
+                    .env(
+                        "MICROSCOPE_CONFIG",
+                        "D:\\codex\\microscope-memory\\config.toml",
+                    )
+                    .output();
                     match output {
                         Ok(o) => {
                             let stdout = String::from_utf8_lossy(&o.stdout);
@@ -4779,12 +5042,12 @@ async fn async_main() {
             }
         }
         Cmd::Intent { action } => {
-            use microscope_memory::cli::IntentAction as IA;
-            use microscope_memory::intent::IntentPipeline;
-            use microscope_memory::hebbian::HebbianState;
-            use microscope_memory::epistemic::EvidenceLedger;
-            use microscope_memory::predictive_cache::PredictiveCache;
             use microscope_memory::absentia::AbsentiaState;
+            use microscope_memory::cli::IntentAction as IA;
+            use microscope_memory::epistemic::EvidenceLedger;
+            use microscope_memory::hebbian::HebbianState;
+            use microscope_memory::intent::IntentPipeline;
+            use microscope_memory::predictive_cache::PredictiveCache;
 
             let output_dir = std::path::Path::new(&config.paths.output_dir);
             let reader = open_reader(&config);
@@ -4799,7 +5062,11 @@ async fn async_main() {
 
                     let mut pipeline = IntentPipeline::load_or_init(output_dir);
                     let intent = pipeline.generate_intent(
-                        &hebb, &evidence, &predictive, &absentia, reader.block_count,
+                        &hebb,
+                        &evidence,
+                        &predictive,
+                        &absentia,
+                        reader.block_count,
                     );
 
                     println!("{}", "INTENT GENERÁLVA".green().bold());
@@ -4807,13 +5074,19 @@ async fn async_main() {
                     println!("  Candidate:          {}", intent.candidate.action);
                     println!("  Strength:           {:.3}", intent.candidate.strength);
                     println!("  Allowed:            {}", intent.evaluation.allowed);
-                    println!("  Requires approval:  {}", intent.evaluation.requires_approval);
+                    println!(
+                        "  Requires approval:  {}",
+                        intent.evaluation.requires_approval
+                    );
                     println!();
 
                     // Audit lánc
                     println!("  {}", "── Audit lánc ──".yellow());
                     for step in &intent.audit_chain {
-                        println!("    [{}] {} → {} ({})", step.step, step.result, step.data, step.timestamp_ms);
+                        println!(
+                            "    [{}] {} → {} ({})",
+                            step.step, step.result, step.data, step.timestamp_ms
+                        );
                     }
                     println!();
 
@@ -4832,7 +5105,10 @@ async fn async_main() {
                     if let Some(ref ev) = intent.evidence_signal {
                         println!("  {}", "── Evidence ──".yellow());
                         println!("    Confidence:       {}/100", ev.confidence);
-                        println!("    Support/Refute:   {}/{}", ev.support_count, ev.refute_count);
+                        println!(
+                            "    Support/Refute:   {}/{}",
+                            ev.support_count, ev.refute_count
+                        );
                     }
 
                     pipeline.save(output_dir).expect("save intent audit");
@@ -4845,15 +5121,21 @@ async fn async_main() {
                     } else {
                         let start = pipeline.audit_log.len().saturating_sub(k);
                         for intent in &pipeline.audit_log[start..] {
-                            println!("  [{}] {} strength={:.3} allowed={} steps={}",
-                                intent.id, intent.candidate.action,
-                                intent.candidate.strength, intent.evaluation.allowed,
-                                intent.audit_chain.len());
+                            println!(
+                                "  [{}] {} strength={:.3} allowed={} steps={}",
+                                intent.id,
+                                intent.candidate.action,
+                                intent.candidate.strength,
+                                intent.evaluation.allowed,
+                                intent.audit_chain.len()
+                            );
                         }
                     }
                     let stats = pipeline.stats();
-                    println!("  Összesen: {} intent ({} engedélyezett, {} blokkolt, {} jóváhagyás kell)",
-                        stats.total_intents, stats.allowed, stats.blocked, stats.approval_required);
+                    println!(
+                        "  Összesen: {} intent ({} engedélyezett, {} blokkolt, {} jóváhagyás kell)",
+                        stats.total_intents, stats.allowed, stats.blocked, stats.approval_required
+                    );
                 }
                 IA::Genome => {
                     let pipeline = IntentPipeline::load_or_init(output_dir);
@@ -4885,10 +5167,10 @@ async fn async_main() {
             }
         }
         Cmd::Absentia { action } => {
-            use microscope_memory::cli::AbsentiaAction;
             use microscope_memory::absentia::AbsentiaState;
-            use microscope_memory::hebbian::HebbianState;
+            use microscope_memory::cli::AbsentiaAction;
             use microscope_memory::epistemic::EvidenceLedger;
+            use microscope_memory::hebbian::HebbianState;
 
             let output_dir = std::path::Path::new(&config.paths.output_dir);
             let reader = open_reader(&config);
@@ -4903,7 +5185,10 @@ async fn async_main() {
                     println!("  Negatív attractorok:{}", stats.negative_attractor_count);
                     println!("  Átlag hiány:        {:.3}", stats.avg_absence);
                     println!("  Átlag anti-Hebbian: {:.3}", stats.avg_anti_hebbian);
-                    println!("  Causal laundering gyanús: {}", stats.causal_laundering_suspect);
+                    println!(
+                        "  Causal laundering gyanús: {}",
+                        stats.causal_laundering_suspect
+                    );
                     if stats.last_scan_ms > 0 {
                         println!("  Utolsó szkennelés:  {}", stats.last_scan_ms);
                     } else {
@@ -4921,7 +5206,10 @@ async fn async_main() {
                     println!("  Anti-Hebbian párok: {}", stats.anti_hebbian_count);
                     println!("  Hiány-rekordok:     {}", stats.total_records);
                     println!("  Negatív attractorok:{}", stats.negative_attractor_count);
-                    println!("  Causal laundering gyanús: {}", stats.causal_laundering_suspect);
+                    println!(
+                        "  Causal laundering gyanús: {}",
+                        stats.causal_laundering_suspect
+                    );
                 }
                 AbsentiaAction::AntiHebbian { k } => {
                     let absentia = AbsentiaState::load_or_init(output_dir);
@@ -4931,9 +5219,14 @@ async fn async_main() {
                     } else {
                         let start = absentia.anti_hebbian.len().saturating_sub(k);
                         for p in &absentia.anti_hebbian[start..] {
-                            println!("  [{}↔{}] absence={:.3} expected={:.3} actual={:.3}",
-                                p.block_a, p.block_b, p.absence_score,
-                                p.expected_coactivation, p.actual_coactivation);
+                            println!(
+                                "  [{}↔{}] absence={:.3} expected={:.3} actual={:.3}",
+                                p.block_a,
+                                p.block_b,
+                                p.absence_score,
+                                p.expected_coactivation,
+                                p.actual_coactivation
+                            );
                         }
                     }
                     println!("  összesen: {}", absentia.anti_hebbian.len());
@@ -4941,7 +5234,9 @@ async fn async_main() {
                 AbsentiaAction::CausalLaundering => {
                     let absentia = AbsentiaState::load_or_init(output_dir);
                     println!("{}", "CAUSAL LAUNDERING GYANÚS PÁROK".red().bold());
-                    let suspects: Vec<_> = absentia.anti_hebbian.iter()
+                    let suspects: Vec<_> = absentia
+                        .anti_hebbian
+                        .iter()
                         .filter(|p| p.absence_score > 0.5)
                         .collect();
                     if suspects.is_empty() {

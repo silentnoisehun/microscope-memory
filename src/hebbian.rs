@@ -129,7 +129,8 @@ impl HebbianState {
                 // retention remap uses, which here would ask for a 128 GB
                 // allocation. It is four times the largest index this project has
                 // shipped (967,587), so no real block index can reach it.
-                self.activations.resize(idx + 1, ActivationRecord::default());
+                self.activations
+                    .resize(idx + 1, ActivationRecord::default());
                 let rec = &mut self.activations[idx];
                 rec.activation_count = 1;
                 rec.last_activated_ms = now_ms;
@@ -1071,8 +1072,7 @@ mod tests {
         let loaded = HebbianState::load_or_init(&dir, n);
         assert_eq!(loaded.activations[1].activation_count, 1);
         assert_eq!(
-            loaded.activations[2].activation_count,
-            1,
+            loaded.activations[2].activation_count, 1,
             "the record before the tear must be applied"
         );
         assert_eq!(

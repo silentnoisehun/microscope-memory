@@ -482,7 +482,11 @@ impl HopeCli {
     pub fn exec(&mut self, command: &str) -> String {
         let parts: Vec<&str> = command.splitn(3, ' ').collect();
         let cmd = parts[0].to_lowercase();
-        let args = if parts.len() > 1 { parts[1..].join(" ") } else { String::new() };
+        let args = if parts.len() > 1 {
+            parts[1..].join(" ")
+        } else {
+            String::new()
+        };
 
         let result = match cmd.as_str() {
             "status" => self.cmd_status(),
@@ -501,7 +505,11 @@ impl HopeCli {
             _ => format!("{{\"ok\":false,\"error\":\"Unknown command: {}\"}}", cmd),
         };
 
-        self.audit_log.push(format!("{} → {}", command, &result[..result.len().min(100)]));
+        self.audit_log.push(format!(
+            "{} → {}",
+            command,
+            &result[..result.len().min(100)]
+        ));
         if self.audit_log.len() > 500 {
             self.audit_log.drain(0..self.audit_log.len() - 500);
         }
@@ -554,15 +562,20 @@ impl HopeCli {
             return "{\"ok\":false,\"error\":\"Usage: recall <query> [k]\"}".to_string();
         }
 
-        let mut scored: Vec<(usize, f32)> = self.blocks
+        let mut scored: Vec<(usize, f32)> = self
+            .blocks
             .iter()
             .enumerate()
             .map(|(i, (text, _, _, _))| {
                 let t = text.to_lowercase();
                 let mut s = 0.0f32;
-                if t.contains(&query) { s += 3.0; }
+                if t.contains(&query) {
+                    s += 3.0;
+                }
                 for word in query.split_whitespace() {
-                    if word.len() > 2 && t.contains(word) { s += 1.0; }
+                    if word.len() > 2 && t.contains(word) {
+                        s += 1.0;
+                    }
                 }
                 (i, s)
             })
@@ -571,21 +584,36 @@ impl HopeCli {
         scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
         scored.truncate(k);
 
-        let results: Vec<String> = scored.iter().map(|(i, s)| {
-            let (text, layer, imp, _) = &self.blocks[*i];
-            format!("{{\"text\":\"{}\",\"layer\":\"{}\",\"importance\":{},\"score\":{}}}",
-                text.chars().take(200).collect::<String>().replace('"', "\\\""),
-                layer, imp, s)
-        }).collect();
+        let results: Vec<String> = scored
+            .iter()
+            .map(|(i, s)| {
+                let (text, layer, imp, _) = &self.blocks[*i];
+                format!(
+                    "{{\"text\":\"{}\",\"layer\":\"{}\",\"importance\":{},\"score\":{}}}",
+                    text.chars()
+                        .take(200)
+                        .collect::<String>()
+                        .replace('"', "\\\""),
+                    layer,
+                    imp,
+                    s
+                )
+            })
+            .collect();
 
-        format!("{{\"ok\":true,\"query\":\"{}\",\"count\":{},\"results\":[{}]}}",
-            query, results.len(), results.join(","))
+        format!(
+            "{{\"ok\":true,\"query\":\"{}\",\"count\":{},\"results\":[{}]}}",
+            query,
+            results.len(),
+            results.join(",")
+        )
     }
 
     fn cmd_store(&mut self, args: &str) -> String {
         let parts: Vec<&str> = args.splitn(3, ' ').collect();
         if parts.is_empty() || parts[0].is_empty() {
-            return "{\"ok\":false,\"error\":\"Usage: store <text> [layer] [importance]\"}".to_string();
+            return "{\"ok\":false,\"error\":\"Usage: store <text> [layer] [importance]\"}"
+                .to_string();
         }
         let text = parts[0].to_string();
         let layer = parts.get(1).unwrap_or(&"session").to_string();
@@ -595,7 +623,10 @@ impl HopeCli {
         // Hebbian: associate with recent blocks
         let new_id = self.blocks.len() as u32;
         let text_lower = text.to_lowercase();
-        let words: Vec<&str> = text_lower.split_whitespace().filter(|w| w.len() > 3).collect();
+        let words: Vec<&str> = text_lower
+            .split_whitespace()
+            .filter(|w| w.len() > 3)
+            .collect();
         for (i, (existing_text, _, _, _)) in self.blocks.iter().enumerate() {
             let existing_lower = existing_text.to_lowercase();
             for word in &words {
@@ -606,11 +637,18 @@ impl HopeCli {
             }
         }
 
-        self.blocks.push((text.clone(), layer.clone(), importance, depth));
-        format!("{{\"ok\":true,\"id\":\"m{}\",\"text\":\"{}\",\"layer\":\"{}\",\"importance\":{}}}",
+        self.blocks
+            .push((text.clone(), layer.clone(), importance, depth));
+        format!(
+            "{{\"ok\":true,\"id\":\"m{}\",\"text\":\"{}\",\"layer\":\"{}\",\"importance\":{}}}",
             new_id,
-            text.chars().take(100).collect::<String>().replace('"', "\\\""),
-            layer, importance)
+            text.chars()
+                .take(100)
+                .collect::<String>()
+                .replace('"', "\\\""),
+            layer,
+            importance
+        )
     }
 
     fn cmd_find(&self, args: &str) -> String {
@@ -619,12 +657,24 @@ impl HopeCli {
 
     fn cmd_doctor(&self) -> String {
         let checks = vec![
-            format!("{{\"name\":\"memory\",\"ok\":true,\"detail\":\"{} blocks\"}}", self.blocks.len()),
-            format!("{{\"name\":\"hebbian\",\"ok\":true,\"detail\":\"{} pairs\"}}", self.hebbian_pairs.len()),
-            format!("{{\"name\":\"audit\",\"ok\":true,\"detail\":\"{} entries\"}}", self.audit_log.len()),
+            format!(
+                "{{\"name\":\"memory\",\"ok\":true,\"detail\":\"{} blocks\"}}",
+                self.blocks.len()
+            ),
+            format!(
+                "{{\"name\":\"hebbian\",\"ok\":true,\"detail\":\"{} pairs\"}}",
+                self.hebbian_pairs.len()
+            ),
+            format!(
+                "{{\"name\":\"audit\",\"ok\":true,\"detail\":\"{} entries\"}}",
+                self.audit_log.len()
+            ),
             format!("{{\"name\":\"wasm\",\"ok\":true,\"detail\":\"running\"}}"),
         ];
-        format!("{{\"ok\":true,\"doctor\":{{\"healthy\":true,\"checks\":[{}]}}}}", checks.join(","))
+        format!(
+            "{{\"ok\":true,\"doctor\":{{\"healthy\":true,\"checks\":[{}]}}}}",
+            checks.join(",")
+        )
     }
 
     fn cmd_intent(&mut self, args: &str) -> String {
@@ -646,8 +696,13 @@ impl HopeCli {
                 format!("{{\"ok\":true,\"intent\":{}}}", intent)
             }
             "audit" => {
-                let entries: Vec<String> = self.intent_history.iter().rev().take(10)
-                    .map(|e| e.clone()).collect();
+                let entries: Vec<String> = self
+                    .intent_history
+                    .iter()
+                    .rev()
+                    .take(10)
+                    .map(|e| e.clone())
+                    .collect();
                 format!("{{\"ok\":true,\"audit\":[{}]}}", entries.join(","))
             }
             _ => "{\"ok\":false,\"error\":\"Usage: intent [generate|audit]\"}".to_string(),
@@ -671,15 +726,31 @@ impl HopeCli {
     }
 
     fn cmd_hebbian(&self) -> String {
-        let pairs: Vec<String> = self.hebbian_pairs.iter().rev().take(20)
+        let pairs: Vec<String> = self
+            .hebbian_pairs
+            .iter()
+            .rev()
+            .take(20)
             .map(|(a, b, s)| format!("{{\"from\":{},\"to\":{},\"strength\":{}}}", a, b, s))
             .collect();
-        format!("{{\"ok\":true,\"total_pairs\":{},\"top_pairs\":[{}]}}", self.hebbian_pairs.len(), pairs.join(","))
+        format!(
+            "{{\"ok\":true,\"total_pairs\":{},\"top_pairs\":[{}]}}",
+            self.hebbian_pairs.len(),
+            pairs.join(",")
+        )
     }
 
     fn cmd_audit(&self, args: &str) -> String {
-        let n: usize = args.split_whitespace().next().and_then(|s| s.parse().ok()).unwrap_or(20);
-        let entries: Vec<String> = self.audit_log.iter().rev().take(n)
+        let n: usize = args
+            .split_whitespace()
+            .next()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(20);
+        let entries: Vec<String> = self
+            .audit_log
+            .iter()
+            .rev()
+            .take(n)
             .map(|e| format!("\"{}\"", e.replace('"', "\\\"")))
             .collect();
         format!("{{\"ok\":true,\"audit\":[{}]}}", entries.join(","))

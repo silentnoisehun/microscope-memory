@@ -129,7 +129,7 @@ pub static RESYNC_STEPS: std::sync::atomic::AtomicU64 = std::sync::atomic::Atomi
 pub static LAST_RESCANS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 
 impl NarrativeMemory {
-pub fn load_or_init(output_dir: &Path) -> Self {
+    pub fn load_or_init(output_dir: &Path) -> Self {
         let path = output_dir.join("narrative_memory.bin");
         let mut episodes = Vec::new();
         let mut next_id = 1u32;

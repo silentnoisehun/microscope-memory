@@ -9,17 +9,15 @@
 use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use crate::hebbian::HebbianState;
-use crate::resonance::ResonanceState;
-use crate::epistemic::EvidenceLedger;
-use crate::predictive_cache::PredictiveCache;
-use crate::emotional_contagion::EmotionalContagionState;
-use crate::morphogenesis::{
-    GrowthConfig, MorphogenField, Seed, mycelium_growth,
-    MorphNode, MorphConnection,
-};
 use crate::absentia::AbsentiaState;
-
+use crate::emotional_contagion::EmotionalContagionState;
+use crate::epistemic::EvidenceLedger;
+use crate::hebbian::HebbianState;
+use crate::morphogenesis::{
+    mycelium_growth, GrowthConfig, MorphConnection, MorphNode, MorphogenField, Seed,
+};
+use crate::predictive_cache::PredictiveCache;
+use crate::resonance::ResonanceState;
 
 // ─── Helpers ────────────────────────────────────────
 
@@ -139,8 +137,13 @@ impl CognitiveGradient {
         let emotion = ((emotional_valence + 1.0) / 2.0).clamp(0.0, 1.0) as f64;
         let execution = execution_success.clamp(0.0, 1.0) as f64;
 
-        w1 * relevance + w2 * resonance + w3 * evidence + w4 * hebbian
-            + w5 * prediction + w6 * emotion + w7 * execution
+        w1 * relevance
+            + w2 * resonance
+            + w3 * evidence
+            + w4 * hebbian
+            + w5 * prediction
+            + w6 * emotion
+            + w7 * execution
     }
 }
 
@@ -196,8 +199,13 @@ impl std::fmt::Display for GradientComponents {
         write!(
             f,
             "rel={:.3} res={:.3} evi={:.3} heb={:.3} pred={:.3} emo={:.3} exec={:.3}",
-            self.relevance, self.resonance, self.evidence, self.hebbian,
-            self.prediction, self.emotion, self.execution
+            self.relevance,
+            self.resonance,
+            self.evidence,
+            self.hebbian,
+            self.prediction,
+            self.emotion,
+            self.execution
         )
     }
 }
@@ -316,19 +324,15 @@ impl CognitiveMorphogenesisEngine {
         let audit_path = output_dir.join("morphogenesis_audit.bin");
         let audit_data = encode_audit_log(&self.audit_log);
         let tmp = output_dir.join("morphogenesis_audit.bin.tmp");
-        std::fs::write(&tmp, &audit_data)
-            .map_err(|e| format!("write audit: {}", e))?;
-        std::fs::rename(&tmp, &audit_path)
-            .map_err(|e| format!("rename audit: {}", e))?;
+        std::fs::write(&tmp, &audit_data).map_err(|e| format!("write audit: {}", e))?;
+        std::fs::rename(&tmp, &audit_path).map_err(|e| format!("rename audit: {}", e))?;
 
         // Metrics log
         let metrics_path = output_dir.join("morphogenesis_metrics.bin");
         let metrics_data = encode_metrics_log(&self.metrics_log);
         let tmp2 = output_dir.join("morphogenesis_metrics.bin.tmp");
-        std::fs::write(&tmp2, &metrics_data)
-            .map_err(|e| format!("write metrics: {}", e))?;
-        std::fs::rename(&tmp2, &metrics_path)
-            .map_err(|e| format!("rename metrics: {}", e))?;
+        std::fs::write(&tmp2, &metrics_data).map_err(|e| format!("write metrics: {}", e))?;
+        std::fs::rename(&tmp2, &metrics_path).map_err(|e| format!("rename metrics: {}", e))?;
 
         Ok(())
     }
@@ -382,7 +386,9 @@ impl CognitiveMorphogenesisEngine {
             .as_ref()
             .map(|s| s.valence)
             .unwrap_or(0.0);
-        let evi_conf = evidence_ledger.records.values()
+        let evi_conf = evidence_ledger
+            .records
+            .values()
             .map(|r| r.confidence as f64)
             .sum::<f64>()
             / evidence_ledger.records.len().max(1) as f64;
@@ -406,8 +412,8 @@ impl CognitiveMorphogenesisEngine {
             };
 
             // Resonance — a resonance field-ből (pozíció alapján kellene, de most egyszerűsített)
-            let res_strength = resonance.field.values().sum::<f32>()
-                / resonance.field.len().max(1) as f32;
+            let res_strength =
+                resonance.field.values().sum::<f32>() / resonance.field.len().max(1) as f32;
 
             // Relevance — nem áll rendelkezésre közvetlenül, a lexical_score kellene
             // Most 0.0, mert a relevancia-t a recall már alkalmazta
@@ -417,8 +423,13 @@ impl CognitiveMorphogenesisEngine {
             let exec = 1.0f32;
 
             let g = self.gradient.compute(
-                lexical, res_strength, evi_conf_u8, hebb_energy,
-                pred_hr, emo_valence, exec,
+                lexical,
+                res_strength,
+                evi_conf_u8,
+                hebb_energy,
+                pred_hr,
+                emo_valence,
+                exec,
             );
             gradient_sum += g;
             gradient_count += 1;
@@ -473,14 +484,19 @@ impl CognitiveMorphogenesisEngine {
         let seed_count = activated_blocks.len().min(3);
         for (i, &(block_idx, score)) in activated_blocks.iter().take(seed_count).enumerate() {
             let idx = block_idx as usize;
-            if idx >= headers.len() { continue; }
+            if idx >= headers.len() {
+                continue;
+            }
             let (hx, hy, hz) = headers[idx];
 
             let seed = Seed::new(
                 &format!("seed_{}_{}", cid, i),
-                hx as f64, hy as f64, hz as f64,
+                hx as f64,
+                hy as f64,
+                hz as f64,
                 &format!("block_{}", idx),
-            ).with_energy((score as f64 * 100.0).max(10.0));
+            )
+            .with_energy((score as f64 * 100.0).max(10.0));
 
             let organism = mycelium_growth(&seed, &field, &phase_config);
 
@@ -488,10 +504,13 @@ impl CognitiveMorphogenesisEngine {
             let avg_conf = if evidence_ledger.records.is_empty() {
                 0.5 // alapértelmezett
             } else {
-                evidence_ledger.records.values()
+                evidence_ledger
+                    .records
+                    .values()
                     .map(|r| r.confidence as f64)
                     .sum::<f64>()
-                    / evidence_ledger.records.len() as f64 / 100.0
+                    / evidence_ledger.records.len() as f64
+                    / 100.0
             };
 
             organisms.push(OrganismContext {
@@ -509,7 +528,6 @@ impl CognitiveMorphogenesisEngine {
         // validált darabszámnak nem volt olvasója.
         for i in 0..organisms.len() {
             for j in (i + 1)..organisms.len() {
-
                 // Geometriai anastomosis: node-ok közötti távolság < 0.5
                 let mut geo_anastomosis = 0usize;
                 for ni in &organisms[i].nodes {
@@ -517,7 +535,7 @@ impl CognitiveMorphogenesisEngine {
                         let dx = ni.position.0 - nj.position.0;
                         let dy = ni.position.1 - nj.position.1;
                         let dz = ni.position.2 - nj.position.2;
-                        let dist = (dx*dx + dy*dy + dz*dz).sqrt();
+                        let dist = (dx * dx + dy * dy + dz * dz).sqrt();
                         if dist < 0.5 {
                             geo_anastomosis += 1;
                         }
@@ -609,9 +627,21 @@ impl CognitiveMorphogenesisEngine {
     /// Statisztikák az audit-naplóról.
     pub fn stats(&self) -> CognitiveMorphogenesisStats {
         let total_cycles = self.audit_log.len();
-        let gas_cycles = self.audit_log.iter().filter(|e| e.phase == Phase::Gas).count();
-        let liquid_cycles = self.audit_log.iter().filter(|e| e.phase == Phase::Liquid).count();
-        let solid_cycles = self.audit_log.iter().filter(|e| e.phase == Phase::Solid).count();
+        let gas_cycles = self
+            .audit_log
+            .iter()
+            .filter(|e| e.phase == Phase::Gas)
+            .count();
+        let liquid_cycles = self
+            .audit_log
+            .iter()
+            .filter(|e| e.phase == Phase::Liquid)
+            .count();
+        let solid_cycles = self
+            .audit_log
+            .iter()
+            .filter(|e| e.phase == Phase::Solid)
+            .count();
 
         let avg_gradient = if total_cycles > 0 {
             self.audit_log.iter().map(|e| e.gradient_avg).sum::<f64>() / total_cycles as f64
@@ -620,7 +650,8 @@ impl CognitiveMorphogenesisEngine {
         };
 
         let total_anastomosis: usize = self.audit_log.iter().map(|e| e.anastomosis_count).sum();
-        let validated_anastomosis: usize = self.audit_log.iter().map(|e| e.anastomosis_validated).sum();
+        let validated_anastomosis: usize =
+            self.audit_log.iter().map(|e| e.anastomosis_validated).sum();
 
         CognitiveMorphogenesisStats {
             total_cycles,
@@ -702,39 +733,63 @@ fn decode_audit_log(data: &[u8]) -> Vec<MorphogenesisAuditEntry> {
         if off + AUDIT_ENTRY_FIXED > data.len() {
             break;
         }
-        let ts = u64::from_le_bytes(data[off..off+8].try_into().unwrap()); off += 8;
-        let cid = u64::from_le_bytes(data[off..off+8].try_into().unwrap()); off += 8;
-        let block_count = u32::from_le_bytes(data[off..off+4].try_into().unwrap()) as usize; off += 4;
-        let qh = u64::from_le_bytes(data[off..off+8].try_into().unwrap()); off += 8;
-        let ga = f64::from_le_bytes(data[off..off+8].try_into().unwrap()); off += 8;
-        let phase_byte = data[off]; off += 1;
+        let ts = u64::from_le_bytes(data[off..off + 8].try_into().unwrap());
+        off += 8;
+        let cid = u64::from_le_bytes(data[off..off + 8].try_into().unwrap());
+        off += 8;
+        let block_count = u32::from_le_bytes(data[off..off + 4].try_into().unwrap()) as usize;
+        off += 4;
+        let qh = u64::from_le_bytes(data[off..off + 8].try_into().unwrap());
+        off += 8;
+        let ga = f64::from_le_bytes(data[off..off + 8].try_into().unwrap());
+        off += 8;
+        let phase_byte = data[off];
+        off += 1;
         let phase = match phase_byte {
             0 => Phase::Gas,
             1 => Phase::Liquid,
             _ => Phase::Solid,
         };
-        let rel = f64::from_le_bytes(data[off..off+8].try_into().unwrap()); off += 8;
-        let res = f64::from_le_bytes(data[off..off+8].try_into().unwrap()); off += 8;
-        let evi = f64::from_le_bytes(data[off..off+8].try_into().unwrap()); off += 8;
-        let heb = f64::from_le_bytes(data[off..off+8].try_into().unwrap()); off += 8;
-        let pred = f64::from_le_bytes(data[off..off+8].try_into().unwrap()); off += 8;
-        let emo = f64::from_le_bytes(data[off..off+8].try_into().unwrap()); off += 8;
-        let exec = f64::from_le_bytes(data[off..off+8].try_into().unwrap()); off += 8;
-        let nnc = u32::from_le_bytes(data[off..off+4].try_into().unwrap()) as usize; off += 4;
-        let ncc = u32::from_le_bytes(data[off..off+4].try_into().unwrap()) as usize; off += 4;
-        let ac = u32::from_le_bytes(data[off..off+4].try_into().unwrap()) as usize; off += 4;
-        let av = u32::from_le_bytes(data[off..off+4].try_into().unwrap()) as usize; off += 4;
-        let ph = data[off] != 0; off += 1;
-        let ecb = data[off]; off += 1;
-        let eca = data[off]; off += 1;
-        let sp = u32::from_le_bytes(data[off..off+4].try_into().unwrap()) as usize; off += 4;
-        let pp = u32::from_le_bytes(data[off..off+4].try_into().unwrap()) as usize; off += 4;
+        let rel = f64::from_le_bytes(data[off..off + 8].try_into().unwrap());
+        off += 8;
+        let res = f64::from_le_bytes(data[off..off + 8].try_into().unwrap());
+        off += 8;
+        let evi = f64::from_le_bytes(data[off..off + 8].try_into().unwrap());
+        off += 8;
+        let heb = f64::from_le_bytes(data[off..off + 8].try_into().unwrap());
+        off += 8;
+        let pred = f64::from_le_bytes(data[off..off + 8].try_into().unwrap());
+        off += 8;
+        let emo = f64::from_le_bytes(data[off..off + 8].try_into().unwrap());
+        off += 8;
+        let exec = f64::from_le_bytes(data[off..off + 8].try_into().unwrap());
+        off += 8;
+        let nnc = u32::from_le_bytes(data[off..off + 4].try_into().unwrap()) as usize;
+        off += 4;
+        let ncc = u32::from_le_bytes(data[off..off + 4].try_into().unwrap()) as usize;
+        off += 4;
+        let ac = u32::from_le_bytes(data[off..off + 4].try_into().unwrap()) as usize;
+        off += 4;
+        let av = u32::from_le_bytes(data[off..off + 4].try_into().unwrap()) as usize;
+        off += 4;
+        let ph = data[off] != 0;
+        off += 1;
+        let ecb = data[off];
+        off += 1;
+        let eca = data[off];
+        off += 1;
+        let sp = u32::from_le_bytes(data[off..off + 4].try_into().unwrap()) as usize;
+        off += 4;
+        let pp = u32::from_le_bytes(data[off..off + 4].try_into().unwrap()) as usize;
+        off += 4;
 
         let mut blocks = Vec::with_capacity(block_count);
         for _ in 0..block_count {
-            if off + 8 > data.len() { break; }
-            let idx = u32::from_le_bytes(data[off..off+4].try_into().unwrap());
-            let score = f32::from_le_bytes(data[off+4..off+8].try_into().unwrap());
+            if off + 8 > data.len() {
+                break;
+            }
+            let idx = u32::from_le_bytes(data[off..off + 4].try_into().unwrap());
+            let score = f32::from_le_bytes(data[off + 4..off + 8].try_into().unwrap());
             blocks.push((idx, score));
             off += 8;
         }
@@ -808,35 +863,72 @@ fn decode_metrics_log(data: &[u8]) -> Vec<MorphogenesisMetrics> {
     let mut off = 8;
 
     for _ in 0..count {
-        if off + 113 > data.len() { break; } // fixed size per entry
-        let ts = u64::from_le_bytes(data[off..off+8].try_into().unwrap()); off += 8;
-        let cid = u64::from_le_bytes(data[off..off+8].try_into().unwrap()); off += 8;
-        let phase = match data[off] { 0 => Phase::Gas, 1 => Phase::Liquid, _ => Phase::Solid }; off += 1;
-        let rp = f64::from_le_bytes(data[off..off+8].try_into().unwrap()); off += 8;
-        let rc = u32::from_le_bytes(data[off..off+4].try_into().unwrap()) as usize; off += 4;
-        let phr = f64::from_le_bytes(data[off..off+8].to_vec().try_into().unwrap()); off += 8;
-        let pc = u32::from_le_bytes(data[off..off+4].try_into().unwrap()) as usize; off += 4;
-        let ta = u32::from_le_bytes(data[off..off+4].try_into().unwrap()) as usize; off += 4;
-        let fa = u32::from_le_bytes(data[off..off+4].try_into().unwrap()) as usize; off += 4;
-        let far = f64::from_le_bytes(data[off..off+8].to_vec().try_into().unwrap()); off += 8;
-        let ge = f64::from_le_bytes(data[off..off+8].to_vec().try_into().unwrap()); off += 8;
-        let nc = u32::from_le_bytes(data[off..off+4].try_into().unwrap()) as usize; off += 4;
-        let ec = u32::from_le_bytes(data[off..off+4].try_into().unwrap()) as usize; off += 4;
-        let ad = f64::from_le_bytes(data[off..off+8].to_vec().try_into().unwrap()); off += 8;
-        let tp = u32::from_le_bytes(data[off..off+4].try_into().unwrap()) as usize; off += 4;
-        let sp = u32::from_le_bytes(data[off..off+4].try_into().unwrap()) as usize; off += 4;
-        let ps = f64::from_le_bytes(data[off..off+8].to_vec().try_into().unwrap()); off += 8;
-        let cc = u32::from_le_bytes(data[off..off+4].try_into().unwrap()); off += 4;
-        let crr = f64::from_le_bytes(data[off..off+8].to_vec().try_into().unwrap()); off += 8;
-        let rsc = f64::from_le_bytes(data[off..off+8].to_vec().try_into().unwrap()); off += 8;
+        if off + 113 > data.len() {
+            break;
+        } // fixed size per entry
+        let ts = u64::from_le_bytes(data[off..off + 8].try_into().unwrap());
+        off += 8;
+        let cid = u64::from_le_bytes(data[off..off + 8].try_into().unwrap());
+        off += 8;
+        let phase = match data[off] {
+            0 => Phase::Gas,
+            1 => Phase::Liquid,
+            _ => Phase::Solid,
+        };
+        off += 1;
+        let rp = f64::from_le_bytes(data[off..off + 8].try_into().unwrap());
+        off += 8;
+        let rc = u32::from_le_bytes(data[off..off + 4].try_into().unwrap()) as usize;
+        off += 4;
+        let phr = f64::from_le_bytes(data[off..off + 8].to_vec().try_into().unwrap());
+        off += 8;
+        let pc = u32::from_le_bytes(data[off..off + 4].try_into().unwrap()) as usize;
+        off += 4;
+        let ta = u32::from_le_bytes(data[off..off + 4].try_into().unwrap()) as usize;
+        off += 4;
+        let fa = u32::from_le_bytes(data[off..off + 4].try_into().unwrap()) as usize;
+        off += 4;
+        let far = f64::from_le_bytes(data[off..off + 8].to_vec().try_into().unwrap());
+        off += 8;
+        let ge = f64::from_le_bytes(data[off..off + 8].to_vec().try_into().unwrap());
+        off += 8;
+        let nc = u32::from_le_bytes(data[off..off + 4].try_into().unwrap()) as usize;
+        off += 4;
+        let ec = u32::from_le_bytes(data[off..off + 4].try_into().unwrap()) as usize;
+        off += 4;
+        let ad = f64::from_le_bytes(data[off..off + 8].to_vec().try_into().unwrap());
+        off += 8;
+        let tp = u32::from_le_bytes(data[off..off + 4].try_into().unwrap()) as usize;
+        off += 4;
+        let sp = u32::from_le_bytes(data[off..off + 4].try_into().unwrap()) as usize;
+        off += 4;
+        let ps = f64::from_le_bytes(data[off..off + 8].to_vec().try_into().unwrap());
+        off += 8;
+        let cc = u32::from_le_bytes(data[off..off + 4].try_into().unwrap());
+        off += 4;
+        let crr = f64::from_le_bytes(data[off..off + 8].to_vec().try_into().unwrap());
+        off += 8;
+        let rsc = f64::from_le_bytes(data[off..off + 8].to_vec().try_into().unwrap());
+        off += 8;
 
         entries.push(MorphogenesisMetrics {
-            timestamp_ms: ts, cycle_id: cid, phase,
-            recall_precision: rp, recall_count: rc,
-            prediction_hit_rate: phr, prediction_count: pc,
-            total_associations: ta, false_associations: fa, false_association_rate: far,
-            graph_entropy: ge, node_count: nc, edge_count: ec, avg_degree: ad,
-            total_paths: tp, stable_paths: sp, path_stability: ps,
+            timestamp_ms: ts,
+            cycle_id: cid,
+            phase,
+            recall_precision: rp,
+            recall_count: rc,
+            prediction_hit_rate: phr,
+            prediction_count: pc,
+            total_associations: ta,
+            false_associations: fa,
+            false_association_rate: far,
+            graph_entropy: ge,
+            node_count: nc,
+            edge_count: ec,
+            avg_degree: ad,
+            total_paths: tp,
+            stable_paths: sp,
+            path_stability: ps,
             convergence_cycles: cc,
             counterevidence_reaction_rate: crr,
             restart_continuity: rsc,
@@ -862,10 +954,7 @@ pub fn sync_hebbian_to_field(
 }
 
 /// Resonance field → MorphogenField gradiensek szinkronizációja.
-pub fn sync_resonance_to_field(
-    res: &ResonanceState,
-    field: &mut MorphogenField,
-) {
+pub fn sync_resonance_to_field(res: &ResonanceState, field: &mut MorphogenField) {
     for (&(x, y, z), &strength) in &res.field {
         let fx = x as f64 * 0.05; // de-quantize
         let fy = y as f64 * 0.05;
@@ -883,7 +972,9 @@ pub fn apply_evidence_modulation(
     if ledger.records.is_empty() {
         return;
     }
-    let avg_conf: f64 = ledger.records.values()
+    let avg_conf: f64 = ledger
+        .records
+        .values()
         .map(|r| r.confidence as f64)
         .sum::<f64>()
         / ledger.records.len() as f64;
@@ -894,10 +985,7 @@ pub fn apply_evidence_modulation(
 }
 
 /// Prediction hit-rate modulálja a gradiens globális erősségét.
-pub fn apply_prediction_modulation(
-    field: &mut MorphogenField,
-    cache: &PredictiveCache,
-) {
+pub fn apply_prediction_modulation(field: &mut MorphogenField, cache: &PredictiveCache) {
     let hit_rate = cache.stats.hit_rate() as f64;
     let modulation = 1.0 + hit_rate;
     for val in field.gradients.values_mut() {
@@ -906,10 +994,7 @@ pub fn apply_prediction_modulation(
 }
 
 /// Emotion modulálja a gradiens dinamikáját.
-pub fn apply_emotion_modulation(
-    field: &mut MorphogenField,
-    emo: &EmotionalContagionState,
-) {
+pub fn apply_emotion_modulation(field: &mut MorphogenField, emo: &EmotionalContagionState) {
     if let Some(ref snap) = emo.local_snapshot {
         let valence_factor = (snap.valence as f64 + 1.0) / 2.0; // [-1,1] → [0,1]
         for val in field.gradients.values_mut() {

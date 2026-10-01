@@ -28,7 +28,11 @@
 /// True when the process must not write learning state.
 pub fn enabled() -> bool {
     static ENABLED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
-    *ENABLED.get_or_init(|| std::env::var("MICROSCOPE_NO_LEARN").map(|v| parse(&v)).unwrap_or(false))
+    *ENABLED.get_or_init(|| {
+        std::env::var("MICROSCOPE_NO_LEARN")
+            .map(|v| parse(&v))
+            .unwrap_or(false)
+    })
 }
 
 fn parse(v: &str) -> bool {

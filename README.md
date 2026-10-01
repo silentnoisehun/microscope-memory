@@ -6,7 +6,7 @@
 
 [![Rust](https://img.shields.io/badge/language-Rust-orange.svg)](https://www.rust-lang.org)
 [![License: MIT](https://img.shields.io/badge/Limit-MIT-blue.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/Tests-519%20passing-brightgreen.svg)](#-testing)
+[![Tests](https://img.shields.io/badge/Tests-526%20passing-brightgreen.svg)](#-testing)
 [![Blocks](https://img.shields.io/badge/Blocks-1.28M-purple.svg)](#-statistics)
 [![WASM](https://img.shields.io/badge/WASM-151%20KB-blueviolet.svg)](#-wasm)
 

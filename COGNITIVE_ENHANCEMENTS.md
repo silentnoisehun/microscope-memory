@@ -41,7 +41,8 @@ Dedicated memory layer for coding agents:
 - Code snippet and symbol storage
 - Error → solution pair tracking
 - Project-level memory with recall by symbol, project, type
-- CLI integration: `microscope-mem code --store`, `--recall`, `--error`
+- CLI integration: none. The `code` subcommand was removed in `a962ad1`; the
+  module is still compiled into the crate and reachable through `lib.rs`.
 
 ## ChatGPT Import (`chatgpt.rs`)
 ChatGPT conversation history import:

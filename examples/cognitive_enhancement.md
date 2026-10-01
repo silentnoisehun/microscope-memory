@@ -12,17 +12,10 @@ Three new modules have been added to enhance the cognitive capabilities of the s
 - Score scenarios based on alignment with long-term goals
 - Parallel simulation support
 
-**Usage**:
-```bash
-# Simulate a scenario
-microscope-mem sandbox --simulate "Implement new feature" --actions "design,code,test,deploy"
-
-# Show best scenario
-microscope-mem sandbox --best
-
-# Clear all scenarios
-microscope-mem sandbox --clear
-```
+**Usage**: none from the command line. The `sandbox` subcommand was removed in
+`a962ad1` and has not been replaced; the module is still compiled into the crate
+and reachable through `lib.rs`. The removed invocations were `sandbox --simulate`,
+`sandbox --best` and `sandbox --clear`.
 
 ## 2. Impulse Control (`impulse_control.rs`)
 
@@ -34,20 +27,10 @@ microscope-mem sandbox --clear
 - Attention budget management
 - Long-term goal alignment checking
 
-**Usage**:
-```bash
-# Filter a stimulus
-microscope-mem impulse --filter "New email notification" --urgency 0.7
-
-# Add suppression pattern
-microscope-mem impulse --suppress "spam"
-
-# Show stats
-microscope-mem impulse --stats
-
-# Clear patterns
-microscope-mem impulse --clear
-```
+**Usage**: none from the command line. The `impulse` subcommand was removed in
+`a962ad1` and has not been replaced; the module is still compiled into the crate.
+The removed invocations were `impulse --filter`, `impulse --suppress`,
+`impulse --stats` and `impulse --clear`.
 
 ## 3. Meta-Supervision (`meta_supervision.rs`)
 
@@ -59,23 +42,10 @@ microscope-mem impulse --clear
 - Automatic correction strategies
 - Performance threshold monitoring (warning/alert/critical)
 
-**Usage**:
-```bash
-# Record performance metrics
-microscope-mem meta --record "50,100,0.8,0.5,0.1"
-
-# Evaluate and get correction suggestions
-microscope-mem meta --evaluate
-
-# Show performance trends
-microscope-mem meta --trends
-
-# Generate full report
-microscope-mem meta --report
-
-# Add custom correction strategy
-microscope-mem meta --add-strategy "optimize_workflow"
-```
+**Usage**: none from the command line. The `meta` subcommand was removed in
+`a962ad1` and has not been replaced; the module is still compiled into the crate.
+The removed invocations were `meta --record`, `meta --evaluate`, `meta --trends`,
+`meta --report` and `meta --add-strategy`.
 
 ## Integration Examples
 

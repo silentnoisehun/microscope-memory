@@ -57,14 +57,34 @@ the spec endpoint, the /v1 routes, 400/404/405, the CORS default, and that guard
 
 **The other 31 commands are not restored.** Their bodies went with the CLI arm
 and reimplementing consolidation, salience decay and the rest would mean
-inventing semantics. Six of them are still documented as runnable:
+inventing semantics. Seven of them were still documented as runnable, found on
+2026-10-01 by extracting every `microscope-mem <word>` out of the tracked
+markdown and running each one against the binary:
 
-| Command | Claimed in |
-|---|---|
-| `morph` | docs/ARCHITECTURE.md (6 mentions) |
-| `meta`, `impulse`, `sandbox` | docs/cognitive_enhancement.md |
-| `code` | docs/COGNITIVE_ENHANCEMENTS.md |
-| `bridge` | docs/ARCHITECTURE.md -- now true again |
+| Documented | Where | Status |
+|---|---|---|
+| `morph` (6 mentions) | docs/ARCHITECTURE.md | module `morphogenesis.rs` compiled, no CLI |
+| `remember` | docs/ARCHITECTURE.md | redirected to `store`, which exists and is the same thing |
+| `import-chat-gpt` | docs/ARCHITECTURE.md | module `chatgpt.rs` compiled, no CLI; `import` is a different command and reads `.mscope` |
+| `sandbox` | examples/cognitive_enhancement.md | module `mental_sandbox.rs` compiled, no CLI |
+| `impulse` | examples/cognitive_enhancement.md | module `impulse_control.rs` compiled, no CLI |
+| `meta` | examples/cognitive_enhancement.md | module `meta_supervision.rs` compiled, no CLI |
+| `code` | COGNITIVE_ENHANCEMENTS.md | module `code_memory.rs` compiled, no CLI |
+
+**The modules are alive; only the CLI bindings are gone.** All six were checked
+for the source file and for a `mod` line in lib.rs, and all six are present, so
+the capability descriptions in those documents are true -- it is the invocation
+that is not. Each document now says so where the command used to be rather than
+the section being deleted, because "this module exists and has no command line"
+is more useful to a reader than a missing section.
+
+The method is worth recording because the first attempt at it was wrong. A
+regex over the documentation suggested 8 bad commands; running each one showed
+7 real and 1 false positive (`cargo`, from a `cargo test` line that followed a
+wrapped `microscope-mem` reference), while missing `remember` entirely and
+flagging `dream`, `pattern-exchange`, `store` and `build`, which all exist. The
+81 subcommands parsed out of `--help` against 118 enum variants is the same kind
+of gap. A check that only reads documents is not a check.
 
 Also found while writing the routing test: `/v1/status` answers **500** when the
 configured data directory does not exist, so the first request against a fresh

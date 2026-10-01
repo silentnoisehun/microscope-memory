@@ -117,6 +117,18 @@ toml = "0.8"
 name = "microscope_bench"
 harness = false
 
+# Release and bench were tuned; dev was not, and it is what filled the disk.
+# Cargo's default for dev is full debug info, which produced 204 MB rlibs and
+# 157 MB pdbs -- roughly 4 GB for one debug build of this crate, which then had
+# to be deleted to make room for the next one. line-tables-only keeps backtraces
+# usable (file and line still resolve) and drops the bulk of the DWARF.
+#
+# This is developer-build only. It does not touch [profile.release] above, the
+# CI, or anything shipped.
+[profile.dev]
+debug = "line-tables-only"
+
+
 [profile.release]
 opt-level = 3
 lto = "fat"

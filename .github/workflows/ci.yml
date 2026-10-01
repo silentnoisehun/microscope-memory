@@ -12,6 +12,34 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  standards:
+    # The three checks AGENTS.md lists as pre-commit steps, which nothing
+    # enforced. Pinned to the toolchain this tree is formatted and linted with,
+    # because a gate that goes red when an unrelated stable bump lands is a gate
+    # people learn to ignore. The job below stays on floating stable on purpose:
+    # that one wants to hear about new compilers.
+    name: standards
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.98.1"
+          components: rustfmt, clippy
+
+      - name: Formatting
+        run: cargo fmt --all -- --check
+
+      - name: Mojibake
+        # A UTF-8 file saved through a single-byte codepage is still valid UTF-8,
+        # so nothing else objects to it. That is how src/main.rs reached 3 MB,
+        # and how the damage got committed, pushed and shipped in the binary.
+        run: python3 scripts/check_mojibake.py --worktree
+
+      - name: Clippy
+        run: cargo clippy --all-targets -- -D warnings
+
   build-and-test:
     runs-on: ubuntu-latest
     steps:

@@ -13,10 +13,28 @@
 //!   * [`torn_read_two_processes`] — the writer is another process, which is
 //!     what `spine.bin` is mapped shared for in the first place.
 //!
-//! Every test asserts a hard zero on violations *and* runs an unbracketed
-//! control read that is expected to violate. The control is what makes the
-//! test mean something: without it, "0 violations" could just be a reader that
-//! never raced anybody.
+//! Every test asserts a hard zero on violations, and every test also asserts
+//! that it actually raced a live writer — without that second half, "0
+//! violations" is just a reader that nobody competed with. Two tests do it
+//! with an unbracketed control read (the pre-fix read path, which must violate
+//! on the same file at the same moment); the two-publisher test asserts publish
+//! progress instead, because its control turned out to be scheduling-sensitive
+//! — see the comment in [`torn_read_two_writers`]. Publishers keep running
+//! until the readers are done for the same reason.
+//!
+//! What the four counters mean, since one is easy to over-read:
+//!
+//!   * `mixed` and `torn_page` are properties of the **file**: a snapshot whose
+//!     parts came from two publishes, or a page copied while it was being
+//!     written.
+//!   * `starved` is a property of the **reader**: `read_snapshot` must never
+//!     give up while a writer is alive.
+//!   * `open_window` is a property of the **read path**, not of the writer:
+//!     `read_snapshot` refuses an odd counter, so it can never hand one out,
+//!     and the counter exists so that dropping that check later cannot be
+//!     silent. Whether a *writer* can leave a window open behind it is a
+//!     different question, answered by the unit tests in `src/spine.rs`
+//!     (`test_stalled_publish_window_is_recoverable`), not by this file.
 
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -126,7 +144,6 @@ impl Violations {
 /// timing luck involved, which is what makes this a regression test rather
 /// than a race lottery.
 fn check_bracketed(reader: &Spine, baseline_delta: u64, out: &Violations, reads: u64) {
-    let mut seen_cycle = 0u64;
     let mut seen_seq = 0u64;
     for _ in 0..reads {
         let Some(snap) = reader.read_snapshot() else {
@@ -150,11 +167,7 @@ fn check_bracketed(reader: &Spine, baseline_delta: u64, out: &Violations, reads:
             out.mixed.fetch_add(1, Ordering::Relaxed);
         }
         seen_seq = snap.tick_seq.max(seen_seq);
-        if snap.stream.cycle != 0 {
-            seen_cycle = snap.stream.cycle;
-        }
     }
-    let _ = seen_cycle;
 }
 
 /// The pre-fix read path, kept on purpose: two separate locked reads with
@@ -219,13 +232,12 @@ fn torn_read_two_handles() {
     publish(&writer);
     let baseline = reader.read_snapshot().expect("baseline snapshot");
     let delta = baseline.stream.cycle.wrapping_sub(baseline.tick_seq);
-    let mixed_delta = delta;
     assert_eq!(
         reader
             .read_stream()
             .cycle
             .wrapping_sub(reader.read_superblock().unwrap().tick_seq),
-        mixed_delta,
+        delta,
         "the unbracketed read must agree while the file is idle"
     );
 
@@ -236,11 +248,11 @@ fn torn_read_two_handles() {
     let writer_thread = {
         let (writer, stop) = (writer.clone(), stop.clone());
         std::thread::spawn(move || {
-            for _ in 1..WRITES {
+            // Until the readers are done, not a fixed count: the control read
+            // has to have a live publish to trip over on every attempt, or a
+            // writer that finishes first turns the test green and empty.
+            while !stop.load(Ordering::Relaxed) {
                 publish(&writer);
-                if stop.load(Ordering::Relaxed) {
-                    break;
-                }
             }
         })
     };
@@ -249,7 +261,7 @@ fn torn_read_two_handles() {
         std::thread::spawn(move || {
             let mut done = 0;
             while done < WRITES {
-                check_bracketed(&reader, mixed_delta, &violations, 500);
+                check_bracketed(&reader, delta, &violations, 500);
                 done += 500;
                 if stop.load(Ordering::Relaxed) {
                     break;
@@ -263,7 +275,7 @@ fn torn_read_two_handles() {
         std::thread::spawn(move || {
             let mut done = 0;
             while done < WRITES {
-                check_unbracketed(&reader, mixed_delta, &control, 500);
+                check_unbracketed(&reader, delta, &control, 500);
                 done += 500;
                 if stop.load(Ordering::Relaxed) {
                     break;
@@ -273,10 +285,10 @@ fn torn_read_two_handles() {
         })
     };
 
-    drop(writer);
-    writer_thread.join().expect("writer thread");
+    drop(writer); // the writer thread owns the handle from here on
     let reads = reader_thread.join().expect("reader thread");
     stop.store(true, Ordering::Relaxed);
+    writer_thread.join().expect("writer thread");
     control_thread.join().expect("control thread");
 
     let summary = report("two handles", &violations, reads);
@@ -311,29 +323,33 @@ fn torn_read_two_writers() {
         .into_iter()
         .map(|(sp, parity)| {
             let stop = stop.clone();
-            let violations = violations.clone();
             std::thread::spawn(move || {
                 let mut seq = 0u64;
-                loop {
+                // Bounded, but only ever ended by `stop` in practice: see the
+                // note in `torn_read_two_handles` about a quiet file.
+                while !stop.load(Ordering::Relaxed) && seq < WRITES {
                     // Two publishers, one counter: `cycle` keeps the parity of
                     // its writer and increments by 2, so a complete page always
                     // satisfies `cycle % 2 == parity` and `hash == !cycle`.
                     let cycle = CYCLE_BASE + seq * 2 + parity;
                     sp.tick(cycle, 0.5, 0.25, !cycle, 1.0, seq, 0, cycle as f64);
                     seq += 1;
-                    if stop.load(Ordering::Relaxed) || seq >= WRITES / 2 {
-                        break;
-                    }
                 }
-                violations.total()
+                seq
             })
         })
         .collect();
+
+    let seq_before = reader
+        .read_snapshot()
+        .expect("snapshot before the writers start")
+        .tick_seq;
 
     let reader_thread = {
         let (violations, reader, stop) = (violations.clone(), reader.clone(), stop.clone());
         std::thread::spawn(move || {
             let mut reads = 0u64;
+            let mut max_seq = 0u64;
             while reads < WRITES * 2 {
                 // No baseline delta here: two publishers make that constant
                 // meaningless. What must still hold for every publish, from
@@ -354,27 +370,39 @@ fn torn_read_two_writers() {
                     violations.mixed.fetch_add(1, Ordering::Relaxed);
                 }
                 reads += 1;
+                max_seq = snap.tick_seq.max(max_seq);
                 if stop.load(Ordering::Relaxed) {
                     break;
                 }
             }
-            reads
+            (reads, max_seq)
         })
     };
 
-    let mut read_count = 0;
-    for w in writers {
-        read_count += w.join().unwrap_or(0);
-    }
+    let (reads, max_seq) = reader_thread.join().expect("reader thread");
     stop.store(true, Ordering::Relaxed);
-    let reads = reader_thread.join().expect("reader thread");
-    let _ = read_count;
+    for w in writers {
+        w.join().expect("writer thread");
+    }
 
     let summary = report("two writers", &violations, reads);
     assert_eq!(
         violations.total(),
         0,
         "torn reads survived the seqlock: {summary}"
+    );
+    // Sensitivity check. The unbracketed half-page oracle the other two tests
+    // use is scheduling-sensitive with two publishers and two readers sharing
+    // one handle: it measured 1 258-1 362 torn pages per 60 000 reads with a
+    // single control thread and 0 per 120 000 once the bracketed reader shares
+    // the handle, so an assert on it would be a flake on a busy machine. What
+    // cannot be vacuous is progress: the counter is global, so a reader that
+    // raced a live writer must have watched it advance by thousands.
+    assert!(
+        max_seq > seq_before + 1_000,
+        "the publish counter only moved from {seq_before} to {max_seq}, so the \
+         readers never raced a writer and this run proves nothing: {}",
+        report("two writers", &violations, reads)
     );
 }
 

@@ -8,6 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **The tearing regression proves what it claims** (`tests/spine_torn_read.rs`). Its header said every test runs an unbracketed
+  control read; `torn_read_two_writers` did not have one, and the other two
+  stopped their publisher after a fixed number of writes, so a writer that
+  finished before the readers turned the test green and empty. Publishers now
+  run until the readers are done, the two-publisher test asserts publish
+  progress (its half-page control measured 0/120 000 once a second reader
+  shared the handle, so it was not assertable), and the header states what
+  each of the four counters measures — `open_window` is a property of the
+  read path, not of the writer.
 - **Spine publish is now one coherent snapshot, and it is a seqlock**
   (`src/spine.rs`). The previous commit's message claimed "1 StreamPage write
   + 1 epoch publish" with "Release/Acquire" ordering; what the code did was

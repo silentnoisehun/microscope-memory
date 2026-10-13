@@ -52,9 +52,7 @@ fn main() {
     let (with_dir, without_dir) = match (args.get(1), args.get(2)) {
         (Some(a), Some(b)) => (PathBuf::from(a), PathBuf::from(b)),
         _ => {
-            eprintln!(
-                "használat: bench_recall_ab <indexelt_könyvtár> <index_nélküli_könyvtár>"
-            );
+            eprintln!("használat: bench_recall_ab <indexelt_könyvtár> <index_nélküli_könyvtár>");
             std::process::exit(2);
         }
     };
@@ -79,8 +77,7 @@ fn main() {
     let mut reader_a = MicroscopeReader::open(&cfg_a).expect("indexelt reader");
     let mut reader_b = MicroscopeReader::open(&cfg_b).expect("index nélküli reader");
     assert_eq!(
-        reader_a.block_count,
-        reader_b.block_count,
+        reader_a.block_count, reader_b.block_count,
         "a két könyvtár blokkszáma eltér"
     );
     println!(

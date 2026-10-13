@@ -1001,8 +1001,7 @@ fn test_light_rebuild_regenerates_text_index() {
         "light rebuild must regenerate the text index it dropped"
     );
 
-    let reader =
-        microscope_memory::MicroscopeReader::open(&config).expect("open reader");
+    let reader = microscope_memory::MicroscopeReader::open(&config).expect("open reader");
     let idx = reader
         .text_index
         .as_ref()

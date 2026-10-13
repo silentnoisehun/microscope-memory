@@ -67,5 +67,8 @@ fn ranked_matches_fresh_reader_after_append() {
         after, baseline,
         "a hosszĂş Ă©letĹ± reader eltĂ©r a friss readertĹ‘l az append utĂˇn"
     );
-    assert!(!after.is_empty(), "az Ăşjrafelvett bejegyzĂ©s nem talĂˇlhatĂł meg");
+    assert!(
+        !after.is_empty(),
+        "az Ăşjrafelvett bejegyzĂ©s nem talĂˇlhatĂł meg"
+    );
 }

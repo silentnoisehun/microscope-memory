@@ -702,7 +702,11 @@ impl MicroscopeReader {
                 if !low.contains(&q) {
                     return None;
                 }
-                Some((h.depth, i, relevance_score(&q, &q_terms, &low, h.importance)))
+                Some((
+                    h.depth,
+                    i,
+                    relevance_score(&q, &q_terms, &low, h.importance),
+                ))
             })
             .collect();
 

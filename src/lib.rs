@@ -136,13 +136,13 @@ pub mod planning;
 pub mod predictive_cache;
 pub mod relevance;
 #[cfg(not(target_arch = "wasm32"))]
+pub mod spine;
+#[cfg(not(target_arch = "wasm32"))]
 pub mod structural_plasticity;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod synaptic_plasticity;
 pub mod temporal_archetype;
 pub mod thought_graph;
-#[cfg(not(target_arch = "wasm32"))]
-pub mod spine;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod vagus;
 #[cfg(not(target_arch = "wasm32"))]

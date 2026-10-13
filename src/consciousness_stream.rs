@@ -476,7 +476,11 @@ fn publish_spine(s: &StreamState) {
         spine.write_hebbian(&hh);
 
         let mut ah = spine.read_attention();
-        for (dst, src) in ah.learned_weights.iter_mut().zip(s.attention.learned_weights) {
+        for (dst, src) in ah
+            .learned_weights
+            .iter_mut()
+            .zip(s.attention.learned_weights)
+        {
             *dst = src;
         }
         ah.last_recall_ms = s.attention.last_recall_ms;

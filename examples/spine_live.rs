@@ -11,8 +11,8 @@ use microscope_memory::spine::Spine;
 
 fn main() {
     let mut config = Config::default();
-    config.paths.output_dir = std::env::var("M1C_OUTPUT_DIR")
-        .unwrap_or_else(|_| "data".to_string());
+    config.paths.output_dir =
+        std::env::var("M1C_OUTPUT_DIR").unwrap_or_else(|_| "data".to_string());
     config.embedding.provider = "none".to_string();
 
     let spine_path = Path::new(&config.paths.output_dir).join("spine.bin");

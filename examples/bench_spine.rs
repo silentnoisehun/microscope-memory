@@ -233,9 +233,7 @@ fn main() {
     }
     println!(
         "F. Emotion+Attention+Cache r+w:     {:?} /3-réteg\n",
-        t.elapsed() / n3
-            .try_into()
-            .unwrap()
+        t.elapsed() / n3.try_into().unwrap()
     );
 
     // ── G. sync (durability pont) ──
@@ -251,8 +249,14 @@ fn main() {
     let emo: EmotionHeader = reopened.read_emotion();
     let cache: CacheHeader = reopened.read_cache();
     println!("\nH. Reopen:");
-    println!("   cycle={} hebbian_activations={}", stream.cycle, hebb.activation_count);
-    println!("   emo_updates={} cache_hits={}", emo.total_updates, cache.total_hits);
+    println!(
+        "   cycle={} hebbian_activations={}",
+        stream.cycle, hebb.activation_count
+    );
+    println!(
+        "   emo_updates={} cache_hits={}",
+        emo.total_updates, cache.total_hits
+    );
 
     // ── Összefoglaló ──
     let legacy_reload = legacy_reload_first;

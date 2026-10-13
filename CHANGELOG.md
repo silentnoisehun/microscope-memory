@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Two files were committed mojibaked and nobody noticed, because the gate that
   catches it could never run.** `examples/bench_recall.rs` (497 marker hits) and
   `tests/append_cache_liveness.rs` (32) carry UTF-8 read through CP1250 and
-  re-saved, so `//! FuttatĂ„â€šĂ‹â€ˇs` instead of `//! Futtatás`. The
+  re-saved, so `//! FuttatĂ„â€šĂ‹â€ˇs` instead of `//! Futtatás`. The <!-- mojibake-ok: a serult alakot szandekosan mutatjuk -->
   `standards` job runs `Mojibake` *after* `Formatting`, and formatting had been
   red on this tree long enough that the mojibake check never got a turn — the
   first commit to fix `cargo fmt` is also the first commit that fails on the

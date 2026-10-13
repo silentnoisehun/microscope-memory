@@ -572,6 +572,9 @@ mod tests {
             snapshot: Arc::new(SharedSnapshot::new_zeroed()),
             spine: Some(spine.clone()),
         };
+        // Activations are a sparse prefix, not preallocated to block_count.
+        // Learn index 2 so the fixture really has three stored records.
+        s.hebbian.record_activation(&[(2, 1.0)], 123);
         s.attention.total_recalls = 77;
         s.emotional_ring.total_updates = 88;
         let before = spine.publish_sequence();
@@ -580,6 +583,7 @@ mod tests {
         let snap = spine.read_store_snapshot().unwrap();
         assert_eq!(snap.stream.cycle, LAYER_HEADER_INTERVAL);
         assert_eq!(snap.hebbian.block_count, 3);
+        assert_eq!(snap.hebbian.activation_count, 1);
         assert_eq!(snap.attention.total_recalls, 77);
         assert_eq!(snap.emotion.total_updates, 88);
         assert_eq!(snap.resonance.last_decay_ms, snap.stream.updated_ms);

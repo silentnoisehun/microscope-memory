@@ -28,7 +28,21 @@ jobs:
         run: rustup target add wasm32-unknown-unknown
 
       - name: Install wasm-bindgen-cli
-        run: cargo install wasm-bindgen-cli --version 0.2.100
+        # The CLI has to be the *same* version as the `wasm-bindgen` crate in
+        # the lockfile: wasm-bindgen stamps the crate version into the module
+        # and refuses to generate bindings from a mismatched one. A pin here
+        # therefore rots the moment the crate updates, and it had -- this step
+        # installed 0.2.100 against a lockfile at 0.2.114, which failed every
+        # master push for 11 days while the Rust build itself was fine. Read the
+        # version out of Cargo.lock so the two cannot drift apart.
+        run: |
+          WANT=$(awk '/^name = "wasm-bindgen"$/{getline; sub(/^version = /, ""); gsub(/[",]/, ""); print; exit}' Cargo.lock)
+          if [ -z "$WANT" ]; then
+            echo "::error::could not read the wasm-bindgen version from Cargo.lock" >&2
+            exit 1
+          fi
+          echo "installing wasm-bindgen-cli $WANT to match the lockfile"
+          cargo install wasm-bindgen-cli --version "$WANT" --locked
 
       - name: Build WASM binary
         run: |

@@ -96,6 +96,14 @@ pub const SUPERBLOCK_BYTES: usize = 56;
 /// (page 0, so this is also the file offset). 8-byte aligned by construction
 /// because mappings start on a page boundary.
 pub const SEQ_SLOT: usize = 56;
+const _: () = assert!(
+    SEQ_SLOT.is_multiple_of(8),
+    "the counter slot must stay 8-byte aligned"
+);
+const _: () = assert!(
+    SEQ_SLOT >= SUPERBLOCK_BYTES,
+    "the payload must end before the counter"
+);
 /// Bytes of the stream page a snapshot read copies. [`StreamHeader`] is
 /// decoded from its first 60 bytes, so the read brackets one cache line
 /// instead of 16 KiB — which is the difference between a reader retrying once
@@ -947,7 +955,18 @@ pub struct Spine {
 /// is what makes `SEQ_SLOT` — a multiple of 8 — an aligned address). No code
 /// may write those 8 bytes non-atomically: [`Spine::write_slot`] is the only
 /// path that writes page 0 wholesale and it refuses to.
+/// The counter is at a fixed offset in a live mapping, so this is the one
+/// place that has to hold the two invariants every caller would otherwise have
+/// to remember: the mapping covers `SEQ_SLOT..SEQ_SLOT + 8`, and the address is
+/// 8-byte aligned. Alignment holds because `mmap` starts on a page boundary and
+/// `SEQ_SLOT` is a multiple of 8; the length is checked here, in release too,
+/// so a caller that forgets its guard panics instead of being undefined.
 unsafe fn seq_atomic(mmap: &mut MmapMut) -> &AtomicU64 {
+    assert!(
+        mmap.len() >= SEQ_SLOT + 8,
+        "spine mapping is {} bytes, too short to carry a counter at {SEQ_SLOT}",
+        mmap.len()
+    );
     let base = mmap.as_mut_ptr();
     // The only alignment the atomic needs is 8, and `mmap(2)` hands out
     // page-aligned bases (4096 at the smallest), so `SEQ_SLOT` — a multiple
@@ -1972,6 +1991,39 @@ mod tests {
             reader.resize(1 << 20).is_err(),
             "a read-only handle must not remap the file"
         );
+    }
+
+    /// The length check inside [`seq_atomic`] is the belt for every `seq_*`
+    /// caller, so it is tested on its own: a mapping too short for the counter
+    /// has to panic, not hand out an out-of-bounds `&AtomicU64`.
+    #[test]
+    #[should_panic(expected = "too short to carry a counter")]
+    fn test_counter_access_on_a_short_mapping_panics() {
+        use std::io::Write;
+        let dir = std::env::temp_dir().join(format!("m1c_spine_short_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).expect("create dir");
+        let path = dir.join("tiny.bin");
+        {
+            let mut f = std::fs::OpenOptions::new()
+                .read(true)
+                .write(true)
+                .create(true)
+                .truncate(true)
+                .open(&path)
+                .expect("create tiny file");
+            f.write_all(&[0u8; 16]).expect("write");
+        }
+        let file = std::fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(&path)
+            .expect("open tiny file");
+        // SAFETY: a private 16-byte mapping of a file this test owns; the
+        // point is that the helper refuses to read a counter out of it.
+        let mut mmap = unsafe { MmapOptions::new().map_mut(&file).expect("map") };
+        let _ = seq_load(&mut mmap);
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

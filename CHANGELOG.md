@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **`UNSAFE.md` covers the spine publish window.** The new `unsafe`
+  surface — `AtomicU64::from_ptr` over the mapping, the raw `flock(2)`
+  declaration, and the `map_mut` of a resized file — is inventoried with what
+  a reviewer has to check, and `seq_atomic` now asserts its length bound in
+  release too, so a future caller that forgets its guard panics rather than
+  reading outside the mapping. `UNSAFE.md`'s counts were re-derived and the
+  drift against the previous pass is stated instead of hidden.
 - **The tearing regression proves what it claims** (`tests/spine_torn_read.rs`). Its header said every test runs an unbracketed
   control read; `torn_read_two_writers` did not have one, and the other two
   stopped their publisher after a fixed number of writes, so a writer that

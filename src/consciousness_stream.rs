@@ -82,6 +82,14 @@ pub struct StreamState {
     /// Lives as `Arc<SharedSnapshot>` so the seqlock address is stable
     /// even if the StreamState Mutex is held by a writer.
     pub snapshot: Arc<SharedSnapshot>,
+
+    /// Spine: a stream teljes rétegállapota egyetlen mmap fájlban
+    /// (`spine.bin` a kimeneti könyvtárban). A háttérszál tick-enként
+    /// írja a skálárokat, a ritkább réteg-fejléceket kvázi-időzítve.
+    ///
+    /// `None` ha a fájl nem nyitható meg (csak olvasható lemez, stb.) —
+    /// a stream akkor is fut, csak nincs kereszt-proc esszenciális nézete.
+    pub spine: Option<Arc<crate::spine::Spine>>,
 }
 
 /// Thread-safe wrapper
@@ -120,6 +128,10 @@ impl ConsciousnessStream {
         )
         .ok();
 
+        // Spine: egyetlen mmap a rétegek állapotára. Megnyitás nem
+        // kötelező — csak-olvasható lemeznél a stream tovább fut nélküle.
+        let spine = crate::spine::Spine::open(output_dir).ok().map(Arc::new);
+
         let state = Arc::new(Mutex::new(StreamState {
             hebbian,
             attention: AttentionState::load_or_init(output_dir),
@@ -138,6 +150,7 @@ impl ConsciousnessStream {
             last_query_ms: 0,
             hebbian_total_energy,
             snapshot: snapshot.clone(),
+            spine: spine.clone(),
         }));
 
         // Set global stream state
@@ -146,6 +159,16 @@ impl ConsciousnessStream {
         let state_clone = state.clone();
         let running = Arc::new(Mutex::new(true));
         let running_clone = running.clone();
+
+        // Ha a Spine élő állapotot hordoz, a ciklusszámláló ott folytatódik,
+        // ahol az előző processz abbahagyta (nincs nulláról indulás).
+        if let Some(sp) = spine.as_ref() {
+            let restored = sp.read_stream();
+            if restored.cycle > 0 {
+                let mut s = crate::sync_guard::mutex_lock(&state);
+                s.cycle = restored.cycle;
+            }
+        }
 
         thread::spawn(move || {
             let mut curiosity_counter = 0u64;
@@ -211,6 +234,9 @@ impl ConsciousnessStream {
 
                 // ─── Publish snapshot (minden ciklusban, lock-free olvasók számára) ───
                 publish_snapshot(&s, snapshot_writer.as_ref());
+
+                // ─── Spine publish (minden ciklusban, egybe írva) ───
+                publish_spine(&s);
 
                 drop(s);
                 thread::sleep(Duration::from_millis(CYCLE_MS));
@@ -402,6 +428,102 @@ fn publish_snapshot(s: &StreamState, writer: Option<&MappedSnapshotWriter>) {
         if let Some(data) = snap.read() {
             let _ = writer.write(&data);
         }
+    }
+}
+
+/// Hány tick-enként íródjanak a ritka réteg-fejlécek (Hebbian, Attention,
+/// Emotion, Resonance, Graph, Cache, Archetype, Mirror, Merkle, Meta).
+/// A skálárok (StreamPage) tick-enként mennek — ők a hot path.
+const LAYER_HEADER_INTERVAL: u64 = 10; // 1 másodperc
+
+/// A stream állapotának publikálása a mmap Spine-be.
+///
+/// A skálárok (ciklus, surprise, curiosity, predikció, Hebbian energiája)
+/// minden tick-ben egybe íródnak — 1 oldal, 1 lock. A réteg-fejlécek
+/// `LAYER_HEADER_INTERVAL`-enként, mert azok csak az aggregátumokat tartják
+/// számon (a nagy tömbök a saját fájljaikon maradnak).
+fn publish_spine(s: &StreamState) {
+    let Some(spine) = &s.spine else { return };
+
+    // Hot path: a teljes StreamPage egy írásba.
+    spine.tick(
+        s.cycle,
+        s.surprise_level,
+        s.curiosity_level,
+        s.predicted_query_hash,
+        s.predicted_confidence,
+        s.last_query_hash,
+        s.last_query_ms,
+        s.hebbian_total_energy as f64,
+    );
+
+    // A ritkább réteg-aggregátumok.
+    if s.cycle.is_multiple_of(LAYER_HEADER_INTERVAL) {
+        let now = now_ms();
+
+        let mut hh = spine.read_hebbian();
+        hh.block_count = s.hebbian.activations.len() as u32;
+        hh.activation_count = s
+            .hebbian
+            .activations
+            .iter()
+            .filter(|a| a.activation_count > 0)
+            .count() as u32;
+        hh.coactivation_count = s.hebbian.coactivations.len() as u32;
+        hh.fingerprint_count = s.hebbian.fingerprints.len() as u32;
+        hh.decay_event_count += s.cycle;
+        hh.last_activation_ms = s.last_query_ms;
+        spine.write_hebbian(&hh);
+
+        let mut ah = spine.read_attention();
+        for (dst, src) in ah.learned_weights.iter_mut().zip(s.attention.learned_weights) {
+            *dst = src;
+        }
+        ah.last_recall_ms = s.attention.last_recall_ms;
+        ah.total_recalls = s.attention.total_recalls;
+        spine.write_attention(&ah);
+
+        let mut eh = spine.read_emotion();
+        eh.current = s.emotional_ring.current;
+        eh.last_update = s.emotional_ring.last_update;
+        eh.total_updates = s.emotional_ring.total_updates;
+        spine.write_emotion(&eh);
+
+        let mut rh = spine.read_resonance();
+        rh.instance_id = s.resonance.instance_id;
+        rh.field_cells = s.resonance.field.len() as u32;
+        rh.outgoing_count = s.resonance.outgoing.len() as u32;
+        rh.incoming_count = s.resonance.incoming.len() as u32;
+        rh.last_decay_ms = now;
+        spine.write_resonance(&rh);
+
+        let mut gh = spine.read_graph();
+        gh.node_count = s.thought_graph.nodes.len() as u32;
+        gh.edge_count = s.thought_graph.edges.len() as u32;
+        gh.pattern_count = s.thought_graph.patterns.len() as u32;
+        gh.current_session_id = s.thought_graph.current_session_id;
+        spine.write_graph(&gh);
+
+        let mut ch = spine.read_cache();
+        ch.total_predictions = s.predictive_cache.stats.total_predictions;
+        ch.total_hits = s.predictive_cache.stats.total_hits;
+        ch.total_misses = s.predictive_cache.stats.total_misses;
+        ch.total_partial_hits = s.predictive_cache.stats.total_partial_hits;
+        ch.current_predictions = s.predictive_cache.predictions.len() as u32;
+        ch.avg_confidence = s.predictive_cache.stats.avg_confidence;
+        ch.last_predict_ms = now;
+        spine.write_cache(&ch);
+
+        let mut arh = spine.read_archetype();
+        arh.active_count = s.archetypes.archetypes.len() as u32;
+        spine.write_archetype(&arh);
+
+        let mut mh = spine.read_mirror();
+        mh.echo_count = s.mirror.echoes.len() as u32;
+        mh.block_resonance_count = s.mirror.block_resonance.len() as u32;
+        mh.total_echoes = s.mirror.echoes.len() as u64;
+        mh.last_mirror_ms = now;
+        spine.write_mirror(&mh);
     }
 }
 

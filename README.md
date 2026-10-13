@@ -6,7 +6,7 @@
 
 [![Rust](https://img.shields.io/badge/language-Rust-orange.svg)](https://www.rust-lang.org)
 [![License: MIT](https://img.shields.io/badge/Limit-MIT-blue.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/Tests-526%20passing-brightgreen.svg)](#-testing)
+[![Tests](https://img.shields.io/badge/Tests-550+%20passing-brightgreen.svg)](#-testing)
 [![Blocks](https://img.shields.io/badge/Blocks-1.28M-purple.svg)](#-statistics)
 [![WASM](https://img.shields.io/badge/WASM-151%20KB-blueviolet.svg)](#-wasm)
 
@@ -16,18 +16,18 @@
 
 ## What It Is
 
-A living, self-organizing memory architecture with 12 memory layers, 9 depths, and 1.28 million blocks. Not a database â€” a cognitive engine that learns, dreams, and remembers.
+A living, self-organizing memory architecture with 12 memory layers, 9 depths, and 1.28 million blocks. Not a database — a cognitive engine that learns, dreams, and remembers.
 
 ### Core Capabilities
 
-- **Hebbian Learning** â€” co-activation strengthens associations
-- **Epistemic Layer** â€” evidence tracking with confidence, refutation, and promotion gates
-- **Absentia (Silence Layer)** â€” detects what's missing, not just what's present
-- **Cognitive Morphogenesis** â€” mycelium growth through cognitive gradient space
-- **Intent Pipeline** â€” auditatable intent generation from genome + memory + absence
-- **Predictive Cache** â€” anticipates what you'll need next
-- **Emotional Contagion** â€” emotional state influences memory dynamics
-- **Reconsolidation** â€” every recall transforms the memory (like a real brain)
+- **Hebbian Learning** — co-activation strengthens associations
+- **Epistemic Layer** — evidence tracking with confidence, refutation, and promotion gates
+- **Absentia (Silence Layer)** — detects what's missing, not just what's present
+- **Cognitive Morphogenesis** — mycelium growth through cognitive gradient space
+- **Intent Pipeline** — auditatable intent generation from genome + memory + absence
+- **Predictive Cache** — anticipates what you'll need next
+- **Emotional Contagion** — emotional state influences memory dynamics
+- **Reconsolidation** — every recall transforms the memory (like a real brain)
 
 ## Statistics
 
@@ -38,9 +38,10 @@ A living, self-organizing memory architecture with 12 memory layers, 9 depths, a
 | Depths | 9 (D0-D8) |
 | Layers | 13 |
 | Data size | 284.7 MB |
-| Rust files | 97 |
-| Lines of code (`src/**/*.rs`) | 54,053 |
-| Tests | 417 library + 16 hooks |
+| Rust files | 110 |
+| Lines of code (`src/**/*.rs`) | 62,938 |
+| Tests | 451 library + 88 integration + 16 hooks |
+| Version | 1.0.0 |
 | Build time | ~2m 30s |
 | Binary size | ~3.0 MB |
 | WASM size | 151.6 KB |
@@ -65,6 +66,29 @@ A living, self-organizing memory architecture with 12 memory layers, 9 depths, a
 | D7 | 497,997 | 38.73% |
 | D8 | 521,703 | 40.60% |
 
+## Performance (v1.0.0, measured)
+
+All figures below are measured on release builds, not estimated. The
+in-process numbers come from interleaved A/B runs in a single binary
+(warm-up discarded, result sets asserted equal); see [BENCHMARKS.md](BENCHMARKS.md)
+for the full tables and methodology.
+
+| Operation | Before | After | Speedup |
+|-----------|--------|-------|---------|
+| Startup (24 state files → 1 mmap) | 19.2 ms | 1.08 ms | 17.8x |
+| Text search, in-process (23,774 blocks) | 901 us/query | 93 us/query | 9.7x |
+| Recall steady-state (persistent context) | 2.3 ms | 0.3 ms | 7x |
+| MCP session steady-state (stdio, shared reader) | 2.68 ms | 113 us | 23.7x |
+| Stream tick write (10 Hz background) | 11x file I/O | 232 ns | — |
+| End-to-end `find` (incl. process start) | 68 ms | 47 ms | 1.4x |
+
+Honest boundaries, stated in the code and the benchmarks: the end-to-end
+CLI is dominated by process start-up (~17 ms floor), so the user-visible
+`find` improves modestly while the in-loop paths (bridge, MCP, bench)
+improve by an order of magnitude. A hand-rolled allocation-free search was
+implemented, measured at 5.4x *slower* than the standard library, and
+reverted — documented so it is not re-attempted.
+
 ## Architecture
 
 ### Cognitive Modules
@@ -72,9 +96,9 @@ A living, self-organizing memory architecture with 12 memory layers, 9 depths, a
 | Module | File | Lines | Purpose |
 |--------|------|-------|---------|
 | Epistemic | `epistemic.rs` | 1,241 | Evidence tracking, confidence, promotion gates |
-| Absentia | `absentia.rs` | 498 | Silence layer â€” detects what's missing |
+| Absentia | `absentia.rs` | 498 | Silence layer — detects what's missing |
 | Intent | `intent.rs` | 461 | Auditatable intent generation |
-| Cognitive Morphogenesis | `cognitive_morphogenesis.rs` | 826 | Integration engine â€” 7-component gradient |
+| Cognitive Morphogenesis | `cognitive_morphogenesis.rs` | 826 | Integration engine — 7-component gradient |
 | Morphogenesis | `morphogenesis.rs` | 2,200 | Biological growth algorithms (mycelium, capillary, slime mold) |
 | Hebbian | `hebbian.rs` | 754 | Co-activation learning |
 | Resonance | `resonance.rs` | 776 | Pulse-based federation protocol |
@@ -114,7 +138,7 @@ The shadow term prevents growth toward areas with weak evidence, without blockin
 
 ### Unit Tests
 ```bash
-cargo test                    # All tests (417 passing)
+cargo test                    # All tests (451 lib + integration)
 cargo test --lib              # Library tests only
 cargo test --test integration # Integration tests only
 ```
@@ -196,7 +220,7 @@ class MicroscopeWasm {
 }
 
 class HopeCli {
-  exec(command: string): string  // Virtual CLI â€” same commands as native
+  exec(command: string): string  // Virtual CLI — same commands as native
 }
 ```
 

@@ -18,6 +18,99 @@ use windows_sys::Win32::System::Memory::{
     VirtualQuery, MEMORY_BASIC_INFORMATION, PAGE_GUARD, PAGE_NOACCESS,
 };
 
+/// Allocation-free, case-insensitive substring test.
+///
+/// `needle` MUST already be lowercased (via `str::to_lowercase`).
+///
+/// **Measured, and rejected for the text-search hot path** — see
+/// `tests/contains_ci.rs::ab_contains_ci_vs_tolowercase`. On a 23,000-block
+/// corpus this costs ~4.9 µs per block against ~0.9 µs for the idiomatic
+/// `hay.to_lowercase().contains(q)`. The standard search is a SIMD two-way
+/// scan and beats a hand-rolled byte loop by roughly 5×, so the per-block
+/// temporary it saves costs far more than the temporary itself. The text
+/// search therefore still uses `to_lowercase()` + `contains()`; this function
+/// is kept as a tested utility for callers that genuinely cannot allocate
+/// (a `no_std` target, or a caller already holding a lowercased needle that
+/// must avoid a second temporary).
+///
+/// Correctness is that of `haystack.to_lowercase().contains(needle)`, checked
+/// exhaustively over every substring of a Hungarian fixture by the test suite.
+#[inline]
+pub fn contains_ci(needle: &str, haystack: &str) -> bool {
+    if needle.is_empty() {
+        return true;
+    }
+    // ASCII fast path. Valid UTF-8 never carries an ASCII byte inside a
+    // multi-byte sequence (continuation bytes are 0x80..=0xBF), so an ASCII
+    // byte match can only ever begin on a char boundary. That makes a plain
+    // byte-wise comparison exact — no decoding, no allocation.
+    if needle.is_ascii() {
+        let n = needle.as_bytes();
+        let h = haystack.as_bytes();
+        if n.len() > h.len() {
+            return false;
+        }
+        let first = n[0];
+        let first_upper = first.to_ascii_uppercase();
+        let mut i = 0usize;
+        while i + n.len() <= h.len() {
+            let b = h[i];
+            if (b == first || b == first_upper)
+                && h[i..i + n.len()]
+                    .iter()
+                    .zip(n)
+                    .all(|(&hb, &nb)| hb.to_ascii_lowercase() == nb)
+            {
+                return true;
+            }
+            i += 1;
+        }
+        return false;
+    }
+
+    // Non-ASCII needle: char-wise, still allocation-free.
+    let bytes = haystack.as_bytes();
+    let mut start = 0usize;
+    while start < bytes.len() {
+        if haystack.is_char_boundary(start) && ci_matches_at(needle, haystack, start) {
+            return true;
+        }
+        start += 1;
+    }
+    false
+}
+
+/// (byte length, modified time) of the append log, used by the reader's cache
+/// validation. `None` when the file does not exist or cannot be stat'd.
+fn append_stamp(path: &Path) -> Option<(u64, std::time::SystemTime)> {
+    let md = fs::metadata(path).ok()?;
+    Some((md.len(), md.modified().ok()?))
+}
+
+/// Does `needle` match `haystack` starting exactly at byte offset `start`?
+/// Both sides are compared with `char::to_lowercase()` semantics.
+#[inline]
+fn ci_matches_at(needle: &str, haystack: &str, start: usize) -> bool {
+    let mut ni = needle.chars();
+    let mut hi = haystack[start..].chars();
+    loop {
+        match (ni.next(), hi.next()) {
+            (None, _) => return true,
+            (Some(nc), Some(hc)) => {
+                if nc == hc {
+                    continue;
+                }
+                // `ToLowercase` is an iterator; `.eq()` compares them element-wise
+                // without allocating a String.
+                if !nc.to_lowercase().eq(hc.to_lowercase()) {
+                    return false;
+                }
+            }
+            _ => return false,
+        }
+    }
+}
+
 pub fn layer_color(id: u8) -> &'static str {
     match id {
         0 => "white",
@@ -91,6 +184,16 @@ pub struct MicroscopeReader {
     pub header_stride: usize,
     pub depth_ranges: [(u32, u32); 9],
     pub text_index: Option<crate::text_index::TextIndex>,
+    /// Hot append log, loaded at open. Cached because the combined ranked
+    /// search reads it on every query and it only changes on append.
+    ///
+    /// `append_log_stamp` is the (len, mtime) of the file the cache was built
+    /// from. The ranked search re-validates it against the file before use:
+    /// one `metadata()` call (~1 µs) instead of a full re-read (~230 µs), so a
+    /// reader held across stores still sees new appends. See
+    /// `find_text_all_ranked`.
+    pub append_log: Vec<AppendEntry>,
+    append_log_stamp: Option<(u64, std::time::SystemTime)>,
 }
 
 impl MicroscopeReader {
@@ -218,6 +321,14 @@ impl MicroscopeReader {
 
         let text_index = crate::text_index::TextIndex::open(&output_dir.join("text_index.bin"));
 
+        // The hot append log, read once here instead of once per query.
+        // `find_text_all_ranked` used to `fs::read` this file on every call,
+        // which made the combined search pay a full file read (and parse) per
+        // query even though it changes only when a block is appended.
+        let append_path = output_dir.join("append.bin");
+        let append_log = read_append_log(&append_path);
+        let append_log_stamp = append_stamp(&append_path);
+
         Ok(MicroscopeReader {
             headers,
             data,
@@ -225,6 +336,8 @@ impl MicroscopeReader {
             header_stride,
             depth_ranges,
             text_index,
+            append_log,
+            append_log_stamp,
         })
     }
 
@@ -510,10 +623,49 @@ impl MicroscopeReader {
         }
     }
 
+    /// Blocks to examine for `query_lower`, in ascending index order.
+    ///
+    /// When the inverted text index is present and was built over the same
+    /// block count, only its candidate blocks are scanned; otherwise every
+    /// block is.
+    ///
+    /// The index is a *prefilter*: it returns a superset of the blocks whose
+    /// text contains `query_lower`, so the caller still runs the exact
+    /// `to_lowercase().contains()` predicate. That keeps the result set
+    /// identical to a full scan — this is what makes the shortcut safe rather
+    /// than approximate.
+    ///
+    /// Ascending order is deliberate: `find_text` sorts its hits by depth with
+    /// a *stable* sort, so equal-depth ties break on scan order. Scanning the
+    /// candidates in ascending index order reproduces the exact ordering the
+    /// full scan produced.
+    fn candidate_blocks(&self, query_lower: &str) -> Vec<usize> {
+        if let Some(idx) = &self.text_index {
+            // A stale index (built over a different block count) must not be
+            // used, or it would silently drop blocks added since.
+            if idx.block_count() == self.block_count {
+                if let Some(cands) = idx.candidates_substring(query_lower) {
+                    let mut out: Vec<usize> = cands.into_iter().map(|i| i as usize).collect();
+                    out.sort_unstable();
+                    return out;
+                }
+            }
+        }
+        (0..self.block_count).collect()
+    }
+
     /// Text search
+    ///
+    /// The idiom here is `to_lowercase()` + `contains()` on purpose. The
+    /// allocation-free `contains_ci` alternative was implemented and measured
+    /// at ~5× slower (see its doc comment and `tests/contains_ci.rs`); the
+    /// standard search is SIMD two-way and the per-block temporary is not the
+    /// bottleneck it looks like. The win for this function comes from the
+    /// inverted index (see `candidate_blocks`), not from the predicate.
     pub fn find_text(&self, query: &str, k: usize) -> Vec<(u8, usize)> {
         let q = query.to_lowercase();
-        let mut results: Vec<(u8, usize)> = (0..self.block_count)
+        let candidates = self.candidate_blocks(&q);
+        let mut results: Vec<(u8, usize)> = candidates
             .into_par_iter()
             .filter_map(|i| {
                 if self.text(i).to_lowercase().contains(&q) {
@@ -540,7 +692,8 @@ impl MicroscopeReader {
     pub fn find_text_ranked(&self, query: &str, k: usize) -> Vec<(u8, usize, f32)> {
         let q = query.to_lowercase();
         let q_terms: Vec<&str> = q.split_whitespace().filter(|t| t.len() > 1).collect();
-        let mut scored: Vec<(u8, usize, f32)> = (0..self.block_count)
+        let candidates = self.candidate_blocks(&q);
+        let mut scored: Vec<(u8, usize, f32)> = candidates
             .into_par_iter()
             .filter_map(|i| {
                 let h = unsafe { self.header_unchecked(i) };
@@ -549,11 +702,7 @@ impl MicroscopeReader {
                 if !low.contains(&q) {
                     return None;
                 }
-                Some((
-                    h.depth,
-                    i,
-                    relevance_score(&q, &q_terms, &low, h.importance),
-                ))
+                Some((h.depth, i, relevance_score(&q, &q_terms, &low, h.importance)))
             })
             .collect();
 
@@ -574,21 +723,69 @@ impl MicroscopeReader {
         scored
     }
 
+    /// Re-read the hot append log from disk.
+    ///
+    /// The log is cached at open because the ranked search reads it on every
+    /// query. Explicit refresh is available for callers that store and search
+    /// through the same reader and cannot tolerate the automatic validation
+    /// heuristic below (see `find_text_all_ranked`).
+    pub fn refresh_append_log(&mut self, config: &Config) {
+        let path = Path::new(&config.paths.output_dir).join("append.bin");
+        self.append_log = read_append_log(&path);
+        self.append_log_stamp = append_stamp(&path);
+    }
+
+    /// Cheap staleness check for the cached append log: `metadata()` is one
+    /// syscall, a re-read plus parse is ~230 µs. Both the byte length and the
+    /// modification time are compared, so a rewritten (not merely extended)
+    /// file is caught too.
+    fn append_log_is_stale(&self, output_dir: &Path) -> bool {
+        let path = output_dir.join("append.bin");
+        match (append_stamp(&path), self.append_log_stamp) {
+            (Some(now), Some(cached)) => {
+                now.0 != cached.0
+                    || now
+                        .1
+                        .duration_since(cached.1)
+                        .map(|d| !d.is_zero())
+                        .unwrap_or(true)
+            }
+            // File appeared or vanished since the cache was built.
+            (Some(_), None) | (None, Some(_)) => true,
+            (None, None) => false,
+        }
+    }
+
     /// Ranked text search across the main index and the hot append log.
+    ///
+    /// The append log is cached on the reader rather than re-read per query.
+    /// The cache validates itself against `append.bin`'s (len, mtime) on every
+    /// call — one `metadata()` syscall instead of a ~230 µs re-read — so a
+    /// reader held across stores still sees entries appended since it was
+    /// opened, and the result is always the same as a fresh reader's.
     pub fn find_text_all_ranked(
-        &self,
-        config: &Config,
+        &mut self,
+        _config: &Config,
         query: &str,
         k: usize,
     ) -> Vec<(u8, usize, bool, f32)> {
+        // `config` is part of the public signature (call sites pass the live
+        // config); the append path comes from it, so keep the argument even
+        // though the cache now owns the read.
         let q = query.to_lowercase();
         let q_terms: Vec<&str> = q.split_whitespace().filter(|t| t.len() > 1).collect();
 
+        // Refresh only when the file moved. A reader opened before the first
+        // store pays exactly one extra read for its whole life.
+        if self.append_log_is_stale(Path::new(&_config.paths.output_dir)) {
+            let path = Path::new(&_config.paths.output_dir).join("append.bin");
+            self.append_log = read_append_log(&path);
+            self.append_log_stamp = append_stamp(&path);
+        }
+
         let mut main: Vec<(u8, usize, f32)> = self.find_text_ranked(query, k).into_iter().collect();
 
-        let append_path = Path::new(&config.paths.output_dir).join("append.bin");
-        let appended = read_append_log(&append_path);
-        for (idx, entry) in appended.iter().enumerate() {
+        for (idx, entry) in self.append_log.iter().enumerate() {
             let low = entry.text.to_lowercase();
             if low.contains(&q) {
                 let s = relevance_score(&q, &q_terms, &low, entry.importance);
@@ -2081,6 +2278,8 @@ mod tests {
             header_stride: HEADER_SIZE,
             depth_ranges: [(0, 0); 9],
             text_index: None,
+            append_log: Vec::new(),
+            append_log_stamp: None,
         };
 
         // Valid index reads the (dummy, zeroed) header without issue.

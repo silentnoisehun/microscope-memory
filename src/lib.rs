@@ -39,6 +39,8 @@ pub mod mirror;
 pub mod query;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod reader;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod recall_ctx;
 pub mod resonance;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod sequential_thinking;
@@ -139,6 +141,8 @@ pub mod structural_plasticity;
 pub mod synaptic_plasticity;
 pub mod temporal_archetype;
 pub mod thought_graph;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod spine;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod vagus;
 #[cfg(not(target_arch = "wasm32"))]

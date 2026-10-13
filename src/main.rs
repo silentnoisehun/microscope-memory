@@ -18,6 +18,7 @@
 //!   microscope-mem serve                    # Start the unified endpoint server (TCP/HTTP)
 
 use microscope_memory::config::Config;
+use microscope_memory::recall_ctx::RecallContext;
 use microscope_memory::reader::{layer_color, print_append_result};
 use microscope_memory::Cli;
 use microscope_memory::Cmd;
@@ -294,12 +295,32 @@ fn phase_summary() -> Vec<(&'static str, f64, u32)> {
 }
 
 fn recall(config: &Config, query: &str, k: usize) {
+    // Fresh context per invocation: behaviour is exactly the old
+    // load-everything-then-save-everything flow. Loop/server callers should
+    // open one context and use `recall_with_ctx` instead.
+    let mut ctx = RecallContext::open(config)
+        .expect("Failed to open microscope index — run 'build' first");
+    recall_with_ctx(&mut ctx, config, query, k);
+}
+
+fn recall_with_ctx(ctx: &mut RecallContext, config: &Config, query: &str, k: usize) {
     let t0 = Instant::now();
     // Cumulative elapsed time at the last traced phase, so the tail of the
     // function can be measured as a remainder at the end.
     let mut t_mark = 0.0f64;
+
+    // ─── Persistent context: no loads here ──────────────────────────────
+    // Every `load_or_init` the old `recall()` performed is already in `ctx`
+    // (loaded once by `RecallContext::open`). The bindings below are disjoint
+    // field borrows, so the shared `reader` and the mutable states coexist.
+    // `tg_pre`/`pc_pre` and the later mutable `thought_graph`/`pred_cache`
+    // are the same objects: the old code loaded each state twice per call.
     let t_open = Instant::now();
-    let reader = open_reader(config);
+    let reader: &microscope_memory::reader::MicroscopeReader = &ctx.reader;
+    let attention: &mut microscope_memory::attention::AttentionState = &mut ctx.attention;
+    let hebb: &mut microscope_memory::hebbian::HebbianState = &mut ctx.hebb;
+    let tg_pre: &microscope_memory::thought_graph::ThoughtGraphState = &ctx.thought_graph;
+    let pc_pre: &microscope_memory::predictive_cache::PredictiveCache = &ctx.pred_cache;
     trace_phase("open_reader", t_open.elapsed().as_secs_f64() * 1000.0);
     println!("{} '{}':", "RECALL".cyan().bold(), query);
 
@@ -307,28 +328,12 @@ fn recall(config: &Config, query: &str, k: usize) {
     let relevance_query = microscope_memory::relevance::RelevanceQuery::new(query);
 
     // ─── Attention: compute layer weights from context ──
-    let output_dir_att = Path::new(&config.paths.output_dir);
     let t_state = Instant::now();
-    let t_s0 = Instant::now();
-    let mut attention = microscope_memory::attention::AttentionState::load_or_init(output_dir_att);
-    trace_phase("  state: attention", t_s0.elapsed().as_secs_f64() * 1000.0);
-    let t_s1 = Instant::now();
-    let mut hebb =
-        microscope_memory::hebbian::HebbianState::load_or_init(output_dir_att, reader.block_count);
-    trace_phase("  state: hebbian", t_s1.elapsed().as_secs_f64() * 1000.0);
-    let t_s2 = Instant::now();
-    let tg_pre = microscope_memory::thought_graph::ThoughtGraphState::load_or_init(output_dir_att);
-    trace_phase(
-        "  state: thought graph",
-        t_s2.elapsed().as_secs_f64() * 1000.0,
-    );
-    let t_s3 = Instant::now();
-    let pc_pre = microscope_memory::predictive_cache::PredictiveCache::load_or_init(output_dir_att);
-    trace_phase("  state: pred cache", t_s3.elapsed().as_secs_f64() * 1000.0);
+    // (states already resident — the four loads below used to cost ~1 ms)
 
     trace_phase("state load", t_state.elapsed().as_secs_f64() * 1000.0);
     let t_emofield = Instant::now();
-    let emotional_field = microscope_memory::emotional::emotional_field(&reader, &hebb);
+    let emotional_field = microscope_memory::emotional::emotional_field(reader, hebb);
     trace_phase(
         "emotional field scan",
         t_emofield.elapsed().as_secs_f64() * 1000.0,
@@ -370,10 +375,10 @@ fn recall(config: &Config, query: &str, k: usize) {
 
     // === 21D Emotional State warp: add wave-based bias from stored state ===
     let (qx, qy, qz) = if config.search.emotion_21d_weight > 0.0 {
-        let emotion_file = output_dir_att.join("emotion_21d.bin");
-        let state =
-            microscope_memory::emotional_21d::EmotionalState21D::load_or_init(&emotion_file);
-        let (edx, edy, edz) = microscope_memory::emotional_21d::emotion_21d_bias(&state);
+        // (from ctx — the per-call file read is gone)
+        let state: &microscope_memory::emotional_21d::EmotionalState21D =
+            &ctx.emotion_21d;
+        let (edx, edy, edz) = microscope_memory::emotional_21d::emotion_21d_bias(state);
         let w21 = config.search.emotion_21d_weight;
         (qx + edx * w21, qy + edy * w21, qz + edz * w21)
     } else {
@@ -482,7 +487,7 @@ fn recall(config: &Config, query: &str, k: usize) {
                     trace_phase("vector search", t_search.elapsed().as_secs_f64() * 1000.0);
                     t_mark = t0.elapsed().as_secs_f64() * 1000.0;
                     if let Some(matches) = &diag {
-                        report_vector_diag(&reader, &eidx, &qe, &hits, matches, want);
+                        report_vector_diag(reader, &eidx, &qe, &hits, matches, want);
                     }
                     for (sim, block_idx) in hits.into_iter().take(want) {
                         if block_idx < reader.block_count {
@@ -665,11 +670,12 @@ fn recall(config: &Config, query: &str, k: usize) {
     trace_phase("append log", t0.elapsed().as_secs_f64() * 1000.0 - t_mark);
     t_mark = t0.elapsed().as_secs_f64() * 1000.0;
 
-    let output_dir_tg = Path::new(&config.paths.output_dir);
-    let mut thought_graph =
-        microscope_memory::thought_graph::ThoughtGraphState::load_or_init(output_dir_tg);
-    let mut pred_cache =
-        microscope_memory::predictive_cache::PredictiveCache::load_or_init(output_dir_tg);
+    // (from ctx — the old code loaded both states a second time here,
+    // discarding the identical copies from the top of the function)
+    let thought_graph: &mut microscope_memory::thought_graph::ThoughtGraphState =
+        &mut ctx.thought_graph;
+    let pred_cache: &mut microscope_memory::predictive_cache::PredictiveCache =
+        &mut ctx.pred_cache;
     let qh_tg = microscope_memory::hebbian::query_hash(query);
 
     // Check predictive cache — instant boost from pre-fetched blocks (scaled by attention)
@@ -824,7 +830,8 @@ fn recall(config: &Config, query: &str, k: usize) {
 
     // ─── Hebbian + Mirror: record activations & detect resonance ──
     let output_dir = Path::new(&config.paths.output_dir);
-    let mut mirror = microscope_memory::mirror::MirrorState::load_or_init(output_dir);
+    // (from ctx)
+    let mirror: &mut microscope_memory::mirror::MirrorState = &mut ctx.mirror;
     let activated: Vec<(u32, f32)> = all_results
         .iter()
         .filter(|(_, _, is_main)| *is_main)
@@ -834,7 +841,7 @@ fn recall(config: &Config, query: &str, k: usize) {
     if !activated.is_empty() {
         let qh = microscope_memory::hebbian::query_hash(query);
         // Mirror: detect resonance before recording (so new fingerprint doesn't match itself)
-        let boosts = microscope_memory::mirror::mirror_boost(&hebb, &mut mirror, &activated, qh);
+        let boosts = microscope_memory::mirror::mirror_boost(hebb, mirror, &activated, qh);
         if !boosts.is_empty() {
             println!(
                 "  {} {} blocks resonated",
@@ -844,8 +851,9 @@ fn recall(config: &Config, query: &str, k: usize) {
         }
         hebb.record_activation(&activated, qh);
 
-        // Resonance: emit pulse with spatial coordinates
-        let mut resonance = microscope_memory::resonance::ResonanceState::load_or_init(output_dir);
+    // Resonance: emit pulse with spatial coordinates
+    // (from ctx)
+    let resonance: &mut microscope_memory::resonance::ResonanceState = &mut ctx.resonance;
         let headers: Vec<(f32, f32, f32)> = activated
             .iter()
             .map(|&(idx, _)| {
@@ -855,10 +863,11 @@ fn recall(config: &Config, query: &str, k: usize) {
             .collect();
         resonance.emit_pulse(&activated, qh, &headers, 1);
 
-        // Archetype: reinforce + temporal tracking
-        let mut archetypes = microscope_memory::archetype::ArchetypeState::load_or_init(output_dir);
-        let mut temporal =
-            microscope_memory::temporal_archetype::TemporalArchetypeState::load_or_init(output_dir);
+    // Archetype: reinforce + temporal tracking
+    // (both from ctx)
+    let archetypes: &mut microscope_memory::archetype::ArchetypeState = &mut ctx.archetypes;
+    let temporal: &mut microscope_memory::temporal_archetype::TemporalArchetypeState =
+        &mut ctx.temporal;
         if let Some((idx, score)) = archetypes.match_archetype(&activated) {
             let arch_id = archetypes.archetypes[idx].id;
             let time_boost = temporal.boost(arch_id);
@@ -887,7 +896,7 @@ fn recall(config: &Config, query: &str, k: usize) {
         thought_graph.detect_patterns();
 
         // Predictive cache: evaluate prediction accuracy and predict next
-        let (hit_type, overlap) = pred_cache.evaluate(qh, &result_block_ids, &mut thought_graph);
+        let (hit_type, overlap) = pred_cache.evaluate(qh, &result_block_ids, thought_graph);
         if hit_type != "none" {
             let symbol = match hit_type {
                 "hit" => "+".green(),
@@ -896,7 +905,7 @@ fn recall(config: &Config, query: &str, k: usize) {
             };
             println!("  {} prediction {} (overlap={})", symbol, hit_type, overlap);
         }
-        pred_cache.predict_next(&thought_graph);
+        pred_cache.predict_next(thought_graph);
 
         // Attention: mark recall and save
         attention.mark_recall();
@@ -976,14 +985,15 @@ fn recall(config: &Config, query: &str, k: usize) {
         t_mark = t0.elapsed().as_secs_f64() * 1000.0;
         // --- Eureka: detect unexpected connections ---
         let eureka_events =
-            microscope_memory::eureka::detect_eureka(config, &reader, query, None, &all_results);
+            microscope_memory::eureka::detect_eureka(config, reader, query, None, &all_results);
         trace_phase(
             "  learn: eureka detect",
             t0.elapsed().as_secs_f64() * 1000.0 - t_mark,
         );
         t_mark = t0.elapsed().as_secs_f64() * 1000.0;
         if !eureka_events.is_empty() {
-            let mut eureka_log = microscope_memory::eureka::EurekaLog::load_or_init(output_dir);
+            // (from ctx)
+            let eureka_log: &mut microscope_memory::eureka::EurekaLog = &mut ctx.eureka_log;
             for ev in &eureka_events {
                 let _ = eureka_log.record(output_dir, ev.clone());
                 println!(
@@ -996,8 +1006,9 @@ fn recall(config: &Config, query: &str, k: usize) {
 
         // --- Spaced repetition: record recall for each activated block ---
         let t_sp = Instant::now();
-        let mut spaced =
-            microscope_memory::spaced_repetition::SpacedRepetition::load_or_init(output_dir);
+        // (from ctx)
+        let spaced: &mut microscope_memory::spaced_repetition::SpacedRepetition =
+            &mut ctx.spaced;
         trace_phase(
             "  learn: spaced load",
             t_sp.elapsed().as_secs_f64() * 1000.0,
@@ -1019,8 +1030,9 @@ fn recall(config: &Config, query: &str, k: usize) {
 
         // --- Narrative: update the system's self-narrative ---
         let t_nv = Instant::now();
-        let mut narrative = microscope_memory::narrative::NarrativeState::load_or_init(output_dir);
-        let esr = microscope_memory::emotional_state::EmotionalStateRing::load_or_init(output_dir);
+        // (both from ctx)
+        let narrative: &mut microscope_memory::narrative::NarrativeState = &mut ctx.narrative;
+        let esr: &microscope_memory::emotional_state::EmotionalStateRing = &ctx.esr;
         trace_phase(
             "  learn: narrative load",
             t_nv.elapsed().as_secs_f64() * 1000.0,
@@ -1035,7 +1047,7 @@ fn recall(config: &Config, query: &str, k: usize) {
             .collect();
         if let Err(e) = narrative.update(
             output_dir,
-            Some(&esr),
+            Some(esr),
             Some(&wm_items),
             due_count,
             thought_count,
@@ -1063,7 +1075,7 @@ fn recall(config: &Config, query: &str, k: usize) {
                 .is_multiple_of(microscope_memory::self_reflect::AUTO_REFLECT_INTERVAL)
         {
             let reflection =
-                microscope_memory::self_reflect::introspect(config, &reader, output_dir);
+                microscope_memory::self_reflect::introspect(config, reader, output_dir);
             println!(
                 "{}",
                 microscope_memory::self_reflect::format_reflection(&reflection)
@@ -1072,8 +1084,9 @@ fn recall(config: &Config, query: &str, k: usize) {
 
         // --- Auto self-model snapshot: every 10th recall ---
         if narrative.session_count > 0 && (narrative.session_count as usize).is_multiple_of(10) {
-            let mut self_model = microscope_memory::self_model::SelfModel::load_or_init(output_dir);
-            let snap = self_model.take_snapshot(config, &reader, output_dir);
+            // (from ctx)
+            let self_model: &mut microscope_memory::self_model::SelfModel = &mut ctx.self_model;
+            let snap = self_model.take_snapshot(config, reader, output_dir);
             let change = self_model.describe_change();
             println!(
                 "{}",
@@ -1083,9 +1096,10 @@ fn recall(config: &Config, query: &str, k: usize) {
 
         // --- Auto curiosity: every 7th recall ---
         if narrative.session_count > 0 && (narrative.session_count as usize).is_multiple_of(7) {
-            let mut curiosity =
-                microscope_memory::curiosity::CuriosityState::load_or_init(output_dir);
-            let queries = curiosity.generate_queries(config, &reader, output_dir);
+            // (from ctx)
+            let curiosity: &mut microscope_memory::curiosity::CuriosityState =
+                &mut ctx.curiosity;
+            let queries = curiosity.generate_queries(config, reader, output_dir);
             if !queries.is_empty() {
                 println!(
                     "{}",
@@ -1097,8 +1111,9 @@ fn recall(config: &Config, query: &str, k: usize) {
         // --- Narrative Memory: build story episode from every recall ---
         {
             let t_nm = Instant::now();
-            let mut nm =
-                microscope_memory::narrative_memory::NarrativeMemory::load_or_init(output_dir);
+        // (from ctx)
+        let nm: &mut microscope_memory::narrative_memory::NarrativeMemory =
+            &mut ctx.narrative_memory;
             trace_phase(
                 "  learn: narrative memory load",
                 t_nm.elapsed().as_secs_f64() * 1000.0,
@@ -1117,7 +1132,7 @@ fn recall(config: &Config, query: &str, k: usize) {
                 ),
             );
             let t_be = Instant::now();
-            if let Some(ep) = nm.build_episode(config, &reader, output_dir, query, &all_results) {
+            if let Some(ep) = nm.build_episode(config, reader, output_dir, query, &all_results) {
                 if nm.episodes.len() <= 3 || nm.episodes.len().is_multiple_of(5) {
                     println!(
                         "{}",
@@ -1133,9 +1148,10 @@ fn recall(config: &Config, query: &str, k: usize) {
 
         // --- Auto inner monologue: every 15th recall ---
         if narrative.session_count > 0 && (narrative.session_count as usize).is_multiple_of(15) {
-            let mut monologue =
-                microscope_memory::inner_monologue::MonologueState::load_or_init(output_dir);
-            let entry = monologue.generate_monologue(config, &reader, output_dir);
+            // (from ctx)
+            let monologue: &mut microscope_memory::inner_monologue::MonologueState =
+                &mut ctx.monologue;
+            let entry = monologue.generate_monologue(config, reader, output_dir);
             println!(
                 "{}",
                 microscope_memory::inner_monologue::format_monologue(&entry)
@@ -4633,13 +4649,19 @@ async fn async_main() {
             // with k=1 and k=10 in the same process separates them: the difference
             // is what the benchmark spends writing results nobody asked for, and
             // it should not be quoted as query latency.
+            //
+            // One shared context across all calls: this is what the persistent
+            // mode measures — a single open plus per-call compute and saves,
+            // instead of a full load-everything cycle per call.
+            let mut ctx = RecallContext::open(&config)
+                .expect("Failed to open microscope index — run 'build' first");
             let t0 = Instant::now();
-            recall(&config, &query, k);
+            recall_with_ctx(&mut ctx, &config, &query, k);
             let first = t0.elapsed().as_secs_f64() * 1000.0;
             let mut warm: Vec<f64> = Vec::with_capacity(n);
             for _ in 0..n {
                 let t = Instant::now();
-                recall(&config, &query, k);
+                recall_with_ctx(&mut ctx, &config, &query, k);
                 warm.push(t.elapsed().as_secs_f64() * 1000.0);
             }
             warm.sort_by(|a, b| a.partial_cmp(b).unwrap());
@@ -4855,7 +4877,7 @@ async fn async_main() {
             }
         }
         Cmd::Find { query, k } => {
-            let r = open_reader(&config);
+            let mut r = open_reader(&config);
             // Results go to stdout; diagnostics go to stderr so that
             // `microscope-mem find ... | ...` stays machine-readable.
             eprintln!("{} '{}':", "FIND".cyan().bold(), query);

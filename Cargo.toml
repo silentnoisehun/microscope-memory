@@ -1,7 +1,7 @@
 [package]
 name = "microscope-memory"
 
-version = "0.8.2"
+version = "1.0.0"
 # Derived by letting clippy check it, not by guessing: raising this until
 # `cargo clippy -- -D warnings` stops reporting incompatible_msrv is how 1.91 was
 # found, after a hand-derived 1.88 was wrong about str::floor_char_boundary in
@@ -59,6 +59,12 @@ serde_json = "1.0"
 zstd = { version = "0.13", optional = true }
 microscope-hooks = { path = "microscope-hooks" }
 epistemic-core = { path = "epistemic-core" }
+# Spine: the mmap-backed state store in src/spine.rs. byteorder gives the
+# little-endian POD (de)serialisation without pulling in serde on the hot
+# path; parking_lot supplies the lock the stream cycle already runs behind
+# (std::sync::Mutex is not reentrant and cannot be held across the tick).
+byteorder = "1.5"
+parking_lot = "0.12"
 
 
 [target.'cfg(windows)'.dependencies]

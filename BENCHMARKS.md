@@ -519,6 +519,80 @@ which is why the absolute values sit near 100 ms even for a no-op query. A
 p50/p95/p99 over many runs, and an in-process timing that excludes start-up,
 would be needed to state this precisely.
 
+## In-process recall with the inverted index (v1.0.0)
+
+This is the in-process complement to the table above. Where that table asks
+"what does the user see" (answer: start-up dominates), this one asks "what
+does the text path itself cost" — the question that matters for loop-bound
+services (bridge, MCP) that hold one reader across thousands of queries.
+
+**Run:** 2026-10-13, release, 23,774 blocks, `text_index.bin` = 100 KB
+(1,617 words, built in 10 ms). 6 mixed queries (English + Hungarian),
+19 interleaved A/B rounds in one process (`examples/bench_recall_ab.rs`),
+warm-up discarded, `assert_eq!` on the result set per query per round.
+Reproduced as `9.72x` and `9.57x` on two separate runs.
+
+| Path | Latency / query | What it includes |
+|------|-----------------|------------------|
+| Full scan | 901 us | 23,774 blocks × to_lowercase + SIMD scan, parallel |
+| Indexed (TIX1 prefilter + exact verify) | 93 us | dict scan + postings union + exact predicate on candidates |
+| **Speedup** | **9.7x** | identical result sets, asserted |
+
+Why the two tables agree instead of contradicting: the 91 ms end-to-end
+figure is ~90 ms of fixed cost plus ~1 ms of text path; the in-process
+figure removes the fixed cost. Multiply either way: at 23,774 blocks the
+index saves ~0.8 ms per query; at 695k blocks the earlier table says the
+saving drowns in start-up. Both are true. Quote the right one for the job.
+
+## Persistent recall context (v1.0.0)
+
+`bench-recall` on the real index, 20 rounds, `MICROSCOPE_RECALL_TRACE=1`.
+Before: every call opened a fresh reader and reloaded every layer state
+(~1.3 ms of file I/O inside a ~2.2 ms call). After: one `RecallContext`
+across all calls; saves unchanged.
+
+| Path | Steady-state p50 |
+|------|------------------|
+| Fresh load per call | 2.3 ms |
+| Persistent context | 0.3 ms |
+| **Speedup** | **7x** |
+
+The remaining 0.3 ms is compute plus the per-call state saves, which are
+the durability mechanism and are intentionally kept. Single-writer
+assumption documented on the struct: a CLI invocation opens a fresh
+context per process and is unaffected.
+
+## MCP session with the shared context (v1.0.0)
+
+`examples/bench_mcp.rs` speaks the real MCP stdio protocol
+(`Content-Length` frames) to one server process: initialize, then 10x
+`tools/call memory_find` in the same session. First call opens the shared
+context (reader plus all layer states); the rest reuse it.
+
+| Call | Latency |
+|------|---------|
+| 1st (context open + search) | 2.68 ms |
+| Steady min / avg / max | 91.8 us / 113 us / 148 us |
+| **First-vs-steady** | **23.7x** |
+
+The steady 113 us is the indexed text search plus result formatting with
+zero reopen cost. Without the shared context every call would pay the
+2.68 ms open. This is what an MCP client (Claude, etc.) experiences across
+a session: one slow call, then two orders of magnitude faster.
+
+Methodology notes, because the machine lies:
+
+- Same binary, alternating A/B/A/B rounds. Machine load, thermals and
+  background processes hit both arms equally; separate runs do not
+  (this host varied ±50% run to run).
+- Correctness is the assertion, not the timing: the fast path must return
+  exactly the slow path's results, or the number is meaningless. The
+  benchmark fails the run if any query differs.
+- A rejected twin lives in the tree on purpose: `pub fn contains_ci` plus
+  `tests/contains_ci.rs` document an allocation-free search measured at
+  **5.4x slower** than `to_lowercase() + contains()`, so future work does
+  not re-attempt it.
+
 ## In-process spatial query (10,000 queries per zoom level)
 
 | Zoom | Blocks | Avg Query Time |

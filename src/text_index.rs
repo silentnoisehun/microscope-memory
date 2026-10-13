@@ -107,6 +107,11 @@ impl TextIndex {
         self.block_count
     }
 
+    /// Number of dictionary words (distinct tokens) in the index.
+    pub fn word_count_public(&self) -> usize {
+        self.word_count
+    }
+
     fn u32_at(&self, off: usize) -> Option<u32> {
         self.data
             .get(off..off + 4)

@@ -2014,12 +2014,13 @@ dependencies = [
 
 [[package]]
 name = "microscope-memory"
-version = "0.8.2"
+version = "1.0.0"
 dependencies = [
  "axum",
  "bincode",
  "blake3",
  "bytemuck",
+ "byteorder",
  "candle-core",
  "candle-nn",
  "candle-transformers",
@@ -2035,6 +2036,7 @@ dependencies = [
  "hmac",
  "memmap2",
  "microscope-hooks",
+ "parking_lot",
  "pollster",
  "pyo3",
  "rand 0.8.7",

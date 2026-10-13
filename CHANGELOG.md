@@ -7,6 +7,83 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-10-13
+
+First 1.x release. The headline is recall and startup latency, measured
+in-process (see BENCHMARKS.md), with the index policy and the breaking API
+change stated honestly below.
+
+### Added
+- **Spine (`src/spine.rs`)**: the consciousness stream's whole scalar layer
+  state (cycle, surprise, curiosity, prediction, Hebbian totals plus ten
+  per-layer headers) in a single `spine.bin` mmap, published by the 10 Hz
+  background tick. Startup: 19.2 ms of per-layer `load_or_init` file reads
+  becomes a 1.08 ms mmap open. New deps: `byteorder`, `parking_lot`.
+- **Inverted text index wired into `find_text`/`find_text_ranked`**: the TIX1
+  index (`text_index.rs`, writer/reader/parser already in-tree, `build` already
+  emitting it) is now actually consulted. `MicroscopeReader::candidate_blocks`
+  prefilters to the index's candidate set with an exact substring predicate
+  still run on every candidate, so results are bit-identical to a full scan
+  (asserted per-query in `examples/bench_recall_ab.rs`).
+- **`refresh_append_log` + self-validating append cache**: `find_text_all_ranked`
+  no longer re-reads and re-parses `append.bin` per query; the reader caches it
+  at open and re-validates against the file's (len, mtime) on every call
+  (~1 us metadata check vs ~230 us re-read), so a reader held across stores
+  still sees new appends. Regression tests: `tests/append_cache_liveness.rs`.
+- **`examples/index_text.rs`**: regenerates `text_index.bin` for an existing
+  data dir without a full rebuild.
+- **`examples/bench_recall_ab.rs`**: interleaved A/B benchmark (indexed vs
+  full scan, same process, alternating rounds, warm-up discarded, results
+  asserted equal).
+- **`RecallContext` (`src/main.rs`)**: the reader plus all seventeen layer
+  states opened once and reused across `recall()` calls, instead of ~20
+  whole-file reads per call. `recall()` itself opens a fresh context per
+  invocation (behaviour identical to before); the bench loop and future
+  server paths hold one context. Saves are unchanged, so durability is
+  unchanged. Steady-state recall: 2.3 ms → 0.3 ms (7x).
+- **`recall_ctx` library module + MCP shared reader**: `RecallContext` moved
+  to `src/recall_ctx.rs` with a generation-guarded `SharedContext`
+  (reopens transparently when `meta.bin` changes, i.e. after any rebuild)
+  and a process-global `with_shared()` accessor. The `memory_find` and
+  `memory_recall` MCP tools now serve from the shared reader instead of
+  reopening per call; mutable layer states stay per-call by design (their
+  stream-vs-disk precedence and save schedule were not safe to guess —
+  documented in the wiring).
+- **`pub fn contains_ci` + `tests/contains_ci.rs`**: allocation-free
+  case-insensitive search, kept as a tested utility. See Performance notes.
+
+### Changed
+- **BREAKING: `find_text_all_ranked` takes `&mut self`** (the cached append
+  log may refresh). External callers need `let mut reader`.
+- Constructor and unit-test fixture struct literals gain the new
+  `append_log` / `append_log_stamp` fields.
+- `Cargo.toml`: `byteorder 1.5`, `parking_lot 0.12` added as direct deps.
+
+### Performance
+- Startup (24 per-layer state files → 1 mmap): **17.8x** cold, **2.9x** warm.
+- Recall, in-process, 23,774 blocks, 19 interleaved rounds:
+  **901 us → 93 us per query (9.7x)**, bit-identical results.
+- The existing end-to-end finding (§"Inverted text index", 2026-09-27,
+  695k blocks, ~91 ms both paths) stands: at that scale process start-up
+  dominates, so the user-visible `find` is unchanged. The 9.7x is the
+  in-process text path, where the loop-bound services (bridge, MCP) live.
+- Attempted and **rejected**: replacing the per-block `to_lowercase()` with
+  a hand-rolled allocation-free scan (`contains_ci`). Measured in-process at
+  **5.4x slower** (913 ns vs 4.9 us per block-compare); std `str::contains`
+  is a SIMD two-way scan and cannot be beaten by a byte loop. Documented in
+  the function's doc comment and its test file so nobody re-attempts it.
+
+### Notes for operators
+- After a **light rebuild** the text index is **regenerated** from the final
+  layout at the end of `build()` (cheap, content-derived), so the indexed
+  recall path survives rebuilds. The stale mid-build file is still dropped
+  first and never served — `test_light_rebuild_regenerates_text_index` pins
+  that the regenerated file matches the new block count and returns results
+  identical to a full scan.
+- `cargo test --release` is unsupported by this crate's own profile
+  (`[profile.release]` sets `panic = "abort"`; tests need `unwind`). The
+  release gate is `cargo build --release` plus debug tests plus CI.
+
 ### Added
 - **Shared hybrid lexical-spatial relevance ranker** (`relevance.rs`): query-token
   coverage, phrase evidence, spatial distance and a small importance prior replace

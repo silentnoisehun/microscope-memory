@@ -973,7 +973,7 @@ fn test_text_index_find_matches_full_scan() {
 }
 
 #[test]
-fn test_light_rebuild_drops_stale_text_index() {
+fn test_light_rebuild_regenerates_text_index() {
     let (_tmp, config) = setup_test_env();
     microscope_memory::store_memory(&config, "Alpha entry for light rebuild", "long_term", 7)
         .expect("store");
@@ -982,8 +982,10 @@ fn test_light_rebuild_drops_stale_text_index() {
     let output_dir = Path::new(&config.paths.output_dir);
     assert!(output_dir.join("text_index.bin").exists());
 
-    // Content change + light rebuild: the stale index must be dropped so it is
-    // never served against the new block layout.
+    // Content change + light rebuild: the old index is positionally stale for
+    // the new block layout, so it is dropped mid-build — but the end of the
+    // build regenerates it from the final layout, instead of leaving every
+    // query on a full scan until the next heavy build.
     let layers_dir = Path::new(&config.paths.layers_dir);
     fs::write(
         layers_dir.join("long_term.txt"),
@@ -991,14 +993,34 @@ fn test_light_rebuild_drops_stale_text_index() {
     )
     .unwrap();
     microscope_memory::build::build(&config, true, false).expect("light rebuild");
+
+    // The regenerated index must exist, be fresh (same block count as the
+    // reader), and find the new content through the indexed path.
     assert!(
-        !output_dir.join("text_index.bin").exists(),
-        "light rebuild must drop the stale text index"
+        output_dir.join("text_index.bin").exists(),
+        "light rebuild must regenerate the text index it dropped"
     );
 
-    let reader = microscope_memory::MicroscopeReader::open(&config).expect("open reader");
-    assert!(reader.text_index.is_none());
-    // Scan fallback still finds the new content.
+    let reader =
+        microscope_memory::MicroscopeReader::open(&config).expect("open reader");
+    let idx = reader
+        .text_index
+        .as_ref()
+        .expect("reader must see the regenerated index");
+    assert_eq!(
+        idx.block_count(),
+        reader.block_count,
+        "regenerated index must match the new layout, never the old one"
+    );
     let hits = reader.find_text("Beta entry", 10);
-    assert!(!hits.is_empty(), "scan fallback must find the new content");
+    assert!(
+        !hits.is_empty(),
+        "indexed path must find the new content after light rebuild"
+    );
+
+    // And the indexed result must equal the full-scan result.
+    let mut reader_noidx = microscope_memory::MicroscopeReader::open(&config).expect("open");
+    reader_noidx.text_index = None;
+    let scan = reader_noidx.find_text("Beta entry", 10);
+    assert_eq!(hits, scan, "index must not change results, only speed");
 }

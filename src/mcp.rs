@@ -1084,7 +1084,8 @@ fn tool_recall(config: &Config, args: &Value) -> Result<String, String> {
     });
     let emotional_recall_weight = config.search.emotional_bias_weight * 0.15;
 
-    let reader = MicroscopeReader::open(config)?;
+    crate::recall_ctx::with_shared(config, |ctx| {
+    let reader = &ctx.reader;
     let output_dir = Path::new(&config.paths.output_dir);
 
     // Load emotional state ring for priming + attention intensity
@@ -1124,7 +1125,7 @@ fn tool_recall(config: &Config, args: &Value) -> Result<String, String> {
             (attn, hebb, tg, pc)
         };
 
-    let emotional_energy = crate::emotional::emotional_field(&reader, &hebb_pre)
+        let emotional_energy = crate::emotional::emotional_field(reader, &hebb_pre)
         .map(|f| f.total_energy)
         .unwrap_or(0.0);
 
@@ -1149,7 +1150,7 @@ fn tool_recall(config: &Config, args: &Value) -> Result<String, String> {
 
     let emotional_weight = config.search.emotional_bias_weight * attn.weight(4);
     let (qx, qy, qz) =
-        crate::emotional::apply_emotional_bias(qx, qy, qz, emotional_weight, &reader, &hebb_pre);
+            crate::emotional::apply_emotional_bias(qx, qy, qz, emotional_weight, reader, &hebb_pre);
 
     // Scan every populated depth, not a window guessed from query length.
     // auto_depth puts 15..39 character statements at D5, so a short question
@@ -1535,6 +1536,7 @@ fn tool_recall(config: &Config, args: &Value) -> Result<String, String> {
 
     output.push_str(&format!("\n{} results", shown));
     Ok(output)
+    })?
 }
 
 // ─── Evidence Layer Tools ───────────────────────────────────────────────────
@@ -1709,39 +1711,41 @@ fn tool_find(config: &Config, args: &Value) -> Result<String, String> {
         .ok_or("Missing required parameter: query")?;
     let k = args.get("k").and_then(|v: &Value| v.as_u64()).unwrap_or(10) as usize;
 
-    let reader = MicroscopeReader::open(config)?;
-    let append_path = Path::new(&config.paths.output_dir).join("append.bin");
-    let appended = crate::read_append_log(&append_path);
-    let results = reader.find_text_all(config, query, k);
+    crate::recall_ctx::with_shared(config, |ctx| {
+        let reader = &ctx.reader;
+        let append_path = Path::new(&config.paths.output_dir).join("append.bin");
+        let appended = crate::read_append_log(&append_path);
+        let results = reader.find_text_all(config, query, k);
 
-    if results.is_empty() {
-        return Ok(format!("No results for '{}'", query));
-    }
-
-    let mut output = format!("Text search '{}': {} results\n\n", query, results.len());
-    for (depth, idx, is_main) in &results {
-        if *is_main {
-            let h = reader.header(*idx);
-            let text = reader.text(*idx);
-            let layer = LAYER_NAMES.get(h.layer_id as usize).unwrap_or(&"?");
-            output.push_str(&format!(
-                "[D{} {}] {}\n",
-                h.depth,
-                layer,
-                crate::safe_truncate(text, 150)
-            ));
-        } else if let Some(entry) = appended.get(idx.saturating_sub(1_000_000)) {
-            let layer = LAYER_NAMES.get(entry.layer_id as usize).unwrap_or(&"?");
-            output.push_str(&format!(
-                "[D{} {}/new] {}\n",
-                depth,
-                layer,
-                crate::safe_truncate(&entry.text, 150)
-            ));
+        if results.is_empty() {
+            return Ok(format!("No results for '{}'", query));
         }
-    }
 
-    Ok(output)
+        let mut output = format!("Text search '{}': {} results\n\n", query, results.len());
+        for (depth, idx, is_main) in &results {
+            if *is_main {
+                let h = reader.header(*idx);
+                let text = reader.text(*idx);
+                let layer = LAYER_NAMES.get(h.layer_id as usize).unwrap_or(&"?");
+                output.push_str(&format!(
+                    "[D{} {}] {}\n",
+                    h.depth,
+                    layer,
+                    crate::safe_truncate(text, 150)
+                ));
+            } else if let Some(entry) = appended.get(idx.saturating_sub(1_000_000)) {
+                let layer = LAYER_NAMES.get(entry.layer_id as usize).unwrap_or(&"?");
+                output.push_str(&format!(
+                    "[D{} {}/new] {}\n",
+                    depth,
+                    layer,
+                    crate::safe_truncate(&entry.text, 150)
+                ));
+            }
+        }
+
+        Ok(output)
+    })?
 }
 
 fn tool_mql_query(config: &Config, args: &Value) -> Result<String, String> {

@@ -75,3 +75,17 @@ jobs:
 
       - name: Core integration tests
         run: cargo test --test integration --locked
+
+      - name: Spine tearing regression
+        # Read it together with src/spine.rs: this is the measurement that says
+        # the publish window works, so a gate that does not run it is not a gate.
+        # `cargo test --lib` and the two named integration tests above never
+        # reach tests/spine_torn_read.rs, which means the file compiled in CI and
+        # did not run — the same failure mode as Mojibake sitting behind
+        # Formatting.
+        #
+        # Debug on purpose: "Build all targets" already produced the artifacts, so
+        # this step costs a link, not a second full build of 452 dependencies. The
+        # assertions were verified in both profiles (the zero-torn and non-zero
+        # control results hold in release too, at 0.17 s per scenario).
+        run: cargo test --test spine_torn_read --locked

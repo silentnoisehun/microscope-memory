@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **CI never ran the tearing regression.** `build-and-test` invokes `cargo test --lib`
+  and two named integration targets, so `tests/spine_torn_read.rs` compiled
+  (`Build all targets`) and was never executed. It has its own step now. Same
+  shape as the `Mojibake` gate sitting behind `Formatting` and never getting a
+  turn: a check nobody runs is decoration.
 - **Two files were committed mojibaked and nobody noticed, because the gate that
   catches it could never run.** `examples/bench_recall.rs` (497 marker hits) and
   `tests/append_cache_liveness.rs` (32) carry UTF-8 read through CP1250 and

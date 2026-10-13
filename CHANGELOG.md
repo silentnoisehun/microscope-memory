@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `Spine::begin_publish()` returns an exclusive `Publish` batch with typed
+  read/write methods, `tick_stream`, and explicit commit (drop also commits).
+  The consciousness stream publishes its scalar tick and all due aggregate
+  headers in one window, retaining the existing ten-cycle aggregate interval.
+- `Spine::read_store_snapshot()` validates all eleven layer headers and the
+  superblock together. Prefixes are 128 bytes so the 108-byte Emotion header
+  fits; compile-time bounds cover every encoded header. The summary uses this
+  snapshot and reports failure instead of falling back to mixed reads.
+- Whole-store tearing regressions cover shared-handle threads, independent
+  handles and a child process, and require observed publish progress. Unit
+  tests cover empty/read-only batches, drop/unwind, short mappings, byte-64+
+  Emotion fields and interrupted counters. `bench_spine_publish` measures
+  batching separately from end-to-end stream execution.
+
+### Fixed
+- Every standalone header write now participates in the seqlock. The mapping
+  mutex is acquired before the publisher lock: `flock` is tied to the open
+  file description, so a second thread on one handle must not acquire/unlock
+  that descriptor while the first thread publishes.
+- Republishing after an interrupted odd counter no longer exposes a transient
+  even value. Windows' shared-writer-mark fallback no longer references the
+  Unix-only `as_raw_fd` API; cross-handle exclusion remains Unix/advisory only.
+- Batches do not promise rollback or durability: unwinding publishes the
+  already-written subset, and crash recovery cannot restore the old state.
+
 ### Fixed
 - **CI never ran the tearing regression.** `build-and-test` invokes `cargo test --lib`
   and two named integration targets, so `tests/spine_torn_read.rs` compiled

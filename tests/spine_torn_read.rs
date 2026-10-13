@@ -13,6 +13,11 @@
 //!   * [`torn_read_two_processes`] — the writer is another process, which is
 //!     what `spine.bin` is mapped shared for in the first place.
 //!
+//! The whole-store tests additionally stamp all eleven headers in one batch,
+//! including the Emotion fields beyond byte 64. They exercise shared-handle
+//! threads, independent handles, and a child process; publish progress and
+//! distinct observed sequences prevent a quiescent snapshot from passing.
+//!
 //! Every test asserts a hard zero on violations, and every test also asserts
 //! that it actually raced a live writer — without that second half, "0
 //! violations" is just a reader that nobody competed with. Two tests do it
@@ -42,7 +47,7 @@ use std::sync::Arc;
 
 use microscope_memory::spine::Spine;
 
-/// These three each spin up a publisher and a reader that never sleep. Run
+/// These tests each spin up a publisher and a reader that never sleep. Run
 /// concurrently on a small machine they oversubscribe it badly enough that the
 /// spawned writer barely gets scheduled, so they take turns instead. A load
 /// test that starves its own subject is measuring the scheduler.
@@ -215,7 +220,12 @@ fn maybe_run_as_writer() -> bool {
                 break;
             }
         }
-        publish_at(&spine, next_cycle(&spine));
+        let cycle = next_cycle(&spine);
+        if std::env::var_os("MICROSCOPE_SPINE_TORN_WHOLE_STORE").is_some() {
+            publish_all_headers(&spine, cycle);
+        } else {
+            publish_at(&spine, cycle);
+        }
     }
     true
 }
@@ -481,4 +491,198 @@ fn torn_read_two_processes() {
         "cross-process control found no mixing, so this run proves nothing: {}",
         report("control", &control, control_reads)
     );
+}
+
+/// Stamp every encoded header with one cycle; the last Emotion fields test
+/// the part of the prefix beyond byte 64 as well as cross-page agreement.
+fn publish_all_headers(spine: &Spine, cycle: u64) {
+    let timestamp = 1_700_000_000_000 + cycle;
+    let mut p = spine.begin_publish();
+    p.tick_stream(
+        cycle,
+        0.5,
+        0.25,
+        !cycle,
+        1.0,
+        cycle,
+        timestamp,
+        cycle as f64,
+        timestamp as i64,
+    );
+    // Widen the partial-update interval deliberately. Readers must reject it.
+    std::thread::yield_now();
+    let mut h = p.read_hebbian();
+    h.activation_count = cycle as u32;
+    p.write_hebbian(&h);
+    let mut a = p.read_attention();
+    a.total_recalls = cycle as u32;
+    p.write_attention(&a);
+    let mut e = p.read_emotion();
+    e.current[20] = cycle as f32;
+    e.total_updates = cycle;
+    e.last_update = timestamp;
+    p.write_emotion(&e);
+    let mut r = p.read_resonance();
+    r.instance_id = cycle;
+    p.write_resonance(&r);
+    let mut g = p.read_graph();
+    g.node_count = cycle as u32;
+    p.write_graph(&g);
+    let mut c = p.read_cache();
+    c.total_predictions = cycle as u32;
+    p.write_cache(&c);
+    let mut ar = p.read_archetype();
+    ar.active_count = cycle as u32;
+    p.write_archetype(&ar);
+    let mut mi = p.read_mirror();
+    mi.total_echoes = cycle;
+    p.write_mirror(&mi);
+    let mut me = p.read_merkle();
+    me.root_hash = !cycle;
+    p.write_merkle(&me);
+    let mut meta = p.read_meta();
+    meta.promotion_count = cycle;
+    p.write_meta(&meta);
+    p.commit();
+}
+
+fn store_is_consistent(s: &microscope_memory::spine::StoreSnapshot) -> bool {
+    let cycle = s.stream.cycle;
+    s.sequence & 1 == 0
+        && s.tick_seq == s.sequence / 2
+        && s.stream.predicted_query_hash == !cycle
+        && s.stream.updated_ms == s.epoch_ms as u64
+        && s.hebbian.activation_count == cycle as u32
+        && s.attention.total_recalls == cycle as u32
+        && s.emotion.current[20] == cycle as f32
+        && s.emotion.total_updates == cycle
+        && s.emotion.last_update == s.stream.updated_ms
+        && s.resonance.instance_id == cycle
+        && s.graph.node_count == cycle as u32
+        && s.cache.total_predictions == cycle as u32
+        && s.archetype.active_count == cycle as u32
+        && s.mirror.total_echoes == cycle
+        && s.merkle.root_hash == !cycle
+        && s.meta.promotion_count == cycle
+}
+
+#[test]
+fn torn_read_whole_store_shared_and_independent_handles() {
+    let _alone = SERIAL.lock().unwrap_or_else(|e| e.into_inner());
+    let dir = TmpDir::new("whole_store");
+    let shared = Arc::new(Spine::open(dir.path()).expect("shared writer"));
+    let independent = Arc::new(Spine::open(dir.path()).expect("independent writer"));
+    if !shared.publish_lock_is_advisory() {
+        eprintln!("skipping competing handles: no advisory publisher lock");
+        return;
+    }
+    publish_all_headers(&shared, CYCLE_BASE);
+    let reader = Spine::open_ro(dir.path()).expect("reader");
+    let before = reader.read_store_snapshot().unwrap().sequence;
+    let stop = Arc::new(AtomicBool::new(false));
+    let barrier = Arc::new(std::sync::Barrier::new(4));
+    let mut writers = Vec::new();
+    // Two threads share the same flock descriptor; the third has its own.
+    // This catches taking flock before the same-handle mapping mutex.
+    for (id, writer) in [shared.clone(), shared, independent]
+        .into_iter()
+        .enumerate()
+    {
+        let stop = stop.clone();
+        let barrier = barrier.clone();
+        writers.push(std::thread::spawn(move || {
+            barrier.wait();
+            for n in 1..=WRITES * 20 {
+                if stop.load(Ordering::Acquire) {
+                    break;
+                }
+                publish_all_headers(&writer, CYCLE_BASE + n * 3 + id as u64);
+            }
+        }));
+    }
+    barrier.wait();
+    let mut failures = 0;
+    let mut max_sequence = before;
+    let mut observed = std::collections::BTreeSet::new();
+    for _ in 0..10_000 {
+        match reader.read_store_snapshot() {
+            Some(s) => {
+                failures += u64::from(!store_is_consistent(&s));
+                max_sequence = max_sequence.max(s.sequence);
+                observed.insert(s.sequence);
+            }
+            None => failures += 1,
+        }
+    }
+    stop.store(true, Ordering::Release);
+    for writer in writers {
+        writer.join().expect("writer thread");
+    }
+    assert!(
+        max_sequence > before + 100,
+        "publishers did not make progress"
+    );
+    assert!(
+        observed.len() > 10,
+        "reader did not observe live publishing"
+    );
+    assert_eq!(failures, 0, "mixed, odd or unavailable store snapshots");
+}
+
+#[test]
+fn torn_read_whole_store_two_processes() {
+    let _alone = SERIAL.lock().unwrap_or_else(|e| e.into_inner());
+    if maybe_run_as_writer() {
+        return;
+    }
+    let dir = TmpDir::new("whole_store_procs");
+    let writer = Spine::open(dir.path()).expect("writer");
+    if !writer.publish_lock_is_advisory() {
+        eprintln!("skipping competing processes: no advisory publisher lock");
+        return;
+    }
+    publish_all_headers(&writer, CYCLE_BASE);
+    let reader = Spine::open_ro(dir.path()).expect("reader");
+    let before = reader.read_store_snapshot().unwrap().sequence;
+    let stopfile = dir.path().join("stop");
+    let mut child = std::process::Command::new(std::env::current_exe().expect("test binary"))
+        .arg("torn_read_whole_store_two_processes")
+        .arg("--nocapture")
+        .env("MICROSCOPE_SPINE_TORN_DIR", dir.path())
+        .env("MICROSCOPE_SPINE_TORN_STOPFILE", &stopfile)
+        .env("MICROSCOPE_SPINE_TORN_WHOLE_STORE", "1")
+        .env("RUST_TEST_THREADS", "1")
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+        .expect("spawn writer child");
+    let mut failures = 0;
+    let mut max_sequence = before;
+    let mut observed = std::collections::BTreeSet::new();
+    let started = std::time::Instant::now();
+    let mut reads = 0;
+    // Keep reading until the child demonstrably published during the reads.
+    while (reads < 10_000 || observed.len() < 100)
+        && started.elapsed() < std::time::Duration::from_secs(30)
+    {
+        match reader.read_store_snapshot() {
+            Some(s) => {
+                failures += u64::from(!store_is_consistent(&s));
+                max_sequence = max_sequence.max(s.sequence);
+                observed.insert(s.sequence);
+            }
+            None => failures += 1,
+        }
+        reads += 1;
+    }
+    std::fs::File::create(&stopfile).expect("stop writer child");
+    let status = child.wait().expect("wait writer child");
+    assert!(status.success(), "child publisher failed: {status}");
+    assert!(max_sequence > before + 100, "child did not publish");
+    assert!(
+        observed.len() >= 100,
+        "reader did not observe live publishing"
+    );
+    assert!(reads >= 10_000, "too few store snapshots");
+    assert_eq!(failures, 0, "mixed, odd or unavailable store snapshots");
 }

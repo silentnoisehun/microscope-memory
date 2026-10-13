@@ -770,7 +770,7 @@ every call -- so no claim is made here about relative speed.
 
 
 
-## Spine publish protocol (measured 2026-10-13)
+## Spine publish protocol before multi-header batching (measured 2026-10-13)
 
 Profile: release, single process, real shared `mmap`, the 2-core box this work
 was developed on. Produced by `examples/bench_spine.rs` (sections B–I); the
@@ -816,6 +816,52 @@ startup row. `bench_spine` computes it from eight `load_or_init()` calls over a
 `data/` directory that is not in this repository, and those modules need the
 crate's dependency tree; on this machine the crate as a whole cannot be built.
 The 17.8× in `README.md` is therefore labelled rather than re-verified.
+
+## Spine multi-header batching (measured 2026-10-13)
+
+The preceding table describes the pre-batching implementation (64-byte stream
+prefix and full-page legacy header reads), not the current API. The current
+read prefix is 128 bytes for all eleven headers; writes still copy whole
+16 KiB pages. The on-disk slot layout and superblock version are unchanged.
+
+`examples/bench_spine_publish.rs` compares the current separate-call pattern
+against the same tick plus eight read-modify-write updates in one `Publish`
+batch. This is **not a checkout-before/checkout-after comparison**: both sides
+use the current code, and standalone writes now also open their own window.
+A due consciousness-stream cycle reduces nine publisher-lock acquisitions
+and nine seqlock windows to one of each. Intermediate cycles still publish
+only the stream; aggregate freshness is unchanged.
+
+Measured in this Linux sandbox, Rust 1.99.0, three sequential runs, 1,000
+warm-up operations and 20,000 measured operations per row. The actual repository
+`src/spine.rs` and example were compiled through an isolated harness with real
+GitHub dependency sources matching the lockfile versions; its manifests omit
+unused optional/platform dependencies to allow offline builds. Release flags
+match the root profile: opt-level 3, fat LTO, one codegen unit, panic abort.
+The harness does **not** compile the rest of the memory engine, so these are
+API microbenchmarks, not a full-crate or end-to-end stream measurement.
+
+| Current operation | Range over 3 runs |
+|---|---:|
+| `tick`, stream only | 557–571 ns |
+| tick + 8 separate header read-modify-writes | 6.51–7.24 µs |
+| same updates in one `Publish` batch | 2.82–2.91 µs |
+| 11 separate header reads, **not validated** | 6.56–6.87 µs |
+| `read_store_snapshot`, **validated** | 6.98–7.12 µs |
+| `read_snapshot`, stream + publish record | 217–218 ns |
+
+The full-store read is not faster than the unvalidated eleven-call pattern in
+this run. It buys a coherent read. Although it copies only 1,408 encoded header
+bytes plus the superblock, decoding still materializes the existing page-sized
+Rust header structs (including zeroed padding); the returned struct is not a
+compact 1,408-byte object. No general throughput or latency guarantee follows
+from these uncontended timings.
+
+Validation during development: 20 Spine unit tests and all five tearing tests
+passed in the isolated harness. Reversing just the mapping/publisher lock order
+in a scratch copy made the new shared/independent-handle test fail (135 bad
+snapshots out of 10,000). This mutation was not committed. Full-crate validation
+is the separate GitHub CI gate, not implied by the harness results.
 
 ## Integrity
 

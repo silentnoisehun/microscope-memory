@@ -79,7 +79,7 @@ for the full tables and methodology.
 | Text search, in-process (23,774 blocks) | 901 us/query | 93 us/query | 9.7x |
 | Recall steady-state (persistent context) | 2.3 ms | 0.3 ms | 7x |
 | MCP session steady-state (stdio, shared reader) | 2.68 ms | 113 us | 23.7x |
-| Stream tick write (10 Hz background) ‡ | 11x file I/O | 666 ns | — |
+| Stream-only tick (historical measurement) ‡ | 11x file I/O | 666 ns | — |
 | End-to-end `find` (incl. process start) | 68 ms | 47 ms | 1.4x |
 
 ‡ Both rows come from `examples/bench_spine.rs`, and both need qualification:
@@ -90,14 +90,17 @@ for the full tables and methodology.
   that happens. The 24-file label counts the state files the layer set opens,
   not the eight the benchmark calls. `Spine::open` on a fresh file measured
   531 µs here (it zero-fills and lays out 13 pages) and 10.9 µs warm.
-- The tick row was 232 ns before the publish protocol existed. A `tick()` now
-  takes `flock(LOCK_EX)` on `spine.publish` and brackets the write in a seqlock
-  window; measured in release on a 2-core box that is **663–671 ns** with the
-  lock and 387 ns without it, so cross-process exclusion costs ~280 ns per
-  publish. The read side went the other way: the pair a consumer needs
-  (`read_stream` + `read_superblock`, 805 ns) is now `read_snapshot` at 103 ns,
-  because the bracketed read copies a 64-byte prefix instead of a 16 KiB page.
-  Full tables in [BENCHMARKS.md](BENCHMARKS.md).
+- The tick row is a **historical, stream-only** measurement before multi-header
+  batching: 663–671 ns with the publisher lock, and `read_snapshot` at 103 ns
+  with a 64-byte prefix. Those are not timings of the current full stream cycle.
+  The current implementation brackets every header write, copies 128-byte read
+  prefixes, and batches the stream plus all due aggregates in one `Publish`
+  window. An isolated Linux API benchmark measured those nine updates at
+  **2.82–2.91 µs batched**, versus **6.51–7.24 µs as separate calls** in the
+  current implementation; the validated full-store read measured 6.98–7.12 µs.
+  These are not end-to-end stream timings. Methodology and limits are in
+  [BENCHMARKS.md](BENCHMARKS.md).
+
 
 Honest boundaries, stated in the code and the benchmarks: the end-to-end
 CLI is dominated by process start-up (~17 ms floor), so the user-visible

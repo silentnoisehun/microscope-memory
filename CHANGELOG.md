@@ -7,7 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `examples/bench_spine.rs` gained a **contended** section (n publishers × m readers over one `spine.bin`): throughput per configuration plus a tearing count judged from inside the page, with unpopulated pages counted separately. Measured: 2.6 M snapshots per sweep, three sweeps, zero torn reads. The single-threaded sections are now labelled as such, and the bench warns when `data/` is missing instead of silently benchmarking empty directories.
+
 ### Fixed
+- **`HebbianHeader::decay_event_count` is no longer corrupted** (`src/consciousness_stream.rs`). `publish_spine` did `+= s.cycle` on every cycle, so the field grew as a sum of cycle values while nothing counted decay events — `HebbianState::apply_drift` decays energies without keeping a tally. The write is gone; the field and `ArchetypeHeader::decay_events` now say in their docs that they have no producer and no consumer, which is the honest state of a fixed-size page layout that cannot be shrunk without a version bump.
 - **`UNSAFE.md` covers the spine publish window.** The new `unsafe`
   surface — `AtomicU64::from_ptr` over the mapping, the raw `flock(2)`
   declaration, and the `map_mut` of a resized file — is inventoried with what
@@ -116,6 +120,7 @@ change stated honestly below.
 
 ### Performance
 - Startup (24 per-layer state files → 1 mmap): **17.8x** cold, **2.9x** warm.
+  - *Labelled 2026-10-13:* this figure is `bench_spine`'s A-vs-B comparison, whose "before" side loads the layer states from a `data/` directory that is not in this repository, and whose "24 files" label counts the files the layer set opens rather than the eight the benchmark calls. It was not re-measured here (the crate cannot be built without crates.io access); the spine-side numbers that can be measured were: `Spine::open` 531 µs cold / 10.9 µs warm, `tick()` 666 ns, and `read_snapshot` 103 ns against the 805 ns two-read pattern it replaces. See the "Spine publish protocol" section of BENCHMARKS.md.
 - Recall, in-process, 23,774 blocks, 19 interleaved rounds:
   **901 us → 93 us per query (9.7x)**, bit-identical results.
 - The existing end-to-end finding (§"Inverted text index", 2026-09-27,

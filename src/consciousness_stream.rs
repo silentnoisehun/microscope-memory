@@ -476,7 +476,10 @@ fn publish_spine(s: &StreamState) {
             .count() as u32;
         hh.coactivation_count = s.hebbian.coactivations.len() as u32;
         hh.fingerprint_count = s.hebbian.fingerprints.len() as u32;
-        hh.decay_event_count += s.cycle;
+        // `decay_event_count` is read-modify-written, not accumulated: the
+        // hebbian layer performs decay inside `apply_drift` without counting
+        // it, so there is nothing to publish here. The previous
+        // `+= s.cycle` made the field a sum of cycle numbers.
         hh.last_activation_ms = s.last_query_ms;
         spine.write_hebbian(&hh);
 

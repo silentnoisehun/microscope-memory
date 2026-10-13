@@ -2055,7 +2055,6 @@ dependencies = [
  "wasm-bindgen",
  "web-sys",
  "wgpu",
- "winapi",
  "windows-sys 0.52.0",
  "zstd",
 ]

@@ -255,6 +255,14 @@ pub struct HebbianHeader {
     pub coactivation_count: u32,
     pub fingerprint_count: u32,
     pub delta_tail_offset: u64,
+    /// Count of hebbian energy-decay events. **There is no producer for this
+    /// field today.** `HebbianState::apply_drift` decays energies in place and
+    /// keeps no count, and nothing in the crate reads the field back; until a
+    /// producer exists, the value here is whatever the file happens to hold.
+    /// `publish_spine` used to do `decay_event_count += cycle`, which grew the
+    /// field as a sum of cycle numbers — quadratically, and unrelated to any
+    /// decay that had happened. That write is gone, which is a behaviour change
+    /// only for a reader that trusted a number with no source.
     pub decay_event_count: u64,
     pub last_activation_ms: u64,
     pub _pad: [u8; PAGE_SIZE - 40],
@@ -583,6 +591,9 @@ pub struct ArchetypeHeader {
     pub active_count: u32,
     pub next_id: u32,
     pub emergence_events: u64,
+    /// Same status as [`HebbianHeader::decay_event_count`]: part of the page
+    /// layout, no producer (`ArchetypeState::decay` performs the event and
+    /// returns nothing), and no consumer.
     pub decay_events: u64,
     pub last_emergence_ms: u64,
     pub _pad: [u8; PAGE_SIZE - 32],

@@ -770,6 +770,53 @@ every call -- so no claim is made here about relative speed.
 
 
 
+## Spine publish protocol (measured 2026-10-13)
+
+Profile: release, single process, real shared `mmap`, the 2-core box this work
+was developed on. Produced by `examples/bench_spine.rs` (sections B–I); the
+contended section was also run through the crate-less probe harness so the
+numbers below are the shipped code's, not a hand-retyped copy's.
+
+| Measurement | Value | Notes |
+|---|---|---|
+| `tick()` uncontended | 663–671 ns (200k iters, 3 runs) | includes `flock(LOCK_EX)`+unlock on `spine.publish` and the seqlock bracket |
+| `tick()` with the publish lock removed | 387 ns | measured by mutation, not a supported configuration: the +280 ns is the price of cross-process exclusion |
+| `read_stream` + `read_superblock` | 805 ns /pair | the pre-snapshot read pattern |
+| `read_snapshot` | 103 ns /pair | 64-byte bracketed prefix, 7.8× cheaper than the pair it replaces |
+| 11 layer headers, one thread | 8.57 µs | each `read_*` copies a 16 KiB page; uncontended, so no lock traffic |
+| `Spine::open`, fresh file | 531 µs | zero-fills + lays out 13 pages, takes the exclusive lock |
+| `Spine::open` + `read_stream`, warm | 10.9 µs | median of 100 |
+
+Contended, publishers running flat out, readers taking as many snapshots as
+they can; tearing judged from inside the page (`predicted_query_hash ==
+!cycle`), which needs no baseline:
+
+| Config | `read_snapshot`/s | `tick()`/s | torn snapshots |
+|---|---:|---:|---:|
+| 1 pub × 1 reader | 5.1–5.4 M | 1.01–1.08 M | 0 / 200 000 |
+| 2 × 2 | 5.5–7.0 M | 0.81–1.14 M | 0 / 400 000 |
+| 4 × 4 | 6.1–6.9 M | 0.68–0.84 M | 0 / 800 000 |
+| 1 × 4 | 6.1–8.8 M | 0.46–0.78 M | 0 / 800 000 |
+| 4 × 1 | 5.4–5.7 M | 0.98–1.13 M | 0 / 200 000 |
+
+2.6 M snapshots per full sweep, three sweeps, **zero** torn reads; `None`
+returns are counted as a failure too, so "starved" is also zero.
+
+**A trap worth recording, because it produced a false positive here first.** A
+reader that starts before its publisher's first `tick()` reads the initialised
+but unpublished page, which is legal and all-zero. Judged by
+`hash == !cycle` that looks exactly like tearing: the first sweep reported
+1 916 and 3 661 "torn" reads, all of them `cycle=0 hash=0 tick_seq=0` with a
+counter already at 2. Once the read is classified as *unpublished* rather than
+*inconsistent* (the `fresh` counter above), every sweep is zero. Any oracle
+built on field agreement must say what an unpopulated page means.
+
+**Not measured here, and not claimable:** the legacy "before" column of the
+startup row. `bench_spine` computes it from eight `load_or_init()` calls over a
+`data/` directory that is not in this repository, and those modules need the
+crate's dependency tree; on this machine the crate as a whole cannot be built.
+The 17.8× in `README.md` is therefore labelled rather than re-verified.
+
 ## Integrity
 
 - **CRC16 verified:** 28679 blocks OK, 0 errors

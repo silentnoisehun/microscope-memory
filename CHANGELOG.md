@@ -7,6 +7,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Spine publish is now one coherent snapshot, and it is a seqlock**
+  (`src/spine.rs`). The previous commit's message claimed "1 StreamPage write
+  + 1 epoch publish" with "Release/Acquire" ordering; what the code did was
+  take the mapping mutex twice — once for the stream page, once for a
+  millisecond timestamp in the superblock that nothing read back — and call
+  the second `drop()` a release barrier. Two handles or two processes each own
+  a `Mutex<MmapMut>`, so the two locks exclude nothing and there is no
+  happens-before between a writer in one process and a reader in another: a
+  reader could pair a new stream header with an older record, and two ticks
+  inside the same millisecond were indistinguishable.
+  - `tick()` now takes `flock(LOCK_EX)` on a new `spine.publish` sidecar (the
+    piece that serialises publishers across processes), then the mapping lock
+    once, and brackets the stream page *and* the superblock payload in a single
+    seqlock window: an odd `AtomicU64` at `SEQ_SLOT` (superblock byte 56)
+    while writing, the next even value stored with `Release`.
+  - `Superblock` gains a monotonic `tick_seq` (superblock format version 2);
+    `epoch_ms` stays as a wall-clock field, not a sequence number.
+  - `Spine::read_snapshot` is the matching read: copy under the counter,
+    retry if it moved, so a torn pairing is not returned. `format_summary` and
+    `examples/spine_live.rs` now read through it, and `Spine::open_ro` is a
+    handle that cannot mark itself a writer or resize the file underneath one.
+  - `write_slot` on the superblock slot is truncated to the payload so a page
+    write can never reset the counter; a window left open by a killed writer
+    is repairable via `Spine::recover_stalled_publish` (`read_snapshot` calls
+    it when its retry budget is exhausted rather than staying wedged).
+- **`tests/spine_torn_read.rs`**: torn-read regression for the three setups the
+  old code failed — two handles in one process, two publishers, two processes.
+  Each asserts zero mixed/torn/window-open reads *and* runs an unbracketed
+  control read on the same file that is required to still show the mixing, so
+  the suite cannot pass by quietly measuring nothing. Measured on Linux with
+  the dev profile: bracketed reads 0 violations in all three setups; the
+  control read reported the mixing.
+- `cargo fmt --all -- --check` passes again (13 files were failing, 64 hunks in
+  `src/spine.rs`), which was keeping `cargo fmt` red in CI.
+- Removed the unused optional `winapi` dependency: nothing referenced it and no
+  feature selected it (it never reached Cargo.lock, so no lockfile churn).
+
+
 ## [1.0.0] - 2026-10-13
 
 First 1.x release. The headline is recall and startup latency, measured

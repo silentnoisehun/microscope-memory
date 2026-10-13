@@ -1,9 +1,9 @@
-//! A hosszĂş Ă©letĹ± reader append-csepĹ‘k tesztje.
+//! A hosszú életű reader append-csepők tesztje.
 //!
 //! A `find_text_all_ranked` az `append.bin`-t cache-eli. Ha a cache nem
-//! validĂˇlja magĂˇt, egy olyan reader, amelyet egy store elĹ‘tt nyitottak meg,
-//! **elavult** talĂˇlatokat ad vissza â€” a store Ăˇltal hozzĂˇadott emlĂ©k
-//! lĂˇthatatlan marad. Ez a teszt ezt az invariĂˇnst kĂ©nyszerĂ­ti ki.
+//! validálja magát, egy olyan reader, amelyet egy store előtt nyitottak meg,
+//! **elavult** találatokat ad vissza — a store által hozzáadott emlék
+//! láthatatlan marad. Ez a teszt ezt az invariánst kényszeríti ki.
 
 use microscope_memory::config::Config;
 use microscope_memory::reader::{store_memory, MicroscopeReader};
@@ -37,7 +37,7 @@ fn long_lived_reader_sees_entries_appended_after_open() {
     let hits = reader.find_text_all_ranked(&cfg, "xylophone", 10);
     assert!(
         hits.iter().any(|(_, _, is_main, _)| !*is_main),
-        "a hosszĂş Ă©letĹ± reader nem lĂˇtja a nyitĂˇs UTĂN append-elt blokkot: {:?}",
+        "a hosszú életű reader nem látja a nyitás UTÁN append-elt blokkot: {:?}",
         hits
     );
 }
@@ -61,14 +61,14 @@ fn ranked_matches_fresh_reader_after_append() {
     assert_eq!(
         before.len(),
         0,
-        "a 'zebra' token nem szerepelhet az indexben a store elĹ‘tt"
+        "a 'zebra' token nem szerepelhet az indexben a store előtt"
     );
     assert_eq!(
         after, baseline,
-        "a hosszĂş Ă©letĹ± reader eltĂ©r a friss readertĹ‘l az append utĂˇn"
+        "a hosszú életű reader eltér a friss readertől az append után"
     );
     assert!(
         !after.is_empty(),
-        "az Ăşjrafelvett bejegyzĂ©s nem talĂˇlhatĂł meg"
+        "az újrafelvett bejegyzés nem található meg"
     );
 }

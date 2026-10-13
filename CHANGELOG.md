@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Two files were committed mojibaked and nobody noticed, because the gate that
+  catches it could never run.** `examples/bench_recall.rs` (497 marker hits) and
+  `tests/append_cache_liveness.rs` (32) carry UTF-8 read through CP1250 and
+  re-saved, so `//! FuttatĂ„â€šĂ‹â€ˇs` instead of `//! Futtatás`. The
+  `standards` job runs `Mojibake` *after* `Formatting`, and formatting had been
+  red on this tree long enough that the mojibake check never got a turn — the
+  first commit to fix `cargo fmt` is also the first commit that fails on the
+  real state of the text. Neither file has a clean revision in history: they were
+  born damaged. Repaired by re-encoding through the CP1250 decode map, iterated
+  per file until the marker set empties, and accepted only on the condition that
+  the ASCII skeleton of the file is byte-identical before and after — so the
+  change cannot touch code, string escapes or delimiters, only the accented
+  text. `python3 scripts/check_mojibake.py --worktree` reports 360 files clean.
+
 ### Added
 - `examples/bench_spine.rs` gained a **contended** section (n publishers × m readers over one `spine.bin`): throughput per configuration plus a tearing count judged from inside the page, with unpopulated pages counted separately. Measured: 2.6 M snapshots per sweep, three sweeps, zero torn reads. The single-threaded sections are now labelled as such, and the bench warns when `data/` is missing instead of silently benchmarking empty directories.
 

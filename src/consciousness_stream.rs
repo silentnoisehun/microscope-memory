@@ -83,12 +83,12 @@ pub struct StreamState {
     /// even if the StreamState Mutex is held by a writer.
     pub snapshot: Arc<SharedSnapshot>,
 
-    /// Spine: a stream teljes rétegállapota egyetlen mmap fájlban
-    /// (`spine.bin` a kimeneti könyvtárban). A háttérszál tick-enként
-    /// írja a skálárokat, a ritkább réteg-fejléceket kvázi-időzítve.
+    /// Spine: the whole layer state of the stream in a single mmap file
+    /// (`spine.bin` in the output directory). The background thread writes
+    /// the scalars every tick, the rarer layer headers on a quasi-timer.
     ///
-    /// `None` ha a fájl nem nyitható meg (csak olvasható lemez, stb.) —
-    /// a stream akkor is fut, csak nincs kereszt-proc esszenciális nézete.
+    /// `None` when the file cannot be opened (read-only disk, etc.) — the
+    /// stream keeps running without it, just without the cross-process view.
     pub spine: Option<Arc<crate::spine::Spine>>,
 }
 
@@ -128,8 +128,8 @@ impl ConsciousnessStream {
         )
         .ok();
 
-        // Spine: egyetlen mmap a rétegek állapotára. Megnyitás nem
-        // kötelező — csak-olvasható lemeznél a stream tovább fut nélküle.
+        // Spine: a single mmap for the layer state. Opening is optional:
+        // on a read-only disk the stream keeps running without it.
         let spine = crate::spine::Spine::open(output_dir).ok().map(Arc::new);
 
         let state = Arc::new(Mutex::new(StreamState {
@@ -160,8 +160,8 @@ impl ConsciousnessStream {
         let running = Arc::new(Mutex::new(true));
         let running_clone = running.clone();
 
-        // Ha a Spine élő állapotot hordoz, a ciklusszámláló ott folytatódik,
-        // ahol az előző processz abbahagyta (nincs nulláról indulás).
+        // When the Spine carries live state, the cycle counter resumes where
+        // the previous process left off (no restart from zero).
         if let Some(sp) = spine.as_ref() {
             let restored = sp.read_stream();
             if restored.cycle > 0 {
@@ -235,7 +235,7 @@ impl ConsciousnessStream {
                 // ─── Publish snapshot (minden ciklusban, lock-free olvasók számára) ───
                 publish_snapshot(&s, snapshot_writer.as_ref());
 
-                // ─── Spine publish (minden ciklusban, egybe írva) ───
+                // ─── Spine publish (every cycle, written as one) ───
                 publish_spine(&s);
 
                 drop(s);
@@ -431,21 +431,21 @@ fn publish_snapshot(s: &StreamState, writer: Option<&MappedSnapshotWriter>) {
     }
 }
 
-/// Hány tick-enként íródjanak a ritka réteg-fejlécek (Hebbian, Attention,
+/// How often the rare layer headers are written (Hebbian, Attention,
 /// Emotion, Resonance, Graph, Cache, Archetype, Mirror, Merkle, Meta).
-/// A skálárok (StreamPage) tick-enként mennek — ők a hot path.
-const LAYER_HEADER_INTERVAL: u64 = 10; // 1 másodperc
+/// The scalars (StreamPage) go out every tick — they are the hot path.
+const LAYER_HEADER_INTERVAL: u64 = 10; // 1 second
 
-/// A stream állapotának publikálása a mmap Spine-be.
+/// Publish the stream state into the mmap Spine.
 ///
-/// A skálárok (ciklus, surprise, curiosity, predikció, Hebbian energiája)
-/// minden tick-ben egybe íródnak — 1 oldal, 1 lock. A réteg-fejlécek
-/// `LAYER_HEADER_INTERVAL`-enként, mert azok csak az aggregátumokat tartják
-/// számon (a nagy tömbök a saját fájljaikon maradnak).
+/// The scalars (cycle, surprise, curiosity, prediction, Hebbian energy) go
+/// out as one write per tick — 1 page, 1 lock. The layer headers go out
+/// every `LAYER_HEADER_INTERVAL`, because they only track aggregates
+/// (the large arrays stay in their own files).
 fn publish_spine(s: &StreamState) {
     let Some(spine) = &s.spine else { return };
 
-    // Hot path: a teljes StreamPage egy írásba.
+    // Hot path: the whole StreamPage in one write.
     spine.tick(
         s.cycle,
         s.surprise_level,
@@ -457,7 +457,7 @@ fn publish_spine(s: &StreamState) {
         s.hebbian_total_energy as f64,
     );
 
-    // A ritkább réteg-aggregátumok.
+    // The rarer layer aggregates.
     if s.cycle.is_multiple_of(LAYER_HEADER_INTERVAL) {
         let now = now_ms();
 

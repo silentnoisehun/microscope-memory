@@ -102,11 +102,7 @@ fn ascii_fast_path_equals_char_path() {
     let hay = "STRATOS stratos StraToS STrAtOs sTrAtOs s mg egy soroS";
     for needle in ["stratos", "strat", "str", "s", "atos"] {
         let lower = needle.to_lowercase();
-        assert!(
-            contains_ci(&lower, hay),
-            "nem tallta: needle={:?}",
-            needle
-        );
+        assert!(contains_ci(&lower, hay), "nem tallta: needle={:?}", needle);
     }
     // Egyelre nem szerepl szk.
     assert!(!contains_ci("stratoss", hay));
@@ -148,12 +144,19 @@ fn ab_contains_ci_vs_tolowercase() {
             s.push(' ');
         }
         // Vegyes nagybetsts, mint egy valdi indexben.
-        if next(&mut seed).is_multiple_of(3) {            s = s.to_uppercase();
+        if next(&mut seed).is_multiple_of(3) {
+            s = s.to_uppercase();
         }
         corpus.push(s);
     }
 
-    let queries = ["stratos", "memory architecture", "hebbian learning", "maradk", "eredmny"];
+    let queries = [
+        "stratos",
+        "memory architecture",
+        "hebbian learning",
+        "maradk",
+        "eredmny",
+    ];
 
     // ── A: a rgi md (to_lowercase per blokk) ──
     let mut a_total = std::time::Duration::ZERO;

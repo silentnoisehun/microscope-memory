@@ -18,8 +18,8 @@
 //!   microscope-mem serve                    # Start the unified endpoint server (TCP/HTTP)
 
 use microscope_memory::config::Config;
-use microscope_memory::recall_ctx::RecallContext;
 use microscope_memory::reader::{layer_color, print_append_result};
+use microscope_memory::recall_ctx::RecallContext;
 use microscope_memory::Cli;
 use microscope_memory::Cmd;
 use microscope_memory::*;
@@ -298,8 +298,8 @@ fn recall(config: &Config, query: &str, k: usize) {
     // Fresh context per invocation: behaviour is exactly the old
     // load-everything-then-save-everything flow. Loop/server callers should
     // open one context and use `recall_with_ctx` instead.
-    let mut ctx = RecallContext::open(config)
-        .expect("Failed to open microscope index — run 'build' first");
+    let mut ctx =
+        RecallContext::open(config).expect("Failed to open microscope index — run 'build' first");
     recall_with_ctx(&mut ctx, config, query, k);
 }
 
@@ -376,8 +376,7 @@ fn recall_with_ctx(ctx: &mut RecallContext, config: &Config, query: &str, k: usi
     // === 21D Emotional State warp: add wave-based bias from stored state ===
     let (qx, qy, qz) = if config.search.emotion_21d_weight > 0.0 {
         // (from ctx — the per-call file read is gone)
-        let state: &microscope_memory::emotional_21d::EmotionalState21D =
-            &ctx.emotion_21d;
+        let state: &microscope_memory::emotional_21d::EmotionalState21D = &ctx.emotion_21d;
         let (edx, edy, edz) = microscope_memory::emotional_21d::emotion_21d_bias(state);
         let w21 = config.search.emotion_21d_weight;
         (qx + edx * w21, qy + edy * w21, qz + edz * w21)
@@ -674,8 +673,7 @@ fn recall_with_ctx(ctx: &mut RecallContext, config: &Config, query: &str, k: usi
     // discarding the identical copies from the top of the function)
     let thought_graph: &mut microscope_memory::thought_graph::ThoughtGraphState =
         &mut ctx.thought_graph;
-    let pred_cache: &mut microscope_memory::predictive_cache::PredictiveCache =
-        &mut ctx.pred_cache;
+    let pred_cache: &mut microscope_memory::predictive_cache::PredictiveCache = &mut ctx.pred_cache;
     let qh_tg = microscope_memory::hebbian::query_hash(query);
 
     // Check predictive cache — instant boost from pre-fetched blocks (scaled by attention)
@@ -851,9 +849,9 @@ fn recall_with_ctx(ctx: &mut RecallContext, config: &Config, query: &str, k: usi
         }
         hebb.record_activation(&activated, qh);
 
-    // Resonance: emit pulse with spatial coordinates
-    // (from ctx)
-    let resonance: &mut microscope_memory::resonance::ResonanceState = &mut ctx.resonance;
+        // Resonance: emit pulse with spatial coordinates
+        // (from ctx)
+        let resonance: &mut microscope_memory::resonance::ResonanceState = &mut ctx.resonance;
         let headers: Vec<(f32, f32, f32)> = activated
             .iter()
             .map(|&(idx, _)| {
@@ -863,11 +861,11 @@ fn recall_with_ctx(ctx: &mut RecallContext, config: &Config, query: &str, k: usi
             .collect();
         resonance.emit_pulse(&activated, qh, &headers, 1);
 
-    // Archetype: reinforce + temporal tracking
-    // (both from ctx)
-    let archetypes: &mut microscope_memory::archetype::ArchetypeState = &mut ctx.archetypes;
-    let temporal: &mut microscope_memory::temporal_archetype::TemporalArchetypeState =
-        &mut ctx.temporal;
+        // Archetype: reinforce + temporal tracking
+        // (both from ctx)
+        let archetypes: &mut microscope_memory::archetype::ArchetypeState = &mut ctx.archetypes;
+        let temporal: &mut microscope_memory::temporal_archetype::TemporalArchetypeState =
+            &mut ctx.temporal;
         if let Some((idx, score)) = archetypes.match_archetype(&activated) {
             let arch_id = archetypes.archetypes[idx].id;
             let time_boost = temporal.boost(arch_id);
@@ -1007,8 +1005,7 @@ fn recall_with_ctx(ctx: &mut RecallContext, config: &Config, query: &str, k: usi
         // --- Spaced repetition: record recall for each activated block ---
         let t_sp = Instant::now();
         // (from ctx)
-        let spaced: &mut microscope_memory::spaced_repetition::SpacedRepetition =
-            &mut ctx.spaced;
+        let spaced: &mut microscope_memory::spaced_repetition::SpacedRepetition = &mut ctx.spaced;
         trace_phase(
             "  learn: spaced load",
             t_sp.elapsed().as_secs_f64() * 1000.0,
@@ -1097,8 +1094,7 @@ fn recall_with_ctx(ctx: &mut RecallContext, config: &Config, query: &str, k: usi
         // --- Auto curiosity: every 7th recall ---
         if narrative.session_count > 0 && (narrative.session_count as usize).is_multiple_of(7) {
             // (from ctx)
-            let curiosity: &mut microscope_memory::curiosity::CuriosityState =
-                &mut ctx.curiosity;
+            let curiosity: &mut microscope_memory::curiosity::CuriosityState = &mut ctx.curiosity;
             let queries = curiosity.generate_queries(config, reader, output_dir);
             if !queries.is_empty() {
                 println!(
@@ -1111,9 +1107,9 @@ fn recall_with_ctx(ctx: &mut RecallContext, config: &Config, query: &str, k: usi
         // --- Narrative Memory: build story episode from every recall ---
         {
             let t_nm = Instant::now();
-        // (from ctx)
-        let nm: &mut microscope_memory::narrative_memory::NarrativeMemory =
-            &mut ctx.narrative_memory;
+            // (from ctx)
+            let nm: &mut microscope_memory::narrative_memory::NarrativeMemory =
+                &mut ctx.narrative_memory;
             trace_phase(
                 "  learn: narrative memory load",
                 t_nm.elapsed().as_secs_f64() * 1000.0,

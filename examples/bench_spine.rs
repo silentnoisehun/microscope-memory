@@ -1,9 +1,16 @@
 //! Spine benchmark — a rétegek önálló fájljaikra töltése vs. egyetlen mmap.
 //!
-//! Két forgatókönyvet mér:
+//! Méri:
 //!   A. COLD — a réteges `load_or_init()` lánc éles adatkönyvtárral (másolat)
 //!   B. SPINE — ugyanaz az állapot egy `spine.bin` mmap-ból
-//! plusz a hot path olvasás/írás késleltetése rétegenként.
+//!   C–F. a hot path: fejrész-olvasás, `tick()`írás, rétegenkénti r+w — **egyszálú,
+//!      versenytárs nélkül**
+//!   I. **kontendált**: n író × m olvasó, throughput + szakadási ráta
+//!
+//! Az A/A2/A3 sorok csak a `data/` könyvtárral jelentenek valamit; az nincs a
+//! repóban, ezért egy tiszta clone-ból futtatva az "előtte" oldal üres
+//! alapállapotokat tölt be. Ezt a bench ki is írja, ne kelljen a számból
+//! kitalálni.
 //!
 //! Futtatás (release): cargo run --release --example bench_spine
 
@@ -64,6 +71,90 @@ fn load_layers_legacy(output_dir: &Path) {
     let _mirror = MirrorState::load_or_init(output_dir);
 }
 
+/// n író × m olvasó egy közös `spine.bin`-en. Az írók `tick()`-et írnak, az
+/// olvasók `read_snapshot()`-t vesznek, és a page-belső invariánst ellenőrzik.
+fn contend(npub: usize, nread: usize, per: u64) -> (f64, f64, u64, u64, u64) {
+    use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+    use std::sync::Arc;
+
+    let dir = temp_dir(&format!("c{}x{}", npub, nread));
+    let mut pubs = Vec::new();
+    for _ in 0..npub {
+        pubs.push(Arc::new(Spine::open(&dir).expect("open publisher")));
+    }
+    let readers: Vec<_> = (0..nread)
+        .map(|_| Arc::new(Spine::open_ro(&dir).expect("open reader")))
+        .collect();
+
+    let stop = Arc::new(AtomicBool::new(false));
+    let ticks = Arc::new(AtomicU64::new(0));
+    let snaps = Arc::new(AtomicU64::new(0));
+    let torn = Arc::new(AtomicU64::new(0));
+    let fresh = Arc::new(AtomicU64::new(0));
+
+    let t0 = Instant::now();
+    let mut writers = Vec::new();
+    for (i, sp) in pubs.into_iter().enumerate() {
+        let (stop, ticks) = (stop.clone(), ticks.clone());
+        let parity = i as u64;
+        writers.push(std::thread::spawn(move || {
+            let mut seq = 0u64;
+            while !stop.load(Ordering::Relaxed) {
+                // A cycle tartja az író paritásáról, így egy teljes page
+                // bármelyik írótól kielégíti az olvasó oracle-át.
+                let cycle = 1_000 + seq * npub as u64 + parity;
+                sp.tick(cycle, 0.1, 0.2, !cycle, 0.5, cycle, cycle, cycle as f64);
+                seq += 1;
+                ticks.fetch_add(1, Ordering::Relaxed);
+            }
+        }));
+    }
+    let mut readers_h = Vec::new();
+    for rd in readers {
+        let (stop, torn, fresh, snaps) = (stop.clone(), torn.clone(), fresh.clone(), snaps.clone());
+        readers_h.push(std::thread::spawn(move || {
+            let mut done = 0u64;
+            while done < per && !stop.load(Ordering::Relaxed) {
+                match rd.read_snapshot() {
+                    Some(s) => {
+                        if s.stream.cycle == 0 && s.stream.predicted_query_hash == 0 {
+                            fresh.fetch_add(1, Ordering::Relaxed);
+                        } else if s.stream.predicted_query_hash != !s.stream.cycle {
+                            torn.fetch_add(1, Ordering::Relaxed);
+                        }
+                        snaps.fetch_add(1, Ordering::Relaxed);
+                        done += 1;
+                    }
+                    // Csillagzás: inkább szólaljunk meg, mint nézzenek ki
+                    // nullának a szakadási számlálók.
+                    None => {
+                        torn.fetch_add(1, Ordering::Relaxed);
+                        stop.store(true, Ordering::Relaxed);
+                    }
+                }
+            }
+        }));
+    }
+    for h in readers_h {
+        h.join().expect("reader thread");
+    }
+    stop.store(true, Ordering::Relaxed);
+    for h in writers {
+        h.join().expect("writer thread");
+    }
+
+    let secs = t0.elapsed().as_secs_f64().max(1e-9);
+    let out = (
+        snaps.load(Ordering::Relaxed) as f64 / secs,
+        ticks.load(Ordering::Relaxed) as f64 / secs,
+        snaps.load(Ordering::Relaxed),
+        torn.load(Ordering::Relaxed),
+        fresh.load(Ordering::Relaxed),
+    );
+    let _ = std::fs::remove_dir_all(&dir);
+    out
+}
+
 fn main() {
     println!("═══════════════════════════════════════════════════════");
     println!("  MICROSCOPE SPINE — mmap vs per-layer file load");
@@ -80,6 +171,12 @@ fn main() {
         Err(_) => "(no bundled data dir; using empty)".to_string(),
     };
     println!("Adatkészlet: {}\n", copy_note);
+    if !real_data.is_dir() {
+        println!(
+            "FIGYELEM: nincs {} — az A/A2/A3 „előtte” sorok üres könyvtárat töltenek,\n             tehát a gyorsulási szám ebből a futásból NEM értelmezhető. A C–I sorok\n             ettől függetlenek (csak spine API-t használnak).\n",
+            real_data.display()
+        );
+    }
 
     // ── A. Legacy cold ──
     let n_cold = 20;
@@ -142,7 +239,9 @@ fn main() {
         spine_open_warm
     );
 
-    // ── C. Hot path: mind a 11 réteg fejrészének olvasása ──
+    // ── C. Hot path: mind a 11 réteg fejrészének olvasása — EGYSZÁLÚ, író nélkül.
+    //        Egy versenytárs sincs, tehát a lock-ok vitelenek; az I. szekció méri
+    //        azt, amit a seqlock és a publisher lock ténylegesen befolyásol. ──
     let s = Spine::open(&spine_dir).unwrap();
 
     // Először egy teljes tick írása, hogy a fejlécek ne legyenek mind nulla.
@@ -169,13 +268,14 @@ fn main() {
     }
     let all_read = t.elapsed();
     println!(
-        "C. 11 fejrész olvasása:              {:?} /all-11  ({} iters, {:?})",
+        "C. 11 fejrész olvasása (1 szál):     {:?} /all-11  ({} iters, {:?})",
         all_read / n_ops,
         n_ops,
         all_read
     );
 
-    // ── D. Hot path: tick írás (amit a stream ciklus csinál 10 Hz-en) ──
+    // ── D. Hot path: tick írás — egyszálú, tehát a publish lock nem vár senkire,
+    //        de a két flock syscall így is benne van; az I. szekció a versenyt. ──
     let n_ticks = 200_000;
     let t = Instant::now();
     for i in 0..n_ticks {
@@ -192,13 +292,37 @@ fn main() {
     }
     let tick_total = t.elapsed();
     println!(
-        "D. tick() (teljes StreamPage írás):  {:?} /tick   ({} ticks, {:?})",
+        "D. tick() (1 szál, teljes page írás): {:?} /tick   ({} ticks, {:?})",
         tick_total / n_ticks,
         n_ticks,
         tick_total
     );
 
-    // ── E. Rétegenkénti fejrész-írás (ez az, ami most fájl-írás) ──
+    // ── E. Az olvasási minta ára: a régi két külön olvasás vs. a bracketelt
+    //        snapshot. Ugyazt a párt hasonlítjuk össze, amire a fogyasztónak
+    //        szüksége van (stream fej + szuperblokk), nem tetszőleges műveletet. ──
+    let t = Instant::now();
+    for _ in 0..n_ops {
+        let _ = s.read_stream();
+        let _ = s.read_superblock();
+    }
+    let pair_read = t.elapsed();
+    let t = Instant::now();
+    for _ in 0..n_ops {
+        let _ = s.read_snapshot();
+    }
+    let snap_read = t.elapsed();
+    println!(
+        "E1. read_stream + read_superblock:  {:?} /pair",
+        pair_read / n_ops
+    );
+    println!(
+        "E2. read_snapshot (bracketelt):     {:?} /pair   ({:.2}× az E1-hez képest)\n",
+        snap_read / n_ops,
+        snap_read.as_secs_f64() / pair_read.as_secs_f64()
+    );
+
+    // ── E'. Rétegenkénti fejrész-írás (ez az, ami most fájl-írás) ──
     let n_w = 100_000;
     let t = Instant::now();
     for i in 0..n_w {
@@ -233,10 +357,28 @@ fn main() {
     }
     println!(
         "F. Emotion+Attention+Cache r+w:     {:?} /3-réteg\n",
-        t.elapsed() / n3
-            .try_into()
-            .unwrap()
+        t.elapsed() / n3.try_into().unwrap()
     );
+
+    // ── I. Kontendált: n író × m olvasó, throughput + szakadási ráta ──
+    // Az olvasó oracle-ai: a page *belsejéből* ellenőrzött páros
+    // (`predicted_query_hash == !cycle`), tehát nem kell hozzá baseline. Az
+    // initált de még publikálatlan page (minden nulla) NEM szakadás — ezért a
+    // `fresh` számláló külön fut; nélküle a szálindítási latencia az első
+    // konfigurációban 16–490 olvasót null-page-en találna, és szakadásnak
+    // látszana. Ez a tanulság bekerült a tesztbe is.
+    let npub = std::thread::available_parallelism()
+        .map(|n| n.get())
+        .unwrap_or(2)
+        .min(4);
+    for (p, r) in [(1usize, 1usize), (2, 2), (npub, npub), (1, npub), (npub, 1)] {
+        let (read_s, tick_s, snaps, torn, fresh) = contend(p, r, 200_000);
+        println!(
+            "I.  {} író × {} olvasó: {:>9.0} snapshot/s, {:>9.0} tick/s |              szakadás={}/{} nem-publikált={}",
+            p, r, read_s, tick_s, torn, snaps, fresh
+        );
+    }
+    println!();
 
     // ── G. sync (durability pont) ──
     let t = Instant::now();
@@ -251,8 +393,14 @@ fn main() {
     let emo: EmotionHeader = reopened.read_emotion();
     let cache: CacheHeader = reopened.read_cache();
     println!("\nH. Reopen:");
-    println!("   cycle={} hebbian_activations={}", stream.cycle, hebb.activation_count);
-    println!("   emo_updates={} cache_hits={}", emo.total_updates, cache.total_hits);
+    println!(
+        "   cycle={} hebbian_activations={}",
+        stream.cycle, hebb.activation_count
+    );
+    println!(
+        "   emo_updates={} cache_hits={}",
+        emo.total_updates, cache.total_hits
+    );
 
     // ── Összefoglaló ──
     let legacy_reload = legacy_reload_first;
@@ -273,9 +421,21 @@ fn main() {
         legacy_reload.as_secs_f64() / spine_reload.as_secs_f64()
     );
     println!(
-        "11 fejrész olvasása: {:>9?}   teljes tick írás: {:>9?}",
+        "11 fejrész olvasása: {:>9?}   tick írás (1 szál): {:>9?}",
         all_read / n_ops,
         tick_total / n_ticks
+    );
+    println!(
+        "olvasási pár: régi {:>9?}  →  bracketelt {:>9?}   ({:.2}×)",
+        pair_read / n_ops,
+        snap_read / n_ops,
+        pair_read.as_secs_f64() / snap_read.as_secs_f64()
+    );
+    println!(
+        "Megjegyzés: a tick() két flock syscallot (spine.publish LOCK_EX + unlock) \
+         és egy seqlock-abroncsot tartalmaz; a D. sor ezt tartalmazza. A lock \
+         nélküli érték a BENCHMARKS.md Spine publish protocol szekciójában van, \
+         mert azt a példából nem lehet váltani."
     );
     println!(
         "Spine fájl: {} oldal ({} KB @ {} B/oldal)",

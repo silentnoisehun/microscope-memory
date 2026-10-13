@@ -235,7 +235,7 @@ impl ConsciousnessStream {
                 // ─── Publish snapshot (minden ciklusban, lock-free olvasók számára) ───
                 publish_snapshot(&s, snapshot_writer.as_ref());
 
-                // ─── Spine publish (every cycle, written as one) ───
+                // ─── Spine publish (every cycle, one seqlock window) ───
                 publish_spine(&s);
 
                 drop(s);
@@ -439,13 +439,18 @@ const LAYER_HEADER_INTERVAL: u64 = 10; // 1 second
 /// Publish the stream state into the mmap Spine.
 ///
 /// The scalars (cycle, surprise, curiosity, prediction, Hebbian energy) go
-/// out as one write per tick — 1 page, 1 lock. The layer headers go out
-/// every `LAYER_HEADER_INTERVAL`, because they only track aggregates
-/// (the large arrays stay in their own files).
+/// out through [`crate::spine::Spine::tick`]: one publisher lock, one mapping
+/// lock, one seqlock window around the stream page and the superblock payload.
+/// That is what lets another process read the two as a unit — the page write
+/// itself is still a 16 KiB copy, so a reader that ignores the publish counter
+/// can still catch it half-done. The layer headers go out every
+/// `LAYER_HEADER_INTERVAL`, because they only track aggregates (the large
+/// arrays stay in their own files).
 fn publish_spine(s: &StreamState) {
     let Some(spine) = &s.spine else { return };
 
-    // Hot path: the whole StreamPage in one write.
+    // Hot path: the StreamPage and the publish record in one window. Read it
+    // back with `Spine::read_snapshot`, never with two separate reads.
     spine.tick(
         s.cycle,
         s.surprise_level,
@@ -471,12 +476,19 @@ fn publish_spine(s: &StreamState) {
             .count() as u32;
         hh.coactivation_count = s.hebbian.coactivations.len() as u32;
         hh.fingerprint_count = s.hebbian.fingerprints.len() as u32;
-        hh.decay_event_count += s.cycle;
+        // `decay_event_count` is read-modify-written, not accumulated: the
+        // hebbian layer performs decay inside `apply_drift` without counting
+        // it, so there is nothing to publish here. The previous
+        // `+= s.cycle` made the field a sum of cycle numbers.
         hh.last_activation_ms = s.last_query_ms;
         spine.write_hebbian(&hh);
 
         let mut ah = spine.read_attention();
-        for (dst, src) in ah.learned_weights.iter_mut().zip(s.attention.learned_weights) {
+        for (dst, src) in ah
+            .learned_weights
+            .iter_mut()
+            .zip(s.attention.learned_weights)
+        {
             *dst = src;
         }
         ah.last_recall_ms = s.attention.last_recall_ms;

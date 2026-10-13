@@ -63,36 +63,22 @@ impl RecallContext {
         let emotion_file = output_dir.join("emotion_21d.bin");
         Ok(Self {
             attention: crate::attention::AttentionState::load_or_init(output_dir),
-            hebb: crate::hebbian::HebbianState::load_or_init(
-                output_dir,
-                reader.block_count,
-            ),
-            thought_graph:
-                crate::thought_graph::ThoughtGraphState::load_or_init(output_dir),
-            pred_cache:
-                crate::predictive_cache::PredictiveCache::load_or_init(output_dir),
-            emotion_21d:
-                crate::emotional_21d::EmotionalState21D::load_or_init(&emotion_file),
+            hebb: crate::hebbian::HebbianState::load_or_init(output_dir, reader.block_count),
+            thought_graph: crate::thought_graph::ThoughtGraphState::load_or_init(output_dir),
+            pred_cache: crate::predictive_cache::PredictiveCache::load_or_init(output_dir),
+            emotion_21d: crate::emotional_21d::EmotionalState21D::load_or_init(&emotion_file),
             mirror: crate::mirror::MirrorState::load_or_init(output_dir),
             resonance: crate::resonance::ResonanceState::load_or_init(output_dir),
             archetypes: crate::archetype::ArchetypeState::load_or_init(output_dir),
-            temporal:
-                crate::temporal_archetype::TemporalArchetypeState::load_or_init(
-                    output_dir,
-                ),
+            temporal: crate::temporal_archetype::TemporalArchetypeState::load_or_init(output_dir),
             eureka_log: crate::eureka::EurekaLog::load_or_init(output_dir),
-            spaced: crate::spaced_repetition::SpacedRepetition::load_or_init(
-                output_dir,
-            ),
+            spaced: crate::spaced_repetition::SpacedRepetition::load_or_init(output_dir),
             narrative: crate::narrative::NarrativeState::load_or_init(output_dir),
             esr: crate::emotional_state::EmotionalStateRing::load_or_init(output_dir),
             self_model: crate::self_model::SelfModel::load_or_init(output_dir),
             curiosity: crate::curiosity::CuriosityState::load_or_init(output_dir),
-            narrative_memory:
-                crate::narrative_memory::NarrativeMemory::load_or_init(output_dir),
-            monologue: crate::inner_monologue::MonologueState::load_or_init(
-                output_dir,
-            ),
+            narrative_memory: crate::narrative_memory::NarrativeMemory::load_or_init(output_dir),
+            monologue: crate::inner_monologue::MonologueState::load_or_init(output_dir),
             reader,
         })
     }
@@ -160,9 +146,7 @@ impl SharedContext {
     pub fn get(&mut self, config: &Config) -> Result<&mut RecallContext, String> {
         let output_dir = Path::new(&config.paths.output_dir);
         let need_reopen = match (&self.ctx, &self.generation) {
-            (Some(ctx), Some(gen)) => {
-                !gen.is_current(output_dir, ctx.reader.block_count)
-            }
+            (Some(ctx), Some(gen)) => !gen.is_current(output_dir, ctx.reader.block_count),
             _ => true,
         };
         if need_reopen {
@@ -205,11 +189,8 @@ pub fn with_shared<R>(
     config: &Config,
     f: impl FnOnce(&mut RecallContext) -> R,
 ) -> Result<R, String> {
-    let cell = GLOBAL.get_or_init(|| {
-        Mutex::new(SharedContext::new(PathBuf::from(
-            &config.paths.output_dir,
-        )))
-    });
+    let cell = GLOBAL
+        .get_or_init(|| Mutex::new(SharedContext::new(PathBuf::from(&config.paths.output_dir))));
     let mut shared = cell.lock().map_err(|e| format!("shared ctx lock: {e}"))?;
     // A different output dir than the global was opened for: treat as a
     // generation change (simplest correct behaviour for multi-tenant use).

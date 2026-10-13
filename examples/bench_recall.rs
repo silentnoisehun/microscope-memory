@@ -1,7 +1,7 @@
-//! Recall hot-path benchmark Ä‚ËĂ˘â€šÂ¬Ă˘â‚¬ĹĄ a valĂ„â€šÄąâ€šdi query Ă„â€šÄąĹşt mĂ„â€šĂ‚Â©rĂ„â€šĂ‚Â©se.
+//! Recall hot-path benchmark — a valódi query út mérése.
 //!
-//! FĂ„â€šĂ‹â€ˇjl: examples/bench_recall.rs
-//! FuttatĂ„â€šĂ‹â€ˇs: cargo run --release --example bench_recall -- [kĂ„â€šĂ‚Â¶rnyezet adatkĂ„â€šĂ‚Â¶nyvtĂ„â€šĂ‹â€ˇr]
+//! Fájl: examples/bench_recall.rs
+//! Futtatás: cargo run --release --example bench_recall -- [környezet adatkönyvtár]
 
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
@@ -10,14 +10,14 @@ use microscope_memory::config::Config;
 use microscope_memory::reader::MicroscopeReader;
 use microscope_memory::spine::Spine;
 
-/// A benchmark hasznĂ„â€šĂ‹â€ˇlatos lekĂ„â€šĂ‚Â©rdezĂ„â€šĂ‚Â©sei (lĂ„â€šĂ‹â€ˇsd mĂ„â€šĂ‚Â©g: a real query log).
+/// A benchmark használatos lekérdezései (lásd még: a real query log).
 const QUERIES: &[&str] = &[
     "stratos",
     "memory architecture",
     "hebbian learning",
     "emotional state",
-    "maradĂ„â€šĂ‚Â©k",
-    "projekt cĂ„â€šĂ‚Â©lkitĂ„Ä…Ă‚Â±zĂ„â€šĂ‚Â©s",
+    "maradék",
+    "projekt célkitűzés",
 ];
 
 fn config_for(dir: &Path) -> Config {
@@ -34,28 +34,28 @@ fn main() {
         .map(PathBuf::from)
         .unwrap_or_else(|| PathBuf::from("data"));
 
-    println!("Ä‚ËĂ˘â‚¬ËĂ‚ÂÄ‚ËĂ˘â‚¬ËĂ‚ÂÄ‚ËĂ˘â‚¬ËĂ‚ÂÄ‚ËĂ˘â‚¬ËĂ‚ÂÄ‚ËĂ˘â‚¬ËĂ‚ÂÄ‚ËĂ˘â‚¬ËĂ‚ÂÄ‚ËĂ˘â‚¬ËĂ‚ÂÄ‚ËĂ˘â‚¬ËĂ‚ÂÄ‚ËĂ˘â‚¬ËĂ‚ÂÄ‚ËĂ˘â‚¬ËĂ‚ÂÄ‚ËĂ˘â‚¬ËĂ‚ÂÄ‚ËĂ˘â‚¬ËĂ‚ÂÄ‚ËĂ˘â‚¬ËĂ‚ÂÄ‚ËĂ˘â‚¬ËĂ‚ÂÄ‚ËĂ˘â‚¬ËĂ‚ÂÄ‚ËĂ˘â‚¬ËĂ‚ÂÄ‚ËĂ˘â‚¬ËĂ‚ÂÄ‚ËĂ˘â‚¬ËĂ‚ÂÄ‚ËĂ˘â‚¬ËĂ‚ÂÄ‚ËĂ˘â‚¬ËĂ‚ÂÄ‚ËĂ˘â‚¬ËĂ‚ÂÄ‚ËĂ˘â‚¬ËĂ‚ÂÄ‚ËĂ˘â‚¬ËĂ‚ÂÄ‚ËĂ˘â‚¬ËĂ‚ÂÄ‚ËĂ˘â‚¬ËĂ‚ÂÄ‚ËĂ˘â‚¬ËĂ‚ÂÄ‚ËĂ˘â‚¬ËĂ‚ÂÄ‚ËĂ˘â‚¬ËĂ‚ÂÄ‚ËĂ˘â‚¬ËĂ‚ÂÄ‚ËĂ˘â‚¬ËĂ‚ÂÄ‚ËĂ˘â‚¬ËĂ‚ÂÄ‚ËĂ˘â‚¬ËĂ‚ÂÄ‚ËĂ˘â‚¬ËĂ‚ÂÄ‚ËĂ˘â‚¬ËĂ‚ÂÄ‚ËĂ˘â‚¬ËĂ‚ÂÄ‚ËĂ˘â‚¬ËĂ‚ÂÄ‚ËĂ˘â‚¬ËĂ‚ÂÄ‚ËĂ˘â‚¬ËĂ‚ÂÄ‚ËĂ˘â‚¬ËĂ‚ÂÄ‚ËĂ˘â‚¬ËĂ‚ÂÄ‚ËĂ˘â‚¬ËĂ‚ÂÄ‚ËĂ˘â‚¬ËĂ‚ÂÄ‚ËĂ˘â‚¬ËĂ‚ÂÄ‚ËĂ˘â‚¬ËĂ‚ÂÄ‚ËĂ˘â‚¬ËĂ‚ÂÄ‚ËĂ˘â‚¬ËĂ‚ÂÄ‚ËĂ˘â‚¬ËĂ‚Â");
-    println!("  MICROSCOPE RECALL Ä‚ËĂ˘â€šÂ¬Ă˘â‚¬ĹĄ hot path benchmark");
-    println!("Ä‚ËĂ˘â‚¬ËĂ‚ÂÄ‚ËĂ˘â‚¬ËĂ‚ÂÄ‚ËĂ˘â‚¬ËĂ‚ÂÄ‚ËĂ˘â‚¬ËĂ‚ÂÄ‚ËĂ˘â‚¬ËĂ‚ÂÄ‚ËĂ˘â‚¬ËĂ‚ÂÄ‚ËĂ˘â‚¬ËĂ‚ÂÄ‚ËĂ˘â‚¬ËĂ‚ÂÄ‚ËĂ˘â‚¬ËĂ‚ÂÄ‚ËĂ˘â‚¬ËĂ‚ÂÄ‚ËĂ˘â‚¬ËĂ‚ÂÄ‚ËĂ˘â‚¬ËĂ‚ÂÄ‚ËĂ˘â‚¬ËĂ‚ÂÄ‚ËĂ˘â‚¬ËĂ‚ÂÄ‚ËĂ˘â‚¬ËĂ‚ÂÄ‚ËĂ˘â‚¬ËĂ‚ÂÄ‚ËĂ˘â‚¬ËĂ‚ÂÄ‚ËĂ˘â‚¬ËĂ‚ÂÄ‚ËĂ˘â‚¬ËĂ‚ÂÄ‚ËĂ˘â‚¬ËĂ‚ÂÄ‚ËĂ˘â‚¬ËĂ‚ÂÄ‚ËĂ˘â‚¬ËĂ‚ÂÄ‚ËĂ˘â‚¬ËĂ‚ÂÄ‚ËĂ˘â‚¬ËĂ‚ÂÄ‚ËĂ˘â‚¬ËĂ‚ÂÄ‚ËĂ˘â‚¬ËĂ‚ÂÄ‚ËĂ˘â‚¬ËĂ‚ÂÄ‚ËĂ˘â‚¬ËĂ‚ÂÄ‚ËĂ˘â‚¬ËĂ‚ÂÄ‚ËĂ˘â‚¬ËĂ‚ÂÄ‚ËĂ˘â‚¬ËĂ‚ÂÄ‚ËĂ˘â‚¬ËĂ‚ÂÄ‚ËĂ˘â‚¬ËĂ‚ÂÄ‚ËĂ˘â‚¬ËĂ‚ÂÄ‚ËĂ˘â‚¬ËĂ‚ÂÄ‚ËĂ˘â‚¬ËĂ‚ÂÄ‚ËĂ˘â‚¬ËĂ‚ÂÄ‚ËĂ˘â‚¬ËĂ‚ÂÄ‚ËĂ˘â‚¬ËĂ‚ÂÄ‚ËĂ˘â‚¬ËĂ‚ÂÄ‚ËĂ˘â‚¬ËĂ‚ÂÄ‚ËĂ˘â‚¬ËĂ‚ÂÄ‚ËĂ˘â‚¬ËĂ‚ÂÄ‚ËĂ˘â‚¬ËĂ‚ÂÄ‚ËĂ˘â‚¬ËĂ‚ÂÄ‚ËĂ˘â‚¬ËĂ‚ÂÄ‚ËĂ˘â‚¬ËĂ‚Â\n");
-    println!("adatkĂ„â€šĂ‚Â¶nyvtĂ„â€šĂ‹â€ˇr: {}\n", data_dir.display());
+    println!("═══════════════════════════════════════════════");
+    println!("  MICROSCOPE RECALL — hot path benchmark");
+    println!("═══════════════════════════════════════════════\n");
+    println!("adatkönyvtár: {}\n", data_dir.display());
 
     let cfg = config_for(&data_dir);
     let mut reader = match MicroscopeReader::open(&cfg) {
         Ok(r) => r,
         Err(e) => {
-            eprintln!("reader nem nyithatĂ„â€šÄąâ€š: {} (futtasd 'build'-el)", e);
+            eprintln!("reader nem nyitható: {} (futtasd 'build'-el)", e);
             return;
         }
     };
 
     println!("index: {} blokk\n", reader.block_count);
 
-    // Warm-up: elsĂ„Ä…Ă˘â‚¬Â talĂ„â€šĂ‹â€ˇlat gyorsĂ„â€šĂ‚Â­tĂ„â€šÄąâ€štĂ„â€šĂ‹â€ˇr nĂ„â€šĂ‚Â©lkĂ„â€šĂ„Ëťl is legyen mĂ„â€šĂ‚Â©rendĂ„Ä…Ă˘â‚¬Â.
+    // Warm-up: első találat gyorsítótár nélkül is legyen mérendő.
     let _ = reader.find_text("warmup", 5);
 
     let n = 200usize;
 
-    // Ä‚ËĂ˘â‚¬ĹĄĂ˘â€šÂ¬Ä‚ËĂ˘â‚¬ĹĄĂ˘â€šÂ¬ 1. find_text (case-insensitive contains + depth sort) Ä‚ËĂ˘â‚¬ĹĄĂ˘â€šÂ¬Ä‚ËĂ˘â‚¬ĹĄĂ˘â€šÂ¬
+    // ── 1. find_text (case-insensitive contains + depth sort) ──
     let mut total = Duration::ZERO;
     let mut hits = 0usize;
     for q in QUERIES {
@@ -68,14 +68,14 @@ fn main() {
     }
     let per = total / (n * QUERIES.len()) as u32;
     println!(
-        "1. find_text ({} query Ă„â€šĂ˘â‚¬â€ť {})      {:>10?}/query   ({} talĂ„â€šĂ‹â€ˇlat)",
+        "1. find_text ({} query × {})      {:>10?}/query   ({} találat)",
         QUERIES.len(),
         n,
         per,
         hits
     );
 
-    // Ä‚ËĂ˘â‚¬ĹĄĂ˘â€šÂ¬Ä‚ËĂ˘â‚¬ĹĄĂ˘â€šÂ¬ 2. find_text_ranked Ä‚ËĂ˘â‚¬ĹĄĂ˘â€šÂ¬Ä‚ËĂ˘â‚¬ĹĄĂ˘â€šÂ¬
+    // ── 2. find_text_ranked ──
     let mut total = Duration::ZERO;
     let mut hits = 0usize;
     for q in QUERIES {
@@ -88,11 +88,11 @@ fn main() {
     }
     let per = total / (n * QUERIES.len()) as u32;
     println!(
-        "2. find_text_ranked                    {:>10?}/query   ({} talĂ„â€šĂ‹â€ˇlat)",
+        "2. find_text_ranked                    {:>10?}/query   ({} találat)",
         per, hits
     );
 
-    // Ä‚ËĂ˘â‚¬ĹĄĂ˘â€šÂ¬Ä‚ËĂ˘â‚¬ĹĄĂ˘â€šÂ¬ 3. find_text_all_ranked (main + append log) Ä‚ËĂ˘â‚¬ĹĄĂ˘â€šÂ¬Ä‚ËĂ˘â‚¬ĹĄĂ˘â€šÂ¬
+    // ── 3. find_text_all_ranked (main + append log) ──
     let mut total = Duration::ZERO;
     let mut hits = 0usize;
     for q in QUERIES {
@@ -105,11 +105,11 @@ fn main() {
     }
     let per = total / (n * QUERIES.len()) as u32;
     println!(
-        "3. find_text_all_ranked (append log)   {:>10?}/query   ({} talĂ„â€šĂ‹â€ˇlat)",
+        "3. find_text_all_ranked (append log)   {:>10?}/query   ({} találat)",
         per, hits
     );
 
-    // Ä‚ËĂ˘â‚¬ĹĄĂ˘â€šÂ¬Ä‚ËĂ˘â‚¬ĹĄĂ˘â€šÂ¬ 4. look() Ä‚ËĂ˘â€šÂ¬Ă˘â‚¬ĹĄ 3D tĂ„â€šĂ‚Â©rbeli lookup Ä‚ËĂ˘â‚¬ĹĄĂ˘â€šÂ¬Ä‚ËĂ˘â‚¬ĹĄĂ˘â€šÂ¬
+    // ── 4. look() — 3D térbeli lookup ──
     let mut total = Duration::ZERO;
     for _ in 0..n {
         let t = Instant::now();
@@ -121,7 +121,7 @@ fn main() {
         total / n as u32
     );
 
-    // Ä‚ËĂ˘â‚¬ĹĄĂ˘â€šÂ¬Ä‚ËĂ˘â‚¬ĹĄĂ˘â€šÂ¬ 5. radial_search Ä‚ËĂ˘â‚¬ĹĄĂ˘â€šÂ¬Ä‚ËĂ˘â‚¬ĹĄĂ˘â€šÂ¬
+    // ── 5. radial_search ──
     let mut total = Duration::ZERO;
     for _ in 0..n {
         let t = Instant::now();
@@ -133,7 +133,7 @@ fn main() {
         total / n as u32
     );
 
-    // Ä‚ËĂ˘â‚¬ĹĄĂ˘â€šÂ¬Ä‚ËĂ˘â‚¬ĹĄĂ˘â€šÂ¬ 6. A Spine a recall kĂ„â€šĂ‚Â¶zben: olvasĂ„â€šĂ‹â€ˇs nem IO Ä‚ËĂ˘â‚¬ĹĄĂ˘â€šÂ¬Ä‚ËĂ˘â‚¬ĹĄĂ˘â€šÂ¬
+    // ── 6. A Spine a recall közben: olvasás nem IO ──
     let spine_dir = std::env::temp_dir().join("m1c_bench_recall_spine");
     let _ = std::fs::remove_dir_all(&spine_dir);
     let spine = Spine::open(&spine_dir).unwrap();
@@ -148,9 +148,9 @@ fn main() {
         }
     }
     println!(
-        "6. spine StreamPage olvasĂ„â€šĂ‹â€ˇs             {:>10?}/read",
+        "6. spine StreamPage olvasás             {:>10?}/read",
         t.elapsed() / n2
     );
 
-    println!("\nKĂ„â€šĂ‚Â©sz Ä‚ËĂ˘â€šÂ¬Ă˘â‚¬ĹĄ a fenti szĂ„â€šĂ‹â€ˇmok a baseline-ek a optimalizĂ„â€šĂ‹â€ˇlĂ„â€šĂ‹â€ˇshoz.");
+    println!("\nKész — a fenti számok a baseline-ek a optimalizáláshoz.");
 }

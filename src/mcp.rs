@@ -1085,31 +1085,32 @@ fn tool_recall(config: &Config, args: &Value) -> Result<String, String> {
     let emotional_recall_weight = config.search.emotional_bias_weight * 0.15;
 
     crate::recall_ctx::with_shared(config, |ctx| {
-    let reader = &ctx.reader;
-    let output_dir = Path::new(&config.paths.output_dir);
+        let reader = &ctx.reader;
+        let output_dir = Path::new(&config.paths.output_dir);
 
-    // Load emotional state ring for priming + attention intensity
-    let emotional_ring = crate::EmotionalStateRing::load_or_init(output_dir);
-    let emotional_intensity = emotional_ring.intensity();
+        // Load emotional state ring for priming + attention intensity
+        let emotional_ring = crate::EmotionalStateRing::load_or_init(output_dir);
+        let emotional_intensity = emotional_ring.intensity();
 
-    // If no explicit emotion, try priming from the emotional state ring
-    let query_emotion = query_emotion.or_else(|| {
-        if emotional_ring.is_active() {
-            if let Some((name, val)) = emotional_ring.dominant() {
-                eprintln!("  [] emotional prime: {} ({:.2})", name, val);
+        // If no explicit emotion, try priming from the emotional state ring
+        let query_emotion = query_emotion.or_else(|| {
+            if emotional_ring.is_active() {
+                if let Some((name, val)) = emotional_ring.dominant() {
+                    eprintln!("  [] emotional prime: {} ({:.2})", name, val);
+                }
+                Some(emotional_ring.current)
+            } else {
+                None
             }
-            Some(emotional_ring.current)
-        } else {
-            None
-        }
-    });
+        });
 
-    let (qx, qy, qz) =
-        crate::content_coords_blended(query, "long_term", config.search.semantic_weight);
-    let relevance_query = crate::relevance::RelevanceQuery::new(query);
+        let (qx, qy, qz) =
+            crate::content_coords_blended(query, "long_term", config.search.semantic_weight);
+        let relevance_query = crate::relevance::RelevanceQuery::new(query);
 
-    let (mut attention, hebb_pre, tg_pre, pc_pre) =
-        if let Some(stream) = crate::consciousness_stream::global_stream() {
+        let (mut attention, hebb_pre, tg_pre, pc_pre) = if let Some(stream) =
+            crate::consciousness_stream::global_stream()
+        {
             let s = crate::sync_guard::mutex_lock(stream);
             (
                 s.attention.clone(),
@@ -1126,416 +1127,420 @@ fn tool_recall(config: &Config, args: &Value) -> Result<String, String> {
         };
 
         let emotional_energy = crate::emotional::emotional_field(reader, &hebb_pre)
-        .map(|f| f.total_energy)
-        .unwrap_or(0.0);
+            .map(|f| f.total_energy)
+            .unwrap_or(0.0);
 
-    if attention.total_recalls > 0 {
-        let quality = attention.infer_quality();
-        if let Some(last) = attention.history.last() {
-            let prev_weights = last.weights;
-            attention.record_outcome(quality, &prev_weights);
+        if attention.total_recalls > 0 {
+            let quality = attention.infer_quality();
+            if let Some(last) = attention.history.last() {
+                let prev_weights = last.weights;
+                attention.record_outcome(quality, &prev_weights);
+            }
         }
-    }
 
-    let attn_signals = crate::attention::AttentionSignals {
-        query_length: query.len(),
-        emotional_energy,
-        emotional_intensity,
-        session_depth: tg_pre.current_path().len(),
-        pattern_confidence: 0.0,
-        cache_hit_rate: pc_pre.stats.hit_rate(),
-        archetype_match_score: 0.0,
-    };
-    let attn = attention.compute_attention(&attn_signals);
+        let attn_signals = crate::attention::AttentionSignals {
+            query_length: query.len(),
+            emotional_energy,
+            emotional_intensity,
+            session_depth: tg_pre.current_path().len(),
+            pattern_confidence: 0.0,
+            cache_hit_rate: pc_pre.stats.hit_rate(),
+            archetype_match_score: 0.0,
+        };
+        let attn = attention.compute_attention(&attn_signals);
 
-    let emotional_weight = config.search.emotional_bias_weight * attn.weight(4);
-    let (qx, qy, qz) =
+        let emotional_weight = config.search.emotional_bias_weight * attn.weight(4);
+        let (qx, qy, qz) =
             crate::emotional::apply_emotional_bias(qx, qy, qz, emotional_weight, reader, &hebb_pre);
 
-    // Scan every populated depth, not a window guessed from query length.
-    // auto_depth puts 15..39 character statements at D5, so a short question
-    // previously never scanned the depth holding its own fact.
-    let (zoom_lo, zoom_hi) = {
-        let mut hi = 0u8;
-        for (d, &(_, count)) in reader.depth_ranges.iter().enumerate() {
-            if count > 0 {
-                hi = d as u8;
-            }
-        }
-        (0u8, hi)
-    };
-
-    // Embed the query and take the nearest stored vectors, so a paraphrase with
-    // no shared token can still become a candidate. See the equivalent path in
-    // main::recall; previously this gate was `lexical > 0.0` alone, which made
-    // the embedding index unreachable from the agent-facing tool.
-    let mut semantic_hits: std::collections::HashMap<usize, f32> = std::collections::HashMap::new();
-    // Vectors of memories still in the append log, keyed by append position;
-    // see the equivalent block in main::recall.
-    let mut appended_sem: std::collections::HashMap<usize, f32> = std::collections::HashMap::new();
-    {
-        use crate::embedding_index::EmbeddingIndex;
-
-        let emb_path = output_dir.join("embeddings.bin");
-        if let Some(eidx) = EmbeddingIndex::open(&emb_path) {
-            // Cached: a long-lived server used to rebuild the provider -- and
-            // re-fault the model weights -- on every single query.
-            let embedded =
-                crate::embeddings::with_cached_provider(&config.embedding, eidx.dim(), |p| {
-                    p.embed(query)
-                });
-            match embedded {
-                Ok(qe) if qe.len() == eidx.dim() => {
-                    for (sim, block_idx) in eidx.search(&qe, (k * 8).max(64)) {
-                        if block_idx < reader.block_count {
-                            semantic_hits.insert(block_idx, sim);
-                        }
-                    }
-                    if let Some(side) = crate::embedding_index::AppendEmbeddings::open(
-                        &output_dir.join(crate::embedding_index::APPEND_EMBEDDINGS_FILE),
-                        eidx.dim(),
-                    ) {
-                        for (sim, ai) in side.search(&qe, (k * 8).max(64)) {
-                            appended_sem.insert(ai as usize, sim);
-                        }
-                    }
-                }
-                Ok(_) => eprintln!("  semantic: provider width differs from index; skipped"),
-                Err(e) => eprintln!("  semantic: embedding failed ({}); lexical path only", e),
-            }
-        }
-    }
-
-    // Load emotions.bin lookup for main-index emotional recall
-    let emotion_lookup = query_emotion
-        .as_ref()
-        .and_then(|_| crate::load_emotion_lookup(output_dir));
-
-    let mut all_results: Vec<(f32, usize, bool)> = Vec::new();
-
-    for zoom in zoom_lo..=zoom_hi {
-        let (start, count) = reader.depth_ranges[zoom as usize];
-        let (start, count) = (start as usize, count as usize);
-        for i in start..(start + count) {
-            let text = reader.text(i);
-            let lexical = relevance_query.lexical_score(text);
-            // Lexical OR semantic: the embedding candidates are useless if the
-            // gate ignores them.
-            let semantic = semantic_hits.get(&i).copied();
-            if lexical > 0.0 || semantic.is_some() {
-                let h = reader.header(i);
-                let dx = h.x - qx;
-                let dy = h.y - qy;
-                let dz = h.z - qz;
-                let spatial_dist = dx * dx + dy * dy + dz * dz;
-                // Emotional similarity boost (if query emotion AND emotions.bin data available)
-                let emo_boost = query_emotion
-                    .as_ref()
-                    .and_then(|qe| {
-                        emotion_lookup
-                            .as_ref()
-                            .and_then(|lookup| lookup(i))
-                            .map(|block_emo| {
-                                crate::emotional_similarity(qe, &block_emo)
-                                    * emotional_recall_weight
-                            })
-                    })
-                    .unwrap_or(0.0);
-                let base = crate::relevance::rank_distance_from_score(
-                    lexical,
-                    spatial_dist,
-                    config.search.keyword_boost,
-                    h.importance,
-                );
-                let mut combined = crate::relevance::apply_boost(base, emo_boost);
-                if let Some(sim) = semantic {
-                    let w = config.search.semantic_weight.clamp(0.0, 1.0);
-                    combined -= sim * w;
-                }
-                all_results.push((combined, i, true));
-            }
-        }
-    }
-
-    let append_path = Path::new(&config.paths.output_dir).join("append.bin");
-    let appended = read_append_log(&append_path);
-    for (ai, entry) in appended.iter().enumerate() {
-        let dx = entry.x - qx;
-        let dy = entry.y - qy;
-        let dz = entry.z - qz;
-        let dist = dx * dx + dy * dy + dz * dz;
-        let lexical = relevance_query.lexical_score(&entry.text);
-        // Emotional boost from inline append entry emotion
-        let emo_boost = query_emotion
-            .as_ref()
-            .map(|qe| crate::emotional_similarity(qe, &entry.emotion) * emotional_recall_weight)
-            .unwrap_or(0.0);
-        if dist < 0.1 || lexical > 0.0 || emo_boost > 0.0 || appended_sem.contains_key(&ai) {
-            let mut base = crate::relevance::rank_distance_from_score(
-                lexical,
-                dist,
-                config.search.keyword_boost,
-                entry.importance,
-            );
-            if let Some(sim) = appended_sem.get(&ai) {
-                let w = config.search.semantic_weight.clamp(0.0, 1.0);
-                base -= *sim * w;
-            }
-            let combined = crate::relevance::apply_boost(base, emo_boost);
-            all_results.push((combined, ai + 1_000_000, false));
-        }
-    }
-
-    // Spreading activation: fingerprint-linked blocks get boosted across 2-hop
-    let link_table = crate::fingerprint::LinkTable::load_cached(output_dir);
-    if let Some(ref lt) = link_table {
-        all_results.sort_by(|a, b| a.0.total_cmp(&b.0));
-        let top_n = all_results.len().min(3);
-        for i in 0..top_n {
-            let (_, idx, is_main) = all_results[i];
-            let text = if is_main {
-                reader.text(idx).to_string()
-            } else {
-                appended
-                    .get(idx - 1_000_000)
-                    .map(|e| e.text.clone())
-                    .unwrap_or_default()
-            };
-            let similar = lt.find_similar(&text, 5);
-            for (linked_idx, sim) in &similar {
-                let linked_idx = *linked_idx as usize;
-                let found = all_results
-                    .iter()
-                    .any(|(_, ri, rim)| *rim && *ri == linked_idx);
-                if !found {
-                    let boost = *sim * 0.12;
-                    all_results.push((boost, linked_idx, true));
-                } else {
-                    for (dist, ri, rim) in &mut all_results {
-                        if *rim && *ri == linked_idx {
-                            *dist = crate::relevance::apply_boost(*dist, *sim * 0.08);
-                            break;
-                        }
-                    }
+        // Scan every populated depth, not a window guessed from query length.
+        // auto_depth puts 15..39 character statements at D5, so a short question
+        // previously never scanned the depth holding its own fact.
+        let (zoom_lo, zoom_hi) = {
+            let mut hi = 0u8;
+            for (d, &(_, count)) in reader.depth_ranges.iter().enumerate() {
+                if count > 0 {
+                    hi = d as u8;
                 }
             }
-        }
-    }
-
-    all_results.sort_by(|a, b| a.0.total_cmp(&b.0));
-    let novel = all_results.first().is_none_or(|(d, _, _)| *d > 0.3);
-
-    let qh_tg = crate::hebbian::query_hash(query);
-    if let Some(stream) = crate::consciousness_stream::global_stream() {
-        crate::consciousness_stream::ConsciousnessStream::feed_query(stream, qh_tg);
-    }
-
-    let (mut thought_graph, mut pred_cache) =
-        if let Some(stream) = crate::consciousness_stream::global_stream() {
-            let s = crate::sync_guard::mutex_lock(stream);
-            (s.thought_graph.clone(), s.predictive_cache.clone())
-        } else {
-            let tg = crate::thought_graph::ThoughtGraphState::load_or_init(output_dir);
-            let pc = crate::predictive_cache::PredictiveCache::load_or_init(output_dir);
-            (tg, pc)
+            (0u8, hi)
         };
 
-    if let Some((cached_blocks, confidence)) = pred_cache.check(qh_tg) {
-        let boost = confidence * crate::thought_graph::PATTERN_BOOST_WEIGHT * attn.weight(6);
-        let cached_set: HashSet<u32> = cached_blocks.iter().copied().collect();
-        for (dist, idx, is_main) in &mut all_results {
-            if *is_main && cached_set.contains(&(*idx as u32)) {
-                *dist = crate::relevance::apply_boost(*dist, boost);
-            }
-        }
-    }
+        // Embed the query and take the nearest stored vectors, so a paraphrase with
+        // no shared token can still become a candidate. See the equivalent path in
+        // main::recall; previously this gate was `lexical > 0.0` alone, which made
+        // the embedding index unreachable from the agent-facing tool.
+        let mut semantic_hits: std::collections::HashMap<usize, f32> =
+            std::collections::HashMap::new();
+        // Vectors of memories still in the append log, keyed by append position;
+        // see the equivalent block in main::recall.
+        let mut appended_sem: std::collections::HashMap<usize, f32> =
+            std::collections::HashMap::new();
+        {
+            use crate::embedding_index::EmbeddingIndex;
 
-    let pattern_boosts: HashMap<u32, f32> =
-        thought_graph.pattern_boost(qh_tg).into_iter().collect();
-    if !pattern_boosts.is_empty() {
-        let tg_scale = attn.weight(5);
-        for (dist, idx, is_main) in &mut all_results {
-            if *is_main {
-                if let Some(&boost) = pattern_boosts.get(&(*idx as u32)) {
-                    *dist = crate::relevance::apply_boost(*dist, boost * tg_scale);
+            let emb_path = output_dir.join("embeddings.bin");
+            if let Some(eidx) = EmbeddingIndex::open(&emb_path) {
+                // Cached: a long-lived server used to rebuild the provider -- and
+                // re-fault the model weights -- on every single query.
+                let embedded =
+                    crate::embeddings::with_cached_provider(&config.embedding, eidx.dim(), |p| {
+                        p.embed(query)
+                    });
+                match embedded {
+                    Ok(qe) if qe.len() == eidx.dim() => {
+                        for (sim, block_idx) in eidx.search(&qe, (k * 8).max(64)) {
+                            if block_idx < reader.block_count {
+                                semantic_hits.insert(block_idx, sim);
+                            }
+                        }
+                        if let Some(side) = crate::embedding_index::AppendEmbeddings::open(
+                            &output_dir.join(crate::embedding_index::APPEND_EMBEDDINGS_FILE),
+                            eidx.dim(),
+                        ) {
+                            for (sim, ai) in side.search(&qe, (k * 8).max(64)) {
+                                appended_sem.insert(ai as usize, sim);
+                            }
+                        }
+                    }
+                    Ok(_) => eprintln!("  semantic: provider width differs from index; skipped"),
+                    Err(e) => eprintln!("  semantic: embedding failed ({}); lexical path only", e),
                 }
             }
         }
-    }
 
-    all_results.sort_by(|a, b| a.0.total_cmp(&b.0));
+        // Load emotions.bin lookup for main-index emotional recall
+        let emotion_lookup = query_emotion
+            .as_ref()
+            .and_then(|_| crate::load_emotion_lookup(output_dir));
 
-    let mut output = format!("Recall '{}' (zoom D{}..D{})", query, zoom_lo, zoom_hi);
-    // Load evidence ledger for confidence/class display.
-    let evidence_ledger =
-        crate::epistemic::EvidenceLedger::load_or_init(Path::new(&config.paths.output_dir));
-    if novel {
-        output.push_str(" [NOVEL TOPIC — low prior memory]");
-    }
-    output.push_str(":\n\n");
-    let mut seen = HashSet::new();
-    let mut shown = 0;
+        let mut all_results: Vec<(f32, usize, bool)> = Vec::new();
 
-    for (dist, idx, is_main) in &all_results {
-        if shown >= k {
-            break;
-        }
-        if !seen.insert((*idx, *is_main)) {
-            continue;
-        }
-        if *is_main {
-            let h = reader.header(*idx);
-            let text = reader.text(*idx);
-            let layer = LAYER_NAMES.get(h.layer_id as usize).unwrap_or(&"?");
-            let class = crate::epistemic::class_of_flags(h.flags);
-            let ch = crate::epistemic::content_hash(text.trim());
-            let conf = evidence_ledger
-                .records
-                .get(&ch)
-                .map(|r| r.confidence)
-                .unwrap_or(0);
-            output.push_str(&format!(
-                "[D{} {} dist={:.3} {} c={}] {}\n",
-                h.depth,
-                layer,
-                dist,
-                class,
-                conf,
-                crate::safe_truncate(text, 150)
-            ));
-        } else {
-            let ai = idx - 1_000_000;
-            if let Some(entry) = appended.get(ai) {
-                let layer = LAYER_NAMES.get(entry.layer_id as usize).unwrap_or(&"?");
-                output.push_str(&format!(
-                    "[APPEND {} dist={:.3}] {}\n",
-                    layer,
-                    dist,
-                    crate::safe_truncate(&entry.text, 150)
-                ));
+        for zoom in zoom_lo..=zoom_hi {
+            let (start, count) = reader.depth_ranges[zoom as usize];
+            let (start, count) = (start as usize, count as usize);
+            for i in start..(start + count) {
+                let text = reader.text(i);
+                let lexical = relevance_query.lexical_score(text);
+                // Lexical OR semantic: the embedding candidates are useless if the
+                // gate ignores them.
+                let semantic = semantic_hits.get(&i).copied();
+                if lexical > 0.0 || semantic.is_some() {
+                    let h = reader.header(i);
+                    let dx = h.x - qx;
+                    let dy = h.y - qy;
+                    let dz = h.z - qz;
+                    let spatial_dist = dx * dx + dy * dy + dz * dz;
+                    // Emotional similarity boost (if query emotion AND emotions.bin data available)
+                    let emo_boost = query_emotion
+                        .as_ref()
+                        .and_then(|qe| {
+                            emotion_lookup
+                                .as_ref()
+                                .and_then(|lookup| lookup(i))
+                                .map(|block_emo| {
+                                    crate::emotional_similarity(qe, &block_emo)
+                                        * emotional_recall_weight
+                                })
+                        })
+                        .unwrap_or(0.0);
+                    let base = crate::relevance::rank_distance_from_score(
+                        lexical,
+                        spatial_dist,
+                        config.search.keyword_boost,
+                        h.importance,
+                    );
+                    let mut combined = crate::relevance::apply_boost(base, emo_boost);
+                    if let Some(sim) = semantic {
+                        let w = config.search.semantic_weight.clamp(0.0, 1.0);
+                        combined -= sim * w;
+                    }
+                    all_results.push((combined, i, true));
+                }
             }
         }
-        shown += 1;
-    }
 
-    let activated: Vec<(u32, f32)> = all_results
-        .iter()
-        .filter(|(_, _, is_main)| *is_main)
-        .take(k)
-        .map(|(score, idx, _)| (*idx as u32, *score))
-        .collect();
+        let append_path = Path::new(&config.paths.output_dir).join("append.bin");
+        let appended = read_append_log(&append_path);
+        for (ai, entry) in appended.iter().enumerate() {
+            let dx = entry.x - qx;
+            let dy = entry.y - qy;
+            let dz = entry.z - qz;
+            let dist = dx * dx + dy * dy + dz * dz;
+            let lexical = relevance_query.lexical_score(&entry.text);
+            // Emotional boost from inline append entry emotion
+            let emo_boost = query_emotion
+                .as_ref()
+                .map(|qe| crate::emotional_similarity(qe, &entry.emotion) * emotional_recall_weight)
+                .unwrap_or(0.0);
+            if dist < 0.1 || lexical > 0.0 || emo_boost > 0.0 || appended_sem.contains_key(&ai) {
+                let mut base = crate::relevance::rank_distance_from_score(
+                    lexical,
+                    dist,
+                    config.search.keyword_boost,
+                    entry.importance,
+                );
+                if let Some(sim) = appended_sem.get(&ai) {
+                    let w = config.search.semantic_weight.clamp(0.0, 1.0);
+                    base -= *sim * w;
+                }
+                let combined = crate::relevance::apply_boost(base, emo_boost);
+                all_results.push((combined, ai + 1_000_000, false));
+            }
+        }
 
-    if !activated.is_empty() {
-        let mut hebb = crate::hebbian::HebbianState::load_or_init(output_dir, reader.block_count);
-        let mut mirror = crate::mirror::MirrorState::load_or_init(output_dir);
-        let qh = crate::hebbian::query_hash(query);
+        // Spreading activation: fingerprint-linked blocks get boosted across 2-hop
+        let link_table = crate::fingerprint::LinkTable::load_cached(output_dir);
+        if let Some(ref lt) = link_table {
+            all_results.sort_by(|a, b| a.0.total_cmp(&b.0));
+            let top_n = all_results.len().min(3);
+            for i in 0..top_n {
+                let (_, idx, is_main) = all_results[i];
+                let text = if is_main {
+                    reader.text(idx).to_string()
+                } else {
+                    appended
+                        .get(idx - 1_000_000)
+                        .map(|e| e.text.clone())
+                        .unwrap_or_default()
+                };
+                let similar = lt.find_similar(&text, 5);
+                for (linked_idx, sim) in &similar {
+                    let linked_idx = *linked_idx as usize;
+                    let found = all_results
+                        .iter()
+                        .any(|(_, ri, rim)| *rim && *ri == linked_idx);
+                    if !found {
+                        let boost = *sim * 0.12;
+                        all_results.push((boost, linked_idx, true));
+                    } else {
+                        for (dist, ri, rim) in &mut all_results {
+                            if *rim && *ri == linked_idx {
+                                *dist = crate::relevance::apply_boost(*dist, *sim * 0.08);
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
 
-        let _ = crate::mirror::mirror_boost(&hebb, &mut mirror, &activated, qh);
-        hebb.record_activation(&activated, qh);
+        all_results.sort_by(|a, b| a.0.total_cmp(&b.0));
+        let novel = all_results.first().is_none_or(|(d, _, _)| *d > 0.3);
 
-        let mut resonance = crate::resonance::ResonanceState::load_or_init(output_dir);
-        let headers: Vec<(f32, f32, f32)> = activated
-            .iter()
-            .map(|&(idx, _)| {
-                let h = reader.header(idx as usize);
-                (h.x, h.y, h.z)
-            })
-            .collect();
-        resonance.emit_pulse(&activated, qh, &headers, 1);
+        let qh_tg = crate::hebbian::query_hash(query);
+        if let Some(stream) = crate::consciousness_stream::global_stream() {
+            crate::consciousness_stream::ConsciousnessStream::feed_query(stream, qh_tg);
+        }
 
-        let mut archetypes = crate::archetype::ArchetypeState::load_or_init(output_dir);
-        let mut temporal =
-            crate::temporal_archetype::TemporalArchetypeState::load_or_init(output_dir);
-        let _ = archetypes.match_archetype(&activated);
-        temporal.decay();
-        archetypes.reinforce(&activated);
+        let (mut thought_graph, mut pred_cache) =
+            if let Some(stream) = crate::consciousness_stream::global_stream() {
+                let s = crate::sync_guard::mutex_lock(stream);
+                (s.thought_graph.clone(), s.predictive_cache.clone())
+            } else {
+                let tg = crate::thought_graph::ThoughtGraphState::load_or_init(output_dir);
+                let pc = crate::predictive_cache::PredictiveCache::load_or_init(output_dir);
+                (tg, pc)
+            };
 
-        let dominant_layer = activated
-            .first()
-            .map(|&(idx, _)| reader.header(idx as usize).layer_id)
-            .unwrap_or(0);
-        thought_graph.record_recall(qh, &activated, dominant_layer);
-        let result_block_ids: Vec<u32> = activated.iter().map(|&(idx, _)| idx).collect();
-        thought_graph.update_pattern_blocks(qh, &result_block_ids);
-        thought_graph.detect_patterns();
+        if let Some((cached_blocks, confidence)) = pred_cache.check(qh_tg) {
+            let boost = confidence * crate::thought_graph::PATTERN_BOOST_WEIGHT * attn.weight(6);
+            let cached_set: HashSet<u32> = cached_blocks.iter().copied().collect();
+            for (dist, idx, is_main) in &mut all_results {
+                if *is_main && cached_set.contains(&(*idx as u32)) {
+                    *dist = crate::relevance::apply_boost(*dist, boost);
+                }
+            }
+        }
 
-        let _ = pred_cache.evaluate(qh, &result_block_ids, &mut thought_graph);
-        pred_cache.predict_next(&thought_graph);
+        let pattern_boosts: HashMap<u32, f32> =
+            thought_graph.pattern_boost(qh_tg).into_iter().collect();
+        if !pattern_boosts.is_empty() {
+            let tg_scale = attn.weight(5);
+            for (dist, idx, is_main) in &mut all_results {
+                if *is_main {
+                    if let Some(&boost) = pattern_boosts.get(&(*idx as u32)) {
+                        *dist = crate::relevance::apply_boost(*dist, boost * tg_scale);
+                    }
+                }
+            }
+        }
 
-        attention.mark_recall();
+        all_results.sort_by(|a, b| a.0.total_cmp(&b.0));
 
-        // Associative: link top-3 results that share keywords.
-        //
-        // The links are built first, then embedded together. Nine sequential
-        // MiniLM inferences measured 585 ms of a ~1,030 ms call, and each one
-        // is independent, so they go through rayon on the cached provider: the
-        // same nine texts, the same nine vectors, in the same order -- only
-        // computed at once instead of one after another. The writes themselves
-        // stay sequential because each one takes the file lock.
-        let mut links: Vec<String> = Vec::new();
-        for (i, &(_, idx_a, is_a)) in all_results.iter().take(3).enumerate() {
-            for &(_, idx_b, is_b) in all_results.iter().take(5).skip(i + 1) {
-                let text_a = if is_a { reader.text(idx_a) } else { "" };
-                let text_b = if is_b { reader.text(idx_b) } else { "" };
-                if !text_a.is_empty() && !text_b.is_empty() {
-                    links.push(format!(
-                        "LINK: [{:.40}] <-> [{:.40}] via '{}'",
-                        text_a, text_b, query
+        let mut output = format!("Recall '{}' (zoom D{}..D{})", query, zoom_lo, zoom_hi);
+        // Load evidence ledger for confidence/class display.
+        let evidence_ledger =
+            crate::epistemic::EvidenceLedger::load_or_init(Path::new(&config.paths.output_dir));
+        if novel {
+            output.push_str(" [NOVEL TOPIC — low prior memory]");
+        }
+        output.push_str(":\n\n");
+        let mut seen = HashSet::new();
+        let mut shown = 0;
+
+        for (dist, idx, is_main) in &all_results {
+            if shown >= k {
+                break;
+            }
+            if !seen.insert((*idx, *is_main)) {
+                continue;
+            }
+            if *is_main {
+                let h = reader.header(*idx);
+                let text = reader.text(*idx);
+                let layer = LAYER_NAMES.get(h.layer_id as usize).unwrap_or(&"?");
+                let class = crate::epistemic::class_of_flags(h.flags);
+                let ch = crate::epistemic::content_hash(text.trim());
+                let conf = evidence_ledger
+                    .records
+                    .get(&ch)
+                    .map(|r| r.confidence)
+                    .unwrap_or(0);
+                output.push_str(&format!(
+                    "[D{} {} dist={:.3} {} c={}] {}\n",
+                    h.depth,
+                    layer,
+                    dist,
+                    class,
+                    conf,
+                    crate::safe_truncate(text, 150)
+                ));
+            } else {
+                let ai = idx - 1_000_000;
+                if let Some(entry) = appended.get(ai) {
+                    let layer = LAYER_NAMES.get(entry.layer_id as usize).unwrap_or(&"?");
+                    output.push_str(&format!(
+                        "[APPEND {} dist={:.3}] {}\n",
+                        layer,
+                        dist,
+                        crate::safe_truncate(&entry.text, 150)
                     ));
                 }
             }
+            shown += 1;
         }
-        // Read-only: skip the linking writes entirely. The links are the
-        // learning here, so this both keeps a measurement from writing and
-        // reports the p50 of a server that no longer learns -- a floor, not
-        // the number a real server sees.
-        if !links.is_empty() && !crate::no_learn::enabled() {
-            let dim = config.embedding.dim;
-            // `with_cached_provider` is generic in the closure's return type, so
-            // this is the vector of results itself -- no Result to unwrap.
-            let vectors: Vec<Result<Vec<f32>, crate::embeddings::EmbeddingError>> =
-                crate::embeddings::with_cached_provider(&config.embedding, dim, |p| {
-                    use crate::parallel::*;
-                    links
-                        .par_iter()
-                        .map(|t| p.embed(t))
-                        .collect::<Vec<Result<Vec<f32>, _>>>()
-                });
-            for (n, link) in links.iter().enumerate() {
-                // A failed inference yields no vector, and the store then embeds
-                // inline -- slower, but a link is never dropped for want of one.
-                let precomputed = vectors
-                    .get(n)
-                    .and_then(|v| v.as_ref().ok())
-                    .filter(|v| v.len() == dim)
-                    .cloned();
-                let _ = store_memory_with_embedding(config, link, "associative", 6, precomputed);
+
+        let activated: Vec<(u32, f32)> = all_results
+            .iter()
+            .filter(|(_, _, is_main)| *is_main)
+            .take(k)
+            .map(|(score, idx, _)| (*idx as u32, *score))
+            .collect();
+
+        if !activated.is_empty() {
+            let mut hebb =
+                crate::hebbian::HebbianState::load_or_init(output_dir, reader.block_count);
+            let mut mirror = crate::mirror::MirrorState::load_or_init(output_dir);
+            let qh = crate::hebbian::query_hash(query);
+
+            let _ = crate::mirror::mirror_boost(&hebb, &mut mirror, &activated, qh);
+            hebb.record_activation(&activated, qh);
+
+            let mut resonance = crate::resonance::ResonanceState::load_or_init(output_dir);
+            let headers: Vec<(f32, f32, f32)> = activated
+                .iter()
+                .map(|&(idx, _)| {
+                    let h = reader.header(idx as usize);
+                    (h.x, h.y, h.z)
+                })
+                .collect();
+            resonance.emit_pulse(&activated, qh, &headers, 1);
+
+            let mut archetypes = crate::archetype::ArchetypeState::load_or_init(output_dir);
+            let mut temporal =
+                crate::temporal_archetype::TemporalArchetypeState::load_or_init(output_dir);
+            let _ = archetypes.match_archetype(&activated);
+            temporal.decay();
+            archetypes.reinforce(&activated);
+
+            let dominant_layer = activated
+                .first()
+                .map(|&(idx, _)| reader.header(idx as usize).layer_id)
+                .unwrap_or(0);
+            thought_graph.record_recall(qh, &activated, dominant_layer);
+            let result_block_ids: Vec<u32> = activated.iter().map(|&(idx, _)| idx).collect();
+            thought_graph.update_pattern_blocks(qh, &result_block_ids);
+            thought_graph.detect_patterns();
+
+            let _ = pred_cache.evaluate(qh, &result_block_ids, &mut thought_graph);
+            pred_cache.predict_next(&thought_graph);
+
+            attention.mark_recall();
+
+            // Associative: link top-3 results that share keywords.
+            //
+            // The links are built first, then embedded together. Nine sequential
+            // MiniLM inferences measured 585 ms of a ~1,030 ms call, and each one
+            // is independent, so they go through rayon on the cached provider: the
+            // same nine texts, the same nine vectors, in the same order -- only
+            // computed at once instead of one after another. The writes themselves
+            // stay sequential because each one takes the file lock.
+            let mut links: Vec<String> = Vec::new();
+            for (i, &(_, idx_a, is_a)) in all_results.iter().take(3).enumerate() {
+                for &(_, idx_b, is_b) in all_results.iter().take(5).skip(i + 1) {
+                    let text_a = if is_a { reader.text(idx_a) } else { "" };
+                    let text_b = if is_b { reader.text(idx_b) } else { "" };
+                    if !text_a.is_empty() && !text_b.is_empty() {
+                        links.push(format!(
+                            "LINK: [{:.40}] <-> [{:.40}] via '{}'",
+                            text_a, text_b, query
+                        ));
+                    }
+                }
+            }
+            // Read-only: skip the linking writes entirely. The links are the
+            // learning here, so this both keeps a measurement from writing and
+            // reports the p50 of a server that no longer learns -- a floor, not
+            // the number a real server sees.
+            if !links.is_empty() && !crate::no_learn::enabled() {
+                let dim = config.embedding.dim;
+                // `with_cached_provider` is generic in the closure's return type, so
+                // this is the vector of results itself -- no Result to unwrap.
+                let vectors: Vec<Result<Vec<f32>, crate::embeddings::EmbeddingError>> =
+                    crate::embeddings::with_cached_provider(&config.embedding, dim, |p| {
+                        use crate::parallel::*;
+                        links
+                            .par_iter()
+                            .map(|t| p.embed(t))
+                            .collect::<Vec<Result<Vec<f32>, _>>>()
+                    });
+                for (n, link) in links.iter().enumerate() {
+                    // A failed inference yields no vector, and the store then embeds
+                    // inline -- slower, but a link is never dropped for want of one.
+                    let precomputed = vectors
+                        .get(n)
+                        .and_then(|v| v.as_ref().ok())
+                        .filter(|v| v.len() == dim)
+                        .cloned();
+                    let _ =
+                        store_memory_with_embedding(config, link, "associative", 6, precomputed);
+                }
+            }
+
+            let _ = hebb.save(output_dir);
+            let _ = mirror.save(output_dir);
+            let _ = resonance.save(output_dir);
+            let _ = archetypes.save(output_dir);
+            let _ = temporal.save(output_dir);
+            let _ = thought_graph.save(output_dir);
+            let _ = pred_cache.save(output_dir);
+            let _ = attention.save(output_dir);
+
+            if let Some(stream) = crate::consciousness_stream::global_stream() {
+                let mut s = crate::sync_guard::mutex_lock(stream);
+                s.hebbian = hebb;
+                s.mirror = mirror;
+                s.resonance = resonance;
+                s.archetypes = archetypes;
+                s.thought_graph = thought_graph;
+                s.predictive_cache = pred_cache;
+                s.attention = attention;
             }
         }
 
-        let _ = hebb.save(output_dir);
-        let _ = mirror.save(output_dir);
-        let _ = resonance.save(output_dir);
-        let _ = archetypes.save(output_dir);
-        let _ = temporal.save(output_dir);
-        let _ = thought_graph.save(output_dir);
-        let _ = pred_cache.save(output_dir);
-        let _ = attention.save(output_dir);
-
-        if let Some(stream) = crate::consciousness_stream::global_stream() {
-            let mut s = crate::sync_guard::mutex_lock(stream);
-            s.hebbian = hebb;
-            s.mirror = mirror;
-            s.resonance = resonance;
-            s.archetypes = archetypes;
-            s.thought_graph = thought_graph;
-            s.predictive_cache = pred_cache;
-            s.attention = attention;
-        }
-    }
-
-    output.push_str(&format!("\n{} results", shown));
-    Ok(output)
+        output.push_str(&format!("\n{} results", shown));
+        Ok(output)
     })?
 }
 

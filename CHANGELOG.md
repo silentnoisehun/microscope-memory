@@ -7,6 +7,85 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **CI never ran the tearing regression.** `build-and-test` invokes `cargo test --lib`
+  and two named integration targets, so `tests/spine_torn_read.rs` compiled
+  (`Build all targets`) and was never executed. It has its own step now. Same
+  shape as the `Mojibake` gate sitting behind `Formatting` and never getting a
+  turn: a check nobody runs is decoration.
+- **Two files were committed mojibaked and nobody noticed, because the gate that
+  catches it could never run.** `examples/bench_recall.rs` (497 marker hits) and
+  `tests/append_cache_liveness.rs` (32) carry UTF-8 read through CP1250 and
+  re-saved, so `//! FuttatĂ„â€šĂ‹â€ˇs` instead of `//! Futtatás`. The <!-- mojibake-ok: a serult alakot szandekosan mutatjuk -->
+  `standards` job runs `Mojibake` *after* `Formatting`, and formatting had been
+  red on this tree long enough that the mojibake check never got a turn — the
+  first commit to fix `cargo fmt` is also the first commit that fails on the
+  real state of the text. Neither file has a clean revision in history: they were
+  born damaged. Repaired by re-encoding through the CP1250 decode map, iterated
+  per file until the marker set empties, and accepted only on the condition that
+  the ASCII skeleton of the file is byte-identical before and after — so the
+  change cannot touch code, string escapes or delimiters, only the accented
+  text. `python3 scripts/check_mojibake.py --worktree` reports 360 files clean.
+
+### Added
+- `examples/bench_spine.rs` gained a **contended** section (n publishers × m readers over one `spine.bin`): throughput per configuration plus a tearing count judged from inside the page, with unpopulated pages counted separately. Measured: 2.6 M snapshots per sweep, three sweeps, zero torn reads. The single-threaded sections are now labelled as such, and the bench warns when `data/` is missing instead of silently benchmarking empty directories.
+
+### Fixed
+- **`HebbianHeader::decay_event_count` is no longer corrupted** (`src/consciousness_stream.rs`). `publish_spine` did `+= s.cycle` on every cycle, so the field grew as a sum of cycle values while nothing counted decay events — `HebbianState::apply_drift` decays energies without keeping a tally. The write is gone; the field and `ArchetypeHeader::decay_events` now say in their docs that they have no producer and no consumer, which is the honest state of a fixed-size page layout that cannot be shrunk without a version bump.
+- **`UNSAFE.md` covers the spine publish window.** The new `unsafe`
+  surface — `AtomicU64::from_ptr` over the mapping, the raw `flock(2)`
+  declaration, and the `map_mut` of a resized file — is inventoried with what
+  a reviewer has to check, and `seq_atomic` now asserts its length bound in
+  release too, so a future caller that forgets its guard panics rather than
+  reading outside the mapping. `UNSAFE.md`'s counts were re-derived and the
+  drift against the previous pass is stated instead of hidden.
+- **The tearing regression proves what it claims** (`tests/spine_torn_read.rs`). Its header said every test runs an unbracketed
+  control read; `torn_read_two_writers` did not have one, and the other two
+  stopped their publisher after a fixed number of writes, so a writer that
+  finished before the readers turned the test green and empty. Publishers now
+  run until the readers are done, the two-publisher test asserts publish
+  progress (its half-page control measured 0/120 000 once a second reader
+  shared the handle, so it was not assertable), and the header states what
+  each of the four counters measures — `open_window` is a property of the
+  read path, not of the writer.
+- **Spine publish is now one coherent snapshot, and it is a seqlock**
+  (`src/spine.rs`). The previous commit's message claimed "1 StreamPage write
+  + 1 epoch publish" with "Release/Acquire" ordering; what the code did was
+  take the mapping mutex twice — once for the stream page, once for a
+  millisecond timestamp in the superblock that nothing read back — and call
+  the second `drop()` a release barrier. Two handles or two processes each own
+  a `Mutex<MmapMut>`, so the two locks exclude nothing and there is no
+  happens-before between a writer in one process and a reader in another: a
+  reader could pair a new stream header with an older record, and two ticks
+  inside the same millisecond were indistinguishable.
+  - `tick()` now takes `flock(LOCK_EX)` on a new `spine.publish` sidecar (the
+    piece that serialises publishers across processes), then the mapping lock
+    once, and brackets the stream page *and* the superblock payload in a single
+    seqlock window: an odd `AtomicU64` at `SEQ_SLOT` (superblock byte 56)
+    while writing, the next even value stored with `Release`.
+  - `Superblock` gains a monotonic `tick_seq` (superblock format version 2);
+    `epoch_ms` stays as a wall-clock field, not a sequence number.
+  - `Spine::read_snapshot` is the matching read: copy under the counter,
+    retry if it moved, so a torn pairing is not returned. `format_summary` and
+    `examples/spine_live.rs` now read through it, and `Spine::open_ro` is a
+    handle that cannot mark itself a writer or resize the file underneath one.
+  - `write_slot` on the superblock slot is truncated to the payload so a page
+    write can never reset the counter; a window left open by a killed writer
+    is repairable via `Spine::recover_stalled_publish` (`read_snapshot` calls
+    it when its retry budget is exhausted rather than staying wedged).
+- **`tests/spine_torn_read.rs`**: torn-read regression for the three setups the
+  old code failed — two handles in one process, two publishers, two processes.
+  Each asserts zero mixed/torn/window-open reads *and* runs an unbracketed
+  control read on the same file that is required to still show the mixing, so
+  the suite cannot pass by quietly measuring nothing. Measured on Linux with
+  the dev profile: bracketed reads 0 violations in all three setups; the
+  control read reported the mixing.
+- `cargo fmt --all -- --check` passes again (13 files were failing, 64 hunks in
+  `src/spine.rs`), which was keeping `cargo fmt` red in CI.
+- Removed the unused optional `winapi` dependency: nothing referenced it and no
+  feature selected it (it never reached Cargo.lock, so no lockfile churn).
+
+
 ## [1.0.0] - 2026-10-13
 
 First 1.x release. The headline is recall and startup latency, measured
@@ -61,6 +140,7 @@ change stated honestly below.
 
 ### Performance
 - Startup (24 per-layer state files → 1 mmap): **17.8x** cold, **2.9x** warm.
+  - *Labelled 2026-10-13:* this figure is `bench_spine`'s A-vs-B comparison, whose "before" side loads the layer states from a `data/` directory that is not in this repository, and whose "24 files" label counts the files the layer set opens rather than the eight the benchmark calls. It was not re-measured here (the crate cannot be built without crates.io access); the spine-side numbers that can be measured were: `Spine::open` 531 µs cold / 10.9 µs warm, `tick()` 666 ns, and `read_snapshot` 103 ns against the 805 ns two-read pattern it replaces. See the "Spine publish protocol" section of BENCHMARKS.md.
 - Recall, in-process, 23,774 blocks, 19 interleaved rounds:
   **901 us → 93 us per query (9.7x)**, bit-identical results.
 - The existing end-to-end finding (§"Inverted text index", 2026-09-27,

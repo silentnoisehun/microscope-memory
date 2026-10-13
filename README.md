@@ -75,12 +75,29 @@ for the full tables and methodology.
 
 | Operation | Before | After | Speedup |
 |-----------|--------|-------|---------|
-| Startup (24 state files → 1 mmap) | 19.2 ms | 1.08 ms | 17.8x |
+| Startup (24 state files → 1 mmap) ‡ | 19.2 ms | 1.08 ms | 17.8x |
 | Text search, in-process (23,774 blocks) | 901 us/query | 93 us/query | 9.7x |
 | Recall steady-state (persistent context) | 2.3 ms | 0.3 ms | 7x |
 | MCP session steady-state (stdio, shared reader) | 2.68 ms | 113 us | 23.7x |
-| Stream tick write (10 Hz background) | 11x file I/O | 232 ns | — |
+| Stream tick write (10 Hz background) ‡ | 11x file I/O | 666 ns | — |
 | End-to-end `find` (incl. process start) | 68 ms | 47 ms | 1.4x |
+
+‡ Both rows come from `examples/bench_spine.rs`, and both need qualification:
+
+- The startup row's "before" side loads the layer states from a `data/`
+  directory that is **not in this repository**, so a clean clone measures eight
+  `load_or_init()` calls against empty defaults; the bench prints a warning when
+  that happens. The 24-file label counts the state files the layer set opens,
+  not the eight the benchmark calls. `Spine::open` on a fresh file measured
+  531 µs here (it zero-fills and lays out 13 pages) and 10.9 µs warm.
+- The tick row was 232 ns before the publish protocol existed. A `tick()` now
+  takes `flock(LOCK_EX)` on `spine.publish` and brackets the write in a seqlock
+  window; measured in release on a 2-core box that is **663–671 ns** with the
+  lock and 387 ns without it, so cross-process exclusion costs ~280 ns per
+  publish. The read side went the other way: the pair a consumer needs
+  (`read_stream` + `read_superblock`, 805 ns) is now `read_snapshot` at 103 ns,
+  because the bracketed read copies a 64-byte prefix instead of a 16 KiB page.
+  Full tables in [BENCHMARKS.md](BENCHMARKS.md).
 
 Honest boundaries, stated in the code and the benchmarks: the end-to-end
 CLI is dominated by process start-up (~17 ms floor), so the user-visible

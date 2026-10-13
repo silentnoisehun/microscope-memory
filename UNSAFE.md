@@ -17,7 +17,16 @@ lines above it. Both rules are mechanical, so the counts can be re-derived:
     15 with an adjacent safety note
     42 without one
 
-Line numbers move; the categories below do not.
+Re-derived after the spine publish window (same script, same rules):
+
+    66 blocks, 12 files
+    26 with an adjacent safety note
+    40 without one
+
+The figures above are from an earlier pass and do not reconcile exactly with
+that method (re-running it on that tree gives 59 blocks / 17 with a note / 12
+files), so treat the table as one block short of the tree rather than as a
+count that was ever exact. Line numbers move; the categories below do not.
 
 ## By category
 
@@ -27,6 +36,7 @@ Line numbers move; the categories below do not.
 | named-pipe IPC | 12 | ai_adapter | the handle is open and owned by exactly one owner; buffer length matches what the pipe reported |
 | seqlock / mmap snapshot | 11 | consciousness_seqlock, consciousness_stream | the sequence number brackets the read, and the snapshot is `repr(C)` with no padding holes |
 | repr(C) transmute | 7 | ai_adapter, viz | the source buffer is exactly the struct size, and the struct has no padding |
+| spine publish window | 7 | spine | the counter is inside the mapping and 8-byte aligned, the mapping covers it, the `flock` handle is owned by exactly one guard, and the guard is taken **before** the mapping lock |
 | SIMD intrinsics | 2 | reader, embeddings | the pointer is readable for the width loaded, and is unaligned-safe |
 | console codepage | 1 | mcp | Windows only; sets UTF-8 for the console before any output |
 | header byte view | 1 | build | the header struct is exactly `HEADER_SIZE` bytes, so reinterpreting it as bytes is sound |
@@ -37,6 +47,20 @@ crate bytes that were not validated by the type system.
 
 ## What is already justified
 
+- `spine.rs` `seq_atomic` — the only place that turns mapping bytes into an
+  `&AtomicU64`. Two invariants, both stated at the block: alignment comes from
+  the page boundary plus a `const` assertion that `SEQ_SLOT.is_multiple_of(8)`,
+  and the length is asserted **in release too**, so a future caller that forgets
+  its own bounds check panics instead of indexing outside the mapping.
+  `test_counter_access_on_a_short_mapping_panics` pins that behaviour.
+- `spine.rs` `writer_lock::try_op` — a raw `flock(2)` declaration, no libc
+  dependency. Sound because the fd is `OwnedFd`/`File`-owned, is not closed
+  while a guard borrows it, and the `i32` constants are the Linux values
+  (`SH=1, EX=2, NB=4, UN=8`), checked against the `errno` returned by the call.
+  What is *not* a soundness question but is the correctness one: `flock` is
+  advisory, so a peer that never takes it invalidates the publish serialisation;
+  `Spine::publish_lock_is_advisory()` reports when the lock could not be opened
+  at all.
 - `reader.rs:244` — `header_unchecked` carries a `# Safety` section naming the
   precondition (`i < block_count`) and states that violating it is undefined
   behaviour. Its caller `header()` checks with an `assert!` first, so the public
@@ -87,5 +111,11 @@ model.
   struct, which should be refused rather than transmuted.
 - A truncation test for the mmap readers: `data.bin` and `microscope.bin`
   shortened after the reader opened, which the audit also asks for.
+- The spine publish window cannot be settled by Miri or Loom: both model one
+  process, and the guarantee that matters here is between two of them, over
+  pages the kernel shares. The evidence in this tree is the measured tearing
+  regression (`tests/spine_torn_read.rs`, zero mixed snapshots in 60 000 reads
+  against an unbracketed control that mixes 61.9% on the same file), not a
+  model checker.
 - `cargo +nightly miri test` on the seqlock and transmute modules, where the
   construction allows it. Windows FFI blocks are out of reach for Miri.

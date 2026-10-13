@@ -438,20 +438,15 @@ const LAYER_HEADER_INTERVAL: u64 = 10; // 1 second
 
 /// Publish the stream state into the mmap Spine.
 ///
-/// The scalars (cycle, surprise, curiosity, prediction, Hebbian energy) go
-/// out through [`crate::spine::Spine::tick`]: one publisher lock, one mapping
-/// lock, one seqlock window around the stream page and the superblock payload.
-/// That is what lets another process read the two as a unit — the page write
-/// itself is still a 16 KiB copy, so a reader that ignores the publish counter
-/// can still catch it half-done. The layer headers go out every
-/// `LAYER_HEADER_INTERVAL`, because they only track aggregates (the large
-/// arrays stay in their own files).
+/// The stream and all due layer aggregates go out in one publish window.
+/// Readers use `Spine::read_store_snapshot` for the complete header set.
+/// Infrequently refreshed headers retain their previous values between updates.
 fn publish_spine(s: &StreamState) {
     let Some(spine) = &s.spine else { return };
 
-    // Hot path: the StreamPage and the publish record in one window. Read it
-    // back with `Spine::read_snapshot`, never with two separate reads.
-    spine.tick(
+    let now = now_ms();
+    let mut p = spine.begin_publish();
+    p.tick_stream(
         s.cycle,
         s.surprise_level,
         s.curiosity_level,
@@ -460,13 +455,12 @@ fn publish_spine(s: &StreamState) {
         s.last_query_hash,
         s.last_query_ms,
         s.hebbian_total_energy as f64,
+        now as i64,
     );
 
     // The rarer layer aggregates.
     if s.cycle.is_multiple_of(LAYER_HEADER_INTERVAL) {
-        let now = now_ms();
-
-        let mut hh = spine.read_hebbian();
+        let mut hh = p.read_hebbian();
         hh.block_count = s.hebbian.activations.len() as u32;
         hh.activation_count = s
             .hebbian
@@ -481,9 +475,9 @@ fn publish_spine(s: &StreamState) {
         // it, so there is nothing to publish here. The previous
         // `+= s.cycle` made the field a sum of cycle numbers.
         hh.last_activation_ms = s.last_query_ms;
-        spine.write_hebbian(&hh);
+        p.write_hebbian(&hh);
 
-        let mut ah = spine.read_attention();
+        let mut ah = p.read_attention();
         for (dst, src) in ah
             .learned_weights
             .iter_mut()
@@ -493,30 +487,30 @@ fn publish_spine(s: &StreamState) {
         }
         ah.last_recall_ms = s.attention.last_recall_ms;
         ah.total_recalls = s.attention.total_recalls;
-        spine.write_attention(&ah);
+        p.write_attention(&ah);
 
-        let mut eh = spine.read_emotion();
+        let mut eh = p.read_emotion();
         eh.current = s.emotional_ring.current;
         eh.last_update = s.emotional_ring.last_update;
         eh.total_updates = s.emotional_ring.total_updates;
-        spine.write_emotion(&eh);
+        p.write_emotion(&eh);
 
-        let mut rh = spine.read_resonance();
+        let mut rh = p.read_resonance();
         rh.instance_id = s.resonance.instance_id;
         rh.field_cells = s.resonance.field.len() as u32;
         rh.outgoing_count = s.resonance.outgoing.len() as u32;
         rh.incoming_count = s.resonance.incoming.len() as u32;
         rh.last_decay_ms = now;
-        spine.write_resonance(&rh);
+        p.write_resonance(&rh);
 
-        let mut gh = spine.read_graph();
+        let mut gh = p.read_graph();
         gh.node_count = s.thought_graph.nodes.len() as u32;
         gh.edge_count = s.thought_graph.edges.len() as u32;
         gh.pattern_count = s.thought_graph.patterns.len() as u32;
         gh.current_session_id = s.thought_graph.current_session_id;
-        spine.write_graph(&gh);
+        p.write_graph(&gh);
 
-        let mut ch = spine.read_cache();
+        let mut ch = p.read_cache();
         ch.total_predictions = s.predictive_cache.stats.total_predictions;
         ch.total_hits = s.predictive_cache.stats.total_hits;
         ch.total_misses = s.predictive_cache.stats.total_misses;
@@ -524,19 +518,20 @@ fn publish_spine(s: &StreamState) {
         ch.current_predictions = s.predictive_cache.predictions.len() as u32;
         ch.avg_confidence = s.predictive_cache.stats.avg_confidence;
         ch.last_predict_ms = now;
-        spine.write_cache(&ch);
+        p.write_cache(&ch);
 
-        let mut arh = spine.read_archetype();
+        let mut arh = p.read_archetype();
         arh.active_count = s.archetypes.archetypes.len() as u32;
-        spine.write_archetype(&arh);
+        p.write_archetype(&arh);
 
-        let mut mh = spine.read_mirror();
+        let mut mh = p.read_mirror();
         mh.echo_count = s.mirror.echoes.len() as u32;
         mh.block_resonance_count = s.mirror.block_resonance.len() as u32;
         mh.total_echoes = s.mirror.echoes.len() as u64;
         mh.last_mirror_ms = now;
-        spine.write_mirror(&mh);
+        p.write_mirror(&mh);
     }
+    p.commit();
 }
 
 fn now_ms() -> u64 {
@@ -551,6 +546,58 @@ mod tests {
     use super::*;
     use crate::config::Config;
     use crate::consciousness_seqlock::{MappedSnapshot, SNAPSHOT_FILE_NAME};
+
+    #[test]
+    fn spine_cycle_batches_due_headers_and_preserves_their_interval() {
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = tmp.path();
+        let spine = Arc::new(crate::spine::Spine::open(dir).unwrap());
+        let mut s = StreamState {
+            hebbian: HebbianState::load_or_init(dir, 3),
+            attention: AttentionState::load_or_init(dir),
+            emotional_ring: EmotionalStateRing::load_or_init(dir),
+            resonance: ResonanceState::load_or_init(dir),
+            thought_graph: ThoughtGraphState::load_or_init(dir),
+            predictive_cache: PredictiveCache::load_or_init(dir),
+            archetypes: ArchetypeState::load_or_init(dir),
+            mirror: MirrorState::load_or_init(dir),
+            predicted_query_hash: 123,
+            predicted_confidence: 0.5,
+            surprise_level: 0.25,
+            curiosity_level: 0.5,
+            cycle: LAYER_HEADER_INTERVAL,
+            last_query_hash: 456,
+            last_query_ms: 789,
+            hebbian_total_energy: 10.0,
+            snapshot: Arc::new(SharedSnapshot::new_zeroed()),
+            spine: Some(spine.clone()),
+        };
+        // Activations are a sparse prefix, not preallocated to block_count.
+        // Learn index 2 so the fixture really has three stored records.
+        s.hebbian.record_activation(&[(2, 1.0)], 123);
+        s.attention.total_recalls = 77;
+        s.emotional_ring.total_updates = 88;
+        let before = spine.publish_sequence();
+        publish_spine(&s);
+        assert_eq!(spine.publish_sequence(), before + 2);
+        let snap = spine.read_store_snapshot().unwrap();
+        assert_eq!(snap.stream.cycle, LAYER_HEADER_INTERVAL);
+        assert_eq!(snap.hebbian.block_count, 3);
+        assert_eq!(snap.hebbian.activation_count, 1);
+        assert_eq!(snap.attention.total_recalls, 77);
+        assert_eq!(snap.emotion.total_updates, 88);
+        assert_eq!(snap.resonance.last_decay_ms, snap.stream.updated_ms);
+        assert_eq!(snap.cache.last_predict_ms, snap.stream.updated_ms);
+        assert_eq!(snap.mirror.last_mirror_ms, snap.stream.updated_ms);
+        assert_eq!(snap.epoch_ms as u64, snap.stream.updated_ms);
+        s.cycle += 1;
+        s.attention.total_recalls = 99;
+        publish_spine(&s);
+        let snap = spine.read_store_snapshot().unwrap();
+        assert_eq!(spine.publish_sequence(), before + 4);
+        assert_eq!(snap.stream.cycle, LAYER_HEADER_INTERVAL + 1);
+        assert_eq!(snap.attention.total_recalls, 77);
+    }
 
     #[cfg(not(target_arch = "wasm32"))]
     #[test]

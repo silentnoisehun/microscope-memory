@@ -1,7 +1,7 @@
 [package]
 name = "microscope-memory"
 
-version = "1.0.0"
+version = "1.2.0"
 # Derived by letting clippy check it, not by guessing: raising this until
 # `cargo clippy -- -D warnings` stops reporting incompatible_msrv is how 1.91 was
 # found, after a hand-derived 1.88 was wrong about str::floor_char_boundary in

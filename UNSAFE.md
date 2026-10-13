@@ -36,7 +36,7 @@ count that was ever exact. Line numbers move; the categories below do not.
 | named-pipe IPC | 12 | ai_adapter | the handle is open and owned by exactly one owner; buffer length matches what the pipe reported |
 | seqlock / mmap snapshot | 11 | consciousness_seqlock, consciousness_stream | the sequence number brackets the read, and the snapshot is `repr(C)` with no padding holes |
 | repr(C) transmute | 7 | ai_adapter, viz | the source buffer is exactly the struct size, and the struct has no padding |
-| spine publish window | 7 | spine | the counter is inside the mapping and 8-byte aligned, the mapping covers it, the `flock` handle is owned by exactly one guard, and the guard is taken **before** the mapping lock |
+| spine publish window | 7 | spine | the counter is inside the mapping and 8-byte aligned, the mapping covers it, the `flock` handle is owned by exactly one guard, and the mapping mutex is held **before** taking the publisher lock |
 | SIMD intrinsics | 2 | reader, embeddings | the pointer is readable for the width loaded, and is unaligned-safe |
 | console codepage | 1 | mcp | Windows only; sets UTF-8 for the console before any output |
 | header byte view | 1 | build | the header struct is exactly `HEADER_SIZE` bytes, so reinterpreting it as bytes is sound |
@@ -61,6 +61,26 @@ crate bytes that were not validated by the type system.
   advisory, so a peer that never takes it invalidates the publish serialisation;
   `Spine::publish_lock_is_advisory()` reports when the lock could not be opened
   at all.
+- Spine batching (`Publish`) adds no raw pointer operation to the production
+  path. It owns the mapping mutex before taking `flock`, because two threads
+  sharing one file description can otherwise acquire the same `flock` and
+  unlock each other's window. Drop closes the counter, then field drop order
+  releases the advisory lock before the mutex. Init and stalled-window
+  recovery follow the same order. A temporary bad-lock-order mutation was
+  rejected by the whole-store regression (135 inconsistent/unavailable reads
+  in 10,000 attempts); the unmodified test passed.
+- `read_store_snapshot` copies eleven 128-byte prefixes plus the 56-byte
+  superblock into private buffers, with an acquire fence before the second
+  counter check. Compile-time bounds cover every encoded header (Emotion is
+  the widest at 108 bytes); decode never rereads the live mapping. These
+  checks cover cooperating publishers, not hostile truncation or an unrelated
+  process writing without the advisory lock.
+- Batch drop and crash recovery are **not rollback**. They can close a window
+  containing partial logical updates; neither reconstructs the previous
+  state, nor flushes the file. Tests pin drop/unwind behaviour explicitly.
+- The short-store snapshot unit test has one additional `map_mut` block: its
+  private test file outlives the mapping and is never truncated while mapped.
+  The inventory counts above predate this test-only block.
 - `reader.rs:244` — `header_unchecked` carries a `# Safety` section naming the
   precondition (`i < block_count`) and states that violating it is undefined
   behaviour. Its caller `header()` checks with an `assert!` first, so the public

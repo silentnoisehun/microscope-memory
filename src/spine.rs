@@ -26,27 +26,24 @@
 //!
 //! # What the counter does and does not cover
 //!
-//! It brackets the **publish payload** — [`Slot::Superblock`] bytes
-//! 0..`SUPERBLOCK_BYTES` and [`Slot::Stream`]. That is the pair a reader
-//! compares, so it is the pair that has to agree, and [`Spine::read_snapshot`]
-//! is the only read that is told whether it does.
+//! Every header write participates in the counter. [`Spine::begin_publish`]
+//! holds one mapping mutex and one publisher lock across a read-modify-write
+//! batch; its first write opens the window, and commit (or drop) closes it.
+//! [`Spine::read_store_snapshot`] validates all eleven header prefixes and the
+//! superblock in one window. [`Spine::read_snapshot`] is the cheaper stream-only
+//! view. Separate legacy `read_*` calls do not form a validated snapshot.
 //!
-//! The nine other layer headers go through [`Spine::write_slot`]. Its writes
-//! exclude each other (mapping mutex plus the publisher lock), but they are
-//! not inside a window and their pages are not covered by the counter, so a
-//! reader in another process can still copy one of those pages mid-write and
-//! get a mix of two publishes of *that* header. Those pages are aggregates of
-//! files that are durable by themselves, so the cost is freshness, not
-//! correctness — and `read_slot` does not claim otherwise. A future multi-slot
-//! seqlock would have to bracket the whole write set and give readers a
-//! validated read per slot.
+//! A window guarantees a coherent copy, not rollback or durability. Dropping
+//! a batch during unwinding publishes whatever was written before the panic;
+//! crash recovery likewise cannot reconstruct the pre-crash state. Aggregates
+//! refreshed less frequently than the stream may legitimately be older.
 //!
 //! # Who is allowed to be inside a window
 //!
 //! A seqlock only helps if at most one writer is in a window at a time; two
 //! overlapping windows can leave a reader validating a counter that neither
 //! writer owns. So publishing also takes `flock(LOCK_EX)` on `spine.publish`
-//! (see [`Spine::publish_guard`]), which is the piece shared pages cannot
+//! (see [`Spine::begin_publish`]), which is the piece shared pages cannot
 //! provide: mutual exclusion between publishers in different processes.
 //!
 //! A second lock file answers a different question. `spine.lock` is held
@@ -58,12 +55,17 @@
 //!
 //! `flock` is advisory, is not available on Windows, and does not exist on
 //! every filesystem; all of those degrade to "publishing is serialised per
-//! process only". That is a real weakening of the guarantee, so it is
+//! handle only". That is a real weakening of the guarantee, so it is
 //! reported by [`Spine::publish_lock_is_advisory`] instead of being hidden.
+//!
+//! Lock order is mapping mutex, then publisher lock. `flock` belongs to the
+//! open file description, not the thread: taking it before the mutex would
+//! let a second thread on the same handle unlock the first thread's publish.
+//! The advisory lock is released before the mapping mutex on exit.
 
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use memmap2::{MmapMut, MmapOptions};
-use parking_lot::Mutex;
+use parking_lot::{Mutex, MutexGuard};
 use std::fs::OpenOptions;
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
@@ -104,12 +106,10 @@ const _: () = assert!(
     SEQ_SLOT >= SUPERBLOCK_BYTES,
     "the payload must end before the counter"
 );
-/// Bytes of the stream page a snapshot read copies. [`StreamHeader`] is
-/// decoded from its first 60 bytes, so the read brackets one cache line
-/// instead of 16 KiB — which is the difference between a reader retrying once
-/// in a blue moon and retrying on half its attempts against a writer running
-/// a tight loop.
-pub const SNAPSHOT_PREFIX_BYTES: usize = 64;
+/// Bytes copied from each header page by a validated snapshot. The largest
+/// encoded header is Emotion (108 bytes); no page padding needs to be read.
+/// This is a format bound, not a measured performance claim.
+pub const SNAPSHOT_PREFIX_BYTES: usize = 128;
 /// Read attempts on a publish window that keeps moving under us before the
 /// reader gives up and reports `None`. Spins for the first 64, then yields,
 /// so the budget is a measure of *patience* rather than of CPU burned
@@ -134,9 +134,20 @@ pub const WRITER_LOCK_FILE_NAME: &str = "spine.lock";
 
 const _: () = assert!(SEQ_SLOT + 8 <= PAGE_SIZE);
 const _: () = assert!(SNAPSHOT_PREFIX_BYTES >= StreamHeader::HEADER_BYTES);
+const _: () = assert!(SNAPSHOT_PREFIX_BYTES >= HebbianHeader::HEADER_BYTES);
+const _: () = assert!(SNAPSHOT_PREFIX_BYTES >= AttentionHeader::HEADER_BYTES);
+const _: () = assert!(SNAPSHOT_PREFIX_BYTES >= EmotionHeader::HEADER_BYTES);
+const _: () = assert!(SNAPSHOT_PREFIX_BYTES >= ResonanceHeader::HEADER_BYTES);
+const _: () = assert!(SNAPSHOT_PREFIX_BYTES >= GraphHeader::HEADER_BYTES);
+const _: () = assert!(SNAPSHOT_PREFIX_BYTES >= CacheHeader::HEADER_BYTES);
+const _: () = assert!(SNAPSHOT_PREFIX_BYTES >= ArchetypeHeader::HEADER_BYTES);
+const _: () = assert!(SNAPSHOT_PREFIX_BYTES >= MirrorHeader::HEADER_BYTES);
+const _: () = assert!(SNAPSHOT_PREFIX_BYTES >= MerkleHeader::HEADER_BYTES);
+const _: () = assert!(SNAPSHOT_PREFIX_BYTES >= MetaHeader::HEADER_BYTES);
 const _: () = assert!(SNAPSHOT_PREFIX_BYTES <= PAGE_SIZE);
 const _: () = assert!(SUPERBLOCK_BYTES + 8 <= PAGE_SIZE);
 const _: () = assert!(HEADER_SIZE == 64);
+const _: () = assert!(11 * PAGE_SIZE + SNAPSHOT_PREFIX_BYTES <= 12 * PAGE_SIZE);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u32)]
@@ -902,13 +913,246 @@ fn now_ms() -> i64 {
 #[derive(Debug, Clone, Copy)]
 pub struct PublishSnapshot {
     pub stream: StreamHeader,
-    /// Publish counter of the snapshot's superblock payload (monotonic, and
-    /// distinct for two ticks inside the same millisecond).
+    /// Counter recorded by the last stream tick (distinct for two ticks in
+    /// one millisecond). Standalone layer writes advance `sequence`, not this
+    /// field; explicit superblock writes may replace the record.
     pub tick_seq: u64,
     /// Wall-clock milliseconds at publish time. Freshness, not ordering.
     pub epoch_ms: i64,
     /// The seqlock value this snapshot was read under; always even.
     pub sequence: u64,
+}
+
+/// All header pages and the publish record copied under one counter value.
+/// Layer aggregates can be older than the stream, but none was copied midway
+/// through a write. Use a single `Publish` batch to update related headers.
+#[derive(Debug, Clone, Copy)]
+pub struct StoreSnapshot {
+    pub stream: StreamHeader,
+    pub hebbian: HebbianHeader,
+    pub attention: AttentionHeader,
+    pub emotion: EmotionHeader,
+    pub resonance: ResonanceHeader,
+    pub graph: GraphHeader,
+    pub cache: CacheHeader,
+    pub archetype: ArchetypeHeader,
+    pub mirror: MirrorHeader,
+    pub merkle: MerkleHeader,
+    pub meta: MetaHeader,
+    pub tick_seq: u64,
+    pub epoch_ms: i64,
+    pub sequence: u64,
+}
+
+struct SnapshotBytes<const N: usize> {
+    headers: [[u8; SNAPSHOT_PREFIX_BYTES]; N],
+    payload: [u8; SUPERBLOCK_BYTES],
+    sequence: u64,
+}
+
+/// One exclusive read-modify-write batch. Do not call methods on the owning
+/// `Spine` while this guard lives: its mapping mutex is non-reentrant. Use the
+/// guard's `read_*` / `write_*` methods instead. Reads alone do not advance the
+/// counter; the first write opens the window and commit/drop closes it.
+///
+/// This is not a rollback transaction. Unwinding closes the window around the
+/// partial update, so callers must not interpret a panic as an aborted batch.
+#[must_use = "hold the batch while updating headers, then commit or drop it"]
+pub struct Publish<'a> {
+    // Field order matters: unlock flock before releasing the mapping mutex.
+    _advisory: PublishGuard<'a>,
+    mmap: MutexGuard<'a, MmapMut>,
+    window: Option<u64>,
+}
+
+impl Drop for Publish<'_> {
+    fn drop(&mut self) {
+        if let Some(n) = self.window.take() {
+            seq_end(&mut self.mmap, n);
+        }
+    }
+}
+
+impl Publish<'_> {
+    fn begin_write(&mut self) -> u64 {
+        if let Some(n) = self.window {
+            return n;
+        }
+        let n = seq_begin(&mut self.mmap);
+        self.window = Some(n);
+        n
+    }
+
+    fn read_prefix(&self, slot: Slot) -> [u8; SNAPSHOT_PREFIX_BYTES] {
+        let mut bytes = [0; SNAPSHOT_PREFIX_BYTES];
+        let off = slot.offset();
+        let end = (off + SNAPSHOT_PREFIX_BYTES).min(self.mmap.len());
+        if off < end {
+            bytes[..end - off].copy_from_slice(&self.mmap[off..end]);
+        }
+        bytes
+    }
+
+    fn write_slot(&mut self, slot: Slot, bytes: &[u8; PAGE_SIZE]) {
+        let off = slot.offset();
+        let len = if slot == Slot::Superblock {
+            SUPERBLOCK_BYTES
+        } else {
+            PAGE_SIZE
+        };
+        if off + len > self.mmap.len() {
+            return;
+        }
+        self.begin_write();
+        self.mmap[off..off + len].copy_from_slice(&bytes[..len]);
+    }
+
+    /// Whether this batch acquired cross-handle/process publisher exclusion.
+    pub fn is_advisory(&self) -> bool {
+        self._advisory.is_advisory()
+    }
+
+    /// Finish the window and release both locks. Drop has the same effect.
+    pub fn commit(self) {}
+
+    pub fn read_superblock(&self) -> Option<Superblock> {
+        Superblock::from_payload(&self.mmap[..SUPERBLOCK_BYTES])
+    }
+
+    /// Copy only the payload; the atomic counter is never overwritten.
+    pub fn write_superblock(&mut self, h: &Superblock) {
+        self.begin_write();
+        self.mmap[..SUPERBLOCK_BYTES].copy_from_slice(&h.to_payload());
+    }
+
+    pub fn read_stream(&self) -> StreamHeader {
+        StreamHeader::from_bytes(&self.read_prefix(Slot::Stream))
+    }
+
+    pub fn write_stream(&mut self, h: &StreamHeader) {
+        self.write_slot(Slot::Stream, &h.to_bytes());
+    }
+
+    pub fn read_hebbian(&self) -> HebbianHeader {
+        HebbianHeader::from_bytes(&self.read_prefix(Slot::Hebbian))
+    }
+
+    pub fn write_hebbian(&mut self, h: &HebbianHeader) {
+        self.write_slot(Slot::Hebbian, &h.to_bytes());
+    }
+
+    pub fn read_attention(&self) -> AttentionHeader {
+        AttentionHeader::from_bytes(&self.read_prefix(Slot::Attention))
+    }
+
+    pub fn write_attention(&mut self, h: &AttentionHeader) {
+        self.write_slot(Slot::Attention, &h.to_bytes());
+    }
+
+    pub fn read_emotion(&self) -> EmotionHeader {
+        EmotionHeader::from_bytes(&self.read_prefix(Slot::Emotion))
+    }
+
+    pub fn write_emotion(&mut self, h: &EmotionHeader) {
+        self.write_slot(Slot::Emotion, &h.to_bytes());
+    }
+
+    pub fn read_resonance(&self) -> ResonanceHeader {
+        ResonanceHeader::from_bytes(&self.read_prefix(Slot::Resonance))
+    }
+
+    pub fn write_resonance(&mut self, h: &ResonanceHeader) {
+        self.write_slot(Slot::Resonance, &h.to_bytes());
+    }
+
+    pub fn read_graph(&self) -> GraphHeader {
+        GraphHeader::from_bytes(&self.read_prefix(Slot::Graph))
+    }
+
+    pub fn write_graph(&mut self, h: &GraphHeader) {
+        self.write_slot(Slot::Graph, &h.to_bytes());
+    }
+
+    pub fn read_cache(&self) -> CacheHeader {
+        CacheHeader::from_bytes(&self.read_prefix(Slot::Cache))
+    }
+
+    pub fn write_cache(&mut self, h: &CacheHeader) {
+        self.write_slot(Slot::Cache, &h.to_bytes());
+    }
+
+    pub fn read_archetype(&self) -> ArchetypeHeader {
+        ArchetypeHeader::from_bytes(&self.read_prefix(Slot::Archetype))
+    }
+
+    pub fn write_archetype(&mut self, h: &ArchetypeHeader) {
+        self.write_slot(Slot::Archetype, &h.to_bytes());
+    }
+
+    pub fn read_mirror(&self) -> MirrorHeader {
+        MirrorHeader::from_bytes(&self.read_prefix(Slot::Mirror))
+    }
+
+    pub fn write_mirror(&mut self, h: &MirrorHeader) {
+        self.write_slot(Slot::Mirror, &h.to_bytes());
+    }
+
+    pub fn read_merkle(&self) -> MerkleHeader {
+        MerkleHeader::from_bytes(&self.read_prefix(Slot::Merkle))
+    }
+
+    pub fn write_merkle(&mut self, h: &MerkleHeader) {
+        self.write_slot(Slot::Merkle, &h.to_bytes());
+    }
+
+    pub fn read_meta(&self) -> MetaHeader {
+        MetaHeader::from_bytes(&self.read_prefix(Slot::Meta))
+    }
+
+    pub fn write_meta(&mut self, h: &MetaHeader) {
+        self.write_slot(Slot::Meta, &h.to_bytes());
+    }
+
+    /// Update the stream and publish record using one caller-supplied time.
+    /// The batch may update other headers before committing the same window.
+    #[allow(clippy::too_many_arguments)]
+    pub fn tick_stream(
+        &mut self,
+        cycle: u64,
+        surprise: f32,
+        curiosity: f32,
+        predicted_hash: u64,
+        predicted_confidence: f32,
+        last_query_hash: u64,
+        last_query_ms: u64,
+        hebbian_total_energy: f64,
+        epoch_ms: i64,
+    ) {
+        if self.mmap.len() < Slot::Stream.offset() + PAGE_SIZE {
+            return;
+        }
+        let h = StreamHeader {
+            cycle,
+            surprise_level: surprise,
+            curiosity_level: curiosity,
+            predicted_query_hash: predicted_hash,
+            predicted_confidence,
+            last_query_hash,
+            last_query_ms,
+            hebbian_total_energy,
+            updated_ms: epoch_ms as u64,
+            _pad: [0; PAGE_SIZE - StreamHeader::HEADER_BYTES],
+        };
+        let n = self.begin_write();
+        let payload = Superblock {
+            tick_seq: n.wrapping_add(1) >> 1,
+            epoch_ms,
+            ..current_superblock(&self.mmap)
+        }
+        .to_payload();
+        self.mmap[..SUPERBLOCK_BYTES].copy_from_slice(&payload);
+        self.write_stream(&h);
+    }
 }
 
 /// One publisher's turn. `Drop` releases the advisory lock, so a publish that
@@ -933,7 +1177,7 @@ impl Drop for PublishGuard<'_> {
 impl PublishGuard<'_> {
     /// Whether this guard actually excluded other publishers. `false` means
     /// the platform or filesystem gave us nothing to lock, so the publish was
-    /// serialised against this process only.
+    /// serialised against this handle only.
     pub fn is_advisory(&self) -> bool {
         self.held
     }
@@ -1013,8 +1257,10 @@ fn snapshot_backoff(attempt: u32) {
 /// "anything you copy now may be mid-write, retry". Returns the odd value, so
 /// this publish's serial number is `(n + 1) >> 1`.
 fn seq_begin(mmap: &mut MmapMut) -> u64 {
+    // A crashed writer may have left it odd. OR, rather than increment, avoids
+    // exposing an even counter while replacing that writer's partial payload.
     // SAFETY: as in `seq_load`.
-    unsafe { seq_atomic(mmap).fetch_add(1, Ordering::AcqRel) | 1 }
+    unsafe { seq_atomic(mmap).fetch_or(1, Ordering::AcqRel) | 1 }
 }
 
 /// Close the window opened by `seq_begin`. The `Release` store is what makes
@@ -1022,7 +1268,7 @@ fn seq_begin(mmap: &mut MmapMut) -> u64 {
 /// value — in this process or in another one.
 fn seq_end(mmap: &mut MmapMut, n: u64) {
     // SAFETY: as in `seq_load`; `n + 1` is even because `n` was forced odd.
-    unsafe { seq_atomic(mmap).store(n + 1, Ordering::Release) }
+    unsafe { seq_atomic(mmap).store(n.wrapping_add(1), Ordering::Release) }
 }
 
 /// Advisory writer lock (`flock(2)` on the sidecar `spine.lock`, so the data
@@ -1054,9 +1300,9 @@ mod writer_lock {
     }
 }
 
-/// No `flock(2)` on these targets. Publishing is still safe — the seqlock
-/// brackets every write — but `resize` has no way to ask other processes to
-/// stand back, so it declines instead of remapping pages out from under them.
+/// No `flock(2)` on these targets. Only same-handle publishers are excluded;
+/// multiple handles/processes must not publish concurrently. `resize` also
+/// cannot ask other processes to stand back, so it declines.
 #[cfg(not(unix))]
 mod writer_lock {
     use std::io;
@@ -1104,15 +1350,26 @@ impl Spine {
             OpenOptions::new().read(true).write(true).open(&path)
         };
         match opened {
-            Ok(file) => Ok((Some(file), true)),
+            Ok(file) => Ok((Some(file), cfg!(unix))),
             Err(_) if !create => Ok((None, false)),
             Err(e) => Err(e),
         }
     }
 
-    /// Take the publisher-exclusive advisory lock for as long as the returned
-    /// guard lives. Blocking, because a publisher that skipped the queue is
-    /// back where the per-process mutex left it: two writers in one window.
+    /// Start an exclusive batch. Only use the returned guard while it lives;
+    /// calling back into this `Spine` would deadlock its mapping mutex.
+    pub fn begin_publish(&self) -> Publish<'_> {
+        let mmap = self.mmap.lock();
+        let advisory = self.publish_guard();
+        Publish {
+            _advisory: advisory,
+            mmap,
+            window: None,
+        }
+    }
+
+    /// Must be taken with the mapping mutex held, and released before it.
+    /// Blocking: skipping the queue would permit overlapping publish windows.
     fn publish_guard(&self) -> PublishGuard<'_> {
         #[cfg(unix)]
         if let Some(file) = self.publish_lock_file.as_ref() {
@@ -1133,9 +1390,9 @@ impl Spine {
         }
     }
 
-    /// `false` when publishers in other processes are not excluded from each
-    /// other, i.e. when two of them could open a publish window at the same
-    /// time and the seqlock alone is what keeps readers whole.
+    /// Whether this platform supports the publisher lock and its sidecar was
+    /// opened. A runtime lock failure is reported by `PublishGuard::is_advisory`.
+    /// Without exclusion, independent handles must not publish concurrently.
     pub fn publish_lock_is_advisory(&self) -> bool {
         self.publish_lock_advisory
     }
@@ -1220,11 +1477,14 @@ impl Spine {
 
     /// Shared ("a writer is live") mark, retried because the exclusive holder
     /// is only ever another process's init or `resize`, both short.
+    #[cfg(not(unix))]
+    fn mark_shared(_lock_file: &std::fs::File) -> std::io::Result<()> {
+        Ok(())
+    }
+
+    #[cfg(unix)]
     fn mark_shared(lock_file: &std::fs::File) -> std::io::Result<()> {
-        #[cfg(unix)]
         use std::os::fd::AsRawFd;
-        #[cfg(not(unix))]
-        let _ = lock_file; // no advisory lock to take; publishing is still safe
         let deadline = std::time::Instant::now() + std::time::Duration::from_millis(500);
         loop {
             match writer_lock::try_op(lock_file.as_raw_fd(), writer_lock::SH | writer_lock::NB) {
@@ -1270,10 +1530,10 @@ impl Spine {
     /// Lay out the superblock, or upgrade a version-1 one. The payload goes
     /// out inside a seqlock window so a concurrent reader sees either the old
     /// superblock or the new one, never a mix. Both writers here write the
-    /// same bytes, so a shared mark is sufficient without excluding the peer.
+    /// same bytes, but still take the publisher lock to exclude their writes.
     fn init_superblock(&self) -> std::io::Result<()> {
-        let _publish = self.publish_guard();
         let mut m = self.mmap.lock();
+        let publish = self.publish_guard();
         if Superblock::from_payload(&m[0..SUPERBLOCK_BYTES]).is_some() {
             return Ok(()); // already the current layout
         }
@@ -1293,45 +1553,29 @@ impl Spine {
         let n = seq_begin(&mut m); // odd: publishing
         m[0..SUPERBLOCK_BYTES].copy_from_slice(&fresh.to_payload());
         seq_end(&mut m, n); // even: published
+        drop(publish);
         drop(m);
         self.sync()?; // layout must be on disk before a peer maps it
         Ok(())
     }
 
-    fn read_slot(&self, slot: Slot) -> [u8; PAGE_SIZE] {
+    // Legacy single-header reads are not validated against peer writes.
+    // Prefer read_store_snapshot when consistency matters.
+    fn read_slot(&self, slot: Slot) -> [u8; SNAPSHOT_PREFIX_BYTES] {
         let off = slot.offset();
         let m = self.mmap.lock();
-        let mut buf = [0u8; PAGE_SIZE];
-        let end = (off + PAGE_SIZE).min(m.len());
-        if off < m.len() {
+        let mut buf = [0u8; SNAPSHOT_PREFIX_BYTES];
+        let end = (off + SNAPSHOT_PREFIX_BYTES).min(m.len());
+        if off < end {
             buf[..end - off].copy_from_slice(&m[off..end]);
         }
         buf
     }
 
-    /// Publish one whole page.
-    ///
-    /// For [`Slot::Superblock`] the write is bracketed by the seqlock and
-    /// trimmed to the payload, because bytes `SEQ_SLOT..` *are* the counter:
-    /// a naive page copy would reset it mid-window. Other slots are plain
-    /// page writes — serialised against this process by the mutex, and
-    /// readable as a stale-but-complete page by peers.
+    /// Publish one page in its own window. For related updates, use
+    /// `begin_publish` instead. Superblock writes exclude the counter bytes.
     pub fn write_slot(&self, slot: Slot, bytes: &[u8; PAGE_SIZE]) {
-        // Taken before the mapping lock, always in that order, so two
-        // publishers cannot both be inside a window; see the module docs.
-        let _publish = self.publish_guard();
-        let off = slot.offset();
-        let mut m = self.mmap.lock();
-        if off + PAGE_SIZE > m.len() || m.len() < SEQ_SLOT + 8 {
-            return;
-        }
-        if slot == Slot::Superblock {
-            let n = seq_begin(&mut m);
-            m[0..SUPERBLOCK_BYTES].copy_from_slice(&bytes[..SUPERBLOCK_BYTES]);
-            seq_end(&mut m, n);
-            return;
-        }
-        m[off..off + PAGE_SIZE].copy_from_slice(bytes);
+        self.begin_publish().write_slot(slot, bytes);
     }
 
     pub fn read_stream(&self) -> StreamHeader {
@@ -1341,17 +1585,8 @@ impl Spine {
         self.write_slot(Slot::Stream, &h.to_bytes());
     }
 
-    /// Publish the stream header and the superblock payload as one snapshot:
-    /// one publisher lock (`flock` on `spine.publish`, which also excludes
-    /// publishers in other processes), one mapping lock, one seqlock window.
-    ///
-    /// That is what makes the pair readable as a unit. It is **not** one
-    /// hardware transaction: the stream page is still a 16 KiB
-    /// `copy_from_slice`, so a reader that ignores the seqlock can still catch
-    /// it mid-write — [`Spine::read_snapshot`] is the read path that does not.
-    /// `updated_ms` in the header and `epoch_ms` in the superblock come from
-    /// the same clock reading, so a snapshot that satisfies
-    /// `stream.updated_ms == epoch_ms as u64` is a snapshot of one tick.
+    /// Publish the stream and superblock in one exclusive window.
+    /// Use `begin_publish` to include layer headers in the same window.
     #[allow(clippy::too_many_arguments)]
     pub fn tick(
         &self,
@@ -1364,134 +1599,127 @@ impl Spine {
         last_query_ms: u64,
         hebbian_total_energy: f64,
     ) {
-        let _publish = self.publish_guard();
         let epoch_ms = now_ms();
-        let h = StreamHeader {
+        let mut p = self.begin_publish();
+        p.tick_stream(
             cycle,
-            surprise_level: surprise,
-            curiosity_level: curiosity,
-            predicted_query_hash: predicted_hash,
+            surprise,
+            curiosity,
+            predicted_hash,
             predicted_confidence,
             last_query_hash,
             last_query_ms,
             hebbian_total_energy,
-            updated_ms: epoch_ms as u64,
-            _pad: [0; PAGE_SIZE - StreamHeader::HEADER_BYTES],
-        };
-        let page = h.to_bytes();
-
-        let mut m = self.mmap.lock();
-        if m.len() < Slot::Stream.offset() + PAGE_SIZE || m.len() < SEQ_SLOT + 8 {
-            return;
-        }
-        let n = seq_begin(&mut m); // odd: publishing
-                                   // The superblock payload is derived before the copy, so no borrow of
-                                   // `m` is live while `m` is written.
-        let payload = Superblock {
-            tick_seq: (n + 1) >> 1,
             epoch_ms,
-            ..current_superblock(&m)
-        }
-        .to_payload();
-        // Payload first: a reader that ignored the counter would still pair a
-        // new superblock with an at-least-as-new stream header, not an old one.
-        m[0..SUPERBLOCK_BYTES].copy_from_slice(&payload);
-        let off = Slot::Stream.offset();
-        m[off..off + PAGE_SIZE].copy_from_slice(&page);
-        seq_end(&mut m, n); // even: published
+        );
+        p.commit();
     }
 
-    /// The latest published snapshot, or `None` once both
-    /// [`SNAPSHOT_MAX_RETRIES`] attempts and [`SNAPSHOT_MAX_WAIT_MS`] have
-    /// been spent on publish windows crossing us.
-    ///
-    /// Both halves are copied under one lock and checked against the counter
-    /// before and after, so a returned snapshot is never a new stream header
-    /// next to an older superblock payload — from this process or any other.
+    /// The stream and superblock copied under one even counter value.
+    /// Returns `None` after the retry/time budget or for an invalid payload.
     pub fn read_snapshot(&self) -> Option<PublishSnapshot> {
-        let mut prefix = [0u8; SNAPSHOT_PREFIX_BYTES];
-        let mut payload = [0u8; SUPERBLOCK_BYTES];
-        let mut started = None::<std::time::Instant>;
+        let bytes = self.read_prefixes([Slot::Stream])?;
+        let sb = Superblock::from_payload(&bytes.payload)?;
+        Some(PublishSnapshot {
+            stream: StreamHeader::from_bytes(&bytes.headers[0]),
+            tick_seq: sb.tick_seq,
+            epoch_ms: sb.epoch_ms,
+            sequence: bytes.sequence,
+        })
+    }
+
+    /// All eleven headers and the superblock from one validated copy.
+    /// This does not imply equal freshness of infrequently updated layers.
+    pub fn read_store_snapshot(&self) -> Option<StoreSnapshot> {
+        let bytes = self.read_prefixes([
+            Slot::Stream,
+            Slot::Hebbian,
+            Slot::Attention,
+            Slot::Emotion,
+            Slot::Resonance,
+            Slot::Graph,
+            Slot::Cache,
+            Slot::Archetype,
+            Slot::Mirror,
+            Slot::Merkle,
+            Slot::Meta,
+        ])?;
+        let sb = Superblock::from_payload(&bytes.payload)?;
+        Some(StoreSnapshot {
+            stream: StreamHeader::from_bytes(&bytes.headers[0]),
+            hebbian: HebbianHeader::from_bytes(&bytes.headers[1]),
+            attention: AttentionHeader::from_bytes(&bytes.headers[2]),
+            emotion: EmotionHeader::from_bytes(&bytes.headers[3]),
+            resonance: ResonanceHeader::from_bytes(&bytes.headers[4]),
+            graph: GraphHeader::from_bytes(&bytes.headers[5]),
+            cache: CacheHeader::from_bytes(&bytes.headers[6]),
+            archetype: ArchetypeHeader::from_bytes(&bytes.headers[7]),
+            mirror: MirrorHeader::from_bytes(&bytes.headers[8]),
+            merkle: MerkleHeader::from_bytes(&bytes.headers[9]),
+            meta: MetaHeader::from_bytes(&bytes.headers[10]),
+            tick_seq: sb.tick_seq,
+            epoch_ms: sb.epoch_ms,
+            sequence: bytes.sequence,
+        })
+    }
+
+    fn read_prefixes<const N: usize>(&self, slots: [Slot; N]) -> Option<SnapshotBytes<N>> {
+        let required_len = slots
+            .iter()
+            .map(|s| s.offset() + SNAPSHOT_PREFIX_BYTES)
+            .max()
+            .unwrap_or(SEQ_SLOT + 8)
+            .max(SEQ_SLOT + 8);
+        if self.mmap.lock().len() < required_len {
+            return None;
+        }
+        let mut started = None;
         let mut attempt = 0u32;
         loop {
-            attempt += 1;
-            let mut m = self.mmap.lock();
-            if m.len() < Slot::Stream.offset() + SNAPSHOT_PREFIX_BYTES || m.len() < SEQ_SLOT + 8 {
-                return None;
+            if let Some(bytes) = self.read_prefixes_once(&slots) {
+                return Some(bytes);
             }
-            let s1 = seq_load(&mut m);
-            if s1 & 1 == 1 {
-                drop(m);
-                if self.snapshot_patience(&mut started, attempt) {
-                    break;
-                }
-                snapshot_backoff(attempt);
-                continue;
+            if self.snapshot_patience(&mut started, attempt) {
+                break;
             }
-            // Copy first, decode after: the copies are what the counter
-            // brackets, and the mapping must not be read a second time once
-            // the check has passed.
-            let off = Slot::Stream.offset();
-            prefix.copy_from_slice(&m[off..off + SNAPSHOT_PREFIX_BYTES]);
-            payload.copy_from_slice(&m[0..SUPERBLOCK_BYTES]);
-            let s2 = seq_load(&mut m);
-            drop(m);
-            if s1 != s2 {
-                if self.snapshot_patience(&mut started, attempt) {
-                    break;
-                }
-                snapshot_backoff(attempt);
-                continue;
-            }
-            let Some(sb) = Superblock::from_payload(&payload) else {
-                // No (or no longer) a spine superblock: retrying will not
-                // make these bytes decodable.
-                return None;
-            };
-            return Some(PublishSnapshot {
-                stream: StreamHeader::from_bytes(&prefix),
-                tick_seq: sb.tick_seq,
-                epoch_ms: sb.epoch_ms,
-                sequence: s2,
-            });
+            snapshot_backoff(attempt);
+            attempt = attempt.saturating_add(1);
         }
-        // Out of patience. The one failure a reader must not accept
-        // permanently is a window that will never close because the process
-        // that opened it was killed; readers would then return `None`
-        // forever. Try to close it, and read once more under the counter.
         if self.recover_stalled_publish() {
-            return self.read_snapshot_once();
+            return self.read_prefixes_once(&slots);
         }
         None
     }
 
-    /// A single bracketed read, no retry. Used right after a stalled window
-    /// was closed, where the caller has already established that nobody is
-    /// publishing; a fresh pair of counter reads is all the check it needs.
-    fn read_snapshot_once(&self) -> Option<PublishSnapshot> {
+    fn read_prefixes_once<const N: usize>(&self, slots: &[Slot; N]) -> Option<SnapshotBytes<N>> {
         let mut m = self.mmap.lock();
-        if m.len() < Slot::Stream.offset() + SNAPSHOT_PREFIX_BYTES || m.len() < SEQ_SLOT + 8 {
+        if m.len() < SEQ_SLOT + 8
+            || slots
+                .iter()
+                .any(|s| s.offset() + SNAPSHOT_PREFIX_BYTES > m.len())
+        {
             return None;
         }
         let s1 = seq_load(&mut m);
         if s1 & 1 == 1 {
             return None;
         }
-        let mut prefix = [0u8; SNAPSHOT_PREFIX_BYTES];
-        let mut payload = [0u8; SUPERBLOCK_BYTES];
-        let off = Slot::Stream.offset();
-        prefix.copy_from_slice(&m[off..off + SNAPSHOT_PREFIX_BYTES]);
-        payload.copy_from_slice(&m[0..SUPERBLOCK_BYTES]);
+        let mut bytes = SnapshotBytes {
+            headers: [[0; SNAPSHOT_PREFIX_BYTES]; N],
+            payload: [0; SUPERBLOCK_BYTES],
+            sequence: s1,
+        };
+        for (prefix, slot) in bytes.headers.iter_mut().zip(slots) {
+            let off = slot.offset();
+            prefix.copy_from_slice(&m[off..off + SNAPSHOT_PREFIX_BYTES]);
+        }
+        bytes.payload.copy_from_slice(&m[..SUPERBLOCK_BYTES]);
+        // Keep payload loads before the final counter check.
+        std::sync::atomic::fence(Ordering::Acquire);
         if seq_load(&mut m) != s1 {
             return None;
         }
-        let sb = Superblock::from_payload(&payload)?;
-        Some(PublishSnapshot {
-            stream: StreamHeader::from_bytes(&prefix),
-            tick_seq: sb.tick_seq,
-            epoch_ms: sb.epoch_ms,
-            sequence: s1,
-        })
+        Some(bytes)
     }
 
     /// `true` when the read should give up: both the attempt budget and the
@@ -1536,12 +1764,7 @@ impl Spine {
         if seq_load(&mut m) & 1 == 0 {
             return false;
         }
-        drop(m);
         let _publish = self.publish_guard();
-        let mut m = self.mmap.lock();
-        if m.len() < SEQ_SLOT + 8 {
-            return false;
-        }
         let n = seq_load(&mut m);
         if n & 1 == 0 {
             return false; // a live writer closed it while we waited for the lock
@@ -1736,29 +1959,25 @@ fn current_superblock(mmap: &MmapMut) -> Superblock {
 
 /// Human-readable dump of the spine.
 ///
-/// The stream header comes from [`Spine::read_snapshot`], so the cycle and
-/// the publish record printed next to it are from the same publish. Two
-/// separate reads is exactly the mixing the seqlock exists to prevent.
+/// All displayed headers come from one validated store snapshot. Failure is
+/// reported explicitly rather than falling back to potentially mixed reads.
 pub fn format_summary(spine: &Spine) -> String {
-    let snap = spine.read_snapshot();
-    let s = snap
-        .as_ref()
-        .map(|p| p.stream)
-        .unwrap_or_else(|| spine.read_stream());
-    let (tick_seq, epoch_ms) = snap
-        .as_ref()
-        .map(|p| (p.tick_seq, p.epoch_ms))
-        .unwrap_or((0, 0));
-    let h = spine.read_hebbian();
-    let a = spine.read_attention();
-    let e = spine.read_emotion();
-    let r = spine.read_resonance();
-    let g = spine.read_graph();
-    let c = spine.read_cache();
-    let ar = spine.read_archetype();
-    let mi = spine.read_mirror();
-    let me = spine.read_merkle();
-    let meta = spine.read_meta();
+    let Some(snap) = spine.read_store_snapshot() else {
+        return "Spine: snapshot unavailable (busy, short or invalid mapping)".to_owned();
+    };
+    let s = snap.stream;
+    let tick_seq = snap.tick_seq;
+    let epoch_ms = snap.epoch_ms;
+    let h = snap.hebbian;
+    let a = snap.attention;
+    let e = snap.emotion;
+    let r = snap.resonance;
+    let g = snap.graph;
+    let c = snap.cache;
+    let ar = snap.archetype;
+    let mi = snap.mirror;
+    let me = snap.merkle;
+    let meta = snap.meta;
     format!(
         "Spine: {} pages mapped ({} KB)\n\
         Publish:  seq={} epoch_ms={} in_flight={}\n\
@@ -1816,6 +2035,127 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
         Spine::open(&dir).unwrap()
     }
+    #[test]
+    fn test_read_only_batch_does_not_publish() {
+        let spine = temp_spine("read_batch");
+        let before = spine.publish_sequence();
+        let p = spine.begin_publish();
+        assert_eq!(p.read_stream().cycle, 0);
+        assert!(p.read_superblock().is_some());
+        p.commit();
+        assert_eq!(spine.publish_sequence(), before);
+    }
+
+    #[test]
+    fn test_batch_is_one_window_and_excludes_partial_reads() {
+        let spine = temp_spine("batch_window");
+        let peer = Spine::open_ro(spine.output_dir()).unwrap();
+        let before = spine.publish_sequence();
+        let mut p = spine.begin_publish();
+        p.tick_stream(9, 0.0, 0.0, !9, 0.0, 0, 0, 9.0, 1234);
+        // A second mapping sees the intermediate bytes, but its validated
+        // read must reject them while the batch is still open.
+        assert_eq!(peer.read_stream().cycle, 9);
+        assert_eq!(peer.read_graph().node_count, 0);
+        assert!(peer
+            .read_prefixes_once(&[Slot::Stream, Slot::Graph])
+            .is_none());
+        let mut graph = p.read_graph();
+        graph.node_count = 9;
+        p.write_graph(&graph);
+        let mut emotion = p.read_emotion();
+        emotion.current[20] = 9.0;
+        emotion.total_updates = 9;
+        p.write_emotion(&emotion);
+        p.commit();
+        assert_eq!(spine.publish_sequence(), before + 2);
+        let snap = peer.read_store_snapshot().unwrap();
+        assert_eq!(snap.stream.cycle, 9);
+        assert_eq!(snap.graph.node_count, 9);
+        // Both values lie past byte 64: a stream-sized prefix loses them.
+        assert_eq!(snap.emotion.current[20], 9.0);
+        assert_eq!(snap.emotion.total_updates, 9);
+        assert_eq!(snap.epoch_ms, 1234);
+        assert_eq!(snap.stream.updated_ms, 1234);
+    }
+
+    #[test]
+    fn test_drop_and_unwinding_close_the_batch_without_rollback() {
+        let spine = temp_spine("batch_drop");
+        let before = spine.publish_sequence();
+        {
+            let mut p = spine.begin_publish();
+            let mut h = p.read_meta();
+            h.block_count = 7;
+            p.write_meta(&h);
+        }
+        assert_eq!(spine.publish_sequence(), before + 2);
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let mut p = spine.begin_publish();
+            let mut h = p.read_graph();
+            h.node_count = 13;
+            p.write_graph(&h);
+            panic!("batch interrupted");
+        }));
+        assert!(result.is_err());
+        assert_eq!(spine.publish_sequence(), before + 4);
+        let snap = spine.read_store_snapshot().unwrap();
+        assert_eq!(snap.meta.block_count, 7);
+        assert_eq!(snap.graph.node_count, 13);
+        spine.tick(2, 0.0, 0.0, 0, 0.0, 0, 0, 0.0);
+        assert!(!spine.publish_window_open());
+    }
+
+    #[test]
+    fn test_each_legacy_header_write_opens_a_window() {
+        let spine = temp_spine("legacy_windows");
+        let before = spine.publish_sequence();
+        let h = spine.read_hebbian();
+        spine.write_hebbian(&h);
+        let g = spine.read_graph();
+        spine.write_graph(&g);
+        let m = spine.read_meta();
+        spine.write_meta(&m);
+        assert_eq!(spine.publish_sequence(), before + 6);
+        assert!(spine.read_store_snapshot().is_some());
+    }
+
+    #[test]
+    fn test_store_snapshot_rejects_short_and_invalid_mappings() {
+        let spine = temp_spine("short_snapshot");
+        // A separate file, so no live peer mapping is truncated underneath it.
+        let path = spine.output_dir().join("short.bin");
+        let file = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(path)
+            .unwrap();
+        file.set_len((Slot::Stream.offset() + SNAPSHOT_PREFIX_BYTES) as u64)
+            .unwrap();
+        // SAFETY: this private file outlives the mapping, and is never truncated.
+        let mut short = unsafe { MmapOptions::new().map_mut(&file).unwrap() };
+        short[..SUPERBLOCK_BYTES].copy_from_slice(&Superblock::new().to_payload());
+        *spine.mmap.lock() = short;
+        assert!(spine.read_snapshot().is_some());
+        assert!(spine.read_store_snapshot().is_none());
+        assert!(format_summary(&spine).contains("snapshot unavailable"));
+        spine.mmap.lock()[..SUPERBLOCK_BYTES].fill(0);
+        assert!(spine.read_snapshot().is_none());
+    }
+
+    #[test]
+    fn test_republishing_after_a_stall_never_marks_the_window_even() {
+        let spine = temp_spine("republish_stall");
+        let mut m = spine.mmap.lock();
+        let odd = seq_begin(&mut m);
+        assert_eq!(seq_begin(&mut m), odd);
+        assert_eq!(seq_load(&mut m), odd);
+        seq_end(&mut m, odd);
+        assert_eq!(seq_load(&mut m), odd + 1);
+    }
+
     #[test]
     fn test_open_creates_superblock() {
         let spine = temp_spine("sb");

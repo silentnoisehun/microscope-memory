@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-10-13
+
 ### Added
 - `Spine::begin_publish()` returns an exclusive `Publish` batch with typed
   read/write methods, `tick_stream`, and explicit commit (drop also commits).

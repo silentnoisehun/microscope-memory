@@ -41,7 +41,7 @@ A living, self-organizing memory architecture with 12 memory layers, 9 depths, a
 | Rust files | 110 |
 | Lines of code (`src/**/*.rs`) | 62,938 |
 | Tests | 451 library + 88 integration + 16 hooks |
-| Version | 1.0.0 |
+| Version | 1.2.0 |
 | Build time | ~2m 30s |
 | Binary size | ~3.0 MB |
 | WASM size | 151.6 KB |

@@ -75,11 +75,9 @@ async fn auth_middleware(State(state): State<AuthState>, req: Request, next: Nex
             .or(headers.get(AUTHORIZATION))
             .and_then(|v| v.to_str().ok())
             .map(|s| {
-                if s.starts_with("Bearer ") {
-                    s[7..].to_owned()
-                } else {
-                    s.to_owned()
-                }
+                s.strip_prefix("Bearer ")
+                    .map(|stripped| stripped.to_owned())
+                    .unwrap_or_else(|| s.to_owned())
             });
 
         if provided.as_deref() != Some(expected.as_str()) {

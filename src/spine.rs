@@ -1158,6 +1158,7 @@ impl Publish<'_> {
 /// One publisher's turn. `Drop` releases the advisory lock, so a publish that
 /// panics part-way through cannot leave the store un-writable.
 pub struct PublishGuard<'a> {
+    #[allow(dead_code)]
     file: Option<&'a std::fs::File>,
     held: bool,
 }
@@ -1196,6 +1197,7 @@ pub struct Spine {
     /// Opened per handle and deliberately *not* held: locking and unlocking
     /// this descriptor around each publish is what serialises publishers.
     /// `None` when the file could not be opened, which costs serialisation.
+    #[allow(dead_code)]
     publish_lock_file: Option<std::fs::File>,
     /// `false` once the publish lock turns out to be unavailable, so nothing
     /// claims an exclusion it does not have.
@@ -1317,6 +1319,7 @@ mod writer_lock {
     #[allow(dead_code)]
     pub const UN: i32 = 8;
 
+    #[allow(dead_code)]
     pub fn try_op(_fd: i32, _operation: i32) -> Result<(), (bool, io::Error)> {
         Err((
             false,
@@ -1886,6 +1889,7 @@ impl Spine {
     /// Grow the file and remap. Refuses unless this handle is a writer and no
     /// peer holds the lock exclusively, because remapping invalidates page 0
     /// — including the seqlock counter — for every other mapping.
+    #[allow(unreachable_code, unused_variables)]
     pub fn resize(&self, new_len: usize) -> std::io::Result<()> {
         #[cfg(unix)]
         use std::os::fd::AsRawFd;

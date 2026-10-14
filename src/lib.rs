@@ -33,6 +33,8 @@ pub mod ai_adapter;
 pub mod bridge;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod mcp;
+#[cfg(all(not(target_arch = "wasm32"), feature = "mcp_http"))]
+pub mod mcp_http;
 pub mod merkle;
 pub mod mirror;
 #[cfg(not(target_arch = "wasm32"))]

@@ -330,6 +330,17 @@ pub enum Cmd {
     },
     /// Start the MCP (Model Context Protocol) server for Claude Desktop integration
     Mcp,
+    /// Start the MCP server over Streamable HTTP transport (remote/multi-client)
+    ///
+    /// Requires `--features mcp_http`.  A non-loopback host requires
+    /// `[server] api_key` to be set in config.
+    McpHttp {
+        /// Interface to bind. A non-loopback host requires [server] api_key.
+        #[arg(long, default_value = "127.0.0.1")]
+        host: String,
+        #[arg(short, long, default_value = "8080")]
+        port: u16,
+    },
     /// Print drop-in MCP server config + auto-context wrapper instructions
     /// for a specific AI client: claude | hermes | cursor | cline | generic
     Config {

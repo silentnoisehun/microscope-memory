@@ -1,4 +1,4 @@
-# Benchmarks — Microscope Memory v0.8.2
+# Benchmarks — Microscope Memory v1.2.0
 
 ## What is measured here (read this first)
 
@@ -65,9 +65,12 @@ Two consequences worth stating plainly. A recall number here cannot be
 re-derived, because the query set was never kept. And a latency number here is a
 single observation on one machine, not a distribution.
 
-**A version inconsistency, found while recording this.** The tag is v0.9.2 and
-the tree is 115 commits past it, but `Cargo.toml` still declares `0.8.2`. A reader
-cannot tell which version the binaries were built from.
+**A version note, found while recording this.** The data below was recorded at
+commit `e0cea99552e5b2ffddfe6304ca27de1d51fd5417` (tagged v0.9.2, +115 commits
+past it) using binaries built from that commit, **not** the current `1.2.0` tree.
+`Cargo.toml` declared `0.8.2` at recording time; it has since been bumped to
+`1.2.0`. The latency figures are reproducible from the pinned commit and corpus
+hashes below; the architectural description applies to the current tree.
 
 ## BEIR SciFact — the measurement to argue with
 

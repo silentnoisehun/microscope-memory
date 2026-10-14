@@ -4,7 +4,7 @@
 Not a database. Not a vector store. A *system that learns, dreams, and remembers* — written in 62,938 lines of pure Rust.
 
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.22983478.svg)](https://doi.org/10.5281/zenodo.22983478)
-[![Rust](https://img.shields.io/badge/Rust-1.85%2B-d74032?style=for-the-badge&logo=rust)](https://www.rust-lang.org/)
+[![Rust](https://img.shields.io/badge/Rust-1.91%2B-d74032?style=for-the-badge&logo=rust)](https://www.rust-lang.org/)
 [![License](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)](LICENSE)
 [![MCP Server](https://img.shields.io/badge/MCP-Server-orange?style=for-the-badge)](https://modelcontextprotocol.io)
 [![ORCID](https://img.shields.io/badge/ORCID-0009--0003--3986--6039-60BE52?style=for-the-badge&logo=orcid)](https://orcid.org/0009-0003-3986-6039)
@@ -139,11 +139,13 @@ The shadow term prevents growth toward areas with weak evidence, without blockin
 
 ---
 
-## ⚡ Performance (v1.0.0, Hardware-Measured)
+## ⚡ Performance
+
+### v0.8.x → v1.2.0 Optimisation Gains
 
 All figures are measured on release builds (in-process A/B runs, warm-up discarded):
 
-| Operation | Before | After | Speedup |
+| Operation | Before (v0.8.x) | After (v1.2.0) | Speedup |
 |---|---|---|---|
 | **Startup** (24 state files → 1 mmap) | 19.2 ms | 1.08 ms | **17.8×** |
 | **Text search** (23,774 blocks, in-process) | 901 µs | 93 µs | **9.7×** |
@@ -151,7 +153,20 @@ All figures are measured on release builds (in-process A/B runs, warm-up discard
 | **MCP session** (stdio, shared reader) | 2.68 ms | 113 µs | **23.7×** |
 | **End-to-end find** (incl. process start) | 68 ms | 47 ms | **1.4×** |
 
-> **Honest boundaries**: The end-to-end CLI is dominated by process startup (~17 ms floor), so user-visible `find` improves modestly. In-loop paths (bridge, MCP, benchmarks) improve by ~10×. See `BENCHMARKS.md` for full methodology.
+> **Honest boundaries**: The end-to-end CLI is dominated by process startup (~17 ms floor), so user-visible `find` improves modestly. In-loop paths (bridge, MCP, benchmarks) improve by ~10×.
+
+### Benchmark Corpus (v0.9.2+ commit `e0cea99`, 12-core Ryzen 5 7535HS)
+
+These are single-observation measurements from `BENCHMARKS.md` — recorded on one machine, not a distribution. The query set was not retained, so recall numbers cannot be re-derived.
+
+| Operation | Avg | Cold | Notes |
+|---|---|---|---|
+| In-process spatial query | ~112 µs | — | 3D nearest-neighbour lookup |
+| Warm `find` (28,679 blocks) | ~186 ms | — | Full text search across all depths |
+| Cold `find` | — | ~3.6 s | First call, file system + mmap |
+| MCP session (stdio, warm) | ~113 µs | — | From the optimisation table above |
+
+See [`BENCHMARKS.md`](BENCHMARKS.md) for full methodology, χ² goodness-of-fit (95% confidence), and the 2Q parity analysis (95% χ²<sub>red</sub>).
 
 ---
 
@@ -196,18 +211,72 @@ microscope-mem autonomous
 
 ### MCP (Model Context Protocol)
 
-Microscope Memory ships with a native MCP server (`microscope-mem-mcp`):
+Microscope Memory ships with a native MCP server built on the [`rmcp`](https://docs.rs/rmcp)
+crate. Two transports are available:
 
-- **stdio transport**: `npx @modelcontextprotocol/inspector` for local dev
-- **Streamable HTTP** (optional feature): Online, multi-client, SSE-capable
-- **Zero JSON on the spine** — the bridge speaks pure binary; the MCP layer is just the interface adapter
+| Transport | Command | Feature | Use case |
+|---|---|---|---|
+| **stdio** (Claude Desktop) | `microscope-mem mcp` | built-in | Local AI assistants |
+| **Streamable HTTP** (remote) | `microscope-mem mcp-http` | `--features mcp_http` | Multi-client, online agents |
 
-```bash
-# Local MCP (stdio) — add to claude_desktop_config.json
+The stdio server implements the full JSON-RPC 2.0 framing by hand (protocol
+version `2024-11-05`) with 47 tools covering store, recall, spatial look,
+MQL query, session log, Hebbian learning, emotional field, dream
+consolidation, and more.
+
+The Streamable HTTP server uses `rmcp`'s `StreamableHttpService` and speaks
+protocol version `2026-07-28` (compatible with `2025-11-25` and `2024-11-05`).
+It exposes the core tools — `memory_status`, `memory_store`, `memory_recall`,
+`memory_find`, `memory_look`, `memory_mql_query`, `memory_session_log`,
+`memory_ping`, and `memory_build`.
+
+#### Security
+
+- **API key auth** — when `[server].api_key` is set in `config.toml`, every
+  request must carry it via the `x-api-key` or `Authorization: Bearer <key>`
+  header.
+- **Origin validation** — when `[server].cors_origin` is set, cross-origin
+  requests whose `Origin` header doesn't match are rejected (DNS-rebinding
+  protection).
+- **Session management** — `Mcp-Session-Id` header handling via
+  `LocalSessionManager` (stateful + stateless modes).
+
+#### Local MCP (stdio) — Claude Desktop config
+
+```json
 {
   "mcpServers": {
     "microscope": {
-      "command": "/path/to/microscope-mem-mcp"
+      "command": "/path/to/microscope-mem",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+#### Streamable HTTP — remote access
+
+```bash
+# Start the server (requires --features mcp_http)
+cargo build --release --features mcp_http
+./target/release/microscope-mem mcp-http --host 127.0.0.1 --port 8080
+
+# With API key (set in config.toml under [server])
+curl -H "x-api-key: your-key" http://localhost:8080/mcp
+
+# MCP client .mcp.json (Streamable HTTP)
+# For Cursor, Claude Code, etc.:
+```
+
+```json
+{
+  "mcpServers": {
+    "microscope-http": {
+      "type": "http",
+      "url": "http://localhost:8080/mcp",
+      "headers": {
+        "x-api-key": "your-key"
+      }
     }
   }
 }
@@ -300,6 +369,9 @@ cargo build --release
 
 # With semantic embeddings (BERT/ONNX)
 cargo build --release --features "native,embeddings"
+
+# With Streamable HTTP MCP server
+cargo build --release --features mcp_http
 
 # WASM
 cargo build --target wasm32-unknown-unknown --release \

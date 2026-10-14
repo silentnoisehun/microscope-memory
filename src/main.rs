@@ -5035,6 +5035,28 @@ async fn async_main() {
             // Start MCP server for Claude Desktop integration
             microscope_memory::mcp::run(config);
         }
+        Cmd::McpHttp { host, port } => {
+            #[cfg(feature = "mcp_http")]
+            {
+                eprintln!(
+                    "[mcp_http] Starting Streamable HTTP MCP server on {}:{}",
+                    host, port
+                );
+                if let Err(e) = microscope_memory::mcp_http::serve_http(config, &host, port).await {
+                    eprintln!("[mcp_http] Server error: {}", e);
+                    std::process::exit(1);
+                }
+            }
+            #[cfg(not(feature = "mcp_http"))]
+            {
+                let _ = (&host, &port);
+                eprintln!(
+                    "[mcp_http] ERROR: the 'mcp_http' feature is not enabled.\n  \
+                     Build with: cargo build --release --features mcp_http"
+                );
+                std::process::exit(1);
+            }
+        }
         Cmd::Config { client } => {
             print_client_setup(&client, &config);
         }

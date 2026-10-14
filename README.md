@@ -228,7 +228,7 @@ The Streamable HTTP server uses `rmcp`'s `StreamableHttpService` and speaks
 protocol version `2026-07-28` (compatible with `2025-11-25` and `2024-11-05`).
 It exposes the core tools — `memory_status`, `memory_store`, `memory_recall`,
 `memory_find`, `memory_look`, `memory_mql_query`, `memory_session_log`,
-`memory_ping`, and `memory_build`.
+`memory_ping`, `memory_build`, and `memory_speak` (text-to-speech via system SAPI).
 
 #### Security
 

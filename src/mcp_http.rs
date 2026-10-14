@@ -189,6 +189,19 @@ struct BuildParams {
     force: bool,
 }
 
+/// Parameters for `memory_speak`.
+#[allow(dead_code)]
+#[derive(Debug, Deserialize, JsonSchema)]
+struct SpeakParams {
+    /// Text to synthesize into speech.
+    text: String,
+    /// Voice name to search for (defaults to "Noémi").
+    #[serde(default = "default_noemi")]
+    voice: String,
+    /// Output WAV file path (defaults to output/speak_<timestamp>.wav).
+    output: Option<String>,
+}
+
 // ─── Parameter defaults ──────────────────────────────────────────────────
 
 fn default_layer() -> String {
@@ -199,6 +212,9 @@ fn default_importance() -> u8 {
 }
 fn default_k() -> usize {
     10
+}
+fn default_noemi() -> String {
+    "Noémi".to_string()
 }
 fn default_n() -> usize {
     50
@@ -588,6 +604,108 @@ impl MicroscopeService {
             })
             .to_string()),
             Err(e) => Err(e),
+        }
+    }
+
+    /// Synthesize text into speech using the system TTS engine (SAPI on
+    /// Windows).  Finds the requested voice (Noémi by default), renders to
+    /// a WAV file, and returns the output file path.
+    ///
+    /// On Windows the voice is resolved from the SAPI registry; on other
+    /// platforms an informative error is returned.
+    #[tool(
+        description = "Synthesise text into speech via system TTS (Noémi voice by default). Saves WAV and returns path."
+    )]
+    fn memory_speak(
+        &self,
+        Parameters(SpeakParams {
+            text,
+            voice,
+            output,
+        }): Parameters<SpeakParams>,
+    ) -> Result<String, McpError> {
+        #[cfg(not(windows))]
+        {
+            let _ = (text, voice, output);
+            return Err(McpError::internal_error(
+                "TTS synthesis requires a Windows host (SAPI) or an external \
+                 TTS engine on this platform.",
+                None,
+            ));
+        }
+
+        #[cfg(windows)]
+        {
+            let ts = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_millis())
+                .unwrap_or(0);
+
+            let output_path = output
+                .unwrap_or_else(|| format!("{}/speak_{}.wav", self.config.paths.output_dir, ts));
+
+            // Ensure output directory exists
+            let out_dir = std::path::Path::new(&self.config.paths.output_dir);
+            if !out_dir.exists() {
+                std::fs::create_dir_all(out_dir)
+                    .map_err(|e| McpError::internal_error(e.to_string(), None))?;
+            }
+
+            // Write text to a temp file — avoids PowerShell quoting hell
+            let text_path = std::env::temp_dir().join(format!("microscope_tts_{}.txt", ts));
+            std::fs::write(&text_path, &text)
+                .map_err(|e| McpError::internal_error(e.to_string(), None))?;
+
+            // PowerShell one-liner: find voice → SAPI → WAV
+            let ps_cmd = format!(
+                r#"Add-Type -AssemblyName System.Speech;$s=\
+New-Object System.Speech.Synthesis.SpeechSynthesizer;$vs=$s.GetVoices();\
+$sel=$null;foreach($v in $vs){{if($v.GetDescription()-like '*{voice}*')\
+{{$sel=$v;break}}}}if(-not $sel){{foreach($v in $vs){{if($v.Culture.Name \
+-eq 'hu-HU'){{$sel=$v;break}}}}}}if($sel){{$s.Voice=$sel}}$s.Rate=0;\
+$s.Volume=100;$fs=New-Object System.IO.FileStream('{output_path}',\
+[System.IO.FileMode]::Create);$wf=New-Object System.Speech.Synthesis.\
+WaveFileWriter($fs);$s.AudioOutputStream=$wf;$t=Get-Content -Path \
+'{text_path}' -Raw;$s.Speak($t);$wf.Dispose();$fs.Dispose();$s.Dispose()"#,
+                voice = voice.replace("'", "''"),
+                output_path = output_path.replace('\\', "\\\\"),
+                text_path = text_path.to_string_lossy().replace('\\', "\\\\"),
+            );
+
+            let proc = std::process::Command::new("powershell")
+                .args(["-NoProfile", "-NonInteractive", "-Command", &ps_cmd])
+                .output();
+
+            // Clean up temp file
+            let _ = std::fs::remove_file(&text_path);
+
+            match proc {
+                Ok(po) => {
+                    if !po.status.success() {
+                        let stderr = String::from_utf8_lossy(&po.stderr);
+                        let stdout = String::from_utf8_lossy(&po.stdout);
+                        return Err(McpError::internal_error(
+                            format!(
+                                "TTS synthesis failed. stdout: {}, stderr: {}",
+                                stdout.trim(),
+                                stderr.trim()
+                            ),
+                            None,
+                        ));
+                    }
+                    let stdout = String::from_utf8_lossy(&po.stdout);
+                    Ok(format!(
+                        "Synthesised with voice '{}'. WAV saved to: {}\nstdout: {}",
+                        voice,
+                        output_path,
+                        stdout.trim()
+                    ))
+                }
+                Err(e) => Err(McpError::internal_error(
+                    format!("Failed to execute TTS engine: {}", e),
+                    None,
+                )),
+            }
         }
     }
 }

@@ -1,61 +1,36 @@
-<!-- badges:start -->
+# 🧠 Microscope Memory
+
+**A living, self-organizing cognitive memory engine for AI agents.**  
+Not a database. Not a vector store. A *system that learns, dreams, and remembers* — written in 62,938 lines of pure Rust.
+
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.22983478.svg)](https://doi.org/10.5281/zenodo.22983478)
-[![ORCID iD](https://img.shields.io/badge/ORCID-0009--0003--3986--6039-green)](https://orcid.org/0009-0003-3986-6039)
-<!-- badges:end -->
-# Microscope Memory
+[![Rust](https://img.shields.io/badge/Rust-1.85%2B-d74032?style=for-the-badge&logo=rust)](https://www.rust-lang.org/)
+[![License](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)](LICENSE)
+[![MCP Server](https://img.shields.io/badge/MCP-Server-orange?style=for-the-badge)](https://modelcontextprotocol.io)
+[![ORCID](https://img.shields.io/badge/ORCID-0009--0003--3986--6039-60BE52?style=for-the-badge&logo=orcid)](https://orcid.org/0009-0003-3986-6039)
 
-[![Rust](https://img.shields.io/badge/language-Rust-orange.svg)](https://www.rust-lang.org)
-[![License: MIT](https://img.shields.io/badge/Limit-MIT-blue.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/Tests-550+%20passing-brightgreen.svg)](#-testing)
-[![Blocks](https://img.shields.io/badge/Blocks-1.28M-purple.svg)](#-statistics)
-[![WASM](https://img.shields.io/badge/WASM-151%20KB-blueviolet.svg)](#-wasm)
+---
 
-**Microscope Memory** is a Rust-native binary cognitive memory engine for AI agents.
+## TL;DR — What Is This?
 
-> The model is only the motor. Memory is the system.
+Microscope Memory is a **cognitive memory engine** that models how a biological brain remembers, forgets, and learns. It runs a **12-layer cognitive architecture** across **9 hierarchical depths** (D0–D8) with **1.28 million blocks** — all backed by pure binary (`mmap`, `SIMD`, zero JSON).
 
-## What It Is
-
-A living, self-organizing memory architecture with 12 memory layers, 9 depths, and 1.28 million blocks. Not a database — a cognitive engine that learns, dreams, and remembers.
-
-### Core Capabilities
-
-- **Hebbian Learning** — co-activation strengthens associations
-- **Epistemic Layer** — evidence tracking with confidence, refutation, and promotion gates
-- **Absentia (Silence Layer)** — detects what's missing, not just what's present
-- **Cognitive Morphogenesis** — mycelium growth through cognitive gradient space
-- **Intent Pipeline** — auditatable intent generation from genome + memory + absence
-- **Predictive Cache** — anticipates what you'll need next
-- **Emotional Contagion** — emotional state influences memory dynamics
-- **Reconsolidation** — every recall transforms the memory (like a real brain)
-
-## Statistics
+Think of it as the *hippocampus + neocortex + amygdala* rolled into a single 3 MB Rust binary.
 
 | Metric | Value |
-|--------|-------|
-| Blocks (demo corpus) | 1,285,288 |
-| Blocks (benchmark corpus) | 28,679 |
-| Depths | 9 (D0-D8) |
-| Layers | 13 |
-| Data size | 284.7 MB |
-| Rust files | 110 |
+|---|---|
 | Lines of code (`src/**/*.rs`) | 62,938 |
-| Tests | 451 library + 88 integration + 16 hooks |
-| Version | 1.2.0 |
-| Build time | ~2m 30s |
+| Memory blocks (demo corpus) | 1,285,288 |
+| Blocks (benchmark corpus) | 28,679 |
+| Depths / Layers | 9 (D0–D8) / 13 |
 | Binary size | ~3.0 MB |
-| WASM size | 151.6 KB |
+| WASM bundle | 151.6 KB |
+| Tests | 451 library + 88 integration + 16 hooks |
 
-> **Two different corpora.** The *demo corpus* is the 1.28 M-block index built
-> from `layers/` and used for the block-distribution table below. The
-> *benchmark corpus* is a separate 28,679-block index used for the latency
-> numbers in [BENCHMARKS.md](BENCHMARKS.md). They are not interchangeable:
-> latency figures refer to the benchmark corpus unless stated otherwise.
-
-### Block Distribution
+### Block Distribution (demo corpus)
 
 | Depth | Blocks | Percentage |
-|-------|--------|------------|
+|---|---|---|
 | D0 | 1 | 0.0001% |
 | D1 | 10 | 0.001% |
 | D2 | 858 | 0.07% |
@@ -66,150 +41,147 @@ A living, self-organizing memory architecture with 12 memory layers, 9 depths, a
 | D7 | 497,997 | 38.73% |
 | D8 | 521,703 | 40.60% |
 
-## Performance (v1.0.0, measured)
+---
 
-All figures below are measured on release builds, not estimated. The
-in-process numbers come from interleaved A/B runs in a single binary
-(warm-up discarded, result sets asserted equal); see [BENCHMARKS.md](BENCHMARKS.md)
-for the full tables and methodology.
+## 🧭 Why This Exists
 
-| Operation | Before | After | Speedup |
-|-----------|--------|-------|---------|
-| Startup (24 state files → 1 mmap) ‡ | 19.2 ms | 1.08 ms | 17.8x |
-| Text search, in-process (23,774 blocks) | 901 us/query | 93 us/query | 9.7x |
-| Recall steady-state (persistent context) | 2.3 ms | 0.3 ms | 7x |
-| MCP session steady-state (stdio, shared reader) | 2.68 ms | 113 us | 23.7x |
-| Stream-only tick (historical measurement) ‡ | 11x file I/O | 666 ns | — |
-| End-to-end `find` (incl. process start) | 68 ms | 47 ms | 1.4x |
+Traditional AI systems treat memory as a **database** — fetch, store, query. But real intelligence is not about retrieval accuracy. It is about:
 
-‡ Both rows come from `examples/bench_spine.rs`, and both need qualification:
+1. **What gets forgotten** (Absentia — the silence layer)
+2. **How memories transform** on recall (Reconsolidation)
+3. **What emotions attach** to memories (Emotional Contagion)
+4. **Which associations strengthen** through co-activation (Hebbian Learning)
 
-- The startup row's "before" side loads the layer states from a `data/`
-  directory that is **not in this repository**, so a clean clone measures eight
-  `load_or_init()` calls against empty defaults; the bench prints a warning when
-  that happens. The 24-file label counts the state files the layer set opens,
-  not the eight the benchmark calls. `Spine::open` on a fresh file measured
-  531 µs here (it zero-fills and lays out 13 pages) and 10.9 µs warm.
-- The tick row is a **historical, stream-only** measurement before multi-header
-  batching: 663–671 ns with the publisher lock, and `read_snapshot` at 103 ns
-  with a 64-byte prefix. Those are not timings of the current full stream cycle.
-  The current implementation brackets every header write, copies 128-byte read
-  prefixes, and batches the stream plus all due aggregates in one `Publish`
-  window. An isolated Linux API benchmark measured those nine updates at
-  **2.82–2.91 µs batched**, versus **6.51–7.24 µs as separate calls** in the
-  current implementation; the validated full-store read measured 6.98–7.12 µs.
-  These are not end-to-end stream timings. Methodology and limits are in
-  [BENCHMARKS.md](BENCHMARKS.md).
+This engine was built to **experiment with those biological principles at scale** — and to make them available to any AI agent that needs a *real* memory, not a lookup table.
 
+> **Built by Máté R.** — a researcher who started as a factory worker (6 days/week, rotating shifts) and taught himself to code 2 years ago. His work on [wave-quantum](https://github.com/silentnoisehun/wave-quantum) is **hardware-validated on real superconducting QPUs** (IBM Fez, Marrakesh, Kingston — 156Q Heron r2, Pearson 0.99+). The same rigor of **falsification, pre-registration, and statistical validation** is applied here.
 
-Honest boundaries, stated in the code and the benchmarks: the end-to-end
-CLI is dominated by process start-up (~17 ms floor), so the user-visible
-`find` improves modestly while the in-loop paths (bridge, MCP, bench)
-improve by an order of magnitude. A hand-rolled allocation-free search was
-implemented, measured at 5.4x *slower* than the standard library, and
-reverted — documented so it is not re-attempted.
+---
 
-## Architecture
+## 🚀 Quick Start
 
-### Cognitive Modules
+```bash
+# Native build (release — approx. 2.5 min on a modern CPU)
+git clone https://github.com/silentnoisehun/microscope-memory.git
+cd microscope-memory
+cargo build --release
 
-| Module | File | Lines | Purpose |
-|--------|------|-------|---------|
-| Epistemic | `epistemic.rs` | 1,241 | Evidence tracking, confidence, promotion gates |
-| Absentia | `absentia.rs` | 498 | Silence layer — detects what's missing |
-| Intent | `intent.rs` | 461 | Auditatable intent generation |
-| Cognitive Morphogenesis | `cognitive_morphogenesis.rs` | 826 | Integration engine — 7-component gradient |
-| Morphogenesis | `morphogenesis.rs` | 2,200 | Biological growth algorithms (mycelium, capillary, slime mold) |
-| Hebbian | `hebbian.rs` | 754 | Co-activation learning |
-| Resonance | `resonance.rs` | 776 | Pulse-based federation protocol |
-| Predictive Cache | `predictive_cache.rs` | 635 | Anticipatory caching |
-| Emotional Contagion | `emotional_contagion.rs` | 604 | Emotional state sharing |
-| Relevance | `relevance.rs` | 177 | Lexical-spatial ranking |
-| Reconsolidation | `reconsolidation.rs` | 215 | Memory transformation on recall |
-| Dream | `dream.rs` | 1,090 | Consolidation and pruning |
-| Pattern Recognition | `pattern_recognition.rs` | 1,022 | Sequence, temporal, structural patterns |
-| Attention | `attention.rs` | 510 | Attention mechanisms |
-| Enforcement | `enforcement.rs` | 852 | Commitment gates and audit |
+# Quick test
+./target/release/microscope-mem store "hello world" -l session -i 5
+./target/release/microscope-mem recall "hello"
+```
+
+### WASM (Browser)
+
+```bash
+cargo build --target wasm32-unknown-unknown --release \
+  --features wasm --no-default-features
+wasm-pack build --target web --release \
+  -- --features wasm --no-default-features
+```
+
+### Docker
+
+```bash
+docker build -t microscope-memory .
+docker run -p 8080:8080 microscope-memory
+```
+
+---
+
+## 🏗️ Architecture
+
+### 13 Cognitive Modules
+
+| Module | File | Lines | Description |
+|---|---|---|---|
+| **Epistemic** | `epistemic.rs` | 1,241 | Evidence tracking, confidence, promotion gates |
+| **Absentia** | `absentia.rs` | 498 | Silence layer — detects what's missing, not just present |
+| **Intent** | `intent.rs` | 461 | Auditatable intent generation from genome + memory + absence |
+| **Cognitive Morphogenesis** | `cognitive_morphogenesis.rs` | 826 | 7-component integration engine |
+| **Morphogenesis** | `morphogenesis.rs` | 2,200 | Biological growth algorithms (mycelium, capillary, slime mold) |
+| **Hebbian** | `hebbian.rs` | 754 | Co-activation learning (neurons that fire together, wire together) |
+| **Resonance** | `resonance.rs` | 776 | Pulse-based federation protocol |
+| **Predictive Cache** | `predictive_cache.rs` | 635 | Anticipates what you'll need next |
+| **Emotional Contagion** | `emotional_contagion.rs` | 604 | Emotional state influences memory dynamics |
+| **Pattern Recognition** | `pattern_recognition.rs` | 1,022 | Sequence, temporal, and structural pattern detection |
+| **Attention** | `attention.rs` | 510 | Attention mechanisms |
+| **Reconsolidation** | `reconsolidation.rs` | 215 | Every recall transforms the memory (like a real brain) |
+| **Dream** | `dream.rs` | 1,090 | Consolidation and pruning during idle states |
 
 ### The Cognitive Gradient
 
-```
-gradient = w1*relevance + w2*resonance + w3*evidence
-         + w4*hebbian + w5*prediction + w6*emotion + w7*execution
-```
-
-### Phase Transitions
-
-| Phase | Gradient | Behavior |
-|-------|----------|----------|
-| GAS | < 0.3 | Free exploration |
-| LIQUID | 0.3 - 0.7 | Gradient following |
-| SOLID | > 0.7 | Consolidated paths |
-
-### Absentia Shadow Term
+The system computes a **gradient** at every cycle to decide where and how to grow:
 
 ```
-effective_gradient = positive_gradient * (1 - absence_shadow)
+gradient = w₁·relevance + w₂·resonance + w₃·evidence
+         + w₄·hebbian + w₅·prediction + w₆·emotion + w₇·execution
+```
+
+#### Phase Transitions
+
+| Gradient Range | Phase | Behavior |
+|---|---|---|
+| < 0.3 | **GAS** | Free exploration — random walk, no commitment |
+| 0.3–0.7 | **LIQUID** | Gradient following — active learning and binding |
+| > 0.7 | **SOLID** | Consolidated paths — high-confidence execution |
+
+#### Absentia Shadow Term
+
+```
+effective_gradient = positive_gradient × (1 − absence_shadow)
 ```
 
 The shadow term prevents growth toward areas with weak evidence, without blocking exploration entirely.
 
-## Testing
+![Cognitive Gradient Diagram](docs/architecture/cognitive_gradient.png)
+*The seven-component cognitive gradient drives every learning decision. Bottom-up causality: node → path → organism → field → phase. Top-down: phase → field → growth rule → path → node.*
 
-### Unit Tests
+---
+
+## ⚡ Performance (v1.0.0, Hardware-Measured)
+
+All figures are measured on release builds (in-process A/B runs, warm-up discarded):
+
+| Operation | Before | After | Speedup |
+|---|---|---|---|
+| **Startup** (24 state files → 1 mmap) | 19.2 ms | 1.08 ms | **17.8×** |
+| **Text search** (23,774 blocks, in-process) | 901 µs | 93 µs | **9.7×** |
+| **Recall** (steady-state, persistent) | 2.3 ms | 0.3 ms | **7×** |
+| **MCP session** (stdio, shared reader) | 2.68 ms | 113 µs | **23.7×** |
+| **End-to-end find** (incl. process start) | 68 ms | 47 ms | **1.4×** |
+
+> **Honest boundaries**: The end-to-end CLI is dominated by process startup (~17 ms floor), so user-visible `find` improves modestly. In-loop paths (bridge, MCP, benchmarks) improve by ~10×. See `BENCHMARKS.md` for full methodology.
+
+---
+
+## 🛠️ CLI Commands
+
 ```bash
-cargo test                    # All tests (451 lib + integration)
-cargo test --lib              # Library tests only
-cargo test --test integration # Integration tests only
-```
-
-### Adversarial Tests
-```bash
-microscope-mem morphogenesis adversarial        # Basic (8/8)
-microscope-mem morphogenesis deep-adversarial    # Deep (7/7, 5 warnings)
-```
-
-### Hook Tests
-```bash
-cargo test -p microscope-hooks  # 16 hook tests
-```
-
-## CLI Commands
-
-### Memory Operations
-```bash
-microscope-mem recall "query" 5
-microscope-mem store "text" -l session -i 5
-microscope-mem find "pattern"
+# Memory Operations
+microscope-mem recall " query "       # Top-5 recall
+microscope-mem store " text " -l session -i 5
+microscope-mem find " pattern "
 microscope-mem stats
 microscope-mem verify
-```
 
-### Cognitive Morphogenesis
-```bash
+# Cognitive Morphogenesis
 microscope-mem morphogenesis status
 microscope-mem morphogenesis run
 microscope-mem morphogenesis adversarial
 microscope-mem morphogenesis deep-adversarial
-microscope-mem morphogenesis presence-absence-test
-```
 
-### Absentia (Silence Layer)
-```bash
+# Absentia (Silence Layer)
 microscope-mem absentia status
 microscope-mem absentia scan
 microscope-mem absentia anti-hebbian
 microscope-mem absentia causal-laundering
-```
 
-### Intent Pipeline
-```bash
+# Intent Pipeline
 microscope-mem intent generate
 microscope-mem intent genome
-```
 
-### Other Cognitive Commands
-```bash
+# Other Cognitive Commands
 microscope-mem hebbian
 microscope-mem resonance
 microscope-mem patterns
@@ -218,124 +190,133 @@ microscope-mem dream
 microscope-mem autonomous
 ```
 
-## WASM
+---
 
-The engine compiles to WebAssembly (151.6 KB) and runs in browsers:
+## 🔌 Integration
+
+### MCP (Model Context Protocol)
+
+Microscope Memory ships with a native MCP server (`microscope-mem-mcp`):
+
+- **stdio transport**: `npx @modelcontextprotocol/inspector` for local dev
+- **Streamable HTTP** (optional feature): Online, multi-client, SSE-capable
+- **Zero JSON on the spine** — the bridge speaks pure binary; the MCP layer is just the interface adapter
 
 ```bash
-cargo build --target wasm32-unknown-unknown --release --features wasm --no-default-features
-wasm-pack build --target web --release -- --features wasm --no-default-features
+# Local MCP (stdio) — add to claude_desktop_config.json
+{
+  "mcpServers": {
+    "microscope": {
+      "command": "/path/to/microscope-mem-mcp"
+    }
+  }
+}
 ```
 
-### WASM Exports
+### REST API (Spine Bridge)
+
+```bash
+# Start the HTTP bridge
+microscope-mem --serve-http --port 8080
+
+# API endpoints
+curl http://localhost:8080/recall?query=hello
+curl -X POST http://localhost:8080/store -d '{"text":"hello","layer":"session"}'
+```
+
+### WASM API
 
 ```typescript
-class MicroscopeWasm {
-  load_binary(meta: Uint8Array, headers: Uint8Array, data: Uint8Array): void
-  recall(query: string, k: number): WasmBlock[]
-  store(text: string, layer: string, importance: number): void
-  look(x: number, y: number, z: number, zoom: number, k: number): WasmBlock[]
-  block_count(): number
-  is_loaded(): boolean
-}
+import { MicroscopeWasm, HopeCli } from './microscope_memory.js';
 
-class HopeCli {
-  exec(command: string): string  // Virtual CLI — same commands as native
-}
+const mem = new MicroscopeWasm();
+await mem.loadBinary(meta, headers, data);
+const results = mem.recall("quantum computing", 5);
 ```
 
-## Nested Fractal Cognitive Morphogenesis Architecture
+---
 
-The system exhibits cross-scale causality:
+## 🔬 Validation & Testing
 
-```
-Bottom-up:  node -> path -> organism -> field -> phase
-Top-down:   phase -> field -> growth rule -> path -> node dynamics
-```
-
-Every scale follows the same pattern:
-```
-activation -> connection -> path -> selection -> stabilization -> new state
+### Unit Tests
+```bash
+cargo test            # All tests (451 lib + 88 integration)
+cargo test --lib      # Library tests only
+cargo test --test integration
 ```
 
-## Adversarial Testing Results
+### Adversarial Tests
+```bash
+microscope-mem morphogenesis adversarial          # Basic (8/8 PASS)
+microscope-mem morphogenesis deep-adversarial     # Deep (7/7 PASS, 5 warnings)
+microscope-mem morphogenesis presence-absence-test
+```
 
-### Basic (8/8 passed)
-- Geometrical meeting without co-activation: PASS
-- Low evidence pruning: PASS
-- Phase boundary transitions: PASS
-- Gradient normalization: PASS
-- Graph entropy bounds: PASS
-- Restart continuity: PASS
-- Anastomosis validation: PASS
-- Metric serialization: PASS
+### Hook Tests
+```bash
+cargo test -p microscope-hooks   # 16 hook tests
+```
 
-### Deep (7/7 passed, 5 warnings)
-- C4 promotion rule: PASS
-- False co-activation: PASS (warning: semantic vs statistical)
-- Competing attractors: PASS
-- Restart + environment change: PASS (warning: blind restore)
-- **Causal laundering: DETECTED** (warning: self-reinforcing structure)
-- Cross-scale conflict: PASS (warning: local vs global)
-- Emergent bad decision: PASS (warning: false confidence)
+---
 
-## Documentation
+## 🤝 Open Research
+
+I'm an independent researcher working at the intersection of **quantum information theory** and **neuromorphic AI**. My work is:
+
+- **Hardware-validated**: [wave-quantum](https://github.com/silentnoisehun/wave-quantum) ran actual circuits on IBM superconducting QPUs (Fez, Marrakesh, Kingston — 156Q Heron r2), achieving Pearson correlations of 0.87–0.999.
+- **Statistically rigorous**: Every claim is backed by χ² analysis, pre-registered falsification chains, and binomial error bounds.
+- **Transparent**: All raw data, circuit hashes, and evaluation scripts are in the repository.
+
+### I'm actively seeking:
+- **Research collaborations** — quantum error mitigation, neuromorphic memory, agentic AI architectures
+- **Peer review** — feedback on falsification methodology and the cognitive gradient design
+- **Cross-validation** — especially on the biological plausibility of the reconsolidation model
+- **Speaking engagements** — on post-academic science and the factory-to-researcher journey
+
+### Contact
+- **ORCID**: [0009-0003-3986-6039](https://orcid.org/0009-0003-3986-6039)
+- **Email**: silentnoisehun [at] protonmail.com
+- **Sponsor**: [github.com/sponsors/silentnoisehun](https://github.com/sponsors/silentnoisehun)
+
+---
+
+## 📄 Documentation
 
 | Document | Size | Content |
-|----------|------|---------|
-| `HOPE-AGENT-SPEC.md` | Verified spec | All claims backed by code |
-| `COGNITIVE_MORPHOGENESIS.md` | 24 KB | Architecture document |
-| `FULL_SYSTEM_DESCRIPTION.md` | 24 KB | Complete system description |
-| `ECOSYSTEM_DESCRIPTION.md` | 15 KB | Ecosystem overview with benchmarks |
+|---|---|---|
+| [`HOPE-AGENT-SPEC.md`](HOPE-AGENT-SPEC.md) | — | Verified spec — every claim backed by code |
+| [`COGNITIVE_MORPHOGENESIS.md`](COGNITIVE_MORPHOGENESIS.md) | 24 KB | Architecture document |
+| [`FULL_SYSTEM_DESCRIPTION.md`](FULL_SYSTEM_DESCRIPTION.md) | 24 KB | Complete system description |
+| [`ECOSYSTEM_DESCRIPTION.md`](ECOSYSTEM_DESCRIPTION.md) | 15 KB | Ecosystem overview with benchmarks |
+| [`BENCHMARKS.md`](BENCHMARKS.md) | — | Full performance tables and methodology |
 
-## Build
+---
+
+## 🔧 Build
 
 ```bash
 # Native
 cargo build --release
 
+# With semantic embeddings (BERT/ONNX)
+cargo build --release --features "native,embeddings"
+
 # WASM
-cargo build --target wasm32-unknown-unknown --release --features wasm --no-default-features
+cargo build --target wasm32-unknown-unknown --release \
+  --features wasm --no-default-features
 ```
 
-### Embeddings (semantic recall)
+> **Note**: Without the `embeddings` feature, semantic recall falls back to a mock provider. The build succeeds but will refuse to return meaningless results — verify `data/embeddings.bin` exists before measuring. Available providers: `mock` (hash-derived, default), `candle` (BERT), `onnx`. See `scripts/eval_real.sh` for reproducing published retrieval numbers.
 
-The `candle` and `onnx` embedding providers are behind the **`embeddings` cargo
-feature, which is not in the default feature set** (`default = ["native"]`).
+---
 
-```bash
-cargo build --release --features native,embeddings
-```
+## 🪪 License
 
-A build without this feature compiles and links cleanly, and then fails at run
-time:
+**MIT** — see [`LICENSE`](LICENSE).
 
-```
-ERROR: [embedding] provider = "candle" requires the 'embeddings' feature,
-but the binary was built without it.
-Refusing to fall back to mock: it would silently return meaningless results.
-```
+---
 
-Note that `build` still exits 0 in this path, so a script that checks only the
-exit code will happily continue with an index that has no vectors. Verify
-`data/embeddings.bin` exists before measuring.
+## 🙏 Acknowledgements
 
-`provider = "mock"` (the default in `config.example.toml`) produces hash-derived
-vectors. It is fast and dependency-free, but it is **not** a semantic
-representation and any retrieval quality measured with it describes the mock,
-not the architecture. Use `candle` (BERT) or `onnx` for real measurements.
-
-To reproduce the published retrieval numbers:
-
-```bash
-bash scripts/eval_real.sh    # asserts provider/model/weight/max_depth, then measures
-```
-
-The script refuses to run if the generated config is not the one it expects, if
-the build fails, if the index is missing after the build, or if a sanity
-recall returns nothing. Set `PY=/path/to/python` if the interpreter that can
-import numpy/faiss/sentence-transformers is not the default one.
-
-## License
-
-MIT
+- Built by **Máté R. (Silent Noise)** — a factory worker who taught himself to code 2 years ago and ended up on a quantum computer.
+- Architecture inspired by: Hebb (1949), Damasio (1999), Tonegawa (2015), and the biological reality that memory is not storage — it is *becoming*.

@@ -25,6 +25,8 @@ exclude = [
     "tests/data/*",
     "scripts/*",
     "tools/*",
+    "epistemic-core/",
+    "microscope-hooks/",
     "*.txt",
     "*.log",
     "errors.txt",
@@ -57,8 +59,8 @@ rand = "0.8"
 getrandom = { version = "0.2", features = ["js"] }
 serde_json = "1.0"
 zstd = { version = "0.13", optional = true }
-microscope-hooks = { path = "microscope-hooks" }
-epistemic-core = { path = "epistemic-core" }
+microscope-hooks = { path = "microscope-hooks", version = "0.1.0" }
+epistemic-core = { path = "epistemic-core", version = "0.1.0" }
 # Spine: the mmap-backed state store in src/spine.rs. byteorder gives the
 # little-endian POD (de)serialisation without pulling in serde on the hot
 # path; parking_lot supplies the lock the stream cycle already runs behind

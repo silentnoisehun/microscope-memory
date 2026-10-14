@@ -275,7 +275,7 @@ I'm an independent researcher working at the intersection of **quantum informati
 
 ### Contact
 - **ORCID**: [0009-0003-3986-6039](https://orcid.org/0009-0003-3986-6039)
-- **Email**: silentnoisehun [at] protonmail.com
+- **Email**: [materobi86@gmail.com](mailto:materobi86@gmail.com)
 - **Sponsor**: [github.com/sponsors/silentnoisehun](https://github.com/sponsors/silentnoisehun)
 
 ---

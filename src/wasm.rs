@@ -10,7 +10,7 @@ use wasm_bindgen::prelude::*;
 use web_sys::console;
 
 use crate::{
-    content_coords_blended, BlockHeader, BLOCK_DATA_SIZE, DEPTH_ENTRY_SIZE, HEADER_SIZE,
+    content_coords_blended, BlockHeader, DEPTH_ENTRY_SIZE, HEADER_SIZE,
     LAYER_NAMES, META_HEADER_SIZE,
 };
 
@@ -24,6 +24,8 @@ pub struct WasmBlock {
     z: f32,
     depth: u8,
     layer: String,
+    layer_id: u8,
+    importance: u8,
     distance: f32,
 }
 
@@ -55,6 +57,14 @@ impl WasmBlock {
         self.layer.clone()
     }
     #[wasm_bindgen(getter)]
+    pub fn layer_id(&self) -> u8 {
+        self.layer_id
+    }
+    #[wasm_bindgen(getter)]
+    pub fn importance(&self) -> u8 {
+        self.importance
+    }
+    #[wasm_bindgen(getter)]
     pub fn distance(&self) -> f32 {
         self.distance
     }
@@ -66,6 +76,10 @@ struct WasmReader {
     data: Vec<u8>,
     block_count: usize,
     depth_ranges: [(u32, u32); 9],
+    /// Precomputed lowercase copy of every block's text, built once at load
+    /// time. Search hot paths (`find_text` / `recall`) read this instead of
+    /// calling `to_lowercase()` on each block on every query.
+    search_texts: Vec<String>,
 }
 
 impl WasmReader {
@@ -96,12 +110,26 @@ impl WasmReader {
             depth_ranges[d] = (start, count);
         }
 
-        Ok(WasmReader {
+        let mut reader = WasmReader {
             headers,
             data,
             block_count,
             depth_ranges,
-        })
+            search_texts: Vec::new(),
+        };
+
+        // Pre-normalize every block's text to lowercase ONCE, at load time.
+        // This is the single biggest search hot-path win: `find_text`/`recall`
+        // previously called `to_lowercase()` on each block for every query,
+        // which dominated latency (benchmark showed WASM 3.3–3.6× slower than
+        // the JS scan). Reusing `text(i)` keeps semantics identical (including
+        // the "<oob>"/"<bin>" sentinels for malformed ranges) while the
+        // lowercased copy is read once per query thereafter.
+        reader.search_texts = (0..reader.block_count)
+            .map(|i| reader.text(i).to_lowercase())
+            .collect();
+
+        Ok(reader)
     }
 
     #[inline(always)]
@@ -120,6 +148,13 @@ impl WasmReader {
         } else {
             "<oob>"
         }
+    }
+
+    /// Lowercased, precomputed copy of block `i`'s text. O(1) lookup — the
+    /// lowercasing happened once in `from_buffers`.
+    #[inline(always)]
+    fn search_text(&self, i: usize) -> &str {
+        self.search_texts.get(i).map(|s| s.as_str()).unwrap_or("")
     }
 
     fn look(&self, x: f32, y: f32, z: f32, zoom: u8, k: usize) -> Vec<(f32, usize)> {
@@ -169,7 +204,7 @@ impl WasmReader {
         let q = query.to_lowercase();
         let mut results: Vec<(u8, usize)> = (0..self.block_count)
             .filter_map(|i| {
-                if self.text(i).to_lowercase().contains(&q) {
+                if self.search_text(i).contains(&q) {
                     Some((self.header(i).depth, i))
                 } else {
                     None
@@ -197,8 +232,8 @@ impl WasmReader {
             let (start, count) = self.depth_ranges[zoom as usize];
             let (start, count) = (start as usize, count as usize);
             for i in start..(start + count) {
-                let text = self.text(i).to_lowercase();
-                let keyword_hits = keywords.iter().filter(|&&kw| text.contains(kw)).count();
+                let st = self.search_text(i);
+                let keyword_hits = keywords.iter().filter(|&&kw| st.contains(kw)).count();
                 if keyword_hits > 0 {
                     let h = self.header(i);
                     let dx = h.x - qx;
@@ -216,6 +251,41 @@ impl WasmReader {
         results
     }
 
+    /// Count substring matches across all blocks (uncapped by `k`). Used by
+    /// `MicroscopeWasm::find_count` to avoid allocating `WasmBlock`s.
+    fn find_text_count(&self, query: &str) -> usize {
+        let q = query.to_lowercase();
+        (0..self.block_count)
+            .filter(|&i| self.search_text(i).contains(&q))
+            .count()
+    }
+
+    /// Count keyword-match recall hits within the zoom-range window.
+    fn recall_count(&self, query: &str) -> usize {
+        let q_lower = query.to_lowercase();
+        let keywords: Vec<&str> = q_lower.split_whitespace().filter(|w| w.len() > 2).collect();
+        if keywords.is_empty() {
+            return 0;
+        }
+        let zoom_range = match query.len() {
+            0..=10 => (0u8, 3u8),
+            11..=40 => (3, 6),
+            _ => (6, 8),
+        };
+        let mut hits = 0usize;
+        for zoom in zoom_range.0..=zoom_range.1 {
+            let (start, count) = self.depth_ranges[zoom as usize];
+            let (start, count) = (start as usize, count as usize);
+            for i in start..(start + count) {
+                let st = self.search_text(i);
+                if keywords.iter().any(|kw| st.contains(*kw)) {
+                    hits += 1;
+                }
+            }
+        }
+        hits
+    }
+
     fn to_wasm_block(&self, i: usize, dist: f32) -> WasmBlock {
         let h = self.header(i);
         let text = self.text(i);
@@ -227,6 +297,8 @@ impl WasmReader {
             z: h.z,
             depth: h.depth,
             layer: layer.to_string(),
+            layer_id: h.layer_id,
+            importance: h.importance,
             distance: dist,
         }
     }
@@ -235,12 +307,42 @@ impl WasmReader {
 /// Append log entry for WASM (in-memory, no file I/O)
 struct WasmAppendEntry {
     text: String,
+    /// Lowercased copy of `text`, populated in `store`/`load_append` and used by
+    /// `find_append`/`recall_append`/`find_append_count`/`recall_append_count`.
+    search_text: String,
     layer_id: u8,
     importance: u8,
     depth: u8,
     x: f32,
     y: f32,
     z: f32,
+}
+
+impl WasmAppendEntry {
+    /// Borrow the lowercased searchable text (cheap, no allocation).
+    #[inline(always)]
+    fn search_text(&self) -> &str {
+        &self.search_text
+    }
+}
+
+/// Bridge from an in-memory append entry to a JS-visible `WasmBlock`.
+#[cfg(target_arch = "wasm32")]
+impl WasmAppendEntry {
+    fn to_wasm_block(&self, dist: f32) -> WasmBlock {
+        let layer = LAYER_NAMES.get(self.layer_id as usize).unwrap_or(&"?");
+        WasmBlock {
+            text: self.text.clone(),
+            x: self.x,
+            y: self.y,
+            z: self.z,
+            depth: self.depth,
+            layer: layer.to_string(),
+            layer_id: self.layer_id,
+            importance: self.importance,
+            distance: dist,
+        }
+    }
 }
 
 /// Main WASM interface for Microscope Memory
@@ -276,60 +378,316 @@ impl MicroscopeWasm {
         }
     }
 
-    /// Exact depth search (k-nearest at zoom level)
+    /// Exact depth search (k-nearest at zoom level) — searches both the main
+    /// index blocks AND in-memory append entries.
     #[wasm_bindgen]
     pub fn look(&self, x: f32, y: f32, z: f32, zoom: u8, k: usize) -> Vec<WasmBlock> {
-        let reader = match &self.reader {
-            Some(r) => r,
-            None => return vec![],
-        };
-        reader
-            .look(x, y, z, zoom, k)
-            .into_iter()
-            .map(|(dist, idx)| reader.to_wasm_block(idx, dist))
-            .collect()
+        if k == 0 {
+            return vec![];
+        }
+        // Collect candidate (distance, block) pairs from both sources.
+        let mut top: Vec<(f32, WasmBlock)> = Vec::with_capacity(k * 2);
+        if let Some(reader) = &self.reader {
+            for (dist, idx) in reader.look(x, y, z, zoom, k) {
+                top.push((dist, reader.to_wasm_block(idx, dist)));
+            }
+        }
+        if !self.append_entries.is_empty() {
+            for entry in &self.append_entries {
+                let dx = entry.x - x;
+                let dy = entry.y - y;
+                let dz = entry.z - z;
+                let dist = dx * dx + dy * dy + dz * dz;
+                top.push((dist, entry.to_wasm_block(dist)));
+            }
+        }
+        if top.is_empty() {
+            return vec![];
+        }
+        let k = k.min(top.len());
+        if k < top.len() {
+            top.select_nth_unstable_by(k, |a, b| a.0.total_cmp(&b.0));
+        }
+        top.truncate(k);
+        top.sort_by(|a, b| a.0.total_cmp(&b.0));
+        top.into_iter().map(|(_, b)| b).collect()
     }
 
-    /// 4D soft zoom search (all blocks, zoom as weighted dimension)
+    /// 4D soft zoom search (all blocks, zoom as weighted dimension) —
+    /// searches both the main index AND in-memory append entries.
     #[wasm_bindgen]
     pub fn look_soft(&self, x: f32, y: f32, z: f32, zoom: u8, k: usize) -> Vec<WasmBlock> {
-        let reader = match &self.reader {
-            Some(r) => r,
-            None => return vec![],
-        };
-        reader
-            .look_soft(x, y, z, zoom, k, 2.0)
-            .into_iter()
-            .map(|(dist, idx)| reader.to_wasm_block(idx, dist))
-            .collect()
+        if k == 0 {
+            return vec![];
+        }
+        let qz = zoom.min(8) as f32 / 8.0;
+        let mut top: Vec<(f32, WasmBlock)> = Vec::with_capacity(k * 2);
+        if let Some(reader) = &self.reader {
+            for (dist, idx) in reader.look_soft(x, y, z, zoom, k, 2.0) {
+                top.push((dist, reader.to_wasm_block(idx, dist)));
+            }
+        }
+        if !self.append_entries.is_empty() {
+            for entry in &self.append_entries {
+                let dx = entry.x - x;
+                let dy = entry.y - y;
+                let dz = entry.z - z;
+                let dw = (entry.depth as f32 / 8.0 - qz) * 2.0;
+                let dist = dx * dx + dy * dy + dz * dz + dw * dw;
+                top.push((dist, entry.to_wasm_block(dist)));
+            }
+        }
+        if top.is_empty() {
+            return vec![];
+        }
+        let k = k.min(top.len());
+        if k < top.len() {
+            top.select_nth_unstable_by(k, |a, b| a.0.total_cmp(&b.0));
+        }
+        top.truncate(k);
+        top.sort_by(|a, b| a.0.total_cmp(&b.0));
+        top.into_iter().map(|(_, b)| b).collect()
     }
 
-    /// Natural language recall (keyword + spatial)
+    /// Natural language recall (keyword + spatial) — searches both the main
+    /// index blocks AND in-memory append entries.
     #[wasm_bindgen]
     pub fn recall(&self, query: &str, k: usize) -> Vec<WasmBlock> {
-        let reader = match &self.reader {
-            Some(r) => r,
-            None => return vec![],
-        };
-        reader
-            .recall(query, k)
-            .into_iter()
-            .map(|(dist, idx)| reader.to_wasm_block(idx, dist))
-            .collect()
+        if k == 0 {
+            return vec![];
+        }
+        let mut top: Vec<(f32, WasmBlock)> = Vec::new();
+        if let Some(reader) = &self.reader {
+            for (dist, idx) in reader.recall(query, k) {
+                top.push((dist, reader.to_wasm_block(idx, dist)));
+            }
+        }
+        for (dist, idx) in self.recall_append(query, k) {
+            top.push((dist, self.append_entries[idx].to_wasm_block(dist)));
+        }
+        if top.is_empty() {
+            return vec![];
+        }
+        let k = k.min(top.len());
+        if k < top.len() {
+            top.select_nth_unstable_by(k, |a, b| a.0.total_cmp(&b.0));
+        }
+        top.truncate(k);
+        top.sort_by(|a, b| a.0.total_cmp(&b.0));
+        top.into_iter().map(|(_, b)| b).collect()
     }
 
-    /// Text search (substring match)
+    /// Text search (substring match) — searches both the main index blocks
+    /// and in-memory append entries. Results are sorted by depth (shallow
+    /// first) and truncated to `k`.
     #[wasm_bindgen]
     pub fn find(&self, query: &str, k: usize) -> Vec<WasmBlock> {
-        let reader = match &self.reader {
-            Some(r) => r,
-            None => return vec![],
-        };
-        reader
-            .find_text(query, k)
-            .into_iter()
-            .map(|(_d, idx)| reader.to_wasm_block(idx, 0.0))
-            .collect()
+        if k == 0 {
+            return vec![];
+        }
+        let mut blocks: Vec<WasmBlock> = Vec::with_capacity(k * 2);
+        if let Some(reader) = &self.reader {
+            for (_d, idx) in reader.find_text(query, k) {
+                blocks.push(reader.to_wasm_block(idx, 0.0));
+            }
+        }
+        for idx in self.find_append(query, k) {
+            blocks.push(self.append_entries[idx].to_wasm_block(0.0));
+        }
+        if blocks.is_empty() {
+            return vec![];
+        }
+        blocks.sort_by_key(|b| b.depth);
+        blocks.truncate(k);
+        blocks
+    }
+
+    /// Count substring matches across the main index + append — the TRUE total
+    /// match count, uncapped by `k` (a count must never hide hits behind a
+    /// result-page limit). Allocates no `WasmBlock`s. Used by the search UI to
+    /// show an accurate hit count before deciding whether to materialize results
+    /// via `find`, which (deliberately) truncates to `k`.
+    #[wasm_bindgen]
+    pub fn find_count(&self, query: &str, _k: usize) -> usize {
+        let mut total = 0usize;
+        if let Some(reader) = &self.reader {
+            total += reader.find_text_count(query);
+        }
+        total += self.find_append_count(query);
+        total
+    }
+
+    /// Count recall (keyword) matches across the main index + append — the
+    /// TRUE total, uncapped by `k`. Allocates no `WasmBlock`s.
+    #[wasm_bindgen]
+    pub fn recall_count(&self, query: &str, _k: usize) -> usize {
+        let mut total = 0usize;
+        if let Some(reader) = &self.reader {
+            total += reader.recall_count(query);
+        }
+        total += self.recall_append_count(query);
+        total
+    }
+
+    /// Paginated substring search. Returns matches ranked by depth
+    /// (shallow-first), the slice `[offset, offset + limit)` of the full
+    /// match ranking. Only `offset + limit` candidates are materialized per
+    /// source, so the UI can page through large result sets without marshaling
+    /// the full list back into JS (`find_count` still returns the uncapped total).
+    #[wasm_bindgen]
+    pub fn find_slice(&self, query: &str, offset: usize, limit: usize) -> Vec<WasmBlock> {
+        if limit == 0 {
+            return vec![];
+        }
+        let need = offset + limit;
+        let mut blocks: Vec<WasmBlock> = Vec::with_capacity(need * 2);
+        if let Some(reader) = &self.reader {
+            for (_d, idx) in reader.find_text(query, need) {
+                blocks.push(reader.to_wasm_block(idx, 0.0));
+            }
+        }
+        for idx in self.find_append(query, need) {
+            blocks.push(self.append_entries[idx].to_wasm_block(0.0));
+        }
+        if blocks.is_empty() {
+            return vec![];
+        }
+        blocks.sort_by_key(|b| b.depth);
+        let start = offset.min(blocks.len());
+        let end = (start + limit).min(blocks.len());
+        if start >= end {
+            return vec![];
+        }
+        // `WasmBlock` is move-only (no `Clone`): drain moves only the kept
+        // slice out; the matching candidates are freed when `blocks` drops.
+        blocks.drain(start..end).collect()
+    }
+
+    /// Paginated keyword + spatial recall. Returns matches ranked by inverse
+    /// distance (nearest-first), the slice `[offset, offset + limit)`, using a
+    /// partial selection so only `offset + limit` matches are materialized.
+    #[wasm_bindgen]
+    pub fn recall_slice(&self, query: &str, offset: usize, limit: usize) -> Vec<WasmBlock> {
+        if limit == 0 {
+            return vec![];
+        }
+        let need = offset + limit;
+        let mut top: Vec<(f32, WasmBlock)> = Vec::with_capacity(need * 2);
+        if let Some(reader) = &self.reader {
+            for (dist, idx) in reader.recall(query, need) {
+                top.push((dist, reader.to_wasm_block(idx, dist)));
+            }
+        }
+        for (dist, idx) in self.recall_append(query, need) {
+            top.push((dist, self.append_entries[idx].to_wasm_block(dist)));
+        }
+        if top.is_empty() {
+            return vec![];
+        }
+        let k = need.min(top.len());
+        if k < top.len() {
+            top.select_nth_unstable_by(k, |a, b| a.0.total_cmp(&b.0));
+        }
+        top.truncate(k);
+        top.sort_by(|a, b| a.0.total_cmp(&b.0));
+        let start = offset.min(top.len());
+        let end = (start + limit).min(top.len());
+        if start >= end {
+            return vec![];
+        }
+        top.drain(start..end).map(|(_, b)| b).collect()
+    }
+
+    /// Keyword + spatial search over in-memory append entries. Returns up to
+    /// `k` (distance, index) pairs sorted nearest-first.
+    fn recall_append(&self, query: &str, k: usize) -> Vec<(f32, usize)> {
+        if k == 0 || self.append_entries.is_empty() {
+            return Vec::new();
+        }
+        let (qx, qy, qz) = content_coords_blended(query, "long_term", 0.0);
+        let q_lower = query.to_lowercase();
+        let keywords: Vec<&str> = q_lower
+            .split_whitespace()
+            .filter(|word| word.len() > 2)
+            .collect();
+        if keywords.is_empty() {
+            return Vec::new();
+        }
+        let mut results: Vec<(f32, usize)> = Vec::new();
+        for (index, entry) in self.append_entries.iter().enumerate() {
+            let keyword_hits = keywords
+                .iter()
+                .filter(|&&word| entry.search_text().contains(word))
+                .count();
+            if keyword_hits == 0 {
+                continue;
+            }
+            let dx = entry.x - qx;
+            let dy = entry.y - qy;
+            let dz = entry.z - qz;
+            let spatial = dx * dx + dy * dy + dz * dz;
+            let boost = keyword_hits as f32 * 0.1;
+            results.push(((spatial - boost).max(0.0), index));
+        }
+        if results.len() > k {
+            results.select_nth_unstable_by(k, |a, b| {
+                a.0.total_cmp(&b.0).then_with(|| a.1.cmp(&b.1))
+            });
+            results.truncate(k);
+        }
+        results.sort_by(|a, b| a.0.total_cmp(&b.0).then_with(|| a.1.cmp(&b.1)));
+        results
+    }
+
+    /// Count recall (keyword) hits over in-memory append entries.
+    fn recall_append_count(&self, query: &str) -> usize {
+        if self.append_entries.is_empty() {
+            return 0;
+        }
+        let q_lower = query.to_lowercase();
+        let keywords: Vec<&str> = q_lower
+            .split_whitespace()
+            .filter(|word| word.len() > 2)
+            .collect();
+        if keywords.is_empty() {
+            return 0;
+        }
+        self.append_entries
+            .iter()
+            .filter(|entry| keywords.iter().any(|kw| entry.search_text().contains(*kw)))
+            .count()
+    }
+
+    /// Substring match over in-memory append entries. Returns up to `k` indices
+    /// sorted by depth (shallow first, then insertion order).
+    fn find_append(&self, query: &str, k: usize) -> Vec<usize> {
+        let q = query.to_lowercase();
+        let mut results: Vec<usize> = self
+            .append_entries
+            .iter()
+            .enumerate()
+            .filter_map(|(index, entry)| entry.search_text().contains(&q).then_some(index))
+            .collect();
+        if results.len() > k {
+            results.select_nth_unstable_by_key(k, |&index| {
+                (self.append_entries[index].depth, index)
+            });
+            results.truncate(k);
+        }
+        results.sort_unstable_by_key(|&index| (self.append_entries[index].depth, index));
+        results
+    }
+
+    /// Count substring matches over in-memory append entries.
+    fn find_append_count(&self, query: &str) -> usize {
+        if self.append_entries.is_empty() {
+            return 0;
+        }
+        let q = query.to_lowercase();
+        self.append_entries
+            .iter()
+            .filter(|entry| entry.search_text().contains(&q))
+            .count()
     }
 
     /// Store new memory entry (in-memory append, no file I/O)
@@ -348,6 +706,7 @@ impl MicroscopeWasm {
         };
         self.append_entries.push(WasmAppendEntry {
             text: text.to_string(),
+            search_text: text.to_lowercase(),
             layer_id,
             importance,
             depth,
@@ -389,9 +748,11 @@ impl MicroscopeWasm {
                 break;
             }
             let text = String::from_utf8_lossy(&data[pos..pos + len]).to_string();
+            let search_text = text.to_lowercase();
             pos += len;
             self.append_entries.push(WasmAppendEntry {
                 text,
+                search_text,
                 layer_id: lid,
                 importance: imp,
                 depth,
@@ -409,7 +770,7 @@ impl MicroscopeWasm {
         buf.extend_from_slice(b"APv2");
         for entry in &self.append_entries {
             let text_bytes = entry.text.as_bytes();
-            let len = text_bytes.len().min(BLOCK_DATA_SIZE);
+            let len = text_bytes.len();
             buf.extend_from_slice(&(len as u32).to_le_bytes());
             buf.push(entry.layer_id);
             buf.push(entry.importance);

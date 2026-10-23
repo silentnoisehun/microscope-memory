@@ -708,6 +708,17 @@ export default function microscopeMemory(pi: any) {
       // delayed.
       if (!AUTO_STORE) return;
       const output = textOf(event?.content);
+      // A failed tool call is an objective "unfinished work" signal: open a
+      // loop so the next session (and the model) see it. The model decides
+      // when to resolve it (memory_resolve_loop) - this is not a keyword
+      // heuristic, just a reaction to an actual error.
+      if (event?.isError) {
+        const snippet = output ? clip(output, 300) : "(no output)";
+        const loopText = "OPEN LOOP (tool error): " + (name || "tool") + " failed — " + snippet;
+        mcp
+          .tool("memory_store", { text: loopText, layer: "session", importance: 6, status: "open" }, 20000)
+          .catch(() => {});
+      }
       if (!output || output.length < 60) return;
       const facts = classifyToolOutput(output);
       for (const fact of facts) {

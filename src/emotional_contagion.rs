@@ -101,6 +101,7 @@ pub struct EmotionalSnapshot {
 }
 
 /// Persistent emotional contagion state.
+#[derive(Clone)]
 pub struct EmotionalContagionState {
     pub instance_id: u64,
     pub local_snapshot: Option<EmotionalSnapshot>,

@@ -82,6 +82,7 @@ impl CuriosityQuery {
     }
 }
 
+#[derive(Clone)]
 pub struct CuriosityState {
     pub queries: Vec<CuriosityQuery>,
 }

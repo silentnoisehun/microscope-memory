@@ -1,0 +1,12 @@
+{
+  "$schema": "https://raw.githubusercontent.com/can1357/oh-my-pi/main/packages/coding-agent/src/config/mcp-schema.json",
+  "mcpServers": {
+    "microscope": {
+      "command": "C:/Users/mater/microscope-memory-clone/target/release/microscope-mem.exe",
+      "args": ["mcp"],
+      "env": {
+        "MICROSCOPE_CONFIG": "C:/Users/mater/.omp/agent/microscope-memory-bridge.toml"
+      }
+    }
+  }
+}

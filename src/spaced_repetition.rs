@@ -100,6 +100,7 @@ impl SpacedBlock {
 }
 
 /// Spaced repetition állapot — az összes tracked blokk.
+#[derive(Clone)]
 pub struct SpacedRepetition {
     pub blocks: Vec<SpacedBlock>,
 }

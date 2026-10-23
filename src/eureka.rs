@@ -58,6 +58,7 @@ impl EurekaEvent {
 }
 
 /// Persistent eureka log.
+#[derive(Clone)]
 pub struct EurekaLog {
     pub events: Vec<EurekaEvent>,
     pub next_id: u64,

@@ -423,7 +423,7 @@ const FORGET_INTERNAL_LAYERS: &[u8] = &[2, 3, 6, 11];
 const FORGET_MIN_IMPORTANCE: u8 = 5;
 
 pub fn forget_old_thoughts(output_dir: &Path, _block_count: usize) -> Result<u32, String> {
-    use crate::{BLOCK_DATA_SIZE, DEPTH_ENTRY_SIZE, HEADER_SIZE, META_HEADER_SIZE};
+    use crate::{DEPTH_ENTRY_SIZE, HEADER_SIZE, META_HEADER_SIZE};
     use std::fs;
 
     let hdr_path = output_dir.join("microscope.bin");
@@ -477,7 +477,14 @@ pub fn forget_old_thoughts(output_dir: &Path, _block_count: usize) -> Result<u32
 
     // Rewrite microscope.bin with only kept headers
     let mut new_headers = Vec::with_capacity(keep_indices.len() * HEADER_SIZE);
-    let mut new_data = Vec::with_capacity(keep_indices.len() * BLOCK_DATA_SIZE);
+    // Packed, variable-length data.bin: see block_data_span. The grid estimate
+    // (keep * BLOCK_DATA_SIZE) over-allocated 21 GB on a 1.34 M-block index
+    // whose packed data is 6.4 MB; size from the real spans instead.
+    let est_data_bytes: usize = keep_indices
+        .iter()
+        .filter_map(|&idx| block_data_span(&headers, idx).map(|(_, len)| len as usize))
+        .sum();
+    let mut new_data = Vec::with_capacity(est_data_bytes);
 
     for &idx in &keep_indices {
         let hdr_off = idx * HEADER_SIZE;
@@ -566,7 +573,7 @@ pub fn evict_over_capacity(
     max_blocks: usize,
     protect_min_importance: u8,
 ) -> Result<u32, String> {
-    use crate::{BLOCK_DATA_SIZE, DEPTH_ENTRY_SIZE, HEADER_SIZE, META_HEADER_SIZE};
+    use crate::{DEPTH_ENTRY_SIZE, HEADER_SIZE, META_HEADER_SIZE};
 
     let hdr_path = output_dir.join("microscope.bin");
     let dat_path = output_dir.join("data.bin");
@@ -612,7 +619,13 @@ pub fn evict_over_capacity(
 
     // Rewrite the binary index, keeping only the surviving blocks.
     let mut new_headers = Vec::with_capacity(keep_indices.len() * HEADER_SIZE);
-    let mut new_data = Vec::with_capacity(keep_indices.len() * BLOCK_DATA_SIZE);
+    // Packed, variable-length data.bin: see block_data_span. Grid estimate
+    // (keep * BLOCK_DATA_SIZE) over-allocates gigabytes; size from real spans.
+    let est_data_bytes: usize = keep_indices
+        .iter()
+        .filter_map(|&idx| block_data_span(&headers, idx).map(|(_, len)| len as usize))
+        .sum();
+    let mut new_data = Vec::with_capacity(est_data_bytes);
     for &idx in &keep_indices {
         let hdr_off = idx * HEADER_SIZE;
         new_headers.extend_from_slice(&headers[hdr_off..hdr_off + HEADER_SIZE]);

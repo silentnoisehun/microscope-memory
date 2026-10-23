@@ -42,6 +42,7 @@ pub struct InhibitionEntry {
 // ─── SalienceState ─────────────────────────────────
 
 /// A salience network állapota: inhibíciós maszk + szűrés.
+#[derive(Clone)]
 pub struct SalienceState {
     pub inhibitions: Vec<InhibitionEntry>,
 }

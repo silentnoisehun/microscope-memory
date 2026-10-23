@@ -1,0 +1,45 @@
+{
+  "schema": "octopus.arm-manifest/v1",
+  "objective": "Independent review of the rebuild-path changes in the Microscope Memory engine: find any remaining path where a rebuild can lose indexed content, install a shrunken index, or drop pending append-log entries.",
+  "arms": [
+    {
+      "id": "arm-a-shrink-guard",
+      "spec": "code-reader + code-analysis",
+      "mission": "Review src/build.rs for the shrink guard and the append-log merge. Report: is the guard evaluated before the index files are written? Is the append-log merge deduplicating correctly against the mirror? Name concrete line numbers.",
+      "input": "C:\\Users\\mater\\microscope-memory-clone\\src\\build.rs",
+      "effect": "read",
+      "completion": "The shrink guard placement and the append-log merge dedup are reported with line numbers.",
+      "stop_condition": "The file has been read and analysed.",
+      "allowed_paths": ["C:\\Users\\mater\\microscope-memory-clone", "D:\\codex"],
+      "evidence": [
+        { "kind": "output_contains", "value": "fn=" }
+      ]
+    },
+    {
+      "id": "arm-b-store-path",
+      "spec": "code-reader",
+      "mission": "Read src/reader.rs and report every write path of a stored memory: the append log, the layer mirror, the timeline, and the auto-rebuild trigger. State which of them can fail without failing the store.",
+      "input": "C:\\Users\\mater\\microscope-memory-clone\\src\\reader.rs",
+      "effect": "read",
+      "completion": "The store write paths and their failure behaviour are listed.",
+      "stop_condition": "The file has been read.",
+      "allowed_paths": ["C:\\Users\\mater\\microscope-memory-clone", "D:\\codex"],
+      "evidence": [
+        { "kind": "output_contains", "value": "LOCAL READ" }
+      ]
+    },
+    {
+      "id": "arm-c-tests",
+      "spec": "code-reader",
+      "mission": "Read the repository AGENTS.md and list the test files, then report which existing test covers the rebuild/retention behaviour and whether the new guard changes any expected outcome.",
+      "input": "C:\\Users\\mater\\microscope-memory-clone\\AGENTS.md",
+      "effect": "read",
+      "completion": "The relevant test files and the expectations that the change affects are listed.",
+      "stop_condition": "The file has been read.",
+      "allowed_paths": ["C:\\Users\\mater\\microscope-memory-clone", "D:\\codex"],
+      "evidence": [
+        { "kind": "output_contains", "value": "LOCAL READ" }
+      ]
+    }
+  ]
+}

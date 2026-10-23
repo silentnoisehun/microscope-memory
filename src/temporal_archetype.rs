@@ -73,6 +73,7 @@ impl TemporalProfile {
 
 // ─── TemporalArchetypeState ─────────────────────────
 
+#[derive(Clone)]
 pub struct TemporalArchetypeState {
     pub profiles: Vec<TemporalProfile>,
 }

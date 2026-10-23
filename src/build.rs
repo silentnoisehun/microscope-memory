@@ -48,17 +48,11 @@ pub fn rebuild_pending(
         });
     }
 
-    let previous_blocks = read_meta_block_count(output_dir);
+    // The shrink guard lives inside build(), before the new index is
+    // installed: a refusal there keeps the previous index intact. Here we only
+    // build and clear the log afterwards.
+    build_consolidating(config, true, heavy)?;
 
-    build(config, true, heavy)?;
-
-    let rebuilt_blocks = read_meta_block_count(output_dir);
-    if pending_entries > 0 && previous_blocks > 0 && rebuilt_blocks < previous_blocks {
-        return Err(format!(
-            "refusing rebuild shrink: {} -> {} blocks",
-            previous_blocks, rebuilt_blocks
-        ));
-    }
     if append_path.exists() {
         fs::remove_file(&append_path).map_err(|e| format!("clear append log: {}", e))?;
         // The append-log vectors are keyed by position in that log, so they die
@@ -305,6 +299,33 @@ pub fn compute_layers_hash(config: &Config) -> [u8; 32] {
 /// fingerprint links). Auto-rebuild passes `false` and drops stale copies so
 /// positional vectors/links are never served with wrong block indices.
 pub fn build(config: &Config, force: bool, heavy: bool) -> Result<(), String> {
+    build_inner(config, force, heavy, false)
+}
+
+/// Build for the consolidation path (`rebuild_pending`).
+///
+/// Two things differ from a plain build:
+///
+/// * the pending append-log entries are merged in. The append log is the
+///   durable store and the mirror write is best effort, so an entry whose
+///   mirror write failed would be lost by a rebuild that only reads the
+///   mirror. The merge is consolidation-only on purpose: a plain build does
+///   not clear the append log, so its entries may already be consolidated
+///   and re-adding them would resurrect content the retention cap trimmed.
+/// * a shrink is guarded. A rebuild that would produce a smaller index is
+///   refused **before any index file is written**, so the installed index
+///   stays intact. With `layer_retention_entries` the mirror is trimmed by
+///   policy, so that shrink is a warning instead of a refusal.
+pub fn build_consolidating(config: &Config, force: bool, heavy: bool) -> Result<(), String> {
+    build_inner(config, force, heavy, true)
+}
+
+fn build_inner(
+    config: &Config,
+    force: bool,
+    heavy: bool,
+    consolidating: bool,
+) -> Result<(), String> {
     let layers_hash = compute_layers_hash(config);
 
     // Incremental build check — skip if layers unchanged
@@ -352,12 +373,57 @@ pub fn build(config: &Config, force: bool, heavy: bool) -> Result<(), String> {
 
     let layer_files = &config.memory_layers.layers;
 
+    // The append log is the durable store; the mirror (layers/*.txt) is
+    // best-effort - a failed mirror write is only a WARN - and the retention
+    // cap trims it. A build that only read the mirror would therefore drop
+    // pending entries the mirror no longer holds, so on the consolidation
+    // path the pending entries are merged in. Entries the mirror already
+    // contains are skipped, so a successful mirror write is not duplicated.
+    //
+    // Consolidation-only: a plain build does not clear the append log, so its
+    // entries may already be in the index, and re-adding them would
+    // resurrect the content the retention cap trimmed.
+    let pending_entries = if consolidating {
+        read_append_log(&output_dir.join("append.bin"))
+    } else {
+        Vec::new()
+    };
+
     // Collect all raw texts per layer
     let mut layer_texts: Vec<(String, Vec<(String, u8)>)> = Vec::new();
     for name in layer_files {
         let path = layers_dir.join(format!("{}.txt", name));
-        let texts = extract_texts_from_file(&path);
-        println!("  {} {}: {} items", ">".green(), name, texts.len());
+        let mut texts = extract_texts_from_file(&path);
+        let mirrored: String = texts
+            .iter()
+            .map(|(t, _)| t.as_str())
+            .collect::<Vec<_>>()
+            .join("\n");
+        let mut added = 0usize;
+        for entry in &pending_entries {
+            if crate::query::layer_name(entry.layer_id) != name.as_str() {
+                continue;
+            }
+            // The mirror may store a truncated view of the text, so compare on
+            // a short prefix.
+            let needle = entry.text.get(..60).unwrap_or(entry.text.as_str());
+            if !needle.is_empty() && mirrored.contains(needle) {
+                continue;
+            }
+            texts.push((entry.text.clone(), entry.importance));
+            added += 1;
+        }
+        if added > 0 {
+            println!(
+                "  {} {}: {} items (+{} from the append log)",
+                ">".green(),
+                name,
+                texts.len(),
+                added
+            );
+        } else {
+            println!("  {} {}: {} items", ">".green(), name, texts.len());
+        }
         layer_texts.push((name.clone(), texts));
     }
 
@@ -710,6 +776,36 @@ pub fn build(config: &Config, force: bool, heavy: bool) -> Result<(), String> {
 
     let n = blocks.len();
     println!("\n  {} blocks total", n);
+
+    // Shrink guard - runs BEFORE the new index is installed, so a refusal
+    // keeps the previous index intact.
+    //
+    // The mirror (layers/*.txt) is the build source, so a rebuild can only
+    // lose what the mirror no longer holds. With layer_retention_entries the
+    // mirror is trimmed by policy, so a shrink is expected and must not block
+    // the consolidation; without a cap a shrink means the mirror was damaged
+    // and the installed index has to be kept.
+    let cap = config.index.layer_retention_entries;
+    let at_cap = cap > 0 && layer_texts.iter().any(|(_, texts)| texts.len() >= cap);
+    if consolidating {
+        let installed_blocks = read_meta_block_count(Path::new(&config.paths.output_dir));
+        if installed_blocks > 0 && n < installed_blocks {
+            if at_cap {
+                println!(
+                    "  {} rebuild shrinks {} -> {} blocks (layer_retention_entries={} trims the mirror)",
+                    "WARN".yellow(),
+                    installed_blocks,
+                    n,
+                    cap
+                );
+            } else {
+                return Err(format!(
+                    "refusing rebuild shrink: {} -> {} blocks",
+                    installed_blocks, n
+                ));
+            }
+        }
+    }
 
     // Sort by depth (a stable no-op in practice — blocks are built in depth
     // order, so this leaves the layout untouched).

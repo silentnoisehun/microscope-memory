@@ -116,7 +116,7 @@ pub struct AntiHebbianPair {
 // ─── AbsentiaState ──────────────────────────────────
 
 /// Az Absentia réteg állapota.
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct AbsentiaState {
     /// Hiány-rekordok.
     pub records: Vec<AbsentiaRecord>,

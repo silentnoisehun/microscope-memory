@@ -42,6 +42,7 @@ pub struct WorkingMemoryItem {
 }
 
 /// Working Memory állapot — korlátos puffer.
+#[derive(Clone)]
 pub struct WorkingMemory {
     pub items: Vec<WorkingMemoryItem>,
     pub capacity: usize,

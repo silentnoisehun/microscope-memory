@@ -248,6 +248,7 @@ pub struct IntentAuditStep {
 // ─── IntentPipeline ─────────────────────────────────
 
 /// Az Intent Pipeline — auditálható szándék-generálás.
+#[derive(Clone)]
 pub struct IntentPipeline {
     pub genome: Genome,
     pub audit_log: Vec<Intent>,

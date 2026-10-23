@@ -8,8 +8,7 @@
 use crate::config::Config;
 use crate::reader::MicroscopeReader;
 use crate::{
-    read_append_log, store_memory, store_memory_with_embedding, store_memory_with_emotion,
-    LAYER_NAMES,
+    read_append_log, store_memory, store_memory_with_embedding, store_memory_with_status, LAYER_NAMES,
 };
 use microscope_hooks::*;
 use serde_json::{json, Value};
@@ -386,13 +385,14 @@ fn handle_tools_list(id: &Value) -> Value {
                 },
                 {
                     "name": "memory_store",
-                    "description": "Store a new memory into the microscope append log",
+                    "description": "Store a new memory into the microscope append log. Use status=\"open\" to open an unfinished-work loop that shows up in the open loop list and in the auto-context of the next session; resolve it later with memory_resolve_loop.",
                     "inputSchema": {
                         "type": "object",
                         "properties": {
                             "text": { "type": "string", "description": "Memory text to store" },
                             "layer": { "type": "string", "description": "Memory layer (long_term, short_term, session, associative, emotional, relational, reflections, echo_cache)", "default": "long_term" },
                             "importance": { "type": "integer", "description": "Importance level 1-10", "default": 5 },
+                            "status": { "type": "string", "description": "Status flag: open (an unfinished loop to come back to) | resolved | archived | normal", "default": "normal", "enum": ["normal", "open", "resolved", "archived"] },
                             "emotion": { "type": "array", "items": { "type": "number" }, "minItems": 21, "maxItems": 21, "description": "21D emotion vector: [joy, sadness, anger, fear, surprise, disgust, trust, anticipation, love, gratitude, curiosity, awe, confusion, anxiety, serenity, hope, pride, shame, guilt, empathy, excitement]" }
                         },
                         "required": ["text"]
@@ -1022,6 +1022,14 @@ fn tool_store(config: &Config, args: &Value) -> Result<String, String> {
         .get("importance")
         .and_then(|v: &Value| v.as_u64())
         .unwrap_or(5) as u8;
+    // Optional status flag: "open" turns the memory into an unfinished-work
+    // loop (it shows up in the open loop list and in the next session's
+    // auto-context), "resolved"/"archived" close or retire one.
+    let status = args
+        .get("status")
+        .and_then(|v: &Value| v.as_str())
+        .filter(|s| matches!(*s, "normal" | "open" | "resolved" | "archived"))
+        .unwrap_or("normal");
 
     // Parse optional 21D emotion vector
     let emotion: Option<[f32; 21]> = args.get("emotion").and_then(|v: &Value| {
@@ -1039,7 +1047,7 @@ fn tool_store(config: &Config, args: &Value) -> Result<String, String> {
     let sid = std::process::id();
     let tagged = format!("[sid-{:04}] {}", sid % 10000, text);
 
-    store_memory_with_emotion(config, &tagged, layer, importance, emotion)?;
+    store_memory_with_status(config, &tagged, layer, importance, Some(status), emotion)?;
 
     let (x, y, z) = crate::content_coords(&tagged, layer);
     let depth = crate::auto_depth(&tagged);

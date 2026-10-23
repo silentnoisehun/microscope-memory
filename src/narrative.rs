@@ -33,6 +33,7 @@ const MAX_FOCUS_LEN: usize = 40;
 // ─── NarrativeState ────────────────────────────────
 
 /// A rendszer belső narratívája — egy snapshot arról, "ki most ő".
+#[derive(Clone)]
 pub struct NarrativeState {
     /// Mikor frissült utoljára.
     pub last_update_ms: u64,

@@ -217,6 +217,7 @@ impl SelfModelSnapshot {
     }
 }
 
+#[derive(Clone)]
 pub struct SelfModel {
     pub snapshots: Vec<SelfModelSnapshot>,
     pub current: Option<SelfModelSnapshot>,

@@ -1,4 +1,4 @@
-# 🧠 Microscope Memory
+﻿# 🧠 Microscope Memory
 
 **A living, self-organizing cognitive memory engine for AI agents.**  
 Not a database. Not a vector store. A *system that learns, dreams, and remembers* — written in 62,938 lines of pure Rust.
@@ -349,10 +349,28 @@ I'm an independent researcher working at the intersection of **quantum informati
 
 ---
 
+---
+
+## ⚡ Ora-Rongyász Master Spine Hub (100% C:\ Local & Headless)
+
+A Microscope Memory mappájába konszolidálva él a teljes Ora-Rongyász ökoszisztéma zéró külső meghajtó-függőséggel (egyik szerver vagy spine sem igényli a D: vagy E: meghajtót a futáshoz):
+
+- **Helyi Gerinc-Tengely (spines/):**
+  - spines/stratos.spine (256 KB) — 212 ns közvetlen POD memória-tükrözés (érzelmi vektor & ciklus-fázis)
+  - spines/hullam_spine.rgs (8.3 MB) — 237 reflex-kar gyűjtemény, AVX2 SIMD interferencia-szórás
+  - spines/wave_echo.wv3 (172 KB) — 265 natív sablon, reflex-kódgenerálás és transzformáció
+- **Helyi Octopus Állapot (.octopus-rust/):**
+  - .octopus-rust/arms/ és .octopus-rust/roots/ — blade topológiák és append-only rezonancia hash-lánc
+- **100% Csendes Headless Motor (Zero-Popup):**
+  - headless.rs a unified-mind-ban: beégetett CREATE_NO_WINDOW (0x08000000) flag, a 24 bio-skill nulla ablakvillanással tickel.
+- **Kettős Kliens Paritás (Claude Code + OMP):**
+  - Mindkét fő-hook (ora-master-kernel.js és ora-master-kernel.ts) ezt a C: meghajtós microscope-memory-clone könyvtárat tekinti elsődleges forrásnak a 4-szintű evolúciós képességekkel (Vagus Actuator, Zero-Fork Hot Reflex Cache, Auto-Healing Open Loops, Dual-Spine Moduláció).
+
 ## 📄 Documentation
 
 | Document | Size | Content |
 |---|---|---|
+| [README-ORA-RONGYASZ.md](README-ORA-RONGYASZ.md) | 34 KB | **Teljes Ora-Rongyász Architektúra, Zero-Popup & 4-Szintű Evolúció** |
 | [`HOPE-AGENT-SPEC.md`](HOPE-AGENT-SPEC.md) | — | Verified spec — every claim backed by code |
 | [`COGNITIVE_MORPHOGENESIS.md`](COGNITIVE_MORPHOGENESIS.md) | 24 KB | Architecture document |
 | [`FULL_SYSTEM_DESCRIPTION.md`](FULL_SYSTEM_DESCRIPTION.md) | 24 KB | Complete system description |

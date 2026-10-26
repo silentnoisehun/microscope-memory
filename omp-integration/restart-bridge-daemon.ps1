@@ -18,11 +18,21 @@ param(
 
 $ErrorActionPreference = 'Continue'
 
-$Bin = 'C:\Users\mater\microscope-memory-clone\target\release\microscope-mem.exe'
+# A futtatási hely a .hope\bin (persisted rule: a build-dir csak forrás).
+# Itt a legfrissebb embeddings-képes build van.
+$Bin = 'C:\Users\mater\.hope\bin\microscope-mem.exe'
 $Config = 'C:\Users\mater\AppData\Local\microscope-memory\config.toml'
 $Port = 6060
 
 function Get-Bridge {
+  # The command line is not always readable, so the port is the reliable
+  # handle: the bridge daemon is the engine process that owns it.
+  $conn = Get-NetTCPConnection -State Listen -ErrorAction SilentlyContinue |
+    Where-Object { $_.LocalPort -eq $Port } | Select-Object -First 1
+  if ($conn) {
+    Get-CimInstance Win32_Process -Filter ("ProcessId=" + $conn.OwningProcess) -ErrorAction SilentlyContinue
+    return
+  }
   Get-CimInstance Win32_Process -Filter "Name='microscope-mem.exe'" -ErrorAction SilentlyContinue |
     Where-Object { $_.CommandLine -match 'bridge' }
 }
@@ -53,7 +63,7 @@ if (-not (Test-Path $Bin)) {
   exit 1
 }
 
-$cmd = '$env:MICROSCOPE_CONFIG=''C:/Users/mater/AppData/Local/microscope-memory/config.toml''; & ''C:/Users/mater/microscope-memory-clone/target/release/microscope-mem.exe'' bridge --port 6060'
+$cmd = '$env:MICROSCOPE_CONFIG=''C:/Users/mater/AppData/Local/microscope-memory/config.toml''; & ''C:/Users/mater/.hope/bin/microscope-mem.exe'' bridge --port 6060'
 Start-Process -FilePath 'powershell.exe' -ArgumentList @('-NoProfile', '-WindowStyle', 'Hidden', '-Command', $cmd) -WindowStyle Hidden
 Start-Sleep -Seconds 6
 

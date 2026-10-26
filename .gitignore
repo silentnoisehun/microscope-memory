@@ -139,3 +139,31 @@ eval_config.toml
 perf_corpus/
 cmsg.txt
 cm*.txt
+
+# Spines & local state (Zero-I/O hub)
+spines/
+stratos_data/
+voice-pipeline/
+.octopus-rust/
+*.rgs
+*.wv3
+*.pid
+.bio-queen.key
+.bio-*.json
+.immune-db.json
+
+# Scratch: ad-hoc probe scripts written while debugging the hooks.
+# They are throwaway one-liners, not part of the installed surface.
+test_*.ps1
+scripts/test-*.ps1
+scripts/debug-hook*.ps1
+scripts/run-hook.ps1
+scripts/test-simple.ps1
+scripts/test-invoke.ps1
+scripts/test-join.ps1
+latest
+node_modules/
+
+# Local checkpoint of the built binaries (git_reflex restores from the
+# repo, not from this directory).
+.golden_state/

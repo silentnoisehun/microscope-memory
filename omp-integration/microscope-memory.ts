@@ -59,9 +59,14 @@ const RETRIEVAL = env.MICROSCOPE_RETRIEVAL !== "0";
 // The bridge prefers the binary built from the current source (it has the
 // relevance ranking). The August build in D:\codex is deliberately NOT in
 // the list: it is the previous engine generation.
+//
+// A `.hope\bin` az EGYETLEN futó hely — a build könyvtár csak forrás.
+// (A target/release pathot sem hagyjuk bent: ha friss buildelunk, a
+// binárium oda kerül, de a hook a .hope\bin-ből indul.)
 const BIN =
   [
     env.MICROSCOPE_BRIDGE_BIN,
+    "C:/Users/mater/.hope/bin/microscope-mem.exe",
     "C:/Users/mater/microscope-memory-clone/target/release/microscope-mem.exe",
     "C:/Users/mater/AppData/Local/microscope-memory/microscope-mem.exe",
   ].find((p) => !!p && existsSync(p as string)) || "";

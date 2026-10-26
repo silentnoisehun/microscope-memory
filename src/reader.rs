@@ -209,6 +209,12 @@ impl MicroscopeReader {
 
         let meta = fs::read(&meta_path)
             .map_err(|e| format!("open meta.bin — run 'build' first: {}", e))?;
+        // A truncated meta.bin cannot be parsed at all, and the depth table
+        // needs its nine entries plus the Merkle root and the layers hash.
+        // 12 + 9*8 + 64 = 148 is the shortest file that carries a full table
+        // (the 12-byte header variant); the canonical 16-byte header needs
+        // 152. Anything shorter is refused here rather than read past the
+        // end of the buffer.
         if meta.len() < 12 {
             return Err("meta.bin too small".to_string());
         }
@@ -242,6 +248,22 @@ impl MicroscopeReader {
                     .try_into()
                     .map_err(|_| "meta.bin: bad depth range bytes")?,
             );
+            // A depth entry that points outside the index is corruption, not
+            // a range. `look()` sizes its result vector from `count`, so a
+            // bogus count is not merely wrong output: it is a request for
+            // gigabytes of memory that aborts the process instead of
+            // returning an error. A meta.bin written with a 12-byte header
+            // lands here exactly: the reader reads four bytes into the
+            // depth table, and the last entry picks up the Merkle root --
+            // 3,595,294,311 blocks, 57 GB.
+            let end = (start as u64) + (count as u64);
+            if end > block_count as u64 {
+                return Err(format!(
+                    "meta.bin depth {} claims blocks {}..{} but the index only has {} \
+                     blocks — the index metadata is corrupt, rebuild it",
+                    d, start, end, block_count
+                ));
+            }
             *range = (start, count);
         }
 
@@ -654,6 +676,37 @@ impl MicroscopeReader {
         (0..self.block_count).collect()
     }
 
+    /// Candidate blocks for a PARTIAL (token-level) match.
+    ///
+    /// The phrase index intersects every token, so it returns nothing for a
+    /// natural-language question. The lexical index unions the tokens instead,
+    /// which is the right prefilter for "contains at least one term" -- but an
+    /// unbounded union over a large corpus is unusable (a five-character token
+    /// expands to a whole dictionary prefix group). The `min_matches` variant
+    /// keeps only blocks that matched at least two distinct terms, which is
+    /// both fast and specific.
+    ///
+    /// Returns `None` when no lexical prefilter is available or the query has
+    /// no usable tokens; the caller then falls back to a full scan.
+    fn candidate_blocks_partial(&self, query_lower: &str, min_matches: u32) -> Option<Vec<usize>> {
+        let idx = self.text_index.as_ref()?;
+        if idx.block_count() != self.block_count {
+            return None;
+        }
+        let tokens: Vec<String> = query_lower
+            .split_whitespace()
+            .filter(|t| t.len() > 1)
+            .map(|t| t.to_string())
+            .collect();
+        if tokens.is_empty() {
+            return None;
+        }
+        let cands = idx.candidates_lexical_min_matches(&tokens, min_matches)?;
+        let mut out: Vec<usize> = cands.into_iter().map(|i| i as usize).collect();
+        out.sort_unstable();
+        Some(out)
+    }
+
     /// Text search
     ///
     /// The idiom here is `to_lowercase()` + `contains()` on purpose. The
@@ -689,11 +742,29 @@ impl MicroscopeReader {
     /// block's recorded importance, and (c) specificity (a short block that is
     /// mostly the query is a stronger hit than a long block that merely
     /// contains it), then drops near-tied noise via a relative score floor.
+    ///
+    /// The candidate filter accepts a block on a FULL phrase hit OR on a
+    /// partial term hit. The earlier `contains(&q)`-only filter made the
+    /// command useless for the way the agent hooks actually call it: they pass
+    /// a whole natural-language prompt, and a block almost never contains that
+    /// whole sentence verbatim -- so `find` returned `(none)` for every
+    /// real question. A term hit now reaches the scorer, which already knows
+    /// how to weigh a partial match (`relevance_score`), and the ranking
+    /// keeps the full-phrase hits on top.
     pub fn find_text_ranked(&self, query: &str, k: usize) -> Vec<(u8, usize, f32)> {
         let q = query.to_lowercase();
         let q_terms: Vec<&str> = q.split_whitespace().filter(|t| t.len() > 1).collect();
-        let candidates = self.candidate_blocks(&q);
-        let mut scored: Vec<(u8, usize, f32)> = candidates
+        // A single-term query has no partial form: "find 42" must stay an
+        // exact-literal search, otherwise every block containing "4" matches.
+        let allow_partial = q_terms.len() > 1;
+
+        // Two passes. The phrase pass uses the inverted index (exact token
+        // intersection). If it yields nothing and the query has several terms,
+        // a partial pass runs over the lexical prefilter (blocks matching at
+        // least two distinct terms) so a natural-language question still finds
+        // the block that carries the answer.
+        let mut scored: Vec<(u8, usize, f32)> = self
+            .candidate_blocks(&q)
             .into_par_iter()
             .filter_map(|i| {
                 let h = unsafe { self.header_unchecked(i) };
@@ -709,6 +780,30 @@ impl MicroscopeReader {
                 ))
             })
             .collect();
+
+        if scored.is_empty() && allow_partial {
+            // The lexical prefilter needs at least two matching terms to be
+            // specific; with one term it degenerates to a corpus scan.
+            let partial = self
+                .candidate_blocks_partial(&q, 2)
+                .unwrap_or_else(|| (0..self.block_count).collect());
+            scored = partial
+                .into_par_iter()
+                .filter_map(|i| {
+                    let h = unsafe { self.header_unchecked(i) };
+                    let text = self.text(i);
+                    let low = text.to_lowercase();
+                    if !low.contains(&q) && !q_terms.iter().any(|t| low.contains(*t)) {
+                        return None;
+                    }
+                    Some((
+                        h.depth,
+                        i,
+                        relevance_score(&q, &q_terms, &low, h.importance),
+                    ))
+                })
+                .collect();
+        }
 
         if scored.is_empty() {
             return Vec::new();
@@ -791,7 +886,11 @@ impl MicroscopeReader {
 
         for (idx, entry) in self.append_log.iter().enumerate() {
             let low = entry.text.to_lowercase();
-            if low.contains(&q) {
+            // Same partial-match rule as `find_text_ranked`: the hot append log
+            // must not lose a hit that the main index would have kept.
+            let hit =
+                low.contains(&q) || (q_terms.len() > 1 && q_terms.iter().any(|t| low.contains(*t)));
+            if hit {
                 let s = relevance_score(&q, &q_terms, &low, entry.importance);
                 main.push((entry.depth, idx + 1_000_000, s));
             }

@@ -8,7 +8,8 @@
 use crate::config::Config;
 use crate::reader::MicroscopeReader;
 use crate::{
-    read_append_log, store_memory, store_memory_with_embedding, store_memory_with_status, LAYER_NAMES,
+    read_append_log, store_memory, store_memory_with_embedding, store_memory_with_status,
+    LAYER_NAMES,
 };
 use microscope_hooks::*;
 use serde_json::{json, Value};

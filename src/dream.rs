@@ -395,6 +395,214 @@ fn block_data_span(headers: &[u8], idx: usize) -> Option<(usize, usize)> {
 fn read_u32(b: &[u8], off: usize) -> u32 {
     u32::from_le_bytes(b[off..off + 4].try_into().unwrap())
 }
+
+/// Byte offset of `depth` inside a packed MSC4 `BlockHeader`.
+///
+/// `x`, `y`, `z` and `zoom` are four `f32`s (16 bytes), so `depth` is the
+/// 17th byte and `layer_id` the 18th. Reading `depth` from byte 14 reads the
+/// low byte of `zoom` instead, which is almost always 0 — that is how a
+/// compaction produced a depth table where every level claimed the same
+/// count, and how the D8 entry ended up with a count of 3,595,294,311.
+const HEADER_DEPTH_OFFSET: usize = 16;
+
+/// Byte offset of `layer_id` inside a packed MSC4 `BlockHeader`.
+const HEADER_LAYER_ID_OFFSET: usize = 17;
+
+/// Byte offset of `importance` inside a packed MSC4 `BlockHeader`.
+const HEADER_IMPORTANCE_OFFSET: usize = 48;
+
+/// Byte offset of `data_offset` inside a packed MSC4 `BlockHeader`.
+const HEADER_DATA_OFFSET_OFFSET: usize = 18;
+
+/// Byte offset of `data_len` inside a packed MSC4 `BlockHeader`.
+const HEADER_DATA_LEN_OFFSET: usize = 22;
+
+/// Byte offset of `crc16` inside a packed MSC4 `BlockHeader`.
+const HEADER_CRC16_OFFSET: usize = 30;
+
+/// Write `meta.bin` in the exact MSC4 layout `build.rs` produces.
+///
+/// The layout is fixed: a 16-byte header (`magic`, `version`, `block_count`,
+/// `depth_count`), then nine 8-byte `(start, count)` depth entries, then the
+/// 32-byte Merkle root and the 32-byte layers hash.
+///
+/// `depth_ranges` must describe the *output* block order, not the input order:
+/// `start` is the index of the first block of that depth in the compacted
+/// index and `count` is how many consecutive blocks of that depth follow. A
+/// running sum is only correct when the blocks are laid out depth by depth,
+/// which is what `build.rs` guarantees by sorting before it writes.
+fn write_meta_msc4(
+    path: &Path,
+    block_count: usize,
+    depth_ranges: &[(u32, u32)],
+    merkle_root: &[u8; 32],
+    layers_hash: &[u8; 32],
+) -> Result<(), String> {
+    use crate::{DEPTH_ENTRY_SIZE, META_HEADER_SIZE};
+
+    debug_assert_eq!(depth_ranges.len(), 9);
+    let mut meta = Vec::with_capacity(META_HEADER_SIZE + 9 * DEPTH_ENTRY_SIZE + 64);
+    meta.extend_from_slice(b"MSC4");
+    meta.extend_from_slice(&4u32.to_le_bytes()); // version
+    meta.extend_from_slice(&(block_count as u32).to_le_bytes());
+    meta.extend_from_slice(&9u32.to_le_bytes()); // depth_count
+    for &(start, count) in depth_ranges.iter().take(9) {
+        meta.extend_from_slice(&start.to_le_bytes());
+        meta.extend_from_slice(&count.to_le_bytes());
+    }
+    meta.extend_from_slice(merkle_root);
+    meta.extend_from_slice(layers_hash);
+
+    let tmp = path.with_extension("bin.tmp");
+    fs::write(&tmp, &meta).map_err(|e| format!("write meta.bin: {e}"))?;
+    fs::rename(&tmp, path).map_err(|e| format!("rename meta.bin: {e}"))?;
+    Ok(())
+}
+
+/// Build the depth table for a compacted block list.
+///
+/// The reader's depth table describes *one contiguous run per depth*:
+/// `start..start+count`. `build.rs` guarantees that by sorting the blocks by
+/// depth before it writes them, and the compaction must preserve the same
+/// invariant -- a level split into two runs cannot be expressed as one
+/// `(start, count)` pair, and the second run would be invisible to every
+/// depth-scoped lookup.
+///
+/// `keep_indices` must therefore already be sorted by depth (see
+/// `sort_survivors_by_depth`). The start of a level is then the position of
+/// its first block and its count is how many blocks it holds. A level with no
+/// blocks stays `(0, 0)`, which is what `build.rs` leaves behind for the
+/// depths it never visits.
+fn depth_ranges_for(headers: &[u8], keep_indices: &[usize]) -> Vec<(u32, u32)> {
+    let mut ranges = vec![(0u32, 0u32); 9];
+    let mut counts = [0u32; 9];
+    let mut first_pos = [u32::MAX; 9];
+
+    for (position, &idx) in keep_indices.iter().enumerate() {
+        let off = idx * crate::HEADER_SIZE;
+        if off + crate::HEADER_SIZE <= headers.len() {
+            let depth = headers[off + HEADER_DEPTH_OFFSET];
+            if (depth as usize) < 9 {
+                if first_pos[depth as usize] == u32::MAX {
+                    first_pos[depth as usize] = position as u32;
+                }
+                counts[depth as usize] += 1;
+            }
+        }
+    }
+
+    for (depth, &count) in counts.iter().enumerate() {
+        if count > 0 {
+            ranges[depth] = (first_pos[depth], count);
+        }
+    }
+    ranges
+}
+
+/// Read the layers content hash out of an existing `meta.bin`.
+///
+/// The hash covers the *source* layer files, not the index layout, so a
+/// compaction leaves it valid: the layer files do not change while the index
+/// is rewritten. Only the offset of the hash moves. The canonical MSC4 header
+/// is 16 bytes, but this file used to write a 12-byte header (magic,
+/// version, block_count -- no `depth_count`), which shifts the whole depth
+/// table four bytes to the left. A reader that assumes one of the two
+/// offsets and gets the other reads the Merkle root instead of the hash.
+///
+/// The layout is `header + 9 * 8` depth entries, then the 32-byte Merkle
+/// root, then the 32-byte layers hash.
+fn read_layers_hash(meta: &[u8]) -> Option<[u8; 32]> {
+    use crate::{DEPTH_ENTRY_SIZE, META_HEADER_SIZE};
+    // Canonical 16-byte header first, then the short 12-byte header.
+    for header_len in [META_HEADER_SIZE, 12usize] {
+        let tail = header_len + 9 * DEPTH_ENTRY_SIZE;
+        if meta.len() >= tail + 64 {
+            let mut hash = [0u8; 32];
+            hash.copy_from_slice(&meta[tail + 32..tail + 64]);
+            return Some(hash);
+        }
+    }
+    None
+}
+
+/// Sort the surviving blocks by depth and return the old-to-new position map.
+///
+/// `build.rs` writes the index depth-sorted, and the reader's depth table
+/// describes *one contiguous run per depth* (`start..start+count`). A
+/// compaction that keeps the original order can split a level in two -- a
+/// block evicted from the middle of D5 leaves D5 as two runs -- and a single
+/// `(start, count)` pair cannot describe that, so the reader would only ever
+/// see the first run and the second half of the level would silently vanish
+/// from every depth-scoped lookup.
+///
+/// Sorting the survivors by depth restores the invariant and makes the table
+/// exact. The sort is stable, so blocks of the same depth keep their
+/// relative order.
+///
+/// The returned map translates an old block index into its position in the
+/// compacted index (`u32::MAX` for blocks that did not survive), which is
+/// what the `parent_idx` field needs: the parent links point at positions,
+/// and compaction moves every block.
+fn sort_survivors_by_depth(headers: &[u8], keep_indices: &mut [usize]) -> Vec<u32> {
+    let total = headers.len() / crate::HEADER_SIZE;
+    keep_indices.sort_by_key(|&i| {
+        let off = i * crate::HEADER_SIZE;
+        if off + crate::HEADER_SIZE <= headers.len() {
+            headers[off + HEADER_DEPTH_OFFSET]
+        } else {
+            u8::MAX
+        }
+    });
+    let mut old_to_new = vec![u32::MAX; total];
+    for (new_pos, &old_idx) in keep_indices.iter().enumerate() {
+        if old_idx < total {
+            old_to_new[old_idx] = new_pos as u32;
+        }
+    }
+    old_to_new
+}
+
+/// Collect the Merkle leaves of a block index: one leaf per block, holding
+/// the block's bytes as they sit in `data.bin`.
+///
+/// A block whose span runs past the end of `data.bin` contributes an empty
+/// leaf, matching `build.rs`, so the two writers agree on the root.
+fn merkle_leaves<'a>(headers: &[u8], data: &'a [u8]) -> Vec<&'a [u8]> {
+    let blocks = headers.len() / crate::HEADER_SIZE;
+    let mut leaves = Vec::with_capacity(blocks);
+    for i in 0..blocks {
+        let off = i * crate::HEADER_SIZE;
+        let start = u32::from_le_bytes(
+            headers[off + HEADER_DATA_OFFSET_OFFSET..off + HEADER_DATA_OFFSET_OFFSET + 4]
+                .try_into()
+                .unwrap(),
+        ) as usize;
+        let len = u16::from_le_bytes(
+            headers[off + HEADER_DATA_LEN_OFFSET..off + HEADER_DATA_LEN_OFFSET + 2]
+                .try_into()
+                .unwrap(),
+        ) as usize;
+        if start + len <= data.len() {
+            leaves.push(&data[start..start + len]);
+        } else {
+            leaves.push(&[]);
+        }
+    }
+    leaves
+}
+
+/// Write the Merkle sidecar next to a rewritten index.
+///
+/// `meta.bin` stores the root, and `merkle.bin` stores the tree the root
+/// belongs to. Rewriting the index without rewriting the sidecar leaves the
+/// two disagreeing, and `verify` reports the mismatch as corruption.
+fn write_merkle_bin(output_dir: &Path, tree: &crate::merkle::MerkleTree) -> Result<(), String> {
+    let path = output_dir.join("merkle.bin");
+    let tmp = output_dir.join("merkle.bin.tmp");
+    fs::write(&tmp, tree.to_bytes()).map_err(|e| format!("write merkle.bin: {e}"))?;
+    fs::rename(&tmp, &path).map_err(|e| format!("rename merkle.bin: {e}"))?;
+    Ok(())
+}
 fn read_u64(b: &[u8], off: usize) -> u64 {
     u64::from_le_bytes(b[off..off + 8].try_into().unwrap())
 }
@@ -423,7 +631,7 @@ const FORGET_INTERNAL_LAYERS: &[u8] = &[2, 3, 6, 11];
 const FORGET_MIN_IMPORTANCE: u8 = 5;
 
 pub fn forget_old_thoughts(output_dir: &Path, _block_count: usize) -> Result<u32, String> {
-    use crate::{DEPTH_ENTRY_SIZE, HEADER_SIZE, META_HEADER_SIZE};
+    use crate::HEADER_SIZE;
     use std::fs;
 
     let hdr_path = output_dir.join("microscope.bin");
@@ -454,9 +662,9 @@ pub fn forget_old_thoughts(output_dir: &Path, _block_count: usize) -> Result<u32
         }
 
         // Read layer_id (byte 17 in MSC4 header: depth(16) then layer_id(17))
-        let layer_id = headers[off + 17];
+        let layer_id = headers[off + HEADER_LAYER_ID_OFFSET];
         // Read importance (byte 48 in MSC4 header: after project_id)
-        let importance = headers[off + 48];
+        let importance = headers[off + HEADER_IMPORTANCE_OFFSET];
 
         // Check if this is an internal thought that should be forgotten
         if FORGET_INTERNAL_LAYERS.contains(&layer_id) && importance < FORGET_MIN_IMPORTANCE {
@@ -475,20 +683,27 @@ pub fn forget_old_thoughts(output_dir: &Path, _block_count: usize) -> Result<u32
         return Ok(0);
     }
 
-    // Rewrite microscope.bin with only kept headers
+    // Rewrite microscope.bin with only kept headers.
+    //
+    // The survivors are sorted by depth first: the reader's depth table
+    // describes one contiguous run per depth, so a compaction that leaves a
+    // level split in two hides part of that level from every depth lookup.
+    let old_to_new = sort_survivors_by_depth(&headers, &mut keep_indices);
+
     let mut new_headers = Vec::with_capacity(keep_indices.len() * HEADER_SIZE);
     // Packed, variable-length data.bin: see block_data_span. The grid estimate
     // (keep * BLOCK_DATA_SIZE) over-allocated 21 GB on a 1.34 M-block index
     // whose packed data is 6.4 MB; size from the real spans instead.
     let est_data_bytes: usize = keep_indices
         .iter()
-        .filter_map(|&idx| block_data_span(&headers, idx).map(|(_, len)| len as usize))
+        .filter_map(|&idx| block_data_span(&headers, idx).map(|(_, len)| len))
         .sum();
     let mut new_data = Vec::with_capacity(est_data_bytes);
 
     for &idx in &keep_indices {
         let hdr_off = idx * HEADER_SIZE;
-        new_headers.extend_from_slice(&headers[hdr_off..hdr_off + HEADER_SIZE]);
+        let mut hdr = [0u8; HEADER_SIZE];
+        hdr.copy_from_slice(&headers[hdr_off..hdr_off + HEADER_SIZE]);
 
         // data.bin is a packed, variable-length file: build.rs advances it with
         // stream_position() and stores the real span in the header's data_offset
@@ -500,8 +715,51 @@ pub fn forget_old_thoughts(output_dir: &Path, _block_count: usize) -> Result<u32
         if let Some((data_start, data_len)) = block_data_span(&headers, idx) {
             let data_end = data_start.saturating_add(data_len).min(data.len());
             if data_start < data_end {
+                // The new data.bin is packed differently from the old one, so
+                // the header's data_offset has to follow the block to its new
+                // position. Copying the old offset leaves the header pointing
+                // into the previous file, and the CRC — which is computed over
+                // the bytes at that offset — describes data that is no longer
+                // there. That is what made 96.6% of the blocks fail the CRC
+                // check after a compaction.
+                let copied_len = data_end - data_start;
+                let new_offset = new_data.len() as u32;
                 new_data.extend_from_slice(&data[data_start..data_end]);
+
+                hdr[HEADER_DATA_OFFSET_OFFSET..HEADER_DATA_OFFSET_OFFSET + 4]
+                    .copy_from_slice(&new_offset.to_le_bytes());
+
+                // The tail of a truncated block is shorter than the header
+                // claims, so data_len is corrected to what was actually kept.
+                let stored_len = copied_len as u16;
+                hdr[HEADER_DATA_LEN_OFFSET..HEADER_DATA_LEN_OFFSET + 2]
+                    .copy_from_slice(&stored_len.to_le_bytes());
+
+                // Recompute the CRC over this block's bytes as they now sit.
+                let crc = crate::crc16_ccitt(
+                    &new_data[new_offset as usize..new_offset as usize + copied_len],
+                );
+                hdr[HEADER_CRC16_OFFSET..HEADER_CRC16_OFFSET + 2]
+                    .copy_from_slice(&crc.to_le_bytes());
             }
+        }
+        new_headers.extend_from_slice(&hdr);
+    }
+
+    // The parent links point at block positions, and compaction moved every
+    // block, so they have to be translated into the new layout. A parent that
+    // did not survive becomes u32::MAX (no parent), which is the sentinel
+    // build.rs uses for a root block.
+    for i in 0..new_headers.len() / HEADER_SIZE {
+        let off = i * HEADER_SIZE;
+        let parent = u32::from_le_bytes(new_headers[off + 24..off + 28].try_into().unwrap());
+        if parent != u32::MAX {
+            let remapped = if (parent as usize) < old_to_new.len() {
+                old_to_new[parent as usize]
+            } else {
+                u32::MAX
+            };
+            new_headers[off + 24..off + 28].copy_from_slice(&remapped.to_le_bytes());
         }
     }
 
@@ -512,45 +770,29 @@ pub fn forget_old_thoughts(output_dir: &Path, _block_count: usize) -> Result<u32
     fs::rename(&hdr_tmp, &hdr_path).map_err(|e| format!("rename microscope.bin: {}", e))?;
     fs::rename(&dat_tmp, &dat_path).map_err(|e| format!("rename data.bin: {}", e))?;
 
-    // Rebuild meta.bin with new block count and depth ranges
+    // Rebuild meta.bin in the canonical MSC4 layout.
+    //
+    // The old writer emitted a 12-byte header (magic, version, block_count --
+    // no depth_count) while every reader assumes 16. The four-byte shift
+    // moved the depth table four bytes to the left, so the reader read the
+    // Merkle root as the last depth entry: its low bytes became a count of
+    // 3,595,294,311, and the reader's `Vec::with_capacity(count)` asked for
+    // 57 GB and aborted the process.
+    //
+    // The Merkle root is recomputed because the block set changed, and the
+    // sidecar tree is rewritten with it so `verify` still agrees.
     let n = keep_indices.len();
-    let mut new_meta = Vec::with_capacity(META_HEADER_SIZE + 9 * DEPTH_ENTRY_SIZE);
-
-    // Copy original magic and version (first 8 bytes)
-    if meta.len() >= 8 {
-        new_meta.extend_from_slice(&meta[..8]);
-    } else {
-        new_meta.extend_from_slice(b"MSC4   ");
-    }
-    // Write new block count (u32 at offset 8)
-    new_meta.extend_from_slice(&(n as u32).to_le_bytes());
-
-    // Compute depth ranges from kept headers
-    let mut depth_counts = [0u32; 9];
-    for &idx in &keep_indices {
-        let off = idx * HEADER_SIZE;
-        let depth = headers[off + 14]; // depth is at byte 14
-        if (depth as usize) < 9 {
-            depth_counts[depth as usize] += 1;
-        }
-    }
-
-    let mut running_start = 0u32;
-    for &count in &depth_counts[..9] {
-        new_meta.extend_from_slice(&running_start.to_le_bytes());
-        new_meta.extend_from_slice(&count.to_le_bytes());
-        running_start += count;
-    }
-
-    // Copy remaining meta data (merkle root, etc.) if available
-    let meta_tail_start = META_HEADER_SIZE + 9 * DEPTH_ENTRY_SIZE;
-    if meta_tail_start < meta.len() {
-        new_meta.extend_from_slice(&meta[meta_tail_start..]);
-    }
-
-    let meta_tmp = output_dir.join("meta.bin.tmp");
-    fs::write(&meta_tmp, &new_meta).map_err(|e| format!("write meta.bin: {}", e))?;
-    fs::rename(&meta_tmp, &meta_path).map_err(|e| format!("rename meta.bin: {}", e))?;
+    let depth_ranges = depth_ranges_for(&headers, &keep_indices);
+    let merkle_tree = crate::merkle::MerkleTree::build(&merkle_leaves(&new_headers, &new_data));
+    let layers_hash = read_layers_hash(&meta).unwrap_or([0u8; 32]);
+    write_meta_msc4(
+        &meta_path,
+        n,
+        &depth_ranges,
+        &merkle_tree.root,
+        &layers_hash,
+    )?;
+    write_merkle_bin(output_dir, &merkle_tree)?;
 
     println!(
         "  [FORGET] {} belső gondolat elfelejtve ({} blokk maradt)",
@@ -573,7 +815,7 @@ pub fn evict_over_capacity(
     max_blocks: usize,
     protect_min_importance: u8,
 ) -> Result<u32, String> {
-    use crate::{DEPTH_ENTRY_SIZE, HEADER_SIZE, META_HEADER_SIZE};
+    use crate::HEADER_SIZE;
 
     let hdr_path = output_dir.join("microscope.bin");
     let dat_path = output_dir.join("data.bin");
@@ -613,30 +855,72 @@ pub fn evict_over_capacity(
     scored.sort_by(|a, b| a.1.total_cmp(&b.1)); // lowest score first
     let victims: std::collections::HashSet<usize> =
         scored.iter().take(target).map(|(idx, _)| *idx).collect();
-    let keep_indices: Vec<usize> = (0..actual_blocks)
+    let mut keep_indices: Vec<usize> = (0..actual_blocks)
         .filter(|i| !victims.contains(i))
         .collect();
 
     // Rewrite the binary index, keeping only the surviving blocks.
+    //
+    // The survivors are sorted by depth first: the reader's depth table
+    // describes one contiguous run per depth, so a compaction that leaves a
+    // level split in two hides part of that level from every depth lookup.
+    let old_to_new = sort_survivors_by_depth(&headers, &mut keep_indices);
+
     let mut new_headers = Vec::with_capacity(keep_indices.len() * HEADER_SIZE);
     // Packed, variable-length data.bin: see block_data_span. Grid estimate
     // (keep * BLOCK_DATA_SIZE) over-allocates gigabytes; size from real spans.
     let est_data_bytes: usize = keep_indices
         .iter()
-        .filter_map(|&idx| block_data_span(&headers, idx).map(|(_, len)| len as usize))
+        .filter_map(|&idx| block_data_span(&headers, idx).map(|(_, len)| len))
         .sum();
     let mut new_data = Vec::with_capacity(est_data_bytes);
     for &idx in &keep_indices {
         let hdr_off = idx * HEADER_SIZE;
-        new_headers.extend_from_slice(&headers[hdr_off..hdr_off + HEADER_SIZE]);
+        let mut hdr = [0u8; HEADER_SIZE];
+        hdr.copy_from_slice(&headers[hdr_off..hdr_off + HEADER_SIZE]);
         // Packed, variable-length data.bin: see block_data_span.
         if let Some((data_start, data_len)) = block_data_span(&headers, idx) {
             let data_end = data_start.saturating_add(data_len).min(data.len());
             if data_start < data_end {
+                // The new data.bin is packed differently from the old one, so
+                // the header's data_offset has to follow the block to its new
+                // position, and the CRC has to be recomputed over the bytes
+                // where the block now sits.
+                let copied_len = data_end - data_start;
+                let new_offset = new_data.len() as u32;
                 new_data.extend_from_slice(&data[data_start..data_end]);
+
+                hdr[HEADER_DATA_OFFSET_OFFSET..HEADER_DATA_OFFSET_OFFSET + 4]
+                    .copy_from_slice(&new_offset.to_le_bytes());
+                let stored_len = copied_len as u16;
+                hdr[HEADER_DATA_LEN_OFFSET..HEADER_DATA_LEN_OFFSET + 2]
+                    .copy_from_slice(&stored_len.to_le_bytes());
+                let crc = crate::crc16_ccitt(
+                    &new_data[new_offset as usize..new_offset as usize + copied_len],
+                );
+                hdr[HEADER_CRC16_OFFSET..HEADER_CRC16_OFFSET + 2]
+                    .copy_from_slice(&crc.to_le_bytes());
             }
         }
+        new_headers.extend_from_slice(&hdr);
     }
+
+    // The parent links point at block positions, and eviction moved every
+    // block, so they have to be translated into the new layout. A parent that
+    // was evicted becomes u32::MAX (no parent).
+    for i in 0..new_headers.len() / HEADER_SIZE {
+        let off = i * HEADER_SIZE;
+        let parent = u32::from_le_bytes(new_headers[off + 24..off + 28].try_into().unwrap());
+        if parent != u32::MAX {
+            let remapped = if (parent as usize) < old_to_new.len() {
+                old_to_new[parent as usize]
+            } else {
+                u32::MAX
+            };
+            new_headers[off + 24..off + 28].copy_from_slice(&remapped.to_le_bytes());
+        }
+    }
+
     let hdr_tmp = output_dir.join("microscope.bin.tmp");
     let dat_tmp = output_dir.join("data.bin.tmp");
     fs::write(&hdr_tmp, &new_headers).map_err(|e| format!("write microscope.bin: {e}"))?;
@@ -644,36 +928,21 @@ pub fn evict_over_capacity(
     fs::rename(&hdr_tmp, &hdr_path).map_err(|e| format!("rename microscope.bin: {e}"))?;
     fs::rename(&dat_tmp, &dat_path).map_err(|e| format!("rename data.bin: {e}"))?;
 
-    // Rebuild meta.bin with the new block count and depth ranges.
+    // Rebuild meta.bin in the canonical MSC4 layout. See forget_old_thoughts:
+    // the 12-byte header this used to write shifted the depth table four
+    // bytes left, and the reader then read the Merkle root as the D8 count.
     let n = keep_indices.len();
-    let mut new_meta = Vec::with_capacity(META_HEADER_SIZE + 9 * DEPTH_ENTRY_SIZE);
-    if meta.len() >= 8 {
-        new_meta.extend_from_slice(&meta[..8]);
-    } else {
-        new_meta.extend_from_slice(b"MSC4\x04\0\0\0");
-    }
-    new_meta.extend_from_slice(&(n as u32).to_le_bytes());
-    let mut depth_counts = [0u32; 9];
-    for &idx in &keep_indices {
-        let off = idx * HEADER_SIZE;
-        let depth = headers[off + 14]; // byte 14: depth
-        if (depth as usize) < 9 {
-            depth_counts[depth as usize] += 1;
-        }
-    }
-    let mut running_start = 0u32;
-    for &count in &depth_counts[..9] {
-        new_meta.extend_from_slice(&running_start.to_le_bytes());
-        new_meta.extend_from_slice(&count.to_le_bytes());
-        running_start += count;
-    }
-    let meta_tail_start = META_HEADER_SIZE + 9 * DEPTH_ENTRY_SIZE;
-    if meta_tail_start < meta.len() {
-        new_meta.extend_from_slice(&meta[meta_tail_start..]);
-    }
-    let meta_tmp = output_dir.join("meta.bin.tmp");
-    fs::write(&meta_tmp, &new_meta).map_err(|e| format!("write meta.bin: {e}"))?;
-    fs::rename(&meta_tmp, &meta_path).map_err(|e| format!("rename meta.bin: {e}"))?;
+    let depth_ranges = depth_ranges_for(&headers, &keep_indices);
+    let merkle_tree = crate::merkle::MerkleTree::build(&merkle_leaves(&new_headers, &new_data));
+    let layers_hash = read_layers_hash(&meta).unwrap_or([0u8; 32]);
+    write_meta_msc4(
+        &meta_path,
+        n,
+        &depth_ranges,
+        &merkle_tree.root,
+        &layers_hash,
+    )?;
+    write_merkle_bin(output_dir, &merkle_tree)?;
 
     trim_embeddings(output_dir, &keep_indices)?;
 

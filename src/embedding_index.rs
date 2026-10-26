@@ -224,11 +224,13 @@ impl EmbeddingIndex {
 /// truncated. Re-measured on the fixed build the curve is flat from 20 down to
 /// 12 -- no fall at all:
 ///
+/// ```text
 ///     minimum   R@1     R@5     R@10
 ///     24        76.7%   91.7%   95.0%
 ///     20        80.0%   95.0%   98.3%
 ///     16        80.0%   95.0%   98.3%
 ///     12        80.0%   95.0%   98.3%
+/// ```
 ///
 /// 20 is the smallest value that captures the whole gain, so it is the default:
 /// it admits the short-but-complete memories ("The user is vegetarian." is 23
@@ -476,11 +478,13 @@ impl AppendEmbeddings {
 /// Swept on the 60-fact benchmark, with the padding fix in place so the
 /// similarities mean something:
 ///
+/// ```text
 ///     floor   R@1     R@5     R@10
 ///     0.30    85.0%   96.7%   96.7%
 ///     0.20    85.0%   98.3%   98.3%
 ///     0.10    85.0%   98.3%   98.3%
 ///     0.00    85.0%   98.3%   98.3%
+/// ```
 ///
 /// 0.2 is the knee: everything at or below it is admitted, and nothing below
 /// 0.2 adds a case. The two it recovers score 0.098 and 0.225 against their own

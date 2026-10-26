@@ -42,9 +42,10 @@
 //!
 //! A seqlock only helps if at most one writer is in a window at a time; two
 //! overlapping windows can leave a reader validating a counter that neither
-//! writer owns. So publishing also takes `flock(LOCK_EX)` on `spine.publish`
+//! writer owns. So publishing also takes an exclusive lock on `spine.publish`
 //! (see [`Spine::begin_publish`]), which is the piece shared pages cannot
 //! provide: mutual exclusion between publishers in different processes.
+//! The lock is `flock(LOCK_EX)` on unix and `LockFileEx` on Windows.
 //!
 //! A second lock file answers a different question. `spine.lock` is held
 //! *shared* for the whole life of a writer handle, and exclusively by
@@ -53,15 +54,15 @@
 //! the publish lock: a handle holding it shared would deadlock against itself
 //! trying to take it exclusively for one tick.
 //!
-//! `flock` is advisory, is not available on Windows, and does not exist on
-//! every filesystem; all of those degrade to "publishing is serialised per
-//! handle only". That is a real weakening of the guarantee, so it is
-//! reported by [`Spine::publish_lock_is_advisory`] instead of being hidden.
+//! The publish lock is advisory, and does not exist on every filesystem; all
+//! of those degrade to "publishing is serialised per handle only". That is a
+//! real weakening of the guarantee, so it is reported by
+//! [`Spine::publish_lock_is_advisory`] instead of being hidden.
 //!
-//! Lock order is mapping mutex, then publisher lock. `flock` belongs to the
-//! open file description, not the thread: taking it before the mutex would
-//! let a second thread on the same handle unlock the first thread's publish.
-//! The advisory lock is released before the mapping mutex on exit.
+//! Lock order is mapping mutex, then publisher lock. The publish lock belongs
+//! to the open file description, not the thread: taking it before the mutex
+//! would let a second thread on the same handle unlock the first thread's
+//! publish. The advisory lock is released before the mapping mutex on exit.
 
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use memmap2::{MmapMut, MmapOptions};
@@ -1165,12 +1166,10 @@ pub struct PublishGuard<'a> {
 
 impl Drop for PublishGuard<'_> {
     fn drop(&mut self) {
-        #[cfg(unix)]
         if let (true, Some(file)) = (self.held, self.file) {
-            use std::os::fd::AsRawFd;
             // Best effort: closing the descriptor would release the lock too,
             // and a caller can do nothing useful with a failed unlock.
-            let _ = writer_lock::try_op(file.as_raw_fd(), writer_lock::UN);
+            let _ = writer_lock::try_op(file, writer_lock::UN);
         }
     }
 }
@@ -1290,9 +1289,10 @@ mod writer_lock {
 
     /// `Err(true)` == somebody else holds it right now, retrying may help.
     /// `Err(false)` == retrying will not help.
-    pub fn try_op(fd: i32, operation: i32) -> Result<(), (bool, io::Error)> {
+    pub fn try_op(file: &std::fs::File, operation: i32) -> Result<(), (bool, io::Error)> {
+        use std::os::fd::AsRawFd;
         // SAFETY: `fd` is an open descriptor owned by our caller.
-        if unsafe { flock(fd, operation) } == 0 {
+        if unsafe { flock(file.as_raw_fd(), operation) } == 0 {
             return Ok(());
         }
         let err = io::Error::last_os_error();
@@ -1302,10 +1302,102 @@ mod writer_lock {
     }
 }
 
-/// No `flock(2)` on these targets. Only same-handle publishers are excluded;
-/// multiple handles/processes must not publish concurrently. `resize` also
-/// cannot ask other processes to stand back, so it declines.
-#[cfg(not(unix))]
+/// No `flock(2)` on these targets, but Windows has a byte-range lock that
+/// does the same job: `LockFileEx` on the sidecar `spine.publish` excludes
+/// other publishers across handles *and* across processes, exactly like
+/// `flock(LOCK_EX)` does on unix.
+///
+/// Windows byte-range locks are mandatory and released when the handle is
+/// closed, which covers the "writer died holding the lock" case the same way
+/// `flock` does: the OS drops it with the process.
+///
+/// The lock is taken on byte 0 of the sidecar file for one byte. Byte-range
+/// locks on Windows are per-handle, so each `Spine` handle opens its own
+/// descriptor (it already does) and locks it independently — that is what
+/// makes two handles contend.
+#[cfg(windows)]
+mod writer_lock {
+    use std::io;
+    use std::os::windows::io::AsRawHandle;
+    use windows_sys::Win32::Foundation::{ERROR_LOCK_VIOLATION, HANDLE};
+    use windows_sys::Win32::Storage::FileSystem::{
+        LockFileEx, UnlockFileEx, LOCKFILE_EXCLUSIVE_LOCK, LOCKFILE_FAIL_IMMEDIATELY,
+    };
+    use windows_sys::Win32::System::IO::OVERLAPPED;
+
+    pub const EX: i32 = 2;
+    pub const NB: i32 = 4;
+    pub const UN: i32 = 8;
+
+    /// The byte range we lock: one byte at offset 0.
+    const RANGE: u32 = 1;
+
+    /// `OVERLAPPED` is how `LockFileEx` addresses the byte range. It must
+    /// outlive the call, and the offset fields select the range.
+    fn overlapped() -> OVERLAPPED {
+        OVERLAPPED {
+            Internal: 0,
+            InternalHigh: 0,
+            Anonymous: windows_sys::Win32::System::IO::OVERLAPPED_0 {
+                Anonymous: windows_sys::Win32::System::IO::OVERLAPPED_0_0 {
+                    Offset: 0,
+                    OffsetHigh: 0,
+                },
+            },
+            hEvent: 0,
+        }
+    }
+
+    /// `Err(true)` == somebody else holds it right now, retrying may help.
+    /// `Err(false)` == retrying will not help.
+    pub fn try_op(file: &std::fs::File, operation: i32) -> Result<(), (bool, io::Error)> {
+        let handle = file.as_raw_handle() as HANDLE;
+        if operation & UN != 0 {
+            let mut ov = overlapped();
+            // SAFETY: `handle` is an open file handle owned by the caller, and
+            // `ov` names the same byte range the caller locked.
+            let ok = unsafe { UnlockFileEx(handle, 0, RANGE, 0, &mut ov) };
+            if ok == 0 {
+                return Err((false, io::Error::last_os_error()));
+            }
+            return Ok(());
+        }
+        if operation & EX != 0 {
+            let mut ov = overlapped();
+            let flags = LOCKFILE_EXCLUSIVE_LOCK
+                | if operation & NB != 0 {
+                    LOCKFILE_FAIL_IMMEDIATELY
+                } else {
+                    0
+                };
+            // SAFETY: `handle` is an open file handle owned by the caller.
+            // Without LOCKFILE_FAIL_IMMEDIATELY the call blocks until the
+            // range is available, which is the "wait our turn" behaviour.
+            let ok = unsafe { LockFileEx(handle, flags, 0, RANGE, 0, &mut ov) };
+            if ok == 0 {
+                let err = io::Error::last_os_error();
+                // ERROR_LOCK_VIOLATION (33) means somebody else holds the
+                // range: the caller may retry.
+                let contended = err.raw_os_error() == Some(ERROR_LOCK_VIOLATION as i32);
+                return Err((contended, err));
+            }
+            return Ok(());
+        }
+        // A shared lock (`flock(LOCK_SH)`) is only used by the "a writer is
+        // live" marker on `spine.lock`, and that path is unix-only. Windows
+        // byte-range locks have no shared equivalent with the same semantics,
+        // so the shared request is a no-op here. The publish lock above is
+        // what actually serialises publishers, and it is the one the seqlock
+        // guarantee depends on.
+        Ok(())
+    }
+}
+
+/// No `flock(2)` and no `LockFileEx` on these targets. Only same-handle
+/// publishers are excluded; multiple handles/processes must not publish
+/// concurrently. `resize` also cannot ask other processes to stand back, so
+/// it declines.
+#[cfg(not(any(unix, windows)))]
 mod writer_lock {
     use std::io;
 
@@ -1320,7 +1412,7 @@ mod writer_lock {
     pub const UN: i32 = 8;
 
     #[allow(dead_code)]
-    pub fn try_op(_fd: i32, _operation: i32) -> Result<(), (bool, io::Error)> {
+    pub fn try_op(_file: &std::fs::File, _operation: i32) -> Result<(), (bool, io::Error)> {
         Err((
             false,
             io::Error::other("advisory writer locks are unavailable on this target"),
@@ -1353,7 +1445,9 @@ impl Spine {
             OpenOptions::new().read(true).write(true).open(&path)
         };
         match opened {
-            Ok(file) => Ok((Some(file), cfg!(unix))),
+            // unix has `flock`, Windows has `LockFileEx`; both exclude
+            // publishers across handles and processes.
+            Ok(file) => Ok((Some(file), cfg!(any(unix, windows)))),
             Err(_) if !create => Ok((None, false)),
             Err(e) => Err(e),
         }
@@ -1374,13 +1468,11 @@ impl Spine {
     /// Must be taken with the mapping mutex held, and released before it.
     /// Blocking: skipping the queue would permit overlapping publish windows.
     fn publish_guard(&self) -> PublishGuard<'_> {
-        #[cfg(unix)]
         if let Some(file) = self.publish_lock_file.as_ref() {
-            use std::os::fd::AsRawFd;
             // `LOCK_EX` with no `LOCK_NB`: wait our turn. A publisher that
             // died holding it takes the lock down with it, so the wait cannot
             // stick on a dead process.
-            if writer_lock::try_op(file.as_raw_fd(), writer_lock::EX).is_ok() {
+            if writer_lock::try_op(file, writer_lock::EX).is_ok() {
                 return PublishGuard {
                     file: Some(file),
                     held: true,
@@ -1487,10 +1579,9 @@ impl Spine {
 
     #[cfg(unix)]
     fn mark_shared(lock_file: &std::fs::File) -> std::io::Result<()> {
-        use std::os::fd::AsRawFd;
         let deadline = std::time::Instant::now() + std::time::Duration::from_millis(500);
         loop {
-            match writer_lock::try_op(lock_file.as_raw_fd(), writer_lock::SH | writer_lock::NB) {
+            match writer_lock::try_op(lock_file, writer_lock::SH | writer_lock::NB) {
                 Ok(()) => return Ok(()),
                 Err((true, _)) if std::time::Instant::now() < deadline => {
                     std::thread::sleep(std::time::Duration::from_millis(2));
@@ -1511,10 +1602,9 @@ impl Spine {
     /// layout on a shared filesystem). Err(WouldBlock) on timeout.
     #[cfg(unix)]
     fn acquire_exclusive_until(lock: &std::fs::File) -> std::io::Result<()> {
-        use std::os::fd::AsRawFd;
         let deadline = std::time::Instant::now() + std::time::Duration::from_millis(500);
         loop {
-            match writer_lock::try_op(lock.as_raw_fd(), writer_lock::EX | writer_lock::NB) {
+            match writer_lock::try_op(lock, writer_lock::EX | writer_lock::NB) {
                 Ok(()) => return Ok(()),
                 Err((true, _)) if std::time::Instant::now() < deadline => {
                     std::thread::sleep(std::time::Duration::from_millis(2));
@@ -1772,7 +1862,12 @@ impl Spine {
         if n & 1 == 0 {
             return false; // a live writer closed it while we waited for the lock
         }
-        if !_publish.is_advisory() {
+        // Only a *real* publisher lock (unix flock / Windows LockFileEx) can
+        // distinguish a dead writer from a live one. On platforms where no
+        // such lock exists (`publish_lock_advisory == false`) publishing is
+        // already serialised per-handle only, so there is nothing to prove and
+        // we close the stalled window directly.
+        if self.publish_lock_advisory && !_publish.is_advisory() {
             // Without the publisher lock there is no way to tell a dead writer
             // from a live one, and closing the window mid-write would hand a
             // reader a half-updated page as if it were a publish.
@@ -1891,8 +1986,6 @@ impl Spine {
     /// — including the seqlock counter — for every other mapping.
     #[allow(unreachable_code, unused_variables)]
     pub fn resize(&self, new_len: usize) -> std::io::Result<()> {
-        #[cfg(unix)]
-        use std::os::fd::AsRawFd;
         let Some(lock) = self.lock_file.as_ref() else {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::PermissionDenied,
@@ -1902,7 +1995,7 @@ impl Spine {
         #[cfg(unix)]
         {
             // Drop the shared mark so the exclusive one can be taken at all.
-            let _ = writer_lock::try_op(lock.as_raw_fd(), writer_lock::UN);
+            let _ = writer_lock::try_op(lock, writer_lock::UN);
             if let Err(e) = Self::acquire_exclusive_until(lock) {
                 // The mark has to go back on the failure path too: a writer
                 // handle that quietly lost it would let a peer resize the file
@@ -1945,7 +2038,7 @@ impl Spine {
 
         #[cfg(unix)]
         {
-            let _ = writer_lock::try_op(lock.as_raw_fd(), writer_lock::UN);
+            let _ = writer_lock::try_op(lock, writer_lock::UN);
             let _ = Self::mark_shared(lock);
         }
         result
@@ -2419,6 +2512,62 @@ mod tests {
         assert!(!spine.publish_window_open());
         spine.tick(2, 0.0, 0.0, 0, 0.0, 0, 0, 0.0);
         assert_eq!(spine.read_snapshot().unwrap().stream.cycle, 2);
+    }
+
+    #[test]
+    fn test_publish_lock_excludes_independent_handles() {
+        // The seqlock only guarantees a coherent copy if at most one writer is
+        // inside a publish window at a time. That exclusion comes from the
+        // advisory lock on `spine.publish`, which has to work on every
+        // platform we ship on — not just unix, where `flock` exists.
+        //
+        // On a platform without a working advisory lock this test fails
+        // loudly rather than letting two publishers interleave and hand
+        // readers a mixed snapshot.
+        let spine = std::sync::Arc::new(temp_spine("publish_exclusion"));
+        let peer = std::sync::Arc::new(Spine::open(spine.output_dir()).unwrap());
+        assert!(
+            spine.publish_lock_is_advisory(),
+            "this platform has no working publisher lock, so two publishers can \
+             overlap a publish window and the seqlock guarantee does not hold"
+        );
+        // The peer handle must see the same advisory capability, and taking a
+        // batch on one must exclude the other.
+        assert!(peer.publish_lock_is_advisory());
+        let held = spine.begin_publish();
+        assert!(
+            held.is_advisory(),
+            "the publish batch took no publisher lock"
+        );
+        // A second publisher on an independent handle must wait for the first
+        // to finish: the exclusive lock is held for the lifetime of the batch.
+        //
+        // The peer signals only *after* it has acquired the lock and taken
+        // its batch, so the assertion below is about the lock and not about
+        // thread scheduling: an unscheduled peer could not signal either way.
+        let (tx, rx) = std::sync::mpsc::channel();
+        let blocked = std::thread::spawn({
+            let peer = peer.clone();
+            move || {
+                let mut p = peer.begin_publish();
+                p.write_meta(&p.read_meta());
+                tx.send(()).expect("signal the main thread");
+            }
+        });
+        // The peer cannot have acquired the lock while our batch is open.
+        assert!(
+            rx.recv_timeout(std::time::Duration::from_millis(250))
+                .is_err(),
+            "a second publisher acquired the publish lock while a publish \
+             window was still open"
+        );
+        drop(held);
+        blocked.join().expect("peer publisher thread");
+        // And it does get in once the window closes.
+        assert!(
+            rx.recv_timeout(std::time::Duration::from_secs(10)).is_ok(),
+            "the second publisher never acquired the publish lock"
+        );
     }
 
     #[test]

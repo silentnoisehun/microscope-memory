@@ -2,14 +2,21 @@
   install.ps1 - wire the Microscope Memory engine into omp (oh-my-pi).
 
   Installs:
-    1. the hook       -> ~/.omp/agent/hooks/pre/microscope-memory.ts
+    1. the kernel hook -> ~/.omp/agent/hooks/pre/ora-master-kernel.ts
+       (the Ora-Rongyasz master kernel: the organs, the memory recall, the
+        context injection, the tool_result fact store)
     2. the MCP server -> ~/.omp/agent/mcp.json   (model facing memory_* tools)
     3. the bridge cfg -> ~/.omp/agent/microscope-memory-bridge.toml
        (the canonical config with auto_rebuild = false, so a store can never
         start a ~20 s index rebuild inside a hook handler)
 
-  Disables the earlier session-start-only extension so the context is not
-  injected twice.
+  DISABLES THE DUPLICATE BRIDGE. Measured 2026-10-24: the old
+  microscope-memory.ts hook and the kernel BOTH ran in the same session.
+  The bridge re-injected the full auto-context on EVERY model call (no
+  turn-based dedup), so the context grew without bound and the model
+  looped forever - a 300 s stall with the work already finished.
+  The kernel injects ONCE per turn (it clears its buffer), so the bridge
+  is now redundant and must stay disabled.
 
   ASCII only on purpose: PowerShell 5.1 reads BOM-less UTF-8 as ANSI and
   non-ASCII bytes can turn into quote characters and break the parser.
@@ -28,14 +35,24 @@ $ErrorActionPreference = 'Stop'
 
 $OmpDir = Join-Path $env:USERPROFILE '.omp\agent'
 $HookDir = Join-Path $OmpDir 'hooks\pre'
-$HookTarget = Join-Path $HookDir 'microscope-memory.ts'
+$HookTarget = Join-Path $HookDir 'ora-master-kernel.ts'
 $McpTarget = Join-Path $OmpDir 'mcp.json'
 $BridgeCfg = Join-Path $OmpDir 'microscope-memory-bridge.toml'
+
+# The DUPLICATE bridge. It must never be active at the same time as the
+# kernel - two hooks injecting the same context twice is what made the
+# model loop forever. Any of these names refers to the same old bridge.
 $LegacyExt = Join-Path $OmpDir 'extensions\microscope-memory.ts'
 $LegacyDisabled = Join-Path $OmpDir 'extensions\microscope-memory.ts.disabled'
+$DuplicateHook = Join-Path $HookDir 'microscope-memory.ts'
+$DuplicateHookDisabled = $DuplicateHook + '.disabled'
+# The bridge was ALSO deployed under a different name by hand, which is
+# how it survived the .disabled convention: the convention is name-based.
+$DuplicateHookAlt = Join-Path $HookDir 'test-original.ts'
+$DuplicateHookAltDisabled = $DuplicateHookAlt + '.disabled'
 
 $RepoRoot = Split-Path -Parent $PSScriptRoot
-$Source = Join-Path $PSScriptRoot 'microscope-memory.ts'
+$Source = Join-Path $PSScriptRoot 'ora-master-kernel.ts'
 $McpSource = Join-Path $PSScriptRoot 'mcp.json'
 
 # The bridge owns the memory of THIS repo, not the machine wide project
@@ -64,7 +81,7 @@ Write-Host ''
 
 # --- uninstall ------------------------------------------------------------
 if ($Uninstall) {
-  foreach ($p in @($HookTarget, $McpTarget, $BridgeCfg)) {
+  foreach ($p in @($HookTarget, $HookTarget + '.disabled', $McpTarget, $BridgeCfg)) {
     if (Test-Path $p) {
       Remove-Item -LiteralPath $p -Force
       Write-Host ("removed: " + $p)
@@ -80,16 +97,51 @@ if ($Uninstall) {
 }
 
 # --- 1. hook --------------------------------------------------------------
-if (-not (Test-Path $Source)) {
-  Write-Error ("hook source not found: " + $Source)
-  exit 1
+# The consolidated master kernel (hooks/pre/ora-master-kernel.ts) also wires
+# the microscope memory. Two hooks doing the same job double the injected
+# context and the stored entries, and they fight over the engine's file lock
+# (the writes then fail). So the memory hook is only installed when nothing
+# else owns the memory wiring.
+$MasterKernel = Join-Path $HookDir 'ora-master-kernel.ts'
+$MasterOwnsMemory = $false
+if (Test-Path $MasterKernel) {
+  $mk = Get-Content $MasterKernel -Raw -ErrorAction SilentlyContinue
+  if ($mk -match 'MICROSCOPE MEMORY' -and $mk -match 'memory_retrieve') {
+    $MasterOwnsMemory = $true
+  }
 }
-if (-not (Test-Path $HookDir)) {
-  New-Item -ItemType Directory -Path $HookDir -Force | Out-Null
+
+if ($MasterOwnsMemory) {
+  Write-Host ("hook:      the master kernel owns the memory wiring (" + $MasterKernel + ")")
+  Write-Host '           the standalone memory hook is NOT installed (it would duplicate it)'
+  $LegacyHook = Join-Path $HookDir 'microscope-memory.ts'
+  if (Test-Path $LegacyHook) {
+    Rename-Item -LiteralPath $LegacyHook -NewName 'microscope-memory.ts.disabled' -Force
+    Write-Host '           disabled the standalone memory hook'
+  }
+} else {
+  if (-not (Test-Path $Source)) {
+    Write-Error ("hook source not found: " + $Source)
+    exit 1
+  }
+  Copy-Item -LiteralPath $Source -Destination $HookTarget -Force
+  Write-Host ("hook:      " + $HookTarget)
+  Write-Host ("           " + (Get-Item $HookTarget).Length + " bytes")
 }
-Copy-Item -LiteralPath $Source -Destination $HookTarget -Force
-Write-Host ("hook:      " + $HookTarget)
-Write-Host ("           " + (Get-Item $HookTarget).Length + " bytes")
+
+# The duplicate bridge MUST be off. Two hooks injecting the same context
+# made the model loop forever (measured: 300 s stall, work already done).
+# The .disabled convention is NAME based, so a hand-deployed copy under a
+# different name (test-original.ts) slipped through - check every alias.
+foreach ($dup in @(
+    @{ active = $DuplicateHook;       disabled = $DuplicateHookDisabled },
+    @{ active = $DuplicateHookAlt;    disabled = $DuplicateHookAltDisabled })) {
+  if (Test-Path $dup.active) {
+    if (Test-Path $dup.disabled) { Remove-Item -LiteralPath $dup.disabled -Force }
+    Rename-Item -LiteralPath $dup.active -NewName ($dup.disabled | Split-Path -Leaf) -Force
+    Write-Host ('disabled:  the duplicate bridge ' + (Split-Path -Leaf $dup.active))
+  }
+}
 
 # The previous extension injected the session context as well; two bridges
 # would inject it twice.

@@ -1,0 +1,3 @@
+$trigger = New-ScheduledTaskTrigger -AtLogOn
+$action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-WindowStyle Hidden -Command `"$env:MICROSCOPE_CONFIG='C:/Users/mater/AppData/Local/microscope-memory/config.toml'; & 'C:/Users/mater/microscope-memory-clone/target/release/microscope-mem.exe' bridge --port 6060`""
+Register-ScheduledTask -TaskName "MicroscopeMemoryDaemon" -Action $action -Trigger $trigger -RunLevel Highest -Force

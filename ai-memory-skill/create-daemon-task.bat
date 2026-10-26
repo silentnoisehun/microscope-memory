@@ -1,0 +1,2 @@
+@echo off
+schtasks /create /tn "MicroscopeMemoryDaemon" /tr "powershell.exe -WindowStyle Hidden -Command \"$env:MICROSCOPE_CONFIG='C:/Users/mater/AppData/Local/microscope-memory/config.toml'; & 'C:/Users/mater/microscope-memory-clone/target/release/microscope-mem.exe' bridge --port 6060\"" /sc onlogon /delay 0000:30 /rl highest /f

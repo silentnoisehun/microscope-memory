@@ -1,0 +1,2 @@
+param([switch]$ForceDream, [switch]$ForceMorphogenesis, [switch]$ForceFederation, [switch]$FullCycle)
+& "C:/Users/mater/microscope-memory-clone/ai-memory-skill\hooks\periodic-consolidation.ps1" -ConfigPath "C:/Users/mater/AppData/Local/microscope-memory/config.toml" -BinaryPath "C:/Users/mater/microscope-memory-clone/target/debug/microscope-mem.exe" -ForceDream:$ForceDream -ForceMorphogenesis:$ForceMorphogenesis -ForceFederation:$ForceFederation -FullCycle:$FullCycle

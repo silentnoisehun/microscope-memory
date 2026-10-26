@@ -1,0 +1,61 @@
+{
+  "name": "ai-memory-skill",
+  "version": "1.0.0",
+  "description": "Automatic Microscope Memory integration for AI agents - session start/end hooks, recall/store automation, cognitive cycle management",
+  "author": "Máté Róbert (Silent Noise)",
+  "license": "MIT",
+  "minMicroscopeVersion": "1.2.0",
+  "hooks": {
+    "SessionStart": {
+      "script": "hooks/session-start.sh",
+      "description": "Auto-context load + startup checklist execution",
+      "priority": 100
+    },
+    "PreToolUse": {
+      "script": "hooks/pre-tool-use.sh",
+      "description": "Auto-recall for relevant queries before tool execution",
+      "priority": 50
+    },
+    "PostToolUse": {
+      "script": "hooks/post-tool-use.sh",
+      "description": "Auto-store for new facts + reconsolidation trigger",
+      "priority": 50
+    },
+    "SessionEnd": {
+      "script": "hooks/session-end.sh",
+      "description": "Dream consolidation + morphogenesis + federation sync",
+      "priority": 100
+    },
+    "UserPromptSubmit": {
+      "script": "hooks/user-prompt-submit.sh",
+      "description": "Query analysis → recall if relevant",
+      "priority": 75
+    }
+  },
+  "config": {
+    "binaryPath": "C:/Users/mater/microscope-memory-clone/target/debug/microscope-mem.exe",
+    "configPath": "C:/Users/mater/AppData/Local/microscope-memory/config.toml",
+    "federatedConfigPath": "C:/Users/mater/AppData/Local/microscope-memory-federated/config.toml",
+    "layers": {
+      "session": 5,
+      "emotional": 7,
+      "long_term": 8,
+      "identity": 9,
+      "reflections": 6
+    },
+    "autoRecallThreshold": 0.3,
+    "autoStoreThreshold": 0.7,
+    "morphogenesisInterval": 5,
+    "dreamOnSessionEnd": true,
+    "federationEnabled": true
+  },
+  "commands": {
+    "microscope:recall": "hooks/recall-wrapper.sh",
+    "microscope:store": "hooks/store-wrapper.sh",
+    "microscope:reconsolidate": "hooks/reconsolidate-wrapper.sh",
+    "microscope:morphogenesis": "hooks/morphogenesis-wrapper.sh",
+    "microscope:dream": "hooks/dream-wrapper.sh",
+    "microscope:pulse": "hooks/pulse-wrapper.sh",
+    "microscope:field": "hooks/field-wrapper.sh"
+  }
+}

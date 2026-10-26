@@ -167,3 +167,21 @@ node_modules/
 # Local checkpoint of the built binaries (git_reflex restores from the
 # repo, not from this directory).
 .golden_state/
+
+# Octopus runtime state and the network tun snapshots.
+.octopus-rust.state.lock
+tun-snapshots/
+
+# Octopus-synthesised side projects. They are self-contained crates with
+# their own Cargo.lock and their own target directory; they are not part
+# of the Microscope Memory workspace.
+show56/
+echoserver/
+bench/
+
+# Reports and notes produced by the other agents during the migration.
+gemini-report.txt
+IMPLEMENTATION_NOTES.md
+TASK_SUMMARY.md
+FINAL_SUMMARY.md
+

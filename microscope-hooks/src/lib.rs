@@ -283,7 +283,7 @@ pub fn default_after_tool_call(mut ctx: HookContext) -> HookContext {
                 text: format!(
                     "[Tool: {}] {}",
                     tool,
-                    &result.chars().take(500).collect::<String>()
+                    result.chars().take(500).collect::<String>()
                 ),
                 layer: "session".to_string(),
                 importance: 4,
@@ -306,7 +306,7 @@ pub fn default_after_response(mut ctx: HookContext) -> HookContext {
                 text: format!(
                     "Q: {} | A: {}",
                     query,
-                    &response.chars().take(300).collect::<String>()
+                    response.chars().take(300).collect::<String>()
                 ),
                 layer: "session".to_string(),
                 importance: 3,

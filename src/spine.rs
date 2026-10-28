@@ -130,6 +130,12 @@ pub const SNAPSHOT_MAX_RETRIES: u32 = 65_536;
 pub const SNAPSHOT_MAX_WAIT_MS: u64 = 50;
 /// Name of the file whose advisory lock serialises publishers.
 pub const PUBLISH_LOCK_FILE_NAME: &str = "spine.publish";
+/// Whether this platform has a cross-process publisher lock at all: `flock(2)`
+/// on unix, `LockFileEx` on Windows. Where it exists, a publish that cannot
+/// take the lock must fail rather than proceed without exclusion. Where it
+/// does not, only same-handle serialisation is possible and that is reported
+/// through [`Spine::publish_lock_is_advisory`].
+const PUBLISH_LOCK_SUPPORTED: bool = cfg!(any(unix, windows));
 /// Name of the file whose advisory lock marks live writers for `resize`.
 pub const WRITER_LOCK_FILE_NAME: &str = "spine.lock";
 
@@ -1466,22 +1472,72 @@ impl Spine {
     }
 
     /// Must be taken with the mapping mutex held, and released before it.
+    ///
     /// Blocking: skipping the queue would permit overlapping publish windows.
+    ///
+    /// This is fail-closed. A publisher that cannot take the lock does not
+    /// publish anyway: continuing would hand readers a snapshot that
+    /// interleaves two writers, which is exactly the corruption the lock
+    /// exists to prevent. On a platform without any publisher lock,
+    /// per-handle serialisation is all there ever was, and callers are told
+    /// about it through [`Spine::publish_lock_is_advisory`].
     fn publish_guard(&self) -> PublishGuard<'_> {
-        if let Some(file) = self.publish_lock_file.as_ref() {
-            // `LOCK_EX` with no `LOCK_NB`: wait our turn. A publisher that
-            // died holding it takes the lock down with it, so the wait cannot
-            // stick on a dead process.
-            if writer_lock::try_op(file, writer_lock::EX).is_ok() {
-                return PublishGuard {
-                    file: Some(file),
-                    held: true,
-                };
+        match self.acquire_publish_lock() {
+            Ok(guard) => guard,
+            Err(err) => {
+                if PUBLISH_LOCK_SUPPORTED {
+                    panic!(
+                        "publisher lock `{PUBLISH_LOCK_FILE_NAME}` could not be acquired ({err}); \
+                         refusing to publish without cross-process exclusion"
+                    );
+                }
+                // No publisher lock on this platform: per-handle serialisation
+                // is all there ever was, and `is_advisory()` says so.
+                PublishGuard {
+                    file: None,
+                    held: false,
+                }
             }
         }
-        PublishGuard {
-            file: None,
-            held: false,
+    }
+
+    /// Take the publisher lock, waiting our turn if a peer holds it.
+    ///
+    /// Contention is not an error: waiting for the lock is how a publisher
+    /// takes its turn, and a publisher that dies mid-window releases the
+    /// lock with its process, so the wait can never stick on a dead writer.
+    /// `Err` therefore means a *real* lock failure, which is what the
+    /// caller has to refuse to publish through.
+    ///
+    /// The lock order is mapping mutex first, then publisher lock, and
+    /// `begin_publish` and `recover_stalled_publish` both follow it, so the
+    /// blocking wait cannot deadlock against a live publisher.
+    fn acquire_publish_lock(&self) -> std::result::Result<PublishGuard<'_>, std::io::Error> {
+        let Some(file) = self.publish_lock_file.as_ref() else {
+            // The sidecar could not be opened, so there is nothing to lock.
+            // On a platform that has publisher locks this is a real failure:
+            // publishing here would not be excluded.
+            return Err(std::io::Error::other(format!(
+                "publisher lock `{PUBLISH_LOCK_FILE_NAME}` is not available"
+            )));
+        };
+        // Fast path: ask for the lock without blocking, so that a genuine
+        // failure is told apart from ordinary contention.
+        match writer_lock::try_op(file, writer_lock::EX | writer_lock::NB) {
+            Ok(()) => Ok(PublishGuard {
+                file: Some(file),
+                held: true,
+            }),
+            Err((true, _)) => {
+                // A peer holds it: wait our turn. The blocking call only
+                // returns an error for a real failure.
+                writer_lock::try_op(file, writer_lock::EX).map_err(|(_, err)| err)?;
+                Ok(PublishGuard {
+                    file: Some(file),
+                    held: true,
+                })
+            }
+            Err((false, err)) => Err(err),
         }
     }
 
@@ -1626,7 +1682,30 @@ impl Spine {
     /// same bytes, but still take the publisher lock to exclude their writes.
     fn init_superblock(&self) -> std::io::Result<()> {
         let mut m = self.mmap.lock();
-        let publish = self.publish_guard();
+        // Fail closed here too, but as an error rather than a panic: opening
+        // the spine is fallible, and a caller deserves an `Err` it can
+        // report, not an unwind through its own setup code.
+        let publish = match self.acquire_publish_lock() {
+            Ok(guard) => guard,
+            Err(err) => {
+                if PUBLISH_LOCK_SUPPORTED {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::WouldBlock,
+                        format!(
+                            "publisher lock `{PUBLISH_LOCK_FILE_NAME}` could not be acquired \
+                             ({err}); refusing to initialise the spine without cross-process \
+                             exclusion"
+                        ),
+                    ));
+                }
+                // No publisher lock on this platform: per-handle serialisation
+                // is all there ever was.
+                PublishGuard {
+                    file: None,
+                    held: false,
+                }
+            }
+        };
         if Superblock::from_payload(&m[0..SUPERBLOCK_BYTES]).is_some() {
             return Ok(()); // already the current layout
         }
@@ -1857,7 +1936,10 @@ impl Spine {
         if seq_load(&mut m) & 1 == 0 {
             return false;
         }
-        let _publish = self.publish_guard();
+        // Take the lock without failing loudly: here a lock failure is not an
+        // error, it means "we could not prove there is no live writer", and
+        // the answer to that is to leave the window alone.
+        let _publish = self.acquire_publish_lock().ok();
         let n = seq_load(&mut m);
         if n & 1 == 0 {
             return false; // a live writer closed it while we waited for the lock
@@ -1867,7 +1949,8 @@ impl Spine {
         // such lock exists (`publish_lock_advisory == false`) publishing is
         // already serialised per-handle only, so there is nothing to prove and
         // we close the stalled window directly.
-        if self.publish_lock_advisory && !_publish.is_advisory() {
+        let excluded = _publish.as_ref().is_some_and(|g| g.is_advisory());
+        if self.publish_lock_advisory && !excluded {
             // Without the publisher lock there is no way to tell a dead writer
             // from a live one, and closing the window mid-write would hand a
             // reader a half-updated page as if it were a publish.
@@ -2568,6 +2651,52 @@ mod tests {
             rx.recv_timeout(std::time::Duration::from_secs(10)).is_ok(),
             "the second publisher never acquired the publish lock"
         );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn test_publish_fails_closed_when_the_lock_cannot_be_taken() {
+        // The silent failure this guards against: a publisher that cannot take
+        // the lock used to carry on with `held: false`, publishing into a
+        // window that another writer could enter at the same time. The
+        // seqlock's guarantee is void in that case, and nothing reported it.
+        //
+        // Contention is *not* a failure — waiting for the lock is how a
+        // publisher takes its turn. A failure is a lock that cannot be
+        // acquired at all, which is what this test provokes by taking the
+        // sidecar away from the handle.
+        let mut spine = temp_spine("publish_fail_closed");
+        assert!(
+            spine.publish_lock_is_advisory(),
+            "this platform has no publisher lock, so there is nothing to fail closed on"
+        );
+        // Take the sidecar away: from now on this handle has nothing to lock.
+        spine.publish_lock_file = None;
+        // The publish must be refused rather than proceed unserialised.
+        let previous = std::panic::take_hook();
+        std::panic::set_hook(Box::new(|_| {}));
+        let refused = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let _ = spine.begin_publish();
+        }));
+        std::panic::set_hook(previous);
+        assert!(
+            refused.is_err(),
+            "a publish that could not take the publisher lock must fail, not \
+             proceed unserialised"
+        );
+        // The mapping mutex must not have been poisoned by that refusal: the
+        // spine has to stay usable once the lock is available again.
+        spine.publish_lock_file = Some(
+            OpenOptions::new()
+                .read(true)
+                .write(true)
+                .truncate(false)
+                .create(true)
+                .open(spine.output_dir().join(PUBLISH_LOCK_FILE_NAME))
+                .expect("reopen the publish sidecar"),
+        );
+        spine.tick(3, 0.0, 0.0, 0, 0.0, 0, 0, 0.0);
+        assert_eq!(spine.read_snapshot().unwrap().stream.cycle, 3);
     }
 
     #[test]

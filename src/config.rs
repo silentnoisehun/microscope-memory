@@ -181,6 +181,7 @@ impl Default for Search {
             zoom_weight: default_search_zoom_weight(),
             keyword_boost: default_search_keyword_boost(),
             semantic_weight: 0.0,
+            semantic_rank_gain: default_semantic_rank_gain(),
             emotional_bias_weight: 0.0,
             emotion_21d_weight: 0.0,
         }

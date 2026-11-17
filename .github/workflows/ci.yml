@@ -46,6 +46,15 @@ jobs:
       - name: Clippy
         run: cargo clippy --all-targets --locked -- -D warnings
 
+      - name: Embeddings feature
+        # The release asset is built with `--features embeddings`, so the
+        # feature combination that ships has to compile. This gate is here
+        # because the v1.3.0 release binary was built without it: the binary
+        # refused every configured `provider = "candle"` index, and nothing in
+        # CI built that feature combination, so the breakage only surfaced
+        # after the release was published.
+        run: cargo check --locked --features embeddings --bin microscope-mem
+
       - name: WASM target
         # The library has to build for the browser too. --no-default-features
         # keeps the native binary out of it; that binary needs the `native`

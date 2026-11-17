@@ -19,7 +19,12 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
 
       - name: Build (release)
-        run: cargo build --release --locked
+        # The `embeddings` feature is what carries the candle provider and the
+        # multilingual encoder. Without it the binary refuses to serve a
+        # configured `provider = "candle"` index at all, and the release asset
+        # would ship a retrieval path that cannot retrieve. `default` already
+        # contains `native`, so `--features embeddings` is the whole delta.
+        run: cargo build --release --locked --features embeddings
 
       - name: Create checksums
         shell: bash

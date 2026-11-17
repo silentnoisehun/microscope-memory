@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.1] - 2026-11-17
+
+### Fixed
+- **The published binary is now built with the `embeddings` feature.** The
+  v1.3.0 release workflow ran `cargo build --release --locked`, and
+  `default = ["native"]` does not include `embeddings`, so the release asset
+  carried no candle provider. Against a configured `provider = "candle"` index
+  that binary refused to run at all:
+
+      ERROR: [embedding] provider = "candle" requires the 'embeddings' feature,
+      but the binary was built without it.
+
+  The source, the unified retrieval path and the corrected multilingual encoder
+  were all correct in v1.3.0 — only the shipped binary was missing the
+  feature. The release workflow now builds with `--features embeddings`.
+- **CI compiles the feature combination that ships.** `ci.yml` gained a
+  `cargo check --locked --features embeddings --bin microscope-mem` gate. No CI
+  job built that combination before, which is why a binary that could not
+  serve the feature it was released for was published without any signal.
+
+### Notes
+- The shipped `semantic_rank_gain` default is unchanged at `1.5`, where its own
+  318-query sweep put the peak. On two live instances a 56-query and a
+  36-query Hungarian/English suite measured `1.0` strictly better
+  (R@1 +1/−0, R@5 +1/−0), and the ranking is flat between 0.5 and 2.0. Set it
+  explicitly per instance if you want the locally measured optimum.
+
 ## [1.3.0] - 2026-11-17
 
 ### Added

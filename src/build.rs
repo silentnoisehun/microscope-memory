@@ -6,8 +6,8 @@ use crate::config::Config;
 use crate::reader::{read_append_log, FileLock, MicroscopeReader};
 use crate::types::BlockHeader;
 use crate::{
-    content_coords_blended, crc16_ccitt, hex_str, layer_to_id, merkle, safe_truncate, to_block,
-    BLOCK_DATA_SIZE, DEPTH_ENTRY_SIZE, HEADER_SIZE, META_HEADER_SIZE,
+    crc16_ccitt, hex_str, layer_to_id, merkle, safe_truncate, to_block, BLOCK_DATA_SIZE,
+    DEPTH_ENTRY_SIZE, HEADER_SIZE, META_HEADER_SIZE,
 };
 
 use crate::parallel::*;
@@ -67,6 +67,77 @@ pub fn rebuild_pending(
         rebuilt: true,
         pending_entries,
     })
+}
+
+/// Rebuild the append-log embedding sidecar with the configured provider.
+///
+/// The sidecar is positional: vector `i` belongs to append-log entry `i`.
+/// A provider or encoder revision change invalidates every vector, so the
+/// sidecar must be regenerated after the main index is rebuilt.  This helper
+/// does that without touching the durable append log.
+pub fn rebuild_append_embeddings(config: &Config) -> Result<usize, String> {
+    use crate::embedding_index::{AppendEmbeddings, APPEND_EMBEDDINGS_FILE};
+
+    let output_dir = Path::new(&config.paths.output_dir);
+    let appended = read_append_log(&output_dir.join("append.bin"));
+    if appended.is_empty() {
+        let sidecar = output_dir.join(APPEND_EMBEDDINGS_FILE);
+        if sidecar.exists() {
+            fs::remove_file(&sidecar).map_err(|e| format!("remove append sidecar: {e}"))?;
+        }
+        return Ok(0);
+    }
+
+    let dim = config.embedding.dim;
+    let mut sidecar = AppendEmbeddings::new(dim);
+    sidecar.provider_fingerprint = Some(crate::embeddings::provider_fingerprint(
+        &config.embedding.provider,
+        &config.embedding.model,
+    ));
+    let provider = crate::embeddings::provider_from_config(&config.embedding, dim);
+    for (index, entry) in appended.iter().enumerate() {
+        if crate::embedding_index::quality_gate(
+            &entry.text,
+            crate::embedding_index::min_embed_chars(),
+        ) != crate::embedding_index::EmbedVerdict::Keep
+        {
+            continue;
+        }
+        let vector = provider
+            .embed(&entry.text)
+            .map_err(|e| format!("embed append entry {index}: {e}"))?;
+        if vector.len() != dim {
+            return Err(format!(
+                "provider returned {} dims for append entry {index}, expected {dim}",
+                vector.len()
+            ));
+        }
+        sidecar.push(index as u32, vector);
+    }
+    sidecar
+        .save(&output_dir.join(APPEND_EMBEDDINGS_FILE))
+        .map_err(|e| format!("save append embedding sidecar: {e}"))?;
+    Ok(sidecar.entries.len())
+}
+
+#[cfg(test)]
+mod append_embedding_tests {
+    use super::*;
+
+    #[test]
+    fn empty_append_log_removes_stale_sidecar() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut config = Config::default();
+        config.paths.output_dir = dir.path().to_string_lossy().to_string();
+        config.embedding.provider = "mock".to_string();
+        config.embedding.dim = 4;
+        let sidecar = dir
+            .path()
+            .join(crate::embedding_index::APPEND_EMBEDDINGS_FILE);
+        std::fs::write(&sidecar, b"stale").unwrap();
+        assert_eq!(rebuild_append_embeddings(&config).unwrap(), 0);
+        assert!(!sidecar.exists());
+    }
 }
 
 /// Consolidate the append log automatically when the configured threshold is
@@ -444,6 +515,8 @@ fn build_inner(
     });
 
     // ═══ DEPTH 1: Layer summaries ═══
+    // Coordinate blending uses the same provider/model as the vector index,
+    // so stored and query coordinates live in the same semantic space.
     let sw = config.search.semantic_weight;
     let depth1_start = blocks.len();
     for (name, texts) in &layer_texts {
@@ -453,7 +526,8 @@ fn build_inner(
             .map(|(t, _)| safe_truncate(t, 40))
             .collect();
         let summary = format!("[{}] {} elem. {}", name, texts.len(), preview.join(" | "));
-        let (x, y, z) = content_coords_blended(name, name, sw);
+        let (x, y, z) =
+            crate::content_coords_blended_with_config(name, name, sw, &config.embedding);
         blocks.push(RawBlock {
             data: to_block(&summary),
             depth: 1,
@@ -478,7 +552,8 @@ fn build_inner(
                 .map(|(t, _)| safe_truncate(t, 40))
                 .collect();
             let summary = format!("[{} #{}] {}", name, ci / 5, chunk.join(" | "));
-            let (x, y, z) = content_coords_blended(&summary, name, sw);
+            let (x, y, z) =
+                crate::content_coords_blended_with_config(&summary, name, sw, &config.embedding);
             blocks.push(RawBlock {
                 data: to_block(&summary),
                 depth: 2,
@@ -499,7 +574,8 @@ fn build_inner(
     let mut depth3_positions: Vec<(f32, f32, f32)> = Vec::new();
     for (li, (name, texts)) in layer_texts.iter().enumerate() {
         for (ti, (text, item_importance)) in texts.iter().enumerate() {
-            let (x, y, z) = content_coords_blended(text, name, sw);
+            let (x, y, z) =
+                crate::content_coords_blended_with_config(text, name, sw, &config.embedding);
             let cluster_idx = ti / 5;
             let (d2_start, d2_count) = depth2_layer_offsets[li];
             let parent = if cluster_idx < d2_count {
@@ -1041,8 +1117,16 @@ fn build_inner(
             let provider: Box<dyn crate::embeddings::EmbeddingProvider> =
                 crate::embeddings::provider_from_config(&config.embedding, config.embedding.dim);
 
-            match crate::embedding_index::build_embedding_index(
-                &*provider, &reader, max_depth, &emb_path,
+            let fingerprint = crate::embeddings::provider_fingerprint(
+                &config.embedding.provider,
+                &config.embedding.model,
+            );
+            match crate::embedding_index::build_embedding_index_with_fingerprint(
+                &*provider,
+                &reader,
+                max_depth,
+                &emb_path,
+                fingerprint,
             ) {
                 Ok(()) => println!("  {} embeddings.bin built", "OK".green()),
                 Err(e) => eprintln!("  {} embedding build: {}", "ERR".red(), e),

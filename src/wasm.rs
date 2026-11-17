@@ -10,8 +10,8 @@ use wasm_bindgen::prelude::*;
 use web_sys::console;
 
 use crate::{
-    content_coords_blended, BlockHeader, DEPTH_ENTRY_SIZE, HEADER_SIZE,
-    LAYER_NAMES, META_HEADER_SIZE,
+    content_coords_blended, BlockHeader, DEPTH_ENTRY_SIZE, HEADER_SIZE, LAYER_NAMES,
+    META_HEADER_SIZE,
 };
 
 /// JavaScript-accessible block result
@@ -630,9 +630,8 @@ impl MicroscopeWasm {
             results.push(((spatial - boost).max(0.0), index));
         }
         if results.len() > k {
-            results.select_nth_unstable_by(k, |a, b| {
-                a.0.total_cmp(&b.0).then_with(|| a.1.cmp(&b.1))
-            });
+            results
+                .select_nth_unstable_by(k, |a, b| a.0.total_cmp(&b.0).then_with(|| a.1.cmp(&b.1)));
             results.truncate(k);
         }
         results.sort_by(|a, b| a.0.total_cmp(&b.0).then_with(|| a.1.cmp(&b.1)));
@@ -669,9 +668,8 @@ impl MicroscopeWasm {
             .filter_map(|(index, entry)| entry.search_text().contains(&q).then_some(index))
             .collect();
         if results.len() > k {
-            results.select_nth_unstable_by_key(k, |&index| {
-                (self.append_entries[index].depth, index)
-            });
+            results
+                .select_nth_unstable_by_key(k, |&index| (self.append_entries[index].depth, index));
             results.truncate(k);
         }
         results.sort_unstable_by_key(|&index| (self.append_entries[index].depth, index));

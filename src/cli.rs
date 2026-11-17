@@ -47,9 +47,24 @@ pub enum Cmd {
         layer: String,
         #[arg(short = 'i', long, default_value = "5")]
         importance: u8,
-        /// Status flag: open (open loop) | resolved | archived | normal
+        /// Status flag: open (open loop) | resolved | archived | superseded | normal
         #[arg(long)]
         status: Option<String>,
+        /// Stable semantic kind for the durable memory atom.
+        #[arg(long, default_value = "observation")]
+        kind: String,
+        /// Subject key used to detect contradictions and supersessions.
+        #[arg(long)]
+        subject: Option<String>,
+        /// Source label recorded in the durable memory atom.
+        #[arg(long, default_value = "agent")]
+        source: String,
+        /// Evidence confidence 0..100 recorded in the durable memory atom.
+        #[arg(long, default_value_t = 50)]
+        confidence: u8,
+        /// Explicit 32-hex atom id that this memory supersedes.
+        #[arg(long)]
+        supersedes: Option<String>,
     },
     /// Show timeline (chronological stores) by window
     Timeline {
@@ -168,6 +183,8 @@ pub enum Cmd {
     },
     /// Rebuild â€” merge pending observations from append log into the main index
     Rebuild,
+    /// Rebuild only the append-log embedding sidecar with the configured provider
+    RebuildEmbeddings,
     /// Semantic search using embeddings
     Embed {
         query: String,

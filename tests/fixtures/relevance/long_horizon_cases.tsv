@@ -1,0 +1,107 @@
+id	fact	query1	query2	query3
+language	A felhasználó magyarul kommunikál, és a tartós válaszokat magyarul szeretné.	Milyen nyelven beszélünk?	Milyen nyelven szeretnél válaszolni?	Milyen nyelvű válaszokat kérsz?
+project_path	Az aktív projekt munkakönyvtára az E:\STRATOS mappa.	Hol található a fejlesztési projekt?	Melyik mappában dolgozunk a projekten?	Mi az aktív projekt útvonala?
+memory_path	A Microscope Memory példány a C:\Users\mater\.codex\microscope-memory útvonalon található.	Hol van a Microscope Memory példány?	Melyik könyvtárban található a memória példánya?	Hová telepítettük a memóriát?
+favorite_language	A felhasználó kedvenc programozási nyelve a Rust.	Milyen programozási nyelven dolgozik legszívesen?	Melyik nyelv a kedvence?	Melyik programozási nyelvet szereti a legjobban?
+project_languages	A STRATOS rendszer fő nyelve Python és TypeScript.	Milyen nyelveket használ a STRATOS rendszer?	A STRATOS milyen programozási nyelveken épül?	Melyek a STRATOS fő nyelvei?
+breakfast	A felhasználó szeret reggelizni kávéval.	Mivel kávézik reggel?	Mit szokott reggel inni?	Milyen reggeli szokása van?
+favorite_color	A felhasználó kedvenc színe a kék.	Milyen színt szeret a legjobban?	Mi a kedvenc színe?	Melyik szín a kedvenc?
+database	A projekt adatbázisa PostgreSQL.	Milyen adatbázist használ a projekt?	Melyik adatbázis fut a STRATOS alatt?	Milyen DBMS választott a projekt?
+lunch	A felhasználó hétköznaponként ebédel a munkahelyén.	Hol ebédel hétköznaponként?	Melyik napokon ebédel a munkahelyén?	Hogyan alakul a hétköznapi ebédje?
+frontend	A STRATOS frontend Next.js technológiát használ.	Milyen technológiával készült a felület?	Mivel épült a STRATOS weboldala?	Milyen frontend keretrendszert használ a projekt?
+memory_depth	A Microscope Memory kilenc mélységű hierarchikus bináris indexet használ.	Hány szinten működik a mentési rendszer?	Hány mélysége van a memóriahierarchiának?	Mekkora a bináris index mélysége?
+minimalism	A felhasználó nem szereti a kanalizált felszíneket.	Milyen felületeket nem szeret?	Mit nem kedvel a felhasználó a dizájnban?	Hogyan kedveli a minimalista megjelenést?
+dev_stack	A fejlesztés Rust és Python kombinációját használja.	Milyen technológiákból áll a fejlesztési stack?	Mely nyelveket használ a fejlesztés?	Rust és Python mellett más nyelvet is használ a projekt?
+tests	A tesztek a cargo test paranccsal futnak.	Hogyan futtatjuk a teszteket?	Melyik parancsal indulnak a Rust tesztek?	Mivel ellenőrizzük a kód helyességét?
+long_term	A memória fontos emlékeket külön long_term rétegben tárolja.	Hol tárolja a memória a fontos emlékeket?	Melyik réteg tartalmazza a tartós tudást?	Hogyan választja el a rendszer a tartós emlékeket?
+gym	A felhasználó hetente háromszor edz.	Milyen gyakran edz?	Hányszor mozog hetente?	Mennyi edzése van egy hét alatt?
+encryption	Az adatok biztonságát titkosítás védi.	Hogyan védik az adatokat?	Milyen titkosítási megoldást használ a projekt?	Mi biztosítja az adatok biztonságát?
+commute	A felhasználó a Budapestről utazik a munkahelyére.	Melyik városból jár a munkahelyére?	Honnan utazik be a felhasználó?	Hol lakik a munkahelye vonatkozásában?
+manual_deploy	A deploy manuálisan történik.	Hogyan történik a deploy?	Automatikus vagy kézi a kiadás?	Milyen módon kerül ki a program az üzembe?
+vegetarian	A felhasználó vegetáriánus ételeket szeret.	Milyen állatokból nem eszik?	Milyen diétát követ?	Húsmentesen étkezik-e?
+bedroom_window	A hálószoba ablakja a kertre néz.	Mire néz a hálószoba ablaka?	Milyen kilátás van a hálószobából?	Mi látszik be a hálószoba ablakán?
+meeting_day	A csapat hetente szerdán áll össze.	Melyik napon tartják a csapatmegbeszélést?	Mikor ülnek össze a csapattal?	A hét melyik napja a közös megbeszélés napja?
+coffee_type	A felhasználó cappuccinót iszik reggel.	Milyen kávét iszik reggel?	A kávéját hogyan készítik?	Milyen kávéval indul a nap?
+backup_drive	A biztonsági mentés külső SSD meghajtóra kerül.	Hol tárolódik a biztonsági mentés?	Milyen meghajtóra mentünk?	Mire mentik a rendszer mentését?
+team_size	A fejlesztőcsapat öt főből áll.	Hány tagja van a csapatnak?	Hány ember dolgozik a projekten?	Mekkora a csapat létszáma?
+vpn	A távoli elérést VPN biztosítja.	Hogyan kapcsolódunk távol a projekthez?	Mi védi a távoli hozzáférést?	VPNen keresztül dolgozunk távolról?
+sprint_length	A fejlesztési ciklusok két hétig tartanak.	Mennyi ideig tart egy sprint?	Hány hetes a fejlesztési ciklus?	Mekkora a sprint hossza?
+error_tracker	A hibákat a Sentry gyűjti.	Hol követjük nyomon a hibákat?	Melyik szolgáltatás gyűjti a runtime hibákat?	Mivel figyeljük az alkalmazás hibáit?
+api_style	A külső API REST alapú.	Milyen típusú a külső API?	REST vagy GraphQL a projekt szolgáltatása?	Hogyan kommunikál a kliens a szerverrel?
+ui_library	A felület a Tailwind CSS stílusokat használja.	Melyik CSS keretrendszert használja a felület?	Milyen stílusrendszer építi a UI-t?	Tailwind vagy más CSS megoldás van a frontenden?
+backup_frequency	A teljes mentés hetente egyszer készül.	Milyen gyakran készül teljes mentés?	Minden héten fut a backup?	Milyen időközzel készül a teljes mentés?
+primary_language	A fejlesztő elsődleges programozási nyelve a TypeScript.	Melyik nyelv a fő fejlesztési nyelv?	Elsősorban milyen nyelven dolgozol?	Melyik nyelven van a legtöbb kód?
+incident_channel	A incidensek a incidents csatornában jelennek meg.	Hol jelennek meg az incidensek?	Melyik csatornában kommunikálunk sürgős ügyekről?	Hol értesülünk incidensekről?
+release_day	A kiadások csütörtökön készülnek.	Melyik napon készül ki a release?	Mikor szokás kiadást készíteni?	A hét melyik napja a kiadás napja?
+database_host	A PostgreSQL adatbázis egy konténerben fut.	Hol fut a PostgreSQL?	Konténerben fut az adatbázis?	Hogyan indítják el az adatbázist?
+font_family	A felület az Inter betűtípust használja.	Milyen betűtípust használ a design?	Mi az alapértelmezett typeface a UI-on?	Milyen fonttal renderel az oldal?
+meeting_room	A heti megbeszélést a Bors teremben tartják.	Melyik teremben tartják a heti megbeszélést?	Hol található a csapat meetingje?	Melyik helyiségben ül össze a csapat?
+monitor_count	A fejlesztő két monitort használ.	Hány monitorral dolgozik a fejlesztő?	Milyen kijelzők támogatják a munkát?	Két kijelzőt használ a fejlesztő?
+morning_routine	A felhasználó reggel kávét iszik, majd egy emlékezetgyakorlatot végez.	Mi a reggeli rutinja?	Mivel kezdi a napot?	Milyen szokással indul a reggel?
+editor	A fejlesztő VS Code-ban dolgozik.	Milyen kódszerkesztőt használ?	Melyik editorban dolgozik?	Van neki saját fejlesztői környezete?
+weekend	Hétköznapokon a felhasználó későn kezdi a munkát.	Mikor kezdi a munkát hétköznaponként?	A hét melyik napjain dolgozik későn?	Milyen munkaidőt tart hétköznapokon?
+backup_encryption	A mentési fájlokat külön AES kulcs védi.	Hogyan védik a mentési fájlokat?	Milyen titkosítást használ a backup?	A mentés külön kulcsot kapott?
+frontend_tests	A frontend Playwright teszteket használ.	Milyen tesztkönyvtárat használ a frontend?	Playwright vagy más eszköz ellenőrzi a UI-t?	Hogyan tesztelik a böngészős felületet?
+cache_system	A gyorsítótár Redisben fut.	Hol fut a gyorsítótár?	Milyen cache rendszert használ a projekt?	Redisben tároljuk az ideiglenes adatokat?
+incident_severity	A legsúlyosabb incidensek severity 1 besorolásúak.	Milyen severity szint a legmagasabb?	Hogyan jelöljük a legsúlyosabb hibákat?	Melyik incidenssúlyossági szint a legrosszabb?
+personal_device	A felhasználó munkáját egy ThinkPad laptopon végezi.	Milyen laptopon dolgozik?	Mi a fejlesztő gépe?	Melyik márkás notebook tulajdona?
+deploy_region	Az alkalmazás eu-central-1 régióban fut.	Melyik felhőrégióban fut az alkalmazás?	Hol található a production deployment?	Melyik AWS régiót használják?
+status_page	A szolgáltatás állapotát a status.example.com mutatja.	Hol ellenőrizhető a szolgáltatás állapota?	Melyik oldalon látható az uptime?	Honnan tudod meg, hogy működik-e a szolgáltatás?
+log_retention	A production logok 30 napig maradnak meg.	Mennyi ideig tároljuk a logokat?	Meddig élnek a production naplók?	Hány nap után törlődnek a logok?
+repository_host	A kód a GitHubon tárolt.	Hol van a kódrepository?	Melyik platformon található a source code?	GitLab vagy GitHub projekt ez?
+review_policy	Minden pull requesthez legalább két jóváhagyás kell.	Hány jóváhagyás kell egy PR-hez?	Milyen review szabály van érvényben?	Mikor merge-elhető egy pull request?
+feature_flags	A funkciókapcsolók a LaunchDarklyben kezelnek.	Hol kezelik a feature flag-eket?	Melyik szolgáltatás tartozékon a flag-ek?	Melyik rendszer kapcsolja ki és be a funkciókat?
+weather_app	A kedvező időjárás alkalmazás a OpenWeather API-t használja.	Milyen időjárás alkalmazás van a projektben?	Melyik szolgáltatás adja az előrejelzést?	Honnan jönnek az időjárás adatok?
+coffee_beans	A kedvenc kávé az Ethiopia Yirgacheffe eredetű.	Milyen kávét kedvel a felhasználó?	Honnan származik a kedvenc kávéja?	Melyik kávé eredetét szereti?
+gym_time	A felhasználó reggel hatkor edz.	Mikor indul edzni?	Hánykor kezdi a testedzést?	Milyen időpontban jár az edzőterembe?
+music	Hétköznapokon jazzt hallgat munka közben.	Milyen zenét hallgat munka közben?	Mi szól a háttérben a munkánál?	Milyen hangulatú zenét kedvel a héten?
+film	Hétvégén egy dokumentumfilmet néz.	Mit csinál a felhasználó hétvégén?	Milyen filmet néz a szabadnapján?	Hogyan tölti az idejét a hétvégén?
+reading	A felhasználó sci-fi regényeket olvas.	Milyen könyveket szeret olvasni?	Milyen műfajt kedvel a könyvek közül?	Mit olvas szabadidőben?
+travel_city	A felhasználó tavaly Lisszabonban nyaralt.	Hol nyaralt tavaly?	Melyik városban volt az előző nyári utazás?	Where did the user travel last summer?
+car	A felhasználó egy Toyota Corolla közlekedési autót használ.	Milyen autóval közlekedik?	Melyik márkás kocsit vezet?	Mi a gépjárműve?
+bicycle	A felhasználó reggelente kerékpárral jár.	Mivel jár reggel a munkahelyére?	Hogyan jut el a munkahelyére?	Melyik közlekedési eszközt használja reggel?
+phone	A felhasználó Android telefont használ.	Milyen operációs rendszerű a telefonja?	Milyen mobiltelefonja van?	Which mobile operating system does the user prefer?
+desktop_os	A fejlesztő laptopon Linux Mintet futtat.	Milyen operációs rendszer alatt dolgozik a laptopon?	Milyen Linux disztribúciót használ?	What desktop operating system is installed on the laptop?
+editor_theme	A VS Code témája egy sötét színpaletta.	Milyen színpalettát használ a kódszerkesztő?	Milyen világos vagy sötét téma aktív a fejlesztői környezetben?	Is the editor theme light or dark?
+package_manager	A Node projekt csomagkezelője az npm.	Melyik Node csomagkezelőt használják?	Hogyan telepítenek JavaScript függőségeket?	Which package manager runs for Node dependencies?
+monorepo	A monorepo pnpm workspace-t használ.	Milyen monorepo rendszert használ a projekt?	Hogyan szervezett a többcsomagos repository?	What workspace system manages the monorepo?
+ci_provider	A CI folyamatok GitHub Actionsen futnak.	Melyik CI szolgáltatás futtatja a teszteket?	Hol futnak az automatikus buildek?	Which CI system runs the pull request checks?
+container_runtime	A konténerek Docker Engine alatt futnak.	Milyen konténer futtatót használnak?	Hol indulnak el a konténerek?	Which container runtime starts the services?
+compose_file	A szolgáltatokat docker-compose.yml indítja.	Melyik fájl indítja el a helyi szolgáltatásokat?	Hogyan állítod össze a helyi környezetet?	Which compose file defines the local stack?
+db_migration	Az adatbázis módosításai Flyway migrációkkal történnek.	Hogyan kezelitek az adatbázis-változásokat?	Melyik migrációs eszközt használjátok?	Which tool applies database schema changes?
+api_version	A REST API verziója v2.	Melyik API verzió él jelenleg?	Hányadik generációjú az API?	What is the current API version?
+auth_method	A felhasználók JWT tokennel hitelesítik magukat.	Hogyan hitelesítik a felhasználókat?	Milyen tokent használ a bejelentkezés?	Which authentication token does the API accept?
+oauth_provider	A bejelentkezés GitHub OAuthot használ.	Melyik OAuth szolgáltatóval lehet belépni?	Melyik közösségi fiókkal lehet hitelesíteni?	Which social login provider is configured?
+rate_limit	Az API tíz kérés per másodperces korlátot használ.	Mekkora az API kéréskorlátja?	Hány kérés érkezhet másodpercenként?	What is the per-second request limit?
+pagination	A listázások 50 elemet adnak oldalanként.	Hány elem jön vissza egy oldalon?	Mekkora az oldalméret a listázásoknál?	How many items are returned per list page?
+websocket	Az élő frissítések WebSocket kapcsolatot használnak.	Hogyan érkeznek az élő frissítések?	Melyik protokoll kezeli a valós idejű adatokat?	Which transport carries live updates?
+email_provider	A tranzakciós leveleket a Postmark küldi.	Melyik szolgáltatás küldi az e-maileket?	Ki kezeli a kimenő levelezést?	Which provider sends transactional email?
+pdf_tool	A PDF dokumentumokat a Playwright generálja.	Melyik eszközzel készülnek a PDF-ek?	Hogyan renderelnek dokumentumokat PDF formátumban?	Which renderer produces the PDF reports?
+spreadsheet_tool	Az elemzési táblázatok Excelben készülnek.	Milyen programmal készítenek elemzési táblázatot?	Melyik irodai fájlformátumot használják az elemzésekhez?	Which office file is used for analysis tables?
+cloud_backup	A felhős mentés az S3 bucketbe kerül.	Hol tárolják a felhős biztonsági mentést?	Melyik felhőtár használata a mentéshez?	Where does the cloud backup land?
+monitoring	A production telemetria a Grafanába fut.	Hol nézik a production metrikákat?	Melyik dashboardon figyelik az éles rendszert?	Which dashboard shows production telemetry?
+tracing	A hívásláncokat a Jaeger rögzíti.	Hol nézhetők meg a distributed trace-ek?	Melyik tracing rendszer gyűjti a hívásláncokat?	Which tracing backend stores request traces?
+log_format	A strukturált logok JSON formátumúak.	Milyen formátumban vannak a strukturált logok?	Hogyan jelenik meg egy log esemény?	What format are structured log events written in?
+flag_service	A funkciókapcsolókat a Unleash kezeli.	Melyik szolgáltatás kezeli a feature flag-eket?	Hol kapcsolhatók ki a kísérleti funkciók?	Which system controls experimental feature toggles?
+cookie_policy	A sütik csak a szükséges működéshez használhatók.	Milyen cookie policy van érvényben?	Melyik sütiket engedélyezitek?	Which cookies are allowed on the site?
+accessibility	A felület megfelel a WCAG 2.2 AA accessibility szintnek.	Milyen akadálymentességi szintet követ a design?	Melyik accessibility standardot teljesítjük?	What accessibility standard does the UI meet?
+browsers	A weboldal modern Chrome, Firefox és Safari böngészőkben működik.	Melyen böngészőkben fut a weboldal?	Milyen böngészőket támogat a frontend?	Which browsers are officially supported?
+mobile_first	A reszponzív design mobil eszközökre is optimalizált.	Milyen eszközökre optimalizál a design?	Hogyan kezeli a kis kijelzőket a felület?	Is the responsive design mobile-first?
+design_system	A komponensek saját design systemet használnak.	Melyik komponenskönyvtár építi a felületet?	Honnan jönnek az UI komponensek?	Which design system supplies the components?
+icon_library	Az ikonok a Lucide ikoncsomagból származnak.	Milyen ikonkészlettel dolgozol?	Melyik ikonkönyvtárat használja a frontend?	Which icon set is used in the UI?
+color_palette	A brand színpaletta sötétkék és türkiz.	Milyen színekből áll a brand paletta?	Melyik fő színt használja a márka?	Which primary brand colour is used?
+typography	A design rendszer Inter és JetBrains Mono betűket használ.	Milyen betűtípusokat használ a design rendszer?	Melyik font váltja a monospace kódot?	Which fonts are defined in the design system?
+spacing	A spacing skála 4 pixeles alapértékkel indul.	Milyen térközskálát használ a UI?	Mi az alapvető spacing egység?	What is the base spacing unit?
+motion	A UI animációi 150 millisek alatt fejeződnek be.	Milyen hosszúak az UI animációk?	Meddig tarthat egy átmenet?	What is the maximum transition duration?
+analytics	A használati analitika PostHoggal történik.	Melyik analitikai eszközt használjátok?	Hol méritek a felhasználói viselkedést?	Which analytics platform tracks user behaviour?
+privacy	A felhasználói adatok nem hagyják el az EU-t.	Hol tárolják a felhasználói adatokat?	Milyen adatvédelmi határ érvényes?	Are personal data stored inside the EU?
+support_sla	Az ügyfélszolgálat válaszideje egy munkanap.	Mennyi a válaszadási idő?	Milyen SLA vonatkozik a supportra?	What is the customer support response SLA?
+calendar	A csapatmegbeszélések a naptárban vannak blokkolva.	Hogyan vannak lefoglalva a megbeszélések?	Melyik naptár tartalmazza a meetingeket?	Where are team meetings scheduled?
+pomodoro	A fejlesztő 25 perces pomodoro szakaszokat használ.	Mennyi ideig dolgozik egy koncentrációs blokkban?	Milyen hosszúak a pomodoro szakaszok?	How long is each focus interval?
+sleep	A felhasználó céljánál többet alszik.	Mit szeretne a felhasználó az alvással kapcsolatban?	Mennyi alvásnál többet szeretne?	How much more sleep does the user want?
+water	A felhasználó napi két liter vizet igyekszik megenni.	Mennyi vizet iszik naponta?	Milyen napi folyadékbevitelt céloz?	How much water does the user drink daily?
+learning_language	A felhasználó spanyolul tanul.	Milyen nyelvet tanul a felhasználó?	Melyik idegen nyelven dolgozik a tanuláson?	Which language is the user learning?
+journal	A felhasználó este egy naplót ír.	Mit csinál a felhasználó este?	Milyen napló szokása van?	What does the user write in the evening?
+gratitude	Minden este három dolgot megköszön.	Mit csinál este a felhasználó a pozitív szokások terén?	Hány dolgot sorol fel naponta?	How many positive things are noted each evening?
+retirement	A felhasználó 65 évesen tervez nyugdíjba vonulni.	Mikor tervez nyugdíjba vonulni?	Melyik életkorban állítja le a munkát?	At what age does the user plan to retire?
+volunteering	A felhasználó havonta egyszer önkénteskedik.	Milyen gyakran segít önkéntes munkában?	Hány alkalommal vállal önkéntes feladatot havonta?	How often does the user volunteer each month?

@@ -432,7 +432,12 @@ fn handle_tools_list(id: &Value, config: &Config) -> Value {
                             "text": { "type": "string", "description": "Memory text to store" },
                             "layer": { "type": "string", "description": "Memory layer (long_term, short_term, session, associative, emotional, relational, reflections, echo_cache)", "default": "long_term" },
                             "importance": { "type": "integer", "description": "Importance level 1-10", "default": 5 },
-                            "status": { "type": "string", "description": "Status flag: open (an unfinished loop to come back to) | resolved | archived | normal", "default": "normal", "enum": ["normal", "open", "resolved", "archived"] },
+                            "status": { "type": "string", "description": "Status flag: open (an unfinished loop to come back to) | resolved | archived | superseded | normal", "default": "normal", "enum": ["normal", "open", "resolved", "archived", "superseded"] },
+                            "kind": { "type": "string", "description": "Durable memory atom kind", "default": "observation", "enum": ["observation", "fact", "preference", "decision", "correction", "task", "episode"] },
+                            "subject": { "type": "string", "description": "Subject key used to detect contradictory statements and supersessions" },
+                            "source": { "type": "string", "description": "Source label recorded in the memory atom", "default": "agent" },
+                            "confidence": { "type": "integer", "description": "Evidence confidence 0..100", "default": 50, "minimum": 0, "maximum": 100 },
+                            "supersedes": { "type": "string", "description": "32-hex memory atom id explicitly superseded by this memory" },
                             "emotion": { "type": "array", "items": { "type": "number" }, "minItems": 21, "maxItems": 21, "description": "21D emotion vector: [joy, sadness, anger, fear, surprise, disgust, trust, anticipation, love, gratitude, curiosity, awe, confusion, anxiety, serenity, hope, pride, shame, guilt, empathy, excitement]" }
                         },
                         "required": ["text"]
@@ -1081,8 +1086,35 @@ fn tool_store(config: &Config, args: &Value) -> Result<String, String> {
     let status = args
         .get("status")
         .and_then(|v: &Value| v.as_str())
-        .filter(|s| matches!(*s, "normal" | "open" | "resolved" | "archived"))
+        .filter(|s| {
+            matches!(
+                *s,
+                "normal" | "open" | "resolved" | "archived" | "superseded"
+            )
+        })
         .unwrap_or("normal");
+    let kind = args
+        .get("kind")
+        .and_then(|v: &Value| v.as_str())
+        .and_then(crate::memory_atom::AtomKind::parse)
+        .unwrap_or(crate::memory_atom::AtomKind::Observation);
+    let subject = args
+        .get("subject")
+        .and_then(|v: &Value| v.as_str())
+        .unwrap_or("");
+    let source = args
+        .get("source")
+        .and_then(|v: &Value| v.as_str())
+        .unwrap_or("agent");
+    let confidence = args
+        .get("confidence")
+        .and_then(|v: &Value| v.as_u64())
+        .unwrap_or(50)
+        .min(100) as u8;
+    let supersedes = args
+        .get("supersedes")
+        .and_then(|v: &Value| v.as_str())
+        .and_then(parse_atom_id_hex);
 
     // Parse optional 21D emotion vector
     let emotion: Option<[f32; 21]> = args.get("emotion").and_then(|v: &Value| {
@@ -1102,6 +1134,26 @@ fn tool_store(config: &Config, args: &Value) -> Result<String, String> {
 
     store_memory_with_status(config, &tagged, layer, importance, Some(status), emotion)?;
 
+    let atom = crate::memory_atom::record_atom(
+        Path::new(&config.paths.output_dir),
+        &config.project_id.0,
+        text,
+        kind,
+        subject,
+        source,
+        confidence,
+        supersedes,
+    )?;
+
+    // Keep the persisted row and the atom linked by the same canonical text.
+    // The session marker is retained in the append log for provenance, while
+    // the atom intentionally stores the original statement so durable
+    // contradiction and supersession checks compare like with like.
+    debug_assert_eq!(
+        crate::memory_atom::canonical_memory_text(&tagged),
+        crate::memory_atom::canonical_memory_text(text)
+    );
+
     let (x, y, z) = crate::content_coords(&tagged, layer);
     let depth = crate::auto_depth(&tagged);
 
@@ -1112,6 +1164,7 @@ fn tool_store(config: &Config, args: &Value) -> Result<String, String> {
          Depth: D{}\n\
          Position: ({:.3}, {:.3}, {:.3})\n\
          Session: sid-{:04}\n\
+         Atom: {}\n\
          Text: {}",
         layer,
         importance,
@@ -1120,8 +1173,20 @@ fn tool_store(config: &Config, args: &Value) -> Result<String, String> {
         y,
         z,
         sid % 10000,
+        atom.id_hex(),
         crate::safe_truncate(text, 200)
     ))
+}
+
+fn parse_atom_id_hex(value: &str) -> Option<[u8; 16]> {
+    if value.len() != 32 || !value.chars().all(|c| c.is_ascii_hexdigit()) {
+        return None;
+    }
+    let mut bytes = [0u8; 16];
+    for (i, byte) in bytes.iter_mut().enumerate() {
+        *byte = u8::from_str_radix(&value[i * 2..i * 2 + 2], 16).ok()?;
+    }
+    Some(bytes)
 }
 
 fn tool_recall(config: &Config, args: &Value) -> Result<String, String> {
@@ -1143,8 +1208,6 @@ fn tool_recall(config: &Config, args: &Value) -> Result<String, String> {
         }
         Some(emo)
     });
-    let emotional_recall_weight = config.search.emotional_bias_weight * 0.15;
-
     crate::recall_ctx::with_shared(config, |ctx| {
         let reader = &ctx.reader;
         let output_dir = Path::new(&config.paths.output_dir);
@@ -1165,10 +1228,12 @@ fn tool_recall(config: &Config, args: &Value) -> Result<String, String> {
             }
         });
 
-        let (qx, qy, qz) =
-            crate::content_coords_blended(query, "long_term", config.search.semantic_weight);
-        let relevance_query = crate::relevance::RelevanceQuery::new(query);
-
+        let (qx, qy, qz) = crate::content_coords_blended_with_config(
+            query,
+            "long_term",
+            config.search.semantic_weight,
+            &config.embedding,
+        );
         let (mut attention, hebb_pre, tg_pre, pc_pre) = if let Some(stream) =
             crate::consciousness_stream::global_stream()
         {
@@ -1227,128 +1292,37 @@ fn tool_recall(config: &Config, args: &Value) -> Result<String, String> {
             (0u8, hi)
         };
 
-        // Embed the query and take the nearest stored vectors, so a paraphrase with
-        // no shared token can still become a candidate. See the equivalent path in
-        // main::recall; previously this gate was `lexical > 0.0` alone, which made
-        // the embedding index unreachable from the agent-facing tool.
-        let mut semantic_hits: std::collections::HashMap<usize, f32> =
-            std::collections::HashMap::new();
-        // Vectors of memories still in the append log, keyed by append position;
-        // see the equivalent block in main::recall.
-        let mut appended_sem: std::collections::HashMap<usize, f32> =
-            std::collections::HashMap::new();
-        {
-            use crate::embedding_index::EmbeddingIndex;
-
-            let emb_path = output_dir.join("embeddings.bin");
-            if let Some(eidx) = EmbeddingIndex::open(&emb_path) {
-                // Cached: a long-lived server used to rebuild the provider -- and
-                // re-fault the model weights -- on every single query.
-                let embedded =
-                    crate::embeddings::with_cached_provider(&config.embedding, eidx.dim(), |p| {
-                        p.embed(query)
-                    });
-                match embedded {
-                    Ok(qe) if qe.len() == eidx.dim() => {
-                        for (sim, block_idx) in eidx.search(&qe, (k * 8).max(64)) {
-                            if block_idx < reader.block_count {
-                                semantic_hits.insert(block_idx, sim);
-                            }
-                        }
-                        if let Some(side) = crate::embedding_index::AppendEmbeddings::open(
-                            &output_dir.join(crate::embedding_index::APPEND_EMBEDDINGS_FILE),
-                            eidx.dim(),
-                        ) {
-                            for (sim, ai) in side.search(&qe, (k * 8).max(64)) {
-                                appended_sem.insert(ai as usize, sim);
-                            }
-                        }
-                    }
-                    Ok(_) => eprintln!("  semantic: provider width differs from index; skipped"),
-                    Err(e) => eprintln!("  semantic: embedding failed ({}); lexical path only", e),
-                }
-            }
-        }
+        // Semantic candidate generation is shared with the CLI.  The previous
+        // MCP-local implementation fetched only 64 candidates and, worse,
+        // applied `semantic_weight` to the cosine score.  In production that
+        // value is 0.0 because it is a coordinate-blend weight, so a genuine
+        // semantic match could become a candidate but could not outrank a weak
+        // lexical hit.  The shared path uses `semantic_rank_gain` and the same
+        // minimum candidate depth on every surface.
+        let semantic_candidates =
+            crate::retrieval::collect_semantic_candidates(config, reader, query, k);
 
         // Load emotions.bin lookup for main-index emotional recall
         let emotion_lookup = query_emotion
             .as_ref()
             .and_then(|_| crate::load_emotion_lookup(output_dir));
 
-        let mut all_results: Vec<(f32, usize, bool)> = Vec::new();
-
-        for zoom in zoom_lo..=zoom_hi {
-            let (start, count) = reader.depth_ranges[zoom as usize];
-            let (start, count) = (start as usize, count as usize);
-            for i in start..(start + count) {
-                let text = reader.text(i);
-                let lexical = relevance_query.lexical_score(text);
-                // Lexical OR semantic: the embedding candidates are useless if the
-                // gate ignores them.
-                let semantic = semantic_hits.get(&i).copied();
-                if lexical > 0.0 || semantic.is_some() {
-                    let h = reader.header(i);
-                    let dx = h.x - qx;
-                    let dy = h.y - qy;
-                    let dz = h.z - qz;
-                    let spatial_dist = dx * dx + dy * dy + dz * dz;
-                    // Emotional similarity boost (if query emotion AND emotions.bin data available)
-                    let emo_boost = query_emotion
-                        .as_ref()
-                        .and_then(|qe| {
-                            emotion_lookup
-                                .as_ref()
-                                .and_then(|lookup| lookup(i))
-                                .map(|block_emo| {
-                                    crate::emotional_similarity(qe, &block_emo)
-                                        * emotional_recall_weight
-                                })
-                        })
-                        .unwrap_or(0.0);
-                    let base = crate::relevance::rank_distance_from_score(
-                        lexical,
-                        spatial_dist,
-                        config.search.keyword_boost,
-                        h.importance,
-                    );
-                    let mut combined = crate::relevance::apply_boost(base, emo_boost);
-                    if let Some(sim) = semantic {
-                        let w = config.search.semantic_weight.clamp(0.0, 1.0);
-                        combined -= sim * w;
-                    }
-                    all_results.push((combined, i, true));
-                }
-            }
-        }
-
         let append_path = Path::new(&config.paths.output_dir).join("append.bin");
         let appended = read_append_log(&append_path);
-        for (ai, entry) in appended.iter().enumerate() {
-            let dx = entry.x - qx;
-            let dy = entry.y - qy;
-            let dz = entry.z - qz;
-            let dist = dx * dx + dy * dy + dz * dz;
-            let lexical = relevance_query.lexical_score(&entry.text);
-            // Emotional boost from inline append entry emotion
-            let emo_boost = query_emotion
-                .as_ref()
-                .map(|qe| crate::emotional_similarity(qe, &entry.emotion) * emotional_recall_weight)
-                .unwrap_or(0.0);
-            if dist < 0.1 || lexical > 0.0 || emo_boost > 0.0 || appended_sem.contains_key(&ai) {
-                let mut base = crate::relevance::rank_distance_from_score(
-                    lexical,
-                    dist,
-                    config.search.keyword_boost,
-                    entry.importance,
-                );
-                if let Some(sim) = appended_sem.get(&ai) {
-                    let w = config.search.semantic_weight.clamp(0.0, 1.0);
-                    base -= *sim * w;
-                }
-                let combined = crate::relevance::apply_boost(base, emo_boost);
-                all_results.push((combined, ai + 1_000_000, false));
-            }
-        }
+        let ranked = crate::retrieval::rank_candidates(
+            config,
+            reader,
+            &appended,
+            query,
+            &semantic_candidates,
+            qx,
+            qy,
+            qz,
+            query_emotion,
+            emotion_lookup.as_ref().map(|lookup| lookup.as_ref()),
+        );
+        let mut all_results: Vec<(f32, usize, bool)> =
+            crate::retrieval::ranked_hits_to_results(ranked);
 
         // Spreading activation: fingerprint-linked blocks get boosted across 2-hop
         let link_table = crate::fingerprint::LinkTable::load_cached(output_dir);
@@ -2233,8 +2207,12 @@ fn tool_ping(config: &Config, args: &Value) -> Result<String, String> {
     let append_path = output_dir.join("append.bin");
     let appended = read_append_log(&append_path);
 
-    let (qx, qy, qz) =
-        crate::content_coords_blended(query, "long_term", config.search.semantic_weight);
+    let (qx, qy, qz) = crate::content_coords_blended_with_config(
+        query,
+        "long_term",
+        config.search.semantic_weight,
+        &config.embedding,
+    );
 
     let mut all_results: Vec<(f32, usize)> = Vec::new();
 
@@ -2297,7 +2275,7 @@ fn tool_ping(config: &Config, args: &Value) -> Result<String, String> {
 fn tool_auto_context(config: &Config, _args: &Value) -> Result<String, String> {
     let reader = MicroscopeReader::open(config)?;
     let output_dir = Path::new(&config.paths.output_dir);
-    let ctx = crate::auto_context::build(output_dir, &reader);
+    let ctx = crate::auto_context::build_with_config(output_dir, &reader, &config.search);
     Ok(crate::auto_context::render(&ctx))
 }
 
@@ -2973,6 +2951,7 @@ fn tool_embed(config: &Config, args: &Value) -> Result<String, String> {
     // Match the provider dimension to the index; fall back to the configured
     // dim when embeddings.bin is absent so recall never queries at dim 128.
     let index = EmbeddingIndex::open(&emb_path);
+    let index = index.filter(|idx| idx.matches_config(&config.embedding));
     let idx_dim = index
         .as_ref()
         .map(|idx| idx.dim())
@@ -3616,6 +3595,8 @@ mod tests {
                 keyword_boost: 0.1,
                 semantic_weight: 0.0,
                 semantic_rank_gain: 2.0,
+                core_memory_freshness: true,
+                core_memory_prefer_confirmed: true,
                 emotional_bias_weight: 0.0,
                 emotion_21d_weight: 0.0,
             },

@@ -1,0 +1,430 @@
+{
+  "meta": {
+    "instance": "C:\\Users\\mater\\.codex\\microscope-memory",
+    "purpose": "Real-corpus retrieval benchmark: lexical baseline vs hybrid (semantic) retrieval, Hungarian and English queries over the actual stored memories.",
+    "note": "Ground truth is the exact stored text; the test resolves it to a block at runtime, so the fixture survives index rebuilds that renumber blocks.",
+    "authored": "2026-11-17"
+  },
+  "cases": [
+    {
+      "id": "user_direction",
+      "expected": "USER DIRECTION: A felhasználó azt kérte, hogy a Codex tartsa és javítsa a saját tartós memóriáját: legyen pontos, hasznos, és szabaduljon meg a dokumentációból és nyers eszközkimenetből származó zajtól.",
+      "queries": [
+        {
+          "lang": "hu",
+          "q": "Mit kért a felhasználó a tartós memóriával kapcsolatban?"
+        },
+        {
+          "lang": "en",
+          "q": "What did the user demand of the long-term memory?"
+        }
+      ],
+      "needle": "USER DIRECTION: A felhasználó azt"
+    },
+    {
+      "id": "user_language",
+      "expected": "USER PREFERENCE: A felhasználó magyarul kommunikál; a tartós válaszok és emlékek az ő nyelvén maradjanak.",
+      "queries": [
+        {
+          "lang": "hu",
+          "q": "Milyen nyelven válaszoljak a felhasználónak?"
+        },
+        {
+          "lang": "en",
+          "q": "In which language should the assistant answer the user?"
+        }
+      ],
+      "needle": "USER PREFERENCE: A felhasználó"
+    },
+    {
+      "id": "memory_quality_policy",
+      "expected": "MEMORY QUALITY POLICY: A core-memory kizárólag explicit felhasználói és projektfaktumokat, igazolt döntéseket és valódi eredményeket tartalmazzon; dokumentáció, nyers shell-kimenet és visszhangzó kódrészlet ne kerüljön bele.",
+      "queries": [
+        {
+          "lang": "hu",
+          "q": "Mit nem szabad elmenteni a tartós emlékek közé?"
+        },
+        {
+          "lang": "en",
+          "q": "What kind of content must never enter the core memory?"
+        }
+      ],
+      "needle": "MEMORY QUALITY POLICY: A"
+    },
+    {
+      "id": "project_context",
+      "expected": "PROJECT CONTEXT: Az aktív munkatér E:\\STRATOS. A dedikált Microscope Memory példány helye C:\\Users\\mater\\.codex\\microscope-memory.",
+      "queries": [
+        {
+          "lang": "hu",
+          "q": "Hol dolgozunk, és hol található a saját memória példányunk?"
+        },
+        {
+          "lang": "en",
+          "q": "Where is the active project and where does the dedicated memory instance live?"
+        }
+      ],
+      "needle": "PROJECT CONTEXT: Az aktív"
+    },
+    {
+      "id": "memory_policy",
+      "expected": "MEMORY POLICY: Általános shell- vagy dokumentációs kimenet bizonyíték, nem tartós emlék. Automatikusan csak explicit felhasználói/projektfaktum, igazolt javítás és strukturált Octopus-eredmény kerülhet tartós rétegbe.",
+      "queries": [
+        {
+          "lang": "hu",
+          "q": "Mi számít tartós emléknek, és mi csak bizonyíték?"
+        },
+        {
+          "lang": "en",
+          "q": "What is allowed to be stored durably and what counts only as evidence?"
+        }
+      ],
+      "needle": "MEMORY POLICY: Általános shell-"
+    },
+    {
+      "id": "first_greeting",
+      "expected": "[2026-11-15 17:05] Felhasználó: szia, majd egy pont. Válasz: Szia! Itt vagyok — miben segíthetek?",
+      "queries": [
+        {
+          "lang": "hu",
+          "q": "Hogyan kezdődött az első beszélgetés?"
+        },
+        {
+          "lang": "en",
+          "q": "How did the very first exchange look like?"
+        }
+      ],
+      "needle": "[2026-11-15 17:05] Felhasználó:"
+    },
+    {
+      "id": "memory_status_at_1707",
+      "expected": "[2026-11-15 17:07] Felhasználó: na milyen a memória? :) Válasz: A Microscope Memory működik, 1466 blokkal és 9 mélységgel; a magyar ékezetes szöveg és a zajos core-memory két ismert hibája azonosítva.",
+      "queries": [
+        {
+          "lang": "hu",
+          "q": "Hány blokkja volt a memóriának, és milyen két hibát találtunk?"
+        },
+        {
+          "lang": "en",
+          "q": "How large was the memory and which two bugs were identified?"
+        }
+      ],
+      "needle": "[2026-11-15 17:07] Felhasználó:"
+    },
+    {
+      "id": "cp1250_bug",
+      "expected": "ERROR CONTEXT (resolved): A Codex Microscope hook korábban tetszőleges shell- és dokumentációs kimenetet 8-as fontosságú emlékként tárolt, a Windows cp1250 stdin-dekódolás pedig elrontotta a magyar Unicode szövegeket. Javítva: UTF-8 stdin, ftfy-helyreállítás, strukturált hibajelre épülő open-loop figyelés, és nyers eszközkimenet automatikus tartós mentésének eltávolítása.",
+      "queries": [
+        {
+          "lang": "hu",
+          "q": "Miért voltak eltorzulva a magyar ékezetes karakterek?"
+        },
+        {
+          "lang": "en",
+          "q": "What corrupted the accented Hungarian characters, and how was it fixed?"
+        }
+      ],
+      "needle": "ERROR CONTEXT (resolved): A Codex"
+    },
+    {
+      "id": "root_causes",
+      "expected": "Igen — most már valóban a saját memóriámat javítottam. A gyökérokok: a hook Windows cp1250 stdin-dekódolása elrontotta a magyar Unicode szövegeket; a PostToolUse classifier dokumentációs és nyers shell-kimenetet emelt 8-as fontosságú core-memorybe; a motor core-memory része pedig csak az append logból olvasott, ezért rebuild után üres volt.",
+      "queries": [
+        {
+          "lang": "hu",
+          "q": "Miért lett üres a core-memory a rebuild után?"
+        },
+        {
+          "lang": "en",
+          "q": "Why was the core memory empty right after a rebuild?"
+        }
+      ],
+      "needle": "Igen — most már valóban a saját"
+    },
+    {
+      "id": "verification",
+      "expected": "Ellenőrzés: - cargo check zöld; auto-context tesztek 3/3 zöld; release build egyszer készült. - 2035 blokk; 2035/2035 CRC és Merkle rendben; nincs nyitott hurok. - Nincs több mojibake a rétegekben vagy a hook naplóban; a magyar karakterek pontosan visszaolvasódnak. - Mentés a javítás előtt: C:\\Users\\mater\\.codex\\microscope-memory-backups\\before-memory-repair-20261115-190753.",
+      "queries": [
+        {
+          "lang": "hu",
+          "q": "Milyen ellenőrzések futottak a memóriajavítás után?"
+        },
+        {
+          "lang": "en",
+          "q": "Which checks were executed once the memory repair finished?"
+        }
+      ],
+      "needle": "- cargo check zöld; auto-context"
+    },
+    {
+      "id": "candle_release",
+      "expected": "- natív Rust/Candle provider; - `paraphrase-multilingual-MiniLM-L12-v2`, 384 dimenzió; - valódi `EMB2` index provider/model fingerprinttel; - magyar benchmark:   - hibrid **R@1 = 0,818**   - hibrid **R@5 = 1,000**   - hibrid **MRR = 0,882** - 19 754 blokk; - minden blokk CRC- és Merkle-integritása rendben; nincs nyitott loop; az új MCP az új release binárissal fut.",
+      "queries": [
+        {
+          "lang": "hu",
+          "q": "Milyen embedding modellt használtunk, és mit mértünk a magyar recallra?"
+        },
+        {
+          "lang": "en",
+          "q": "Which embedding model powered the release and what recall did it reach?"
+        }
+      ],
+      "needle": "- natív Rust/Candle provider;"
+    },
+    {
+      "id": "benchmark_is_smoke_test",
+      "expected": "De a jelenlegi \"legjobb memória-motor\" benchmarkja csak **10 kérdést és 19 korpuszbejegyzést** vizsgál. Ez fejlesztési smoke test, nem megbízható memóriaértékelés.",
+      "queries": [
+        {
+          "lang": "hu",
+          "q": "Mennyire tekinthető megbízhatónak a jelenlegi memória benchmark?"
+        },
+        {
+          "lang": "en",
+          "q": "How trustworthy is the memory benchmark we have today?"
+        }
+      ],
+      "needle": "De a jelenlegi \"legjobb"
+    },
+    {
+      "id": "cli_mcp_weight",
+      "expected": "A CLI fő útvonala a `semantic_rank_gain = 1.5` értékkel rangsorol, de az MCP a `semantic_weight = 0.0` értékkel súlyoz. Ez azt jelenti, hogy az MCP:",
+      "queries": [
+        {
+          "lang": "hu",
+          "q": "Melyik súlyt használja a CLI és az MCP a rangsoroláshoz?"
+        },
+        {
+          "lang": "en",
+          "q": "Which weight parameter did the CLI and the MCP each apply when ranking?"
+        }
+      ],
+      "needle": "A CLI fő útvonala a"
+    },
+    {
+      "id": "freshness_switches",
+      "expected": "A `core_memory_freshness` és `core_memory_prefer_confirmed` konfigurációs kapcsolók vannak, de a kód nem használja őket. Az indexelt core-memory `ts_ms` értéke is mindig `None`.",
+      "queries": [
+        {
+          "lang": "hu",
+          "q": "Használja-e tényleg a kód a frissességi kapcsolókat?"
+        },
+        {
+          "lang": "en",
+          "q": "Does the code actually honour the freshness configuration flags?"
+        }
+      ],
+      "needle": "A `core_memory_freshness` és"
+    },
+    {
+      "id": "vector_coverage",
+      "expected": "A 19 754 blokk többsége a hierarchikus index terméke. A vektorindex az alkalmas D0–D5 blokkokból 251-et fed le. Ez nem feltétlenül hiba – a karakter-, token- és szótaghierarchy nem mindig érdemes szemantikusa…",
+      "queries": [
+        {
+          "lang": "hu",
+          "q": "Mekkora részét fedi le a vektorindex a hierarchikus indexnek?"
+        },
+        {
+          "lang": "en",
+          "q": "How much of the hierarchical index does the vector index actually cover?"
+        }
+      ],
+      "needle": "A 19 754 blokk többsége a"
+    },
+    {
+      "id": "forgetting_goal",
+      "expected": "> **Ne mindent őrizzen meg, hanem a következő döntéshez leghasznosabb, legbiztosabb és legfrissebb tudást adja vissza.**",
+      "queries": [
+        {
+          "lang": "hu",
+          "q": "Mi a cél a felejtéssel kapcsolatban a memóriarendszerben?"
+        },
+        {
+          "lang": "en",
+          "q": "What should the memory system optimise for when it forgets something?"
+        }
+      ],
+      "needle": "> **Ne mindent őrizzen meg, hanem"
+    },
+    {
+      "id": "bigger_model_not_needed",
+      "expected": "A legjobb memória-motorhoz **nem kell feltétlenül nagyobb embeddingmodell**. A jelenlegi MiniLM jó alap. A legnagyobb hasznot az adná, ha:",
+      "queries": [
+        {
+          "lang": "hu",
+          "q": "Kell-e nagyobb embedding modell egy jobb memóriamotorhoz?"
+        },
+        {
+          "lang": "en",
+          "q": "Would a stronger embedding model make the memory engine better?"
+        }
+      ],
+      "needle": "A legjobb memória-motorhoz **nem"
+    },
+    {
+      "id": "pipeline_plan",
+      "expected": "Meg tudom építeni a teljes embedding‑pipet és a magyar benchmarkot úgy, hogy a lexical baseline és az embedding eredménye objektíven összehasonlítható legyen.",
+      "queries": [
+        {
+          "lang": "hu",
+          "q": "Mi a terv az embedding pipeline és a benchmark elkészítésére?"
+        },
+        {
+          "lang": "en",
+          "q": "What is the plan for wiring up the embedding pipeline and the evaluation?"
+        }
+      ],
+      "needle": "Meg tudom építeni a teljes"
+    },
+    {
+      "id": "no_blind_weight",
+      "expected": "**Amit nem tennék most:** vakon `semantic_weight`-et emelni, mert a mögöttes provider még mindig mock. Az csak a hash‑alapú térbeli súlyozást változtatná meg, nem a valódi szemantikát.",
+      "queries": [
+        {
+          "lang": "hu",
+          "q": "Miért nem emeljük vakon a semantic_weight értékét?"
+        },
+        {
+          "lang": "en",
+          "q": "Why should the semantic weight not be raised blindly?"
+        }
+      ],
+      "needle": "**Amit nem tennék most:** vakon"
+    },
+    {
+      "id": "memory_repaired",
+      "expected": "**Igen — most már valóban a saját memóriámat javítottam.** 🙂",
+      "queries": [
+        {
+          "lang": "hu",
+          "q": "Elkészült a saját memória javítása?"
+        },
+        {
+          "lang": "en",
+          "q": "Was the assistant's own memory repair completed?"
+        }
+      ],
+      "needle": "**Igen — most már valóban a saját"
+    },
+    {
+      "id": "backup_path",
+      "expected": "A javítás előtti teljes állapot mentése:   `C:\\Users\\mater\\.codex\\microscope-memory-backups\\before-memory-repair-20261115-190753`",
+      "queries": [
+        {
+          "lang": "hu",
+          "q": "Hol található a javítás előtti állapot mentése?"
+        },
+        {
+          "lang": "en",
+          "q": "Where is the snapshot of the state before the repair kept?"
+        }
+      ],
+      "needle": "A javítás előtti teljes állapot"
+    },
+    {
+      "id": "last_turn",
+      "expected": "SESSION CONTEXT 2026-11-17 - Codex forduló. Kérdés:  Válasz: Rendben. Ha később előjön konkrét bottleneck vagy új igény, jelezz. (turn 10)",
+      "queries": [
+        {
+          "lang": "hu",
+          "q": "Mit válaszolt a rendszer a legutóbbi fordulóban?"
+        },
+        {
+          "lang": "en",
+          "q": "What was the reply in the very last conversation turn?"
+        }
+      ],
+      "needle": "SESSION CONTEXT 2026-11-17 -"
+    },
+    {
+      "id": "octopus_failure",
+      "expected": "OCTOPUS RUN: 2/3 kar sikeres — FAIL CODE-READER + DIAGNOSTICS, OK TESTING-CODEGEN + CODE-REVIEW, OK CODE-QUALITY + LINT-RULES — root=root-26020-1-1794832914750 — hibak: code-reader: contract validation failed: Field 'path' cannot contain newlines",
+      "queries": [
+        {
+          "lang": "hu",
+          "q": "Mi hibázott a párhuzamos karok futásakor?"
+        },
+        {
+          "lang": "en",
+          "q": "What went wrong in the parallel arm run?"
+        }
+      ],
+      "needle": "OCTOPUS RUN: 2/3 kar sikeres —"
+    },
+    {
+      "id": "octopus_success",
+      "expected": "OCTOPUS RUN: 2/2 kar sikeres — OK ARCHITECT-MIND + SENIOR-ARCHITECT, OK MICROSCOPE-MEMORY + MEMORY-SKILLS-V2 — root=root-8728-1-1794773543026",
+      "queries": [
+        {
+          "lang": "hu",
+          "q": "Melyik párhuzamos karok futottak sikeresen?"
+        },
+        {
+          "lang": "en",
+          "q": "Which parallel arms finished successfully?"
+        }
+      ],
+      "needle": "OCTOPUS RUN: 2/2 kar sikeres — OK"
+    },
+    {
+      "id": "hook_script_path",
+      "expected": "C:\\Users\\mater\\.codex\\hooks\\microscope_memory.py",
+      "queries": [
+        {
+          "lang": "hu",
+          "q": "Hol van a memória hook script?"
+        },
+        {
+          "lang": "en",
+          "q": "Where is the memory hook script located?"
+        }
+      ],
+      "needle": "C:\\Users\\mater\\.codex\\hooks\\micros"
+    },
+    {
+      "id": "auto_context_file",
+      "expected": "C:\\Users\\mater\\microscope-memory-clone\\src\\auto_context.rs",
+      "queries": [
+        {
+          "lang": "hu",
+          "q": "Melyik forrásfájl implementálja az auto-contextet?"
+        },
+        {
+          "lang": "en",
+          "q": "Which source file implements the auto-context snapshot?"
+        }
+      ],
+      "needle": "C:\\Users\\mater\\microscope-memory-c"
+    },
+    {
+      "id": "model_id_literal",
+      "expected": "`sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2`,",
+      "queries": [
+        {
+          "lang": "hu",
+          "q": "Melyik embedding modell azonosító szerepel a beállításokban?"
+        },
+        {
+          "lang": "en",
+          "q": "Which embedding model identifier is configured?"
+        }
+      ],
+      "needle": "További javítási sorrend: 1)"
+    },
+    {
+      "id": "candle_backup",
+      "expected": "C:\\Users\\mater\\.codex\\microscope-memory-backups\\before-candle-deploy-20261115-210547.",
+      "queries": [
+        {
+          "lang": "hu",
+          "q": "Melyik mentés készült a candle telepítés előtt?"
+        },
+        {
+          "lang": "en",
+          "q": "Which backup was taken before the candle deployment?"
+        }
+      ],
+      "needle": "MILESTONE — A Microscope Memory"
+    }
+  ]
+}

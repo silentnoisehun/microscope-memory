@@ -1,0 +1,20 @@
+magyar_nyelv	A felhasználó magyarul kommunikál, és a tartós válaszokat magyarul szeretné.
+stratos_hely	Az aktív projekt munkakönyvtára az E:\STRATOS mappa.
+memoria_hely	A Microscope Memory példány a C:\Users\mater\.codex\microscope-memory útvonalon található.
+rust_nyelv	A felhasználó kedvenc programozási nyelve a Rust.
+stratos_nyelvek	A STRATOS rendszer fő nyelve Python és TypeScript.
+reggeli_kave	A felhasználó szeret reggelizni kávéval.
+kedvenc_szin	A felhasználó kedvenc színe a kék.
+postgresql	A projekt adatbázisa PostgreSQL.
+heti_ebed	A felhasználó hétköznaponként ebédel a munkahelyén.
+nextjs	A STRATOS frontend Next.js technológiát használ.
+memoria_szintek	A Microscope Memory kilenc mélységű hierarchikus bináris indexet használ.
+minimalizmus	A felhasználó nem szereti a kanalizált felszíneket.
+fejlesztesi_stack	A fejlesztés Rust és Python kombinációját használja.
+tesztek	A tesztek a cargo test paranccsal futnak.
+fontos_emlekek	A memória fontos emlékeket külön long_term rétegben tárolja.
+edzes	A felhasználó hetente háromszor edz.
+titkositas	Az adatok biztonságát titkosítás védi.
+budapest	A felhasználó a Budapestről utazik a munkahelyére.
+deploy	A deploy manuálisan történik.
+vegetarianus	A felhasználó vegetáriánus ételeket szeret.

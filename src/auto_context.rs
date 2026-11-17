@@ -26,6 +26,10 @@ pub const CORE_MEMORIES_TOP_N: usize = 3;
 pub const CORE_MEMORIES_MIN_IMP: u8 = 7;
 /// Max chars per core memory.
 pub const CORE_MEMORY_MAX_CHARS: usize = 500;
+/// Confidence at or above this value counts as explicitly confirmed for the
+/// core-memory policy.  The default atom confidence is 50, so merely storing
+/// an atom must not be mistaken for confirmation.
+pub const CORE_MEMORY_CONFIRMED_MIN_CONFIDENCE: u8 = 70;
 
 /// A core memory entry with full text content.
 #[derive(Debug, Clone, Default)]
@@ -34,6 +38,10 @@ pub struct CoreMemory {
     pub layer: String,
     pub importance: u8,
     pub depth: u8,
+    /// Freshness in the form of the entry timestamp when available.
+    pub ts_ms: Option<u64>,
+    /// Evidence confidence 0..100 when the ledger knows this content.
+    pub confidence: Option<u8>,
 }
 
 /// Assembled auto-context, ready to format for an LLM prompt.
@@ -49,8 +57,78 @@ pub struct AutoContext {
     pub core_memories: Vec<CoreMemory>,
 }
 
+fn latest_observation_states(
+    entries: &[timeline::TimelineEntry],
+) -> std::collections::HashMap<String, (u64, u8)> {
+    let mut states = std::collections::HashMap::new();
+    for entry in entries {
+        let key = entry.text.trim().to_string();
+        if key.is_empty() {
+            continue;
+        }
+        let replace = states
+            .get(&key)
+            .map(|(ts, _)| entry.ts_ms >= *ts)
+            .unwrap_or(true);
+        if replace {
+            states.insert(key, (entry.ts_ms, entry.status));
+        }
+    }
+    states
+}
+
+fn sort_core_memories(candidates: &mut [CoreMemory], search: &crate::config::Search) {
+    candidates.sort_by(|a, b| {
+        let confirmed = |memory: &CoreMemory| {
+            memory
+                .confidence
+                .map(|confidence| confidence >= CORE_MEMORY_CONFIRMED_MIN_CONFIDENCE)
+                .unwrap_or(false)
+        };
+        let confirmed_order = || {
+            if search.core_memory_prefer_confirmed {
+                confirmed(b).cmp(&confirmed(a))
+            } else {
+                std::cmp::Ordering::Equal
+            }
+        };
+        confirmed_order()
+            .then_with(|| b.importance.cmp(&a.importance))
+            .then_with(|| {
+                if search.core_memory_prefer_confirmed {
+                    b.confidence.unwrap_or(0).cmp(&a.confidence.unwrap_or(0))
+                } else {
+                    std::cmp::Ordering::Equal
+                }
+            })
+            .then_with(|| {
+                if search.core_memory_freshness {
+                    b.ts_ms.unwrap_or(0).cmp(&a.ts_ms.unwrap_or(0))
+                } else {
+                    std::cmp::Ordering::Equal
+                }
+            })
+    });
+}
+
 /// Build the auto-context from disk + in-memory state.
 pub fn build(output_dir: &Path, reader: &crate::reader::MicroscopeReader) -> AutoContext {
+    build_with_config(output_dir, reader, &crate::config::Search::default())
+}
+
+/// Build the snapshot with the configured core-memory policy.
+///
+/// The previous `build` function ignored `core_memory_freshness` and
+/// `core_memory_prefer_confirmed` entirely, and indexed memories carried no
+/// timestamp at all (`ts_ms` was always `None`).  The result was that an old
+/// high-importance fact and a fresh confirmed correction were impossible to
+/// order correctly.  Timeline entries provide the durable timestamp and the
+/// latest status for the same exact text.
+pub fn build_with_config(
+    output_dir: &Path,
+    reader: &crate::reader::MicroscopeReader,
+    search: &crate::config::Search,
+) -> AutoContext {
     let mut ctx = AutoContext::default();
 
     // Timeline (last session, capped to TIMELINE_TOP_N).
@@ -86,26 +164,105 @@ pub fn build(output_dir: &Path, reader: &crate::reader::MicroscopeReader) -> Aut
     }
 
     // Core memories: find top-importance blocks and embed their full text.
-    // Scan append log first (most recent stores with importance field).
+    // Pending append-log entries are considered first because they are the
+    // freshest observations.  Durable index blocks are the fallback: a normal
+    // rebuild clears the append log, so reading only the log made core memory
+    // disappear after every consolidation.
+    // Latest durable observation state per exact text.  The timeline is
+    // append-only, so a later archived/superseded row must win over an older
+    // normal row for the same memory.
+    let observation_state =
+        latest_observation_states(&timeline::read_all(&output_dir.join("timeline.bin")));
+
     let appended = crate::reader::read_append_log(&append_path);
     let mut candidates: Vec<CoreMemory> = appended
         .iter()
         .filter(|e| e.importance >= CORE_MEMORIES_MIN_IMP)
-        .map(|e| {
+        .filter_map(|e| {
+            let observation = observation_state.get(e.text.trim());
+            if observation
+                .map(|(_, status)| timeline::is_inactive_status(*status))
+                .unwrap_or(false)
+            {
+                return None;
+            }
             let layer = LAYER_NAMES
                 .get(e.layer_id as usize)
                 .unwrap_or(&"?")
                 .to_string();
-            CoreMemory {
+            Some(CoreMemory {
                 text: crate::safe_truncate(&e.text, CORE_MEMORY_MAX_CHARS).to_string(),
                 layer,
                 importance: e.importance,
                 depth: 0,
-            }
+                ts_ms: observation.map(|(ts, _)| *ts),
+                confidence: None,
+            })
         })
         .collect();
-    // Sort by importance desc, then take top N.
-    candidates.sort_by_key(|a| std::cmp::Reverse(a.importance));
+
+    let indexed_candidates: Vec<CoreMemory> = reader
+        .depth_ranges
+        .iter()
+        .enumerate()
+        .filter(|(depth, _)| *depth == 3)
+        .flat_map(|(_, (start, count))| *start as usize..*start as usize + *count as usize)
+        .filter_map(|idx| {
+            let header = reader.header(idx);
+            if header.importance < CORE_MEMORIES_MIN_IMP {
+                return None;
+            }
+            let layer = LAYER_NAMES
+                .get(header.layer_id as usize)
+                .unwrap_or(&"?")
+                .to_string();
+            let text = reader.text(idx);
+            let observation = observation_state.get(text.trim());
+            if observation
+                .map(|(_, status)| timeline::is_inactive_status(*status))
+                .unwrap_or(false)
+            {
+                return None;
+            }
+            Some(CoreMemory {
+                text: crate::safe_truncate(text, CORE_MEMORY_MAX_CHARS).to_string(),
+                layer,
+                importance: header.importance,
+                depth: 3,
+                ts_ms: observation.map(|(ts, _)| *ts),
+                confidence: None,
+            })
+        })
+        .collect();
+
+    // Keep fresh pending observations ahead of durable entries, then take the
+    // top N by importance.  Deduplication prevents the same text from being
+    // shown twice when it exists in both sources.
+    for candidate in indexed_candidates {
+        if !candidates
+            .iter()
+            .any(|existing| existing.text == candidate.text)
+        {
+            candidates.push(candidate);
+        }
+    }
+    // Attach evidence confidence from the ledger when it is available.
+    let ledger = crate::epistemic::EvidenceLedger::load_or_init(output_dir);
+    // Durable memory atoms carry explicit supersession and contradiction
+    // relations.  An atom that has been superseded, or whose subject has a
+    // newer active atom, must not reappear in the active core-memory view.
+    let atom_ledger = crate::memory_atom::AtomLedger::load(&output_dir.join("memory_atoms.bin"));
+    candidates.retain(|candidate| !atom_ledger.is_inactive_text(&candidate.text));
+    for candidate in &mut candidates {
+        let hash = crate::epistemic::content_hash(&candidate.text);
+        candidate.confidence = atom_ledger
+            .confidence_for_text(&candidate.text)
+            .or_else(|| ledger.records.get(&hash).map(|record| record.confidence));
+    }
+    // Explicit confirmation first, then importance, confidence and freshness.
+    // A default-confidence atom is not confirmation, so merely storing an
+    // observation cannot promote it into the confirmed slot.
+    sort_core_memories(&mut candidates, search);
     candidates.truncate(CORE_MEMORIES_TOP_N);
     ctx.core_memories = candidates;
 
@@ -295,5 +452,177 @@ mod tests {
         assert!(s.contains("compacted"));
         assert!(s.contains("#1"));
         assert!(s.contains("todo"));
+    }
+
+    #[test]
+    fn render_includes_core_memories() {
+        let mut ctx = AutoContext::default();
+        ctx.core_memories.push(CoreMemory {
+            text: "durable preference".to_string(),
+            layer: "long_term".to_string(),
+            importance: 8,
+            depth: 3,
+            ts_ms: None,
+            confidence: None,
+        });
+        let rendered = render(&ctx);
+        assert!(rendered.contains("CORE MEMORIES"));
+        assert!(rendered.contains("durable preference"));
+    }
+
+    #[test]
+    fn core_memory_prefers_confirmed_then_important_then_fresh() {
+        let mut candidates = vec![
+            CoreMemory {
+                text: "old important".to_string(),
+                layer: "long_term".to_string(),
+                importance: 9,
+                depth: 3,
+                ts_ms: Some(1),
+                confidence: None,
+            },
+            CoreMemory {
+                text: "confirmed".to_string(),
+                layer: "long_term".to_string(),
+                importance: 7,
+                depth: 3,
+                ts_ms: Some(2),
+                confidence: Some(80),
+            },
+            CoreMemory {
+                text: "fresh important".to_string(),
+                layer: "long_term".to_string(),
+                importance: 8,
+                depth: 3,
+                ts_ms: Some(3),
+                confidence: None,
+            },
+        ];
+        sort_core_memories(
+            &mut candidates,
+            &crate::config::Search {
+                core_memory_freshness: true,
+                core_memory_prefer_confirmed: true,
+                ..crate::config::Search::default()
+            },
+        );
+        assert_eq!(candidates[0].text, "confirmed");
+        assert_eq!(candidates[1].text, "old important");
+        assert_eq!(candidates[2].text, "fresh important");
+    }
+
+    #[test]
+    fn default_atom_confidence_is_not_treated_as_confirmation() {
+        let mut candidates = vec![
+            CoreMemory {
+                text: "important unconfirmed".to_string(),
+                layer: "long_term".to_string(),
+                importance: 8,
+                depth: 3,
+                ts_ms: Some(1),
+                confidence: Some(50),
+            },
+            CoreMemory {
+                text: "default confidence".to_string(),
+                layer: "long_term".to_string(),
+                importance: 7,
+                depth: 3,
+                ts_ms: Some(2),
+                confidence: Some(50),
+            },
+        ];
+        let search = crate::config::Search {
+            core_memory_freshness: false,
+            core_memory_prefer_confirmed: true,
+            ..crate::config::Search::default()
+        };
+        sort_core_memories(&mut candidates, &search);
+        assert_eq!(candidates[0].text, "important unconfirmed");
+    }
+
+    #[test]
+    fn freshness_policy_can_be_disabled() {
+        let mut candidates = vec![
+            CoreMemory {
+                text: "fresh low".to_string(),
+                layer: "long_term".to_string(),
+                importance: 7,
+                depth: 3,
+                ts_ms: Some(200),
+                confidence: None,
+            },
+            CoreMemory {
+                text: "old high".to_string(),
+                layer: "long_term".to_string(),
+                importance: 8,
+                depth: 3,
+                ts_ms: Some(100),
+                confidence: None,
+            },
+        ];
+        let search = crate::config::Search {
+            core_memory_freshness: false,
+            core_memory_prefer_confirmed: false,
+            ..crate::config::Search::default()
+        };
+        sort_core_memories(&mut candidates, &search);
+        assert_eq!(candidates[0].text, "old high");
+    }
+
+    #[test]
+    fn confirmed_policy_can_be_disabled() {
+        let mut candidates = vec![
+            CoreMemory {
+                text: "confirmed low".to_string(),
+                layer: "long_term".to_string(),
+                importance: 7,
+                depth: 3,
+                ts_ms: Some(200),
+                confidence: Some(100),
+            },
+            CoreMemory {
+                text: "unconfirmed high".to_string(),
+                layer: "long_term".to_string(),
+                importance: 8,
+                depth: 3,
+                ts_ms: Some(100),
+                confidence: None,
+            },
+        ];
+        let search = crate::config::Search {
+            core_memory_freshness: false,
+            core_memory_prefer_confirmed: false,
+            ..crate::config::Search::default()
+        };
+        sort_core_memories(&mut candidates, &search);
+        assert_eq!(candidates[0].text, "unconfirmed high");
+    }
+
+    #[test]
+    fn latest_inactive_timeline_status_wins() {
+        let entries = vec![
+            timeline::TimelineEntry {
+                ts_ms: 100,
+                layer_id: 3,
+                importance: 8,
+                depth: 3,
+                status: timeline::STATUS_NORMAL,
+                text: "fact".to_string(),
+            },
+            timeline::TimelineEntry {
+                ts_ms: 200,
+                layer_id: 3,
+                importance: 8,
+                depth: 3,
+                status: timeline::STATUS_SUPERSEDED,
+                text: "fact".to_string(),
+            },
+        ];
+        let states = latest_observation_states(&entries);
+        assert_eq!(
+            states.get("fact"),
+            Some(&(200, timeline::STATUS_SUPERSEDED))
+        );
+        assert!(timeline::is_inactive_status(states["fact"].1));
     }
 }

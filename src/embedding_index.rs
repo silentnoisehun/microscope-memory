@@ -6,8 +6,9 @@
 //! which blew the file up to gigabytes for no benefit. Search now scans only
 //! the embedded subset.
 //!
-//! Layout:
-//!   [u32 embedded_count][u32 dim][u32 max_depth]
+//! Layout (V2):
+//!   [4 bytes "EMB2"][u32 embedded_count][u32 dim][u32 max_depth]
+//!   [u64 provider/model fingerprint]
 //!   [u32 block_idx × embedded_count]      (ascending, for binary search)
 //!   [f32 × dim × embedded_count]
 //!
@@ -29,6 +30,8 @@ pub struct EmbeddingIndex {
     embedded_count: usize,
     dim: usize,
     max_depth: u32,
+    header_size: usize,
+    provider_fingerprint: Option<u64>,
 }
 
 /// Process-wide cache of the mapped embedding index, keyed on path, file length
@@ -77,7 +80,9 @@ pub fn open_embedding_cached(path: &Path) -> Option<Arc<EmbeddingIndex>> {
     Some(handle)
 }
 
-const HEADER_SIZE: usize = 12; // 3 × u32
+const HEADER_SIZE_V1: usize = 12; // 3 × u32
+const HEADER_SIZE_V2: usize = 24; // magic + 3 × u32 + u64 fingerprint
+const EMBEDDING_MAGIC_V2: &[u8; 4] = b"EMB2";
 
 impl EmbeddingIndex {
     /// Open an existing embeddings.bin file (sparse format).
@@ -87,15 +92,34 @@ impl EmbeddingIndex {
         }
         let file = fs::File::open(path).ok()?;
         let data = unsafe { memmap2::Mmap::map(&file).ok()? };
-        if data.len() < HEADER_SIZE {
+        if data.len() < HEADER_SIZE_V1 {
             return None;
         }
 
-        let embedded_count = u32::from_le_bytes(data[0..4].try_into().unwrap()) as usize;
-        let dim = u32::from_le_bytes(data[4..8].try_into().unwrap()) as usize;
-        let max_depth = u32::from_le_bytes(data[8..12].try_into().unwrap());
+        let (header_size, embedded_count, dim, max_depth, provider_fingerprint) =
+            if data.starts_with(EMBEDDING_MAGIC_V2) {
+                if data.len() < HEADER_SIZE_V2 {
+                    return None;
+                }
+                let embedded_count = u32::from_le_bytes(data[4..8].try_into().unwrap()) as usize;
+                let dim = u32::from_le_bytes(data[8..12].try_into().unwrap()) as usize;
+                let max_depth = u32::from_le_bytes(data[12..16].try_into().unwrap());
+                let fingerprint = u64::from_le_bytes(data[16..24].try_into().unwrap());
+                (
+                    HEADER_SIZE_V2,
+                    embedded_count,
+                    dim,
+                    max_depth,
+                    Some(fingerprint),
+                )
+            } else {
+                let embedded_count = u32::from_le_bytes(data[0..4].try_into().unwrap()) as usize;
+                let dim = u32::from_le_bytes(data[4..8].try_into().unwrap()) as usize;
+                let max_depth = u32::from_le_bytes(data[8..12].try_into().unwrap());
+                (HEADER_SIZE_V1, embedded_count, dim, max_depth, None)
+            };
 
-        let expected = HEADER_SIZE
+        let expected = header_size
             + embedded_count
                 .checked_mul(4)
                 .and_then(|v| v.checked_add(embedded_count.checked_mul(dim * 4)?))
@@ -109,6 +133,8 @@ impl EmbeddingIndex {
             embedded_count,
             dim,
             max_depth,
+            header_size,
+            provider_fingerprint,
         })
     }
 
@@ -121,7 +147,7 @@ impl EmbeddingIndex {
     pub fn embedding(&self, block_idx: usize) -> Option<&[f32]> {
         let ids = self.block_ids();
         let pos = ids.binary_search(&(block_idx as u32)).ok()?;
-        let offset = HEADER_SIZE + self.embedded_count * 4 + pos * self.dim * 4;
+        let offset = self.header_size + self.embedded_count * 4 + pos * self.dim * 4;
         let ptr = self.data[offset..].as_ptr() as *const f32;
         // Safety: the vectors region is a multiple of 4 bytes past a 4-aligned
         // base, and the size was validated in open().
@@ -139,6 +165,21 @@ impl EmbeddingIndex {
         self.max_depth as u8
     }
 
+    /// Fingerprint of the provider/model pair that built this index.
+    /// Legacy V1 indexes have none and are therefore never accepted for a
+    /// configured real provider.
+    pub fn provider_fingerprint(&self) -> Option<u64> {
+        self.provider_fingerprint
+    }
+
+    /// True when this index was built by the configured provider/model pair.
+    /// Legacy V1 indexes and indexes from another model are rejected instead
+    /// of being mixed with the current semantic space.
+    pub fn matches_config(&self, config: &crate::config::Embedding) -> bool {
+        let expected = crate::embeddings::provider_fingerprint(&config.provider, &config.model);
+        self.provider_fingerprint == Some(expected)
+    }
+
     /// Search for top-k most similar blocks to query embedding.
     /// Returns Vec<(similarity, block_index)> sorted descending.
     pub fn search(&self, query_emb: &[f32], k: usize) -> Vec<(f32, usize)> {
@@ -147,7 +188,7 @@ impl EmbeddingIndex {
             k,
             self.dim,
             &self.data,
-            HEADER_SIZE,
+            self.header_size,
             self.embedded_count,
             self.block_ids(),
         )
@@ -168,7 +209,7 @@ impl EmbeddingIndex {
         }
         let ids = self.block_ids();
         let pos = ids.binary_search(&(block_idx as u32)).ok()?;
-        let offset = HEADER_SIZE + self.embedded_count * 4 + pos * self.dim * 4;
+        let offset = self.header_size + self.embedded_count * 4 + pos * self.dim * 4;
         let ptr = self.data[offset..].as_ptr() as *const f32;
         // Safety: same invariants as search(); pos < embedded_count.
         let emb = unsafe { std::slice::from_raw_parts(ptr, self.dim) };
@@ -186,13 +227,13 @@ impl EmbeddingIndex {
         }
         let ids = self.block_ids();
         let target = ids.binary_search(&(block_idx as u32)).ok()?;
-        let target_off = HEADER_SIZE + self.embedded_count * 4 + target * self.dim * 4;
+        let target_off = self.header_size + self.embedded_count * 4 + target * self.dim * 4;
         let tptr = self.data[target_off..].as_ptr() as *const f32;
         let target_emb = unsafe { std::slice::from_raw_parts(tptr, self.dim) };
         let target_sim = cosine_similarity_simd(query_emb, target_emb);
         let mut higher = 0usize;
         for i in 0..self.embedded_count {
-            let offset = HEADER_SIZE + self.embedded_count * 4 + i * self.dim * 4;
+            let offset = self.header_size + self.embedded_count * 4 + i * self.dim * 4;
             let ptr = self.data[offset..].as_ptr() as *const f32;
             // Safety: same invariants as search(); i < embedded_count.
             let emb = unsafe { std::slice::from_raw_parts(ptr, self.dim) };
@@ -205,7 +246,7 @@ impl EmbeddingIndex {
 
     /// Block-id lookup array (ascending u32 indices).
     fn block_ids(&self) -> &[u32] {
-        let start = HEADER_SIZE;
+        let start = self.header_size;
         let end = start + self.embedded_count * 4;
         let ptr = self.data[start..end].as_ptr() as *const u32;
         // Safety: start is 4-aligned and the region size was validated.
@@ -298,8 +339,8 @@ pub fn quality_gate(text: &str, min_chars: usize) -> EmbedVerdict {
 /// gap -- the store path embeds the text once and records the vector under its
 /// append index, and recall scores it next to the main index.
 ///
-/// Layout:
-///   [4 bytes "AEM1"][u32 dim][u32 record_count]
+/// Layout (V2):
+///   [4 bytes "AEM2"][u32 dim][u32 record_count][u64 provider fingerprint]
 ///   [u32 append_index][f32 x dim] x record_count
 ///
 /// Two properties keep it from desynchronising into wrong answers. It is
@@ -307,11 +348,12 @@ pub fn quality_gate(text: &str, min_chars: usize) -> EmbedVerdict {
 /// record whose append index no longer exists is simply never looked up, so an
 /// external edit of the log cannot resurrect a vector for a different memory.
 pub const APPEND_EMBEDDINGS_FILE: &str = "append_embeddings.bin";
-const APPEND_EMBEDDINGS_MAGIC: &[u8; 4] = b"AEM1";
-const APPEND_EMBEDDINGS_HEADER: usize = 12;
+const APPEND_EMBEDDINGS_MAGIC: &[u8; 4] = b"AEM2";
+const APPEND_EMBEDDINGS_HEADER: usize = 20;
 
 pub struct AppendEmbeddings {
     pub dim: usize,
+    pub provider_fingerprint: Option<u64>,
     /// (append index, vector), in write order.
     pub entries: Vec<(u32, Vec<f32>)>,
 }
@@ -320,6 +362,7 @@ impl AppendEmbeddings {
     pub fn new(dim: usize) -> Self {
         AppendEmbeddings {
             dim,
+            provider_fingerprint: None,
             entries: Vec::new(),
         }
     }
@@ -330,7 +373,7 @@ impl AppendEmbeddings {
     /// degraded answer, it is a wrong one.
     pub fn open(path: &Path, dim: usize) -> Option<Self> {
         let data = fs::read(path).ok()?;
-        if data.len() < APPEND_EMBEDDINGS_HEADER || &data[0..4] != APPEND_EMBEDDINGS_MAGIC {
+        if data.len() < 12 || &data[0..4] != APPEND_EMBEDDINGS_MAGIC {
             return None;
         }
         let file_dim = u32::from_le_bytes(data[4..8].try_into().ok()?) as usize;
@@ -338,6 +381,11 @@ impl AppendEmbeddings {
             return None;
         }
         let count = u32::from_le_bytes(data[8..12].try_into().ok()?) as usize;
+        let provider_fingerprint = if data.len() >= APPEND_EMBEDDINGS_HEADER {
+            Some(u64::from_le_bytes(data[12..20].try_into().ok()?))
+        } else {
+            None
+        };
         let stride = 4 + dim * 4;
         let mut entries = Vec::with_capacity(count.min(65_536));
         for i in 0..count {
@@ -354,11 +402,21 @@ impl AppendEmbeddings {
             }
             entries.push((index, v));
         }
-        Some(AppendEmbeddings { dim, entries })
+        Some(AppendEmbeddings {
+            dim,
+            provider_fingerprint,
+            entries,
+        })
     }
 
     pub fn push(&mut self, append_index: u32, vector: Vec<f32>) {
         self.entries.push((append_index, vector));
+    }
+
+    /// True when this sidecar was produced by the configured provider/model.
+    pub fn matches_config(&self, config: &crate::config::Embedding) -> bool {
+        let expected = crate::embeddings::provider_fingerprint(&config.provider, &config.model);
+        self.provider_fingerprint == Some(expected)
     }
 }
 
@@ -431,6 +489,10 @@ impl AppendEmbeddings {
         buf.extend_from_slice(APPEND_EMBEDDINGS_MAGIC);
         buf.extend_from_slice(&(self.dim as u32).to_le_bytes());
         buf.extend_from_slice(&(self.entries.len() as u32).to_le_bytes());
+        let fingerprint = self
+            .provider_fingerprint
+            .unwrap_or_else(|| crate::embeddings::provider_fingerprint("unknown", "unknown"));
+        buf.extend_from_slice(&fingerprint.to_le_bytes());
         for (index, v) in &self.entries {
             if v.len() != self.dim {
                 return Err(format!(
@@ -645,7 +707,7 @@ pub fn build_embedding_index(
         );
     }
 
-    let mut buf = Vec::with_capacity(HEADER_SIZE + block_ids.len() * 4 + vectors.len() * 4);
+    let mut buf = Vec::with_capacity(HEADER_SIZE_V1 + block_ids.len() * 4 + vectors.len() * 4);
     buf.extend_from_slice(&(block_ids.len() as u32).to_le_bytes());
     buf.extend_from_slice(&(dim as u32).to_le_bytes());
     buf.extend_from_slice(&(max_depth as u32).to_le_bytes());
@@ -667,6 +729,54 @@ pub fn build_embedding_index(
         dim
     );
 
+    Ok(())
+}
+
+/// Build an embedding index and stamp it with the provider/model
+/// fingerprint.  The semantic search paths only accept an index whose
+/// fingerprint matches the current configuration.
+pub fn build_embedding_index_with_fingerprint(
+    provider: &dyn EmbeddingProvider,
+    reader: &crate::MicroscopeReader,
+    max_depth: u8,
+    output_path: &Path,
+    provider_fingerprint: u64,
+) -> Result<(), String> {
+    build_embedding_index(provider, reader, max_depth, output_path)?;
+    stamp_provider_fingerprint(output_path, provider_fingerprint)
+}
+
+/// Add the provider/model fingerprint to a freshly built V1 index by
+/// rewriting its header to the V2 layout.  The vector payload is unchanged.
+pub fn stamp_provider_fingerprint(
+    output_path: &Path,
+    provider_fingerprint: u64,
+) -> Result<(), String> {
+    let data = fs::read(output_path).map_err(|e| format!("read embedding index: {}", e))?;
+    if data.len() < HEADER_SIZE_V1 {
+        return Err("embedding index is too short".into());
+    }
+    if data.starts_with(EMBEDDING_MAGIC_V2) {
+        let mut out = data;
+        out[16..24].copy_from_slice(&provider_fingerprint.to_le_bytes());
+        fs::write(output_path, out).map_err(|e| format!("write embedding index: {}", e))?;
+        return Ok(());
+    }
+
+    let embedded_count = u32::from_le_bytes(data[0..4].try_into().unwrap()) as usize;
+    let dim = u32::from_le_bytes(data[4..8].try_into().unwrap()) as usize;
+    let max_depth = u32::from_le_bytes(data[8..12].try_into().unwrap());
+    let payload = &data[HEADER_SIZE_V1..];
+    let mut out = Vec::with_capacity(HEADER_SIZE_V2 + payload.len());
+    out.extend_from_slice(EMBEDDING_MAGIC_V2);
+    out.extend_from_slice(&(embedded_count as u32).to_le_bytes());
+    out.extend_from_slice(&(dim as u32).to_le_bytes());
+    out.extend_from_slice(&max_depth.to_le_bytes());
+    out.extend_from_slice(&provider_fingerprint.to_le_bytes());
+    out.extend_from_slice(payload);
+    let tmp_path = output_path.with_extension("bin.tmp");
+    fs::write(&tmp_path, &out).map_err(|e| format!("write embedding index: {}", e))?;
+    fs::rename(&tmp_path, output_path).map_err(|e| format!("rename embedding index: {}", e))?;
     Ok(())
 }
 

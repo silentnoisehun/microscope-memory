@@ -303,6 +303,17 @@ fn recall(config: &Config, query: &str, k: usize) {
     recall_with_ctx(&mut ctx, config, query, k);
 }
 
+fn parse_atom_id_hex(value: &str) -> Option<[u8; 16]> {
+    if value.len() != 32 || !value.chars().all(|c| c.is_ascii_hexdigit()) {
+        return None;
+    }
+    let mut bytes = [0u8; 16];
+    for (i, byte) in bytes.iter_mut().enumerate() {
+        *byte = u8::from_str_radix(&value[i * 2..i * 2 + 2], 16).ok()?;
+    }
+    Some(bytes)
+}
+
 fn recall_with_ctx(ctx: &mut RecallContext, config: &Config, query: &str, k: usize) {
     let t0 = Instant::now();
     // Cumulative elapsed time at the last traced phase, so the tail of the
@@ -324,8 +335,12 @@ fn recall_with_ctx(ctx: &mut RecallContext, config: &Config, query: &str, k: usi
     trace_phase("open_reader", t_open.elapsed().as_secs_f64() * 1000.0);
     println!("{} '{}':", "RECALL".cyan().bold(), query);
 
-    let (qx, qy, qz) = content_coords_blended(query, "long_term", config.search.semantic_weight);
-    let relevance_query = microscope_memory::relevance::RelevanceQuery::new(query);
+    let (qx, qy, qz) = microscope_memory::content_coords_blended_with_config(
+        query,
+        "long_term",
+        config.search.semantic_weight,
+        &config.embedding,
+    );
 
     // ─── Attention: compute layer weights from context ──
     let t_state = Instant::now();
@@ -398,143 +413,17 @@ fn recall_with_ctx(ctx: &mut RecallContext, config: &Config, query: &str, k: usi
     // not be retrieved at all, and the embedding index was never opened. Embed
     // the query with the configured provider and take the nearest blocks from
     // the stored vectors, then let those compete with the lexical hits.
-    let mut semantic_hits: std::collections::HashMap<usize, f32> = std::collections::HashMap::new();
-    // Vectors of memories still in the append log, keyed by append position.
-    // They are not in embeddings.bin (which is built from the consolidated
-    // index) but they are real, stored memories, and until this existed they
-    // were reachable only by exact token overlap.
-    let mut appended_sem: std::collections::HashMap<usize, f32> = std::collections::HashMap::new();
-    {
-        let emb_path = Path::new(&config.paths.output_dir).join("embeddings.bin");
-        if let Some(eidx) = microscope_memory::embedding_index::open_embedding_cached(&emb_path) {
-            // The provider must be cached, not rebuilt. Constructing one loads the
-            // whole MiniLM model from disk, and doing that per query made it the
-            // single largest cost in a recall: the phases below it add up to about
-            // 12 ms of a 102 ms steady-state call, so the remainder was here.
-            // `with_cached_provider` is the same helper the store path was routed
-            // through when that cost was found there.
-            // Timed separately because it is the largest remaining phase and the
-            // FAISS baselines do not include query encoding at all -- they search
-            // pre-computed query vectors -- so without this number the 37 ms
-            // steady state and the 0.41 ms baseline cannot be compared honestly.
-            let t_qemb = Instant::now();
-
-            let r = microscope_memory::embeddings::with_cached_provider(
-                &config.embedding,
-                eidx.dim(),
-                |provider| match provider.embed(query) {
-                    Ok(qe) if qe.len() == eidx.dim() => Ok(qe),
-                    Ok(v) => Err(format!(
-                        "provider returned {} dims, index expects {}",
-                        v.len(),
-                        eidx.dim()
-                    )),
-                    Err(e) => Err(e.to_string()),
-                },
-            );
-            trace_phase("query embed", t_qemb.elapsed().as_secs_f64() * 1000.0);
-            match r {
-                Ok(qe) if qe.len() == eidx.dim() => {
-                    // Over-fetch, then let the final ranking do the ordering.
-                    // Over-fetch, then let the final ranking do the ordering.
-                    // The floor is 256, raised from 64 after a diagnostic run over
-                    // all 60 eval questions that classified every miss as one of
-                    // three kinds: not in the vector list, dropped by this
-                    // pre-fetch, or dropped by the final ranking. Of the 31
-                    // misses, 6 were lost to the 64-entry cut and sit in the
-                    // 128..256 band: 128 recovers none of them (R@5 stays
-                    // 46.7%), 256 recovers all six (R@5 48.3%, R@10 51.7%), and
-                    // 512 is identical to 256 at higher cost. So 256 is a
-                    // measured floor, not a guess.
-                    //
-                    // This is a partial fix. The dominant failure -- 21 of the 31
-                    // misses -- is not a pre-fetch problem: `want`=2048 admits
-                    // those answers and changes recall by exactly nothing. They
-                    // are embedded, they score a mean cosine of 0.935, and they
-                    // sit at mean rank 6,209 of 46,565, because the corpus holds
-                    // 36,568 D5 summaries of similar content that outscore them.
-                    // Neither a duplicate-vector cap nor removing the spatial term
-                    // moves this either; both were measured and changed nothing.
-                    // The remedy is corpus-level, not a reweighting of the score.
-                    let want = (k * 8).max(256);
-                    // Diagnostic only: when MICROSCOPE_EVAL_MATCH is set, fetch a
-                    // deeper list once so the expected answer can be located
-                    // within it. Admission is unchanged either way -- the
-                    // admitted set is always the first `want` entries, which is
-                    // exactly the top of the cosine-sorted list.
-                    // Diagnostics are opt-in and cost real time: full_rank_of
-                    // scans every stored vector, and it was observed to roughly
-                    // double end-to-end p50. Require MICROSCOPE_EVAL_DIAG=1 in
-                    // addition to the match tokens, so a normal measurement run
-                    // is unaffected.
-                    let diag = std::env::var("MICROSCOPE_EVAL_DIAG")
-                        .ok()
-                        .filter(|v| v == "1")
-                        .and_then(|_| std::env::var("MICROSCOPE_EVAL_MATCH").ok())
-                        .filter(|s| !s.is_empty());
-                    let fetch = if diag.is_some() { want.max(1024) } else { want };
-                    // NOTE: a bit-exact redundancy filter was tried here and
-                    // reverted. The Python-side check suggested 1,996 identical
-                    // vectors, but that was a quantisation artefact; the D5
-                    // blocks are near-duplicates, not byte-identical ones, so
-                    // capping identical vectors did not change the result list
-                    // (depth histogram [0,0,0,0,3,1021] -> [0,0,0,0,7,1017]).
-                    // The real obstacle is near-duplicate crowding, which needs
-                    // similarity-based diversity, not a bit comparison.
-                    let t_search = Instant::now();
-                    let hits = eidx.search(&qe, fetch);
-                    trace_phase("vector search", t_search.elapsed().as_secs_f64() * 1000.0);
-                    t_mark = t0.elapsed().as_secs_f64() * 1000.0;
-                    if let Some(matches) = &diag {
-                        report_vector_diag(reader, &eidx, &qe, &hits, matches, want);
-                    }
-                    for (sim, block_idx) in hits.into_iter().take(want) {
-                        if block_idx < reader.block_count {
-                            semantic_hits.insert(block_idx, sim);
-                        }
-                    }
-                    trace_phase(
-                        "  collect semantic hits",
-                        t0.elapsed().as_secs_f64() * 1000.0 - t_mark,
-                    );
-                    t_mark = t0.elapsed().as_secs_f64() * 1000.0;
-                    if let Some(side) = microscope_memory::embedding_index::open_append_cached(
-                        &Path::new(&config.paths.output_dir)
-                            .join(microscope_memory::embedding_index::APPEND_EMBEDDINGS_FILE),
-                        eidx.dim(),
-                    ) {
-                        for (sim, ai) in side.search(&qe, want) {
-                            appended_sem.insert(ai as usize, sim);
-                        }
-                    }
-                    trace_phase(
-                        "  side index open + search",
-                        t0.elapsed().as_secs_f64() * 1000.0 - t_mark,
-                    );
-                    t_mark = t0.elapsed().as_secs_f64() * 1000.0;
-                    trace_phase(
-                        "  embedding scope tail",
-                        t0.elapsed().as_secs_f64() * 1000.0 - t_mark,
-                    );
-                    t_mark = t0.elapsed().as_secs_f64() * 1000.0;
-                }
-                Ok(_) => {
-                    eprintln!(
-                        "  semantic: provider returned a different width than the index; skipped"
-                    );
-                }
-                Err(e) => {
-                    eprintln!("  semantic: embedding failed ({}); lexical path only", e);
-                }
-            }
-        }
-    }
-
+    // Semantic candidate generation is the same operation on every surface.
+    // Keep this path in lockstep with MCP: provider validation, cache use,
+    // candidate depth, append-sidecar handling and fingerprint compatibility
+    // are all owned by the shared retrieval layer.
+    let t_qemb = Instant::now();
+    let semantic_candidates =
+        microscope_memory::retrieval::collect_semantic_candidates(config, reader, query, k);
     trace_phase(
-        "embedding scope teardown",
-        t0.elapsed().as_secs_f64() * 1000.0 - t_mark,
+        "query embed + semantic candidates",
+        t_qemb.elapsed().as_secs_f64() * 1000.0,
     );
-    t_mark = t0.elapsed().as_secs_f64() * 1000.0;
 
     // Candidate set. The inverted text index is a *prefilter*, not a gate.
     // Previously the scan walked the depth ranges but skipped every block that
@@ -559,111 +448,33 @@ fn recall_with_ctx(ctx: &mut RecallContext, config: &Config, query: &str, k: usi
     // 78.3/80.0/80.0 -- while SciFact p50 fell 600.6 -> 156.3 ms and the
     // in-process query went 306.3 -> 89.9 ms. Set the variable to 1 to restore
     // the old unbounded union exactly; that path is pinned by a test.
-    let min_matches: u32 = std::env::var("MICROSCOPE_LEX_MIN_MATCHES")
-        .ok()
-        .and_then(|v| v.parse().ok())
-        .unwrap_or(3);
-    let lex_cands: Vec<u32> = reader
-        .text_index
-        .as_ref()
-        .and_then(|idx| idx.candidates_lexical_min_matches(relevance_query.tokens(), min_matches))
-        .unwrap_or_default();
-
     trace_phase(
-        "lexical prefilter",
-        t0.elapsed().as_secs_f64() * 1000.0 - t_mark,
-    );
-    t_mark = t0.elapsed().as_secs_f64() * 1000.0;
-
-    // `lex_cands` is kept intact (cloned below) so the diagnostic block can
-    // still report whether the answer came from the lexical or vector side.
-    let candidates = microscope_memory::relevance::merge_candidates(
-        lex_cands.clone(),
-        semantic_hits.keys().copied(),
-        reader.block_count,
-    );
-    trace_note(
-        "candidate sources",
-        format!(
-            "lexical {} + semantic {} -> {}",
-            lex_cands.len(),
-            semantic_hits.len(),
-            candidates.len()
-        ),
-    );
-
-    for i in candidates {
-        let text = reader.text(i);
-        let lexical = relevance_query.lexical_score(text);
-        // A block qualifies if it matches lexically OR is one of the
-        // nearest blocks by embedding. Previously the gate was
-        // `lexical > 0.0` alone, which made every semantic candidate
-        // unreachable: a paraphrase sharing no token scored zero and was
-        // dropped before ranking ever saw it.
-        let semantic = semantic_hits.get(&i).copied();
-        if lexical > 0.0 || semantic.is_some() {
-            let h = reader.header(i);
-            let dx = h.x - qx;
-            let dy = h.y - qy;
-            let dz = h.z - qz;
-            let spatial_dist = dx * dx + dy * dy + dz * dz;
-            let mut combined = microscope_memory::relevance::rank_distance_from_score(
-                lexical,
-                spatial_dist,
-                config.search.keyword_boost,
-                h.importance,
-            );
-            // Cosine similarity is a score, not a distance: fold it in as a
-            // bonus so a strong semantic match can outrank a weak lexical
-            // one. The gain is `search.semantic_rank_gain`, not
-            // `search.semantic_weight`: the latter is a 0..1 blend for the
-            // query's coordinates and was previously doubling as this,
-            // which meant raising it to test the ranking also moved the
-            // coordinates, and the two effects could not be told apart.
-            // The upper bound was 1.0, which made that unmeasurable: every
-            // value above 1 collapsed to the same score, so sweeping
-            // 1.0..10.0 returned identical recall and the term looked
-            // irrelevant. It was clamped, not irrelevant.
-            if let Some(sim) = semantic {
-                let w = config.search.semantic_rank_gain.clamp(0.0, 8.0);
-                combined -= sim * w;
-            }
-            all_results.push((combined, i, true));
-        }
-    }
-
-    trace_phase(
-        "score candidates",
+        "lexical + semantic candidate ranking",
         t0.elapsed().as_secs_f64() * 1000.0 - t_mark,
     );
     t_mark = t0.elapsed().as_secs_f64() * 1000.0;
 
     let append_path = Path::new(&config.paths.output_dir).join("append.bin");
     let appended = read_append_log(&append_path);
-    for (ai, entry) in appended.iter().enumerate() {
-        let dx = entry.x - qx;
-        let dy = entry.y - qy;
-        let dz = entry.z - qz;
-        let dist = dx * dx + dy * dy + dz * dz;
-        let lexical = relevance_query.lexical_score(&entry.text);
-        // A pending entry is a candidate on a semantic hit alone, exactly as a
-        // main-index block is: a paraphrase of a fresh memory shares no token
-        // with it, which is the case the embedding path exists to serve.
-        let semantic = appended_sem.get(&ai).copied();
-        if dist < 0.1 || lexical > 0.0 || semantic.is_some() {
-            let mut combined = microscope_memory::relevance::rank_distance_from_score(
-                lexical,
-                dist,
-                config.search.keyword_boost,
-                entry.importance,
-            );
-            if let Some(sim) = semantic {
-                let w = config.search.semantic_rank_gain.clamp(0.0, 8.0);
-                combined -= sim * w;
-            }
-            all_results.push((combined, ai + 1_000_000, false));
-        }
-    }
+    let ranked = microscope_memory::retrieval::rank_candidates(
+        config,
+        reader,
+        &appended,
+        query,
+        &semantic_candidates,
+        qx,
+        qy,
+        qz,
+        None,
+        None,
+    );
+    all_results.extend(microscope_memory::retrieval::ranked_hits_to_results(ranked));
+
+    trace_phase(
+        "score candidates",
+        t0.elapsed().as_secs_f64() * 1000.0 - t_mark,
+    );
+    t_mark = t0.elapsed().as_secs_f64() * 1000.0;
 
     // ─── ThoughtGraph + Predictive Cache ──
     trace_phase("append log", t0.elapsed().as_secs_f64() * 1000.0 - t_mark);
@@ -736,9 +547,18 @@ fn recall_with_ctx(ctx: &mut RecallContext, config: &Config, query: &str, k: usi
                 .filter(|s| !s.is_empty())
                 .collect();
             if !needles.is_empty() {
-                let lex: std::collections::HashSet<usize> = lex_cands
-                    .iter()
-                    .map(|c| *c as usize)
+                let relevance_query = microscope_memory::relevance::RelevanceQuery::new(query);
+                let min_matches: u32 = std::env::var("MICROSCOPE_LEX_MIN_MATCHES")
+                    .ok()
+                    .and_then(|value| value.parse().ok())
+                    .unwrap_or(3);
+                let lex_candidates = reader.text_index.as_ref().and_then(|index| {
+                    index.candidates_lexical_min_matches(relevance_query.tokens(), min_matches)
+                });
+                let lex: std::collections::HashSet<usize> = lex_candidates
+                    .unwrap_or_default()
+                    .into_iter()
+                    .map(|c| c as usize)
                     .filter(|i| *i < reader.block_count)
                     .collect();
                 let mut pos: Option<(usize, bool, bool)> = None;
@@ -758,7 +578,7 @@ fn recall_with_ctx(ctx: &mut RecallContext, config: &Config, query: &str, k: usi
                         pos = Some((
                             dedup_pos,
                             lex.contains(idx),
-                            semantic_hits.contains_key(idx),
+                            semantic_candidates.main.contains_key(idx),
                         ));
                     }
                     dedup_pos += 1;
@@ -1193,6 +1013,13 @@ fn semantic_search(config: &Config, query: &str, k: usize, metric: &str) {
     let emb_path = output_dir.join("embeddings.bin");
 
     if let Some(idx) = EmbeddingIndex::open(&emb_path) {
+        if !idx.matches_config(&config.embedding) {
+            println!(
+                "  {} embedding index provider/model mismatch — ignored; rebuild required",
+                "ERROR:".red()
+            );
+            return;
+        }
         println!(
             "  Using pre-built embedding index ({} blocks, {} dim)",
             idx.block_count(),
@@ -1210,7 +1037,22 @@ fn semantic_search(config: &Config, query: &str, k: usize, metric: &str) {
             }
         };
 
-        let results = idx.search(&query_embedding, k);
+        // The semantic index contains derived sentence nodes (D4) beside the
+        // canonical memory nodes (D3).  The diagnostic surface must present
+        // the same distinct-memory view as recall, otherwise it can report
+        // the same fact several times and make the engine look worse than it
+        // is.
+        let raw_results = idx.search(&query_embedding, k.saturating_mul(8).max(64));
+        let mut seen = std::collections::HashSet::new();
+        let results: Vec<(f32, usize)> = raw_results
+            .into_iter()
+            .filter(|(_, block_idx)| {
+                seen.insert(microscope_memory::retrieval::canonical_result_text(
+                    reader.text(*block_idx),
+                ))
+            })
+            .take(k)
+            .collect();
         println!("\n  {} {} results:", "Found".green(), results.len());
         for (sim, block_idx) in results {
             let h = reader.header(block_idx);
@@ -1277,6 +1119,12 @@ fn semantic_search(config: &Config, query: &str, k: usize, metric: &str) {
     }
 
     results.sort_by(|a, b| b.0.total_cmp(&a.0));
+    let mut seen = std::collections::HashSet::new();
+    results.retain(|(_, block_idx)| {
+        seen.insert(microscope_memory::retrieval::canonical_result_text(
+            reader.text(*block_idx),
+        ))
+    });
     results.truncate(k);
 
     println!("\n  {} {} results:", "Found".green(), results.len());
@@ -1687,99 +1535,6 @@ fn init_demo(config: &Config, force: bool) -> Result<(), String> {
     );
 
     Ok(())
-}
-
-/// Diagnostic: report where the expected answer sits in the vector ranking.
-///
-/// Compiled in unconditionally but does nothing unless `MICROSCOPE_EVAL_MATCH`
-/// is set, in which case the caller has already fetched a deep (>=1024) list.
-/// The match tokens come from the evaluation harness and are used **only** to
-/// locate the answer in this report; they never influence candidate admission
-/// or scoring.
-fn report_vector_diag(
-    reader: &microscope_memory::reader::MicroscopeReader,
-    eidx: &microscope_memory::embedding_index::EmbeddingIndex,
-    qe: &[f32],
-    hits: &[(f32, usize)],
-    matches: &str,
-    want: usize,
-) {
-    let needles: Vec<String> = matches
-        .split('|')
-        .map(|s| s.trim().to_lowercase())
-        .filter(|s| !s.is_empty())
-        .collect();
-    if needles.is_empty() {
-        return;
-    }
-    // Depth histogram of what the vector search actually returned.
-    let mut depth_hist = [0usize; 9];
-    for (_, idx) in hits.iter() {
-        if *idx < reader.block_count {
-            let d = reader.header(*idx).depth as usize;
-            if d < depth_hist.len() {
-                depth_hist[d] += 1;
-            }
-        }
-    }
-    // Depth histogram of the WHOLE embedded set. If D5 dominates here too, the
-    // top-k being all D5 is a property of the corpus, not of the scoring.
-    let mut all_hist = [0usize; 9];
-    for id in eidx.all_block_ids() {
-        let i = *id as usize;
-        if i < reader.block_count {
-            let d = reader.header(i).depth as usize;
-            if d < all_hist.len() {
-                all_hist[d] += 1;
-            }
-        }
-    }
-    // Score of the expected block wherever it lives, its depth, and its rank in
-    // the FULL untruncated cosine ordering. The last number is the decisive one:
-    // a high rank with a high score means the top-k is crowded out, not that the
-    // embedding is bad.
-    let mut answer_sim: Option<(f32, usize, Option<usize>)> = None;
-    for id in eidx.all_block_ids() {
-        let i = *id as usize;
-        if i >= reader.block_count {
-            continue;
-        }
-        let text = reader.text(i).to_lowercase();
-        if needles.iter().any(|n| text.contains(n)) {
-            if let Some(sim) = eidx.similarity_of(i, qe) {
-                let d = reader.header(i).depth as usize;
-                if sim > answer_sim.map(|a| a.0).unwrap_or(f32::MIN) {
-                    let rank = eidx.full_rank_of(i, qe).map(|(r, _)| r);
-                    answer_sim = Some((sim, d, rank));
-                }
-            }
-        }
-    }
-    let mut found: Option<(usize, f32, usize)> = None;
-    for (rank, (sim, idx)) in hits.iter().enumerate() {
-        if *idx >= reader.block_count {
-            continue;
-        }
-        let text = reader.text(*idx).to_lowercase();
-        if needles.iter().any(|n| text.contains(n)) {
-            found = Some((rank, *sim, reader.header(*idx).depth as usize));
-            break;
-        }
-    }
-    let verdict = match found {
-        None => "a_outside_top1024",
-        Some((rank, _, _)) if rank >= want => "b_lost_in_prefetch",
-        Some(_) => "c_in_prefetch",
-    };
-    eprintln!(
-        "EVALDIAG vectors={} want={} depths={:?} all_depths={:?} answer={} answer_sim={:?}",
-        hits.len(),
-        want,
-        &depth_hist[0..6],
-        &all_hist[0..6],
-        verdict,
-        answer_sim,
-    );
 }
 
 fn timestamp_to_str(secs: u64) -> String {
@@ -4506,6 +4261,11 @@ async fn async_main() {
             layer,
             importance,
             status,
+            kind,
+            subject,
+            source,
+            confidence,
+            supersedes,
         } => {
             crate::reader::store_memory_with_status(
                 &config,
@@ -4516,6 +4276,28 @@ async fn async_main() {
                 None,
             )
             .expect("store failed");
+
+            let kind = microscope_memory::memory_atom::AtomKind::parse(&kind)
+                .unwrap_or(microscope_memory::memory_atom::AtomKind::Observation);
+            let supersedes_id = supersedes.as_deref().and_then(parse_atom_id_hex);
+            let atom = microscope_memory::memory_atom::record_atom(
+                Path::new(&config.paths.output_dir),
+                &config.project_id.0,
+                &text,
+                kind,
+                subject.as_deref().unwrap_or(""),
+                &source,
+                confidence,
+                supersedes_id,
+            )
+            .expect("memory atom failed");
+            println!(
+                "  {} atom={} kind={} relation={}",
+                "ATOM".cyan().bold(),
+                atom.id_hex(),
+                atom.kind.as_str(),
+                atom.relation.as_str()
+            );
 
             // ── Fail-soft emotion extraction side-branch ──
             // Principle 1: memory is already stored. This is a separate,
@@ -4615,7 +4397,7 @@ async fn async_main() {
                 }
             };
             let output_dir = std::path::Path::new(&config.paths.output_dir);
-            let ctx = crate::auto_context::build(output_dir, &reader);
+            let ctx = crate::auto_context::build_with_config(output_dir, &reader, &config.search);
             let text = if compact {
                 crate::auto_context::render_compact(&ctx)
             } else {
@@ -5133,6 +4915,13 @@ async fn async_main() {
                     let text_b = safe_truncate(reader.text(pair.block_b as usize), 30);
                     println!("    {}x  [{}] <-> [{}]", pair.count, text_a, text_b);
                 }
+            }
+        }
+        Cmd::RebuildEmbeddings => {
+            println!("{}", "Rebuilding append embeddings...".cyan());
+            match microscope_memory::build::rebuild_append_embeddings(&config) {
+                Ok(count) => println!("  {} append vectors rebuilt", count),
+                Err(e) => eprintln!("  {} {}", "ERROR:".red(), e),
             }
         }
         Cmd::HebbianDrift => {

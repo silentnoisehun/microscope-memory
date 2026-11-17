@@ -7,7 +7,6 @@ pub mod bench;
 pub mod cognitive;
 pub mod federated;
 pub mod init;
-pub mod recall;
 pub mod search;
 pub mod verify;
 pub mod viz;

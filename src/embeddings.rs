@@ -14,6 +14,43 @@ pub trait EmbeddingProvider: Send + Sync {
     fn dimension(&self) -> usize;
 }
 
+/// Stable fingerprint of the semantic model that produced a vector index.
+///
+/// The vector width alone cannot identify a model: the old mock provider and
+/// the real multilingual MiniLM both produced 384-dimensional vectors.
+/// Mixing those sets silently returns plausible but wrong matches, so every
+/// embedding index carries this fingerprint.
+///
+/// The encoder revision is part of the fingerprint as well.  Provider and
+/// model names are not sufficient: the native BERT provider changed how
+/// sequences are pooled (special tokens are now excluded), so vectors from
+/// the old and new revisions describe different semantic spaces even though
+/// both are 384-dimensional MiniLM vectors.
+pub const ENCODER_REVISION: &str = "bert-mean-pool-special-excluded-v2";
+
+pub fn provider_fingerprint(provider: &str, model: &str) -> u64 {
+    provider_fingerprint_with_revision(provider, model, ENCODER_REVISION)
+}
+
+/// Fingerprint a provider/model/encoder-revision triple.
+///
+/// Kept public so compatibility tests can construct the historical revision
+/// explicitly instead of duplicating the hash algorithm.
+pub fn provider_fingerprint_with_revision(provider: &str, model: &str, revision: &str) -> u64 {
+    let mut hash = 0xcbf29ce484222325u64;
+    for byte in provider
+        .as_bytes()
+        .iter()
+        .chain(model.as_bytes().iter())
+        .chain(revision.as_bytes().iter())
+        .chain([0u8].iter())
+    {
+        hash ^= *byte as u64;
+        hash = hash.wrapping_mul(0x100000001b3);
+    }
+    hash
+}
+
 #[derive(Debug)]
 pub enum EmbeddingError {
     ApiError(String),
@@ -434,10 +471,12 @@ pub fn provider_from_config(
             Ok(p) => Box::new(p),
             Err(e) => {
                 eprintln!(
-                    "  WARN: python embedding provider unavailable: {} — using mock",
+                    "  ERROR: python embedding provider unavailable: {}\n  \
+                     Refusing to fall back to mock: it would silently return \
+                     meaningless semantic results.",
                     e
                 );
-                Box::new(MockEmbeddingProvider::new(idx_dim))
+                std::process::exit(2);
             }
         },
         "candle" => {
@@ -496,30 +535,30 @@ pub fn provider_from_config(
                         Box::new(p)
                     }
                     Err(EmbeddingError::NetworkError) => {
-                        eprintln!("  [bge-small] Network/model download failed. Check internet / HuggingFace cache. Falling back to mock provider.");
-                        Box::new(MockEmbeddingProvider::new(idx_dim))
+                        eprintln!("  ERROR: [bge-small] Network/model download failed. Check internet / HuggingFace cache. Refusing to fall back to mock provider.");
+                        std::process::exit(2);
                     }
                     Err(e) => {
                         eprintln!(
-                            "  [bge-small] Init failed: {}. Falling back to mock provider.",
+                            "  ERROR: [bge-small] Init failed: {}. Refusing to fall back to mock provider.",
                             e
                         );
-                        Box::new(MockEmbeddingProvider::new(idx_dim))
+                        std::process::exit(2);
                     }
                 }
             }
             #[cfg(not(feature = "embeddings"))]
             {
-                eprintln!("  WARN: bge-small requires the 'embeddings' feature — using mock");
-                Box::new(MockEmbeddingProvider::new(idx_dim))
+                eprintln!("  ERROR: bge-small requires the 'embeddings' feature. Refusing to fall back to mock provider.");
+                std::process::exit(2);
             }
         }
         other => {
             eprintln!(
-                "  WARN: unknown embedding provider '{}' — using mock",
+                "  ERROR: unknown embedding provider '{}'. Refusing to fall back to mock provider.",
                 other
             );
-            Box::new(MockEmbeddingProvider::new(idx_dim))
+            std::process::exit(2);
         }
     }
 }
@@ -733,16 +772,54 @@ impl CandleEmbeddingProvider {
             .forward(&input_ids, &token_type_ids)
             .map_err(|e| EmbeddingError::ApiError(format!("forward: {}", e)))?;
 
-        // Mean pooling over sequence dimension
-        let pooled = output
-            .mean(1)
-            .map_err(|e| EmbeddingError::ApiError(format!("mean pool: {}", e)))?
-            .squeeze(0)
-            .map_err(|e| EmbeddingError::ApiError(format!("squeeze: {}", e)))?;
-
-        let mut embedding: Vec<f32> = pooled
-            .to_vec1()
-            .map_err(|e| EmbeddingError::ApiError(format!("to_vec: {}", e)))?;
+        // Mean pooling over real content tokens only.
+        //
+        // Averaging every position included [CLS] and [SEP].  The reference
+        // Sentence-Transformers implementation excludes special tokens from
+        // mean pooling, so the native provider was systematically a different
+        // encoder from the reference even with identical weights.  The
+        // difference was measurable on the 318-query long-horizon suite.
+        //
+        // The attention mask removes padding; the special-token mask removes
+        // [CLS]/[SEP].  Both are needed: padding is fake input, while special
+        // tokens are control markers, not sentence content.
+        let special_mask = encoding.get_special_tokens_mask();
+        let pool_weights: Vec<f32> = mask
+            .iter()
+            .zip(special_mask.iter())
+            .map(|(&attention, &special)| {
+                if attention != 0 && special == 0 {
+                    1.0
+                } else {
+                    0.0
+                }
+            })
+            .collect();
+        let weight_sum: f32 = pool_weights.iter().sum();
+        if weight_sum <= 0.0 {
+            return Err(EmbeddingError::ApiError(
+                "input contained no poolable content tokens".into(),
+            ));
+        }
+        let hidden = output
+            .to_vec3::<f32>()
+            .map_err(|e| EmbeddingError::ApiError(format!("to_vec3: {}", e)))?;
+        let sequence = hidden
+            .first()
+            .ok_or_else(|| EmbeddingError::ApiError("empty model output".into()))?;
+        let mut embedding = vec![0.0f32; sequence.first().map(|row| row.len()).unwrap_or(0)];
+        for (position, row) in sequence.iter().enumerate() {
+            let weight = pool_weights.get(position).copied().unwrap_or(0.0);
+            if weight == 0.0 {
+                continue;
+            }
+            for (target, value) in embedding.iter_mut().zip(row.iter()) {
+                *target += value * weight;
+            }
+        }
+        for value in &mut embedding {
+            *value /= weight_sum;
+        }
 
         // L2 normalize
         let norm: f32 = embedding.iter().map(|x| x * x).sum::<f32>().sqrt();
@@ -774,6 +851,20 @@ impl EmbeddingProvider for CandleEmbeddingProvider {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn encoder_revision_changes_provider_fingerprint() {
+        let old = provider_fingerprint_with_revision(
+            "candle",
+            "paraphrase-multilingual-MiniLM-L12-v2",
+            "bert-mean-pool-all-v1",
+        );
+        let current = provider_fingerprint("candle", "paraphrase-multilingual-MiniLM-L12-v2");
+        assert_ne!(
+            old, current,
+            "old and corrected pooling revisions must not share an embedding index"
+        );
+    }
 
     #[test]
     fn test_cosine_similarity() {

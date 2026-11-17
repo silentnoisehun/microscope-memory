@@ -122,6 +122,8 @@ pub mod keystore;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod knowledge_base;
 #[cfg(not(target_arch = "wasm32"))]
+pub mod memory_atom;
+#[cfg(not(target_arch = "wasm32"))]
 pub mod mental_sandbox;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod mental_stimulation;
@@ -137,6 +139,8 @@ pub mod pattern_recognition;
 pub mod planning;
 pub mod predictive_cache;
 pub mod relevance;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod retrieval;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod spine;
 #[cfg(not(target_arch = "wasm32"))]
@@ -298,6 +302,61 @@ fn semantic_coords(text: &str, weight: f32) -> Option<(f32, f32, f32)> {
         }
     }
     None
+}
+
+/// Blend deterministic content coordinates with the configured real semantic
+/// model.  The previous implementation always used the hash-based mock
+/// provider here, even when `semantic_weight` was non-zero, so raising the
+/// weight changed the hash blend rather than enabling semantic retrieval.
+/// The real provider is used only when explicitly configured; `none`/`mock`
+/// retain the old deterministic behavior for tests and offline builds.
+pub fn content_coords_blended_with_config(
+    text: &str,
+    layer: &str,
+    weight: f32,
+    embedding: &crate::config::Embedding,
+) -> (f32, f32, f32) {
+    let (hx, hy, hz) = content_coords(text, layer);
+    if weight <= 0.0 {
+        return (hx, hy, hz);
+    }
+
+    let semantic = match embedding.provider.as_str() {
+        "none" | "mock" => semantic_coords(text, weight),
+        _ => {
+            let provider =
+                embeddings::with_cached_provider(embedding, embedding.dim, |p| p.embed(text).ok());
+            provider.and_then(|emb| {
+                if emb.len() >= 3 {
+                    Some((
+                        (emb[0] + 1.0) / 2.0,
+                        (emb[1] + 1.0) / 2.0,
+                        (emb[2] + 1.0) / 2.0,
+                    ))
+                } else {
+                    None
+                }
+            })
+        }
+    };
+
+    match semantic {
+        Some((sx, sy, sz)) => {
+            let w = weight.clamp(0.0, 1.0);
+            (
+                (1.0 - w) * hx + w * sx,
+                (1.0 - w) * hy + w * sy,
+                (1.0 - w) * hz + w * sz,
+            )
+        }
+        None => (hx, hy, hz),
+    }
+}
+
+/// True when the configured provider is a real semantic model rather than the
+/// deterministic hash mock.
+pub fn embedding_provider_is_real(config: &crate::config::Embedding) -> bool {
+    !matches!(config.provider.as_str(), "none" | "mock")
 }
 
 pub fn content_coords_blended(text: &str, layer: &str, weight: f32) -> (f32, f32, f32) {

@@ -9,8 +9,8 @@ use std::path::{Path, PathBuf};
 use crate::config::Config;
 use crate::types::{AppendEntry, BlockHeader, MemoryQueryOptions, ProjectId};
 use crate::{
-    auto_depth, content_coords_blended, layer_to_id, safe_truncate, BLOCK_DATA_SIZE,
-    DEPTH_ENTRY_SIZE, HEADER_SIZE, LAYER_NAMES, LEGACY_HEADER_SIZE, META_HEADER_SIZE,
+    auto_depth, layer_to_id, safe_truncate, BLOCK_DATA_SIZE, DEPTH_ENTRY_SIZE, HEADER_SIZE,
+    LAYER_NAMES, LEGACY_HEADER_SIZE, META_HEADER_SIZE,
 };
 
 #[cfg(windows)]
@@ -1725,7 +1725,12 @@ pub fn store_memory_temporary(
     importance: u8,
 ) -> Result<(), String> {
     let _lock = FileLock::acquire(config)?;
-    let (x, y, z) = content_coords_blended(text, layer, config.search.semantic_weight);
+    let (x, y, z) = crate::content_coords_blended_with_config(
+        text,
+        layer,
+        config.search.semantic_weight,
+        &config.embedding,
+    );
     let lid = layer_to_id(layer);
     let depth = auto_depth(text);
 
@@ -1812,16 +1817,19 @@ fn embed_appended_entry_with(config: &Config, text: &str, precomputed: Option<Ve
         min_embed_chars, quality_gate, AppendEmbeddings, EmbedVerdict, APPEND_EMBEDDINGS_FILE,
     };
 
-    // A provider whose cargo feature is not compiled in would fail on every
-    // store; skip quietly rather than warn once per memory.
+    // A real provider whose feature is not compiled in would fail on every
+    // store.  Refuse loudly: silently skipping would leave the semantic path
+    // without fresh vectors while the configuration claimed it was enabled.
     let feature_missing = match config.embedding.provider.as_str() {
         "candle" => !cfg!(feature = "embeddings"),
-        "onnx" => !cfg!(feature = "onnx"),
-        "python" => !cfg!(feature = "python"),
         _ => false,
     };
     if feature_missing {
-        return;
+        eprintln!(
+            "  ERROR: embedding provider '{}' requires a feature not compiled into this binary",
+            config.embedding.provider
+        );
+        std::process::exit(2);
     }
 
     let dim = config.embedding.dim;
@@ -1851,6 +1859,10 @@ fn embed_appended_entry_with(config: &Config, text: &str, precomputed: Option<Ve
             let path = output_dir.join(APPEND_EMBEDDINGS_FILE);
             let mut sidecar =
                 AppendEmbeddings::open(&path, dim).unwrap_or_else(|| AppendEmbeddings::new(dim));
+            sidecar.provider_fingerprint = Some(crate::embeddings::provider_fingerprint(
+                &config.embedding.provider,
+                &config.embedding.model,
+            ));
             // One vector per append index: if a repaired log puts a different
             // memory at a position, the newer vector replaces the stale one.
             sidecar.entries.retain(|(i, _)| *i as usize != append_index);
@@ -1910,7 +1922,12 @@ fn store_memory_with_status_inner(
 ) -> Result<(), String> {
     let _lock = FileLock::acquire(config)?;
     let t0 = std::time::Instant::now();
-    let (x, y, z) = content_coords_blended(text, layer, config.search.semantic_weight);
+    let (x, y, z) = crate::content_coords_blended_with_config(
+        text,
+        layer,
+        config.search.semantic_weight,
+        &config.embedding,
+    );
     let lid = layer_to_id(layer);
     let depth = auto_depth(text);
 
@@ -1975,6 +1992,7 @@ fn store_memory_with_status_inner(
         "open" => crate::timeline::STATUS_OPEN,
         "resolved" => crate::timeline::STATUS_RESOLVED,
         "archived" => crate::timeline::STATUS_ARCHIVED,
+        "superseded" => crate::timeline::STATUS_SUPERSEDED,
         _ => crate::timeline::STATUS_NORMAL,
     };
     let entry = crate::timeline::TimelineEntry {

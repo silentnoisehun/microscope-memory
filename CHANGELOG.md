@@ -7,6 +7,67 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-11-17
+
+### Added
+- **One retrieval path for the CLI, the MCP server and the legacy command
+  surface.** `src/retrieval.rs` owns provider selection, fingerprint
+  validation, query encoding, candidate generation and score fusion. The two
+  surfaces previously disagreed on the gain that applied to the cosine score:
+  the MCP path applied `semantic_weight` (a 0..1 coordinate blend, 0.0 in
+  production) where the CLI applied `semantic_rank_gain`. With that value a
+  real semantic match could be admitted as a candidate and still not outrank a
+  weak lexical hit.
+- **Durable memory atoms** (`src/memory_atom.rs`, `output/memory_atoms.bin`,
+  format `MAT1`): a stable SHA-256 identity, semantic kind, optional subject
+  key, source, confidence and creation time. A newer statement about the same
+  subject records a `Contradicts` relation, an explicit `supersedes` id
+  records a `Supersedes` relation. The ledger is append-only, so history
+  stays auditable instead of being overwritten.
+- **Native multilingual embeddings.** The candle provider runs
+  `paraphrase-multilingual-MiniLM-L12-v2` (384 dim) offline from the local
+  Hugging Face cache. The vector index carries a provider/model/encoder-
+  revision fingerprint in the `EMB2` layout, so an index built by another
+  model -- or by the 384-dimensional mock provider -- can never be served
+  silently: the width alone never identified a model.
+- **Real-corpus retrieval benchmark** (`tests/real_corpus_benchmark.rs`): 28
+  stored statements, each with a Hungarian and an English query, measured
+  through the production `rank_candidates` path against a live instance.
+  Fixtures: `tests/fixtures/relevance/real_corpus_cases.json` and
+  `portable_cases.json`. The test skips when `MICROSCOPE_CONFIG` is unset, so
+  a normal `cargo test` run stays green on a machine without an instance.
+- `examples/embedding_probe.rs`, `scripts/compare_embedding_models.py` and
+  `docs/measurements/long_horizon_model_comparison.json` for comparing
+  embedding models against the long-horizon fixture.
+- `[search] core_memory_freshness` and `[search] core_memory_prefer_confirmed`,
+  defaulting to preferring explicitly confirmed evidence, then importance,
+  then recency.
+
+### Fixed
+- **The native BERT provider pooled over the 512-token padded window and
+  included the special tokens.** It now trims to the real sequence length and
+  pools over the content tokens only, so a stored vector reproduces an
+  independent sentence-transformers encoding at cosine 1.0000 (0.32-0.37
+  before). Verified on 150 sampled blocks across every length bucket, and the
+  encoder revision is part of the index fingerprint, so vectors from the old
+  and the new pooling describe different spaces and cannot be mixed.
+- The Python embedding provider no longer falls back to the mock provider:
+  an unavailable provider is an error, because the fallback returns plausible
+  but meaningless semantic results.
+
+### Measured
+Retrieval recall over the production path, Hungarian and English queries
+together (56 queries on the Codex instance, 36 on the portable instance):
+
+| corpus | lexical R@1 / R@5 | hybrid R@1 / R@5 |
+| --- | --- | --- |
+| Codex instance (28 statements) | 0.232 / 0.304 | 0.446 / 0.643 |
+| portable instance (18 statements) | 0.139 / 0.250 | 0.278 / 0.722 |
+
+The hybrid path never lost a lexical hit (20 gained, 1 lost; 17 gained, 0
+lost). `semantic_rank_gain = 1.0` measured strictly better than 1.5 (R@1
++1/-0, R@5 +1/-0) and is now the recommended value.
+
 ## [1.2.0] - 2026-10-13
 
 ### Added

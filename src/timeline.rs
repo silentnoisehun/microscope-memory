@@ -33,6 +33,12 @@ pub const STATUS_NORMAL: u8 = 3;
 pub const STATUS_OPEN: u8 = 0;
 pub const STATUS_RESOLVED: u8 = 1;
 pub const STATUS_ARCHIVED: u8 = 2;
+/// Explicitly superseded by a newer statement.  Archived means "kept but
+/// inactive"; superseded additionally means that another memory claims the
+/// same subject with a different value.  Keeping the distinction makes the
+/// contradiction trail visible instead of flattening every inactive fact
+/// into one generic archive bucket.
+pub const STATUS_SUPERSEDED: u8 = 4;
 
 /// One chronological memory entry.
 #[derive(Clone, Debug)]
@@ -43,6 +49,12 @@ pub struct TimelineEntry {
     pub depth: u8,
     pub status: u8,
     pub text: String,
+}
+
+/// True when a timeline status describes an inactive memory that must not be
+/// promoted into the active core-memory view.
+pub fn is_inactive_status(status: u8) -> bool {
+    status == STATUS_ARCHIVED || status == STATUS_SUPERSEDED
 }
 
 /// Append a TimelineEntry. Thread-safe-ish via O_APPEND on POSIX; on Windows

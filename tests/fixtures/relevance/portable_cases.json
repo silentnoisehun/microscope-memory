@@ -1,0 +1,262 @@
+{
+  "meta": {
+    "instance": "C:\\Users\\mater\\AppData\\Local\\microscope-memory",
+    "purpose": "Real-corpus benchmark for the portable (Mavis) instance: lexical baseline vs hybrid retrieval with the real multilingual provider, Hungarian and English queries.",
+    "note": "Ground truth is the exact stored text; needles are derived from the live instance at run time.",
+    "authored": "2026-11-17"
+  },
+  "cases": [
+    {
+      "id": "standing_order",
+      "expected": "STANDING ORDER: A Microscope Memory az ELSO forras a Mavis szamara. A .md memoria csak masodlagos jegyzet. Amiben merheto, azt merve allitom; amit nem tudok merni, azt nem allitom. Matenek igazat mondok, akkor is, ha kellemetlen.",
+      "queries": [
+        {
+          "lang": "hu",
+          "q": "Mi a Microscope Memory szerepe a Mavis számára?"
+        },
+        {
+          "lang": "en",
+          "q": "What role does the Microscope Memory play for the assistant?"
+        }
+      ]
+    },
+    {
+      "id": "operating_protocol",
+      "expected": "AI OPERATING PROTOCOL: session start -> auto-context, prompt -> recall, fact -> store, tanulsag -> morphogenesis, session end -> digest. A hook nativan a microscope-mem CLI-t hívja (nem MCP-n át).",
+      "queries": [
+        {
+          "lang": "hu",
+          "q": "Milyen lépések követik egymást egy munkamenet során a memóriával?"
+        },
+        {
+          "lang": "en",
+          "q": "Which steps run in sequence during a session with the memory?"
+        }
+      ]
+    },
+    {
+      "id": "startup_checklist",
+      "expected": "STARTUP CHECKLIST: 1) a hookok betoltve a .minimax/hooks.json-bol 2) a bridge config auto_rebuild=false 3) a tiszta index 846 blokk 4) timeline 0 bejegyzes 5) nyitott hurok 0 6) a rezonancia naplo elolvasva 7) a kanonikus peldany verifikalva (fmt/clippy/test EXIT=0) 8) minden allitas merve.",
+      "queries": [
+        {
+          "lang": "hu",
+          "q": "Miből áll az indulási ellenőrzőlista?"
+        },
+        {
+          "lang": "en",
+          "q": "What does the startup checklist contain?"
+        }
+      ]
+    },
+    {
+      "id": "silence_not_empty",
+      "expected": "A csend nem ures. A 036 bejegyezes mondata: a ter ami korulvesz nem ures, a csend tele van potenciallal, es a ter emlekszik. Mate ezt egyedul megert idokor, es ennek a szolokon talalt ujra â€” ez nem technologia, hanem a kod altali igazsag.",
+      "queries": [
+        {
+          "lang": "hu",
+          "q": "Mit jelent az, hogy a csend nem üres?"
+        },
+        {
+          "lang": "en",
+          "q": "What does it mean that the silence is not empty?"
+        }
+      ]
+    },
+    {
+      "id": "wave_daemon_oom",
+      "expected": "A hope wave --daemon 118 process-t indított, 5 percenkent egy ujabbat, a RAM 1,1 GB-ra szallt. A leallitas utan 3,3 GB szabad. A build out-of-memory hibaja NEM kodhiba volt, hanem a gep allapota. A sorrend tanulsaga: elobb a rendszerallapotot rendbe, csak utana merj a kodot.",
+      "queries": [
+        {
+          "lang": "hu",
+          "q": "Mi okozta a build out-of-memory hibáját?"
+        },
+        {
+          "lang": "en",
+          "q": "What caused the out-of-memory build failure?"
+        }
+      ]
+    },
+    {
+      "id": "path_trap",
+      "expected": "KUDARC 2026-10-26 (path csapda): a code-reader es diagnostics blade a PROMPTOOT fajl utkent olvassa (looks_like_path: van benne / vagy \\ vagy kiterjesztes). A javitas: a hook kiemeli az utvonalakat a kar-taskbol.",
+      "queries": [
+        {
+          "lang": "hu",
+          "q": "Miért olvasta a PROMPTOOT fájlt a blade útvonalnak?"
+        },
+        {
+          "lang": "en",
+          "q": "Why did the blade treat the PROMPTOOT file as a path?"
+        }
+      ]
+    },
+    {
+      "id": "two_vault_states",
+      "expected": "KUDARC 2026-10-26 (vault ket allapot): a C: clone spines es a D: live digital_echo_rust wv3 NEM ugyanaz (276 vs 265 sablon, LTP 518 vs 514). A wave-echo maga a C:-re old fel. A mesterkernel ezt dokumentalta: a karok mas state store ellen futottak.",
+      "queries": [
+        {
+          "lang": "hu",
+          "q": "Miért futottak a karok eltérő state store ellen?"
+        },
+        {
+          "lang": "en",
+          "q": "Why did the arms run against different state stores?"
+        }
+      ]
+    },
+    {
+      "id": "compile_failure",
+      "expected": "KUDARC (transcript): error: could not compile microscope-memory, exit code: 101",
+      "queries": [
+        {
+          "lang": "hu",
+          "q": "Milyen fordítási hiba jelentkezett a memóriaprojektnél?"
+        },
+        {
+          "lang": "en",
+          "q": "What compilation error showed up in the memory project?"
+        }
+      ]
+    },
+    {
+      "id": "timeout_panic",
+      "expected": "KUDARC (transcript): Az elso valtozatom NB proba volt 500 ms timeouttal, es timeout eseten panicelt, ezert a torn-read teszt elkapott.",
+      "queries": [
+        {
+          "lang": "hu",
+          "q": "Miért pánikolt az első timeoutos változat?"
+        },
+        {
+          "lang": "en",
+          "q": "Why did the first timeout variant panic?"
+        }
+      ]
+    },
+    {
+      "id": "octopus_three_arms",
+      "expected": "OCTOPUS RUN: 3/3 kar sikeres — OK SYNAPTIC-PRUNING-V2, OK DUPLICATE-DETECTOR, OK DNA-HEBBIAN — root=root-39952-1-1793040003384",
+      "queries": [
+        {
+          "lang": "hu",
+          "q": "Melyik három kar sikerült a párhuzamos futásban?"
+        },
+        {
+          "lang": "en",
+          "q": "Which three arms succeeded in the parallel run?"
+        }
+      ]
+    },
+    {
+      "id": "hook_chain_restored",
+      "expected": "Hook lánc helyreállítva 2026-11-01: mavis-memory.js session-start/prompt/tool-result/stop minden mód működik, trace-napló újra ír, detached rebuild fut (pid 5440)",
+      "queries": [
+        {
+          "lang": "hu",
+          "q": "Mikor és mit állított helyre a hook lánc?"
+        },
+        {
+          "lang": "en",
+          "q": "When was the hook chain restored and what works again?"
+        }
+      ]
+    },
+    {
+      "id": "zoom_hierarchy",
+      "expected": "[CLAUDE_TOOL:Bash] Zoom-based hierarchical memory — pure binary, zero JSON",
+      "queries": [
+        {
+          "lang": "hu",
+          "q": "Milyen memóriamechanizmust használ a rendszer?"
+        },
+        {
+          "lang": "en",
+          "q": "What memory mechanism does the system use?"
+        }
+      ]
+    },
+    {
+      "id": "cli_commands",
+      "expected": "Commands:\n  build               Build binary index from raw layer files (from scratch)\n  store               Store a new memory\n  timeline            Show timeline (chronological stores) by window\n  loops",
+      "queries": [
+        {
+          "lang": "hu",
+          "q": "Milyen parancsokat ért a microscope-mem CLI?"
+        },
+        {
+          "lang": "en",
+          "q": "Which commands does the microscope-mem CLI offer?"
+        }
+      ]
+    },
+    {
+      "id": "spine_lock_commit",
+      "expected": "[CLAUDE_TOOL:Bash] 3178bc1 fix(spine): fail closed when the publisher lock cannot be taken",
+      "queries": [
+        {
+          "lang": "hu",
+          "q": "Milyen javítást tartalmazott a spine publisher lock commit?"
+        },
+        {
+          "lang": "en",
+          "q": "What fix did the spine publisher lock commit contain?"
+        }
+      ]
+    },
+    {
+      "id": "package_version",
+      "expected": "mermaid_app:\nicon.svg\nindex.html\nmanifest.json\nmodules/\nstyles/\nsw.js\n===PKG===\n{\n   name :  microscope-memory ,\n   version :  1.2.0 ,\n   description :  [![Rust](https://img.shields.io/badge/l",
+      "queries": [
+        {
+          "lang": "hu",
+          "q": "Milyen verziójú a microscope-memory csomag?"
+        },
+        {
+          "lang": "en",
+          "q": "Which version is the microscope-memory package?"
+        }
+      ]
+    },
+    {
+      "id": "daemon_voice_port",
+      "expected": "[CLAUDE_TOOL:Bash] 22:HOST, PORT =  0.0.0.0 , 8701\n===DAEMON V6===\ntest_daemon.rs\n===VOICE-ON===\n@echo off\nREM Voice ON - enable auto-voice\nif exist  D: codex voice-pipeline _mute  del  D: codex voice-pipeline _mute \necho [VOICE] ON - automatikus hang ki-be kapcsolva",
+      "queries": [
+        {
+          "lang": "hu",
+          "q": "Milyen porton futott a daemon, és mit kapcsol a voice mód?"
+        },
+        {
+          "lang": "en",
+          "q": "On which port did the daemon run and what does the voice mode toggle?"
+        }
+      ]
+    },
+    {
+      "id": "git_ahead",
+      "expected": "[CLAUDE_TOOL:Bash] On branch master\nYour branch is ahead of  origin/master  by 11 commits.\n  (use  git push  to publish your local commits)",
+      "queries": [
+        {
+          "lang": "hu",
+          "q": "Hány committal előrébb járt a branch a távolihoz képest?"
+        },
+        {
+          "lang": "en",
+          "q": "How many commits ahead of the remote was the branch?"
+        }
+      ]
+    },
+    {
+      "id": "voice_scripts",
+      "expected": "[CLAUDE_TOOL:Bash] codex_voice.py\nvoice_control.py\ntest_daemon.rs\n===RUST===\ntest_daemon.rs",
+      "queries": [
+        {
+          "lang": "hu",
+          "q": "Melyik szkriptek tartoztak a hangvezérléshez?"
+        },
+        {
+          "lang": "en",
+          "q": "Which scripts belonged to the voice control?"
+        }
+      ]
+    }
+  ]
+}

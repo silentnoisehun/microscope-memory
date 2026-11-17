@@ -1,4 +1,4 @@
-﻿# Microscope Memory
+# Microscope Memory
 
 A Microscope Memory egy kognitív memória engine — 12 réteg, 9 mélység, bináris mmap. Nem napló, nem adatbázis — élő emlékezet.
 
@@ -27,8 +27,8 @@ A rétegek neve magáért beszél. Nem kell szabály — magától értetődik, 
 
 ### CLI (ha kell)
 ```powershell
-$env:MICROSCOPE_CONFIG = "D:\codex\microscope-memory\config.toml"
-& "D:\codex\microscope-memory\target\release\microscope-mem.exe" <command>
+$env:MICROSCOPE_CONFIG = "C:\Users\mater\AppData\Local\microscope-memory\config.toml"
+& "C:\Users\mater\microscope-memory-clone\target\release\microscope-mem.exe" <command>
 ```
 
 --- project-doc ---

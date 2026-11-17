@@ -24,8 +24,12 @@ impl Default for HooksConfig {
     }
 }
 
-fn default_hooks_enabled() -> bool { true }
-fn default_hooks_min_importance() -> u8 { 3 }
+fn default_hooks_enabled() -> bool {
+    true
+}
+fn default_hooks_min_importance() -> u8 {
+    3
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Config {
@@ -74,9 +78,15 @@ impl Default for Paths {
         }
     }
 }
-fn default_layers_dir() -> String { "./layers".to_string() }
-fn default_output_dir() -> String { "./output".to_string() }
-fn default_temp_dir() -> String { "./tmp".to_string() }
+fn default_layers_dir() -> String {
+    "./layers".to_string()
+}
+fn default_output_dir() -> String {
+    "./output".to_string()
+}
+fn default_temp_dir() -> String {
+    "./tmp".to_string()
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Index {
@@ -117,8 +127,12 @@ impl Default for Index {
         }
     }
 }
-fn default_index_max_depth() -> u8 { 8 }
-fn default_index_header_size() -> usize { 50 }
+fn default_index_max_depth() -> u8 {
+    8
+}
+fn default_index_header_size() -> usize {
+    50
+}
 
 fn default_auto_rebuild() -> bool {
     true
@@ -168,6 +182,14 @@ pub struct Search {
     /// apart before this field existed.
     #[serde(default = "default_semantic_rank_gain")]
     pub semantic_rank_gain: f32,
+    /// Freshness weight in core-memory selection.  The default prefers
+    /// explicitly confirmed evidence first, then importance, then recency.
+    #[serde(default = "default_core_memory_freshness")]
+    pub core_memory_freshness: bool,
+    /// When enabled, an explicitly confirmed memory outranks an unconfirmed
+    /// memory regardless of age.
+    #[serde(default = "default_core_memory_prefer_confirmed")]
+    pub core_memory_prefer_confirmed: bool,
     #[serde(default)]
     pub emotional_bias_weight: f32,
     #[serde(default)]
@@ -182,14 +204,22 @@ impl Default for Search {
             keyword_boost: default_search_keyword_boost(),
             semantic_weight: 0.0,
             semantic_rank_gain: default_semantic_rank_gain(),
+            core_memory_freshness: true,
+            core_memory_prefer_confirmed: true,
             emotional_bias_weight: 0.0,
             emotion_21d_weight: 0.0,
         }
     }
 }
-fn default_search_default_k() -> usize { 10 }
-fn default_search_zoom_weight() -> f32 { 3.0 }
-fn default_search_keyword_boost() -> f32 { 0.4 }
+fn default_search_default_k() -> usize {
+    10
+}
+fn default_search_zoom_weight() -> f32 {
+    3.0
+}
+fn default_search_keyword_boost() -> f32 {
+    0.4
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct MemoryLayers {
@@ -238,9 +268,15 @@ impl Default for Performance {
         }
     }
 }
-fn default_perf_use_mmap() -> bool { true }
-fn default_perf_cache_size() -> usize { 64 }
-fn default_perf_build_workers() -> usize { 4 }
+fn default_perf_use_mmap() -> bool {
+    true
+}
+fn default_perf_cache_size() -> usize {
+    64
+}
+fn default_perf_build_workers() -> usize {
+    4
+}
 
 fn default_cache_ttl() -> u64 {
     300
@@ -280,12 +316,33 @@ fn default_max_depth() -> u8 {
     5
 }
 fn default_semantic_rank_gain() -> f32 {
-    // Set from the measured curve, not chosen: see WHITEPAPER 11.9. The
-    // knee is at 2.0 -- 1.0 costs about 1.7 points of R@1 and nothing above 2.0
-    // adds any.
-    2.0
+    // Set from the measured long-horizon curve, not guessed. The corrected
+    // native MiniLM encoder peaks around gain=1.5 on the 318-query suite;
+    // 2.0 remains close but loses a small amount of R@1 in the local sweep.
+    1.5
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn default_semantic_gain_matches_measured_curve() {
+        assert_eq!(default_semantic_rank_gain(), 1.5);
+    }
+}
+
+fn default_core_memory_freshness() -> bool {
+    true
+}
+
+fn default_core_memory_prefer_confirmed() -> bool {
+    true
+}
+
+fn default_true() -> bool {
+    true
+}
 impl Default for Embedding {
     fn default() -> Self {
         Self {
@@ -375,10 +432,6 @@ pub struct EpistemicConfig {
     /// Bias added to eviction score from confidence (0 = disabled).
     #[serde(default)]
     pub eviction_evidence_bias: f32,
-}
-
-fn default_true() -> bool {
-    true
 }
 fn default_min_sources() -> u32 {
     1

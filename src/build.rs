@@ -1795,7 +1795,10 @@ mod tests {
     #[test]
     fn canonicalize_strips_trailing_whitespace() {
         assert_eq!(canonicalize_entry_text("hello world "), "hello world");
-        assert_eq!(canonicalize_entry_text("  leading and trailing  "), "leading and trailing");
+        assert_eq!(
+            canonicalize_entry_text("  leading and trailing  "),
+            "leading and trailing"
+        );
     }
 
     /// Double (or more) newlines — the layer-file entry separator — must be
@@ -1807,10 +1810,7 @@ mod tests {
             canonicalize_entry_text("paragraph one\n\nparagraph two"),
             "paragraph one\nparagraph two"
         );
-        assert_eq!(
-            canonicalize_entry_text("a\n\n\n\nb"),
-            "a\nb"
-        );
+        assert_eq!(canonicalize_entry_text("a\n\n\n\nb"), "a\nb");
     }
 
     /// Single newlines (line wraps inside one paragraph) are preserved as-is.
@@ -1838,8 +1838,16 @@ mod tests {
     fn mirror_matches_entry_with_trailing_space() {
         // `mirrored` is what extract_texts_from_file returns: already trimmed.
         // `entry` is the raw append-log text, which may have trailing whitespace.
-        assert!(mirror_text_matches("hello world", "long_term", "hello world "));
-        assert!(mirror_text_matches("hello world", "long_term", "hello world\n"));
+        assert!(mirror_text_matches(
+            "hello world",
+            "long_term",
+            "hello world "
+        ));
+        assert!(mirror_text_matches(
+            "hello world",
+            "long_term",
+            "hello world\n"
+        ));
     }
 
     /// An entry with internal double-newlines (daemon Daydream content) must

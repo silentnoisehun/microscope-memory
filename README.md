@@ -62,7 +62,7 @@ Traditional AI systems treat memory as a **database** — fetch, store, query. B
 
 This engine was built to **experiment with those biological principles at scale** — and to make them available to any AI agent that needs a *real* memory, not a lookup table.
 
-> **Built by Máté R.** — a researcher who started as a factory worker (6 days/week, rotating shifts) and taught himself to code 2 years ago. His work on [wave-quantum](https://github.com/silentnoisehun/wave-quantum) is **hardware-validated on real superconducting QPUs** (IBM Fez, Marrakesh, Kingston — 156Q Heron r2, Pearson 0.99+). The same rigor of **falsification, pre-registration, and statistical validation** is applied here.
+> **Built by Máté R.** — an independent systems researcher focusing on neuromorphic memory architectures and biological learning principles applied to autonomous AI agents. Every architectural design is subject to empirical validation, pre-registered testing, and reproducible benchmarks.
 
 ---
 
@@ -336,21 +336,16 @@ cargo test -p microscope-hooks   # 16 hook tests
 
 ---
 
-## 🤝 Open Research
+## 🤝 Open Research & Collaboration
 
-I'm an independent researcher working at the intersection of **quantum information theory** and **neuromorphic AI**. My work is:
+Microscope Memory is an open-source project exploring the intersection of **high-performance systems engineering** and **neuromorphic memory architectures**.
 
-- **Hardware-validated**: [wave-quantum](https://github.com/silentnoisehun/wave-quantum) ran actual circuits on IBM superconducting QPUs (Fez, Marrakesh, Kingston — 156Q Heron r2), achieving Pearson correlations of 0.87–0.999.
-- **Statistically rigorous**: Every claim is backed by χ² analysis, pre-registered falsification chains, and binomial error bounds.
-- **Transparent**: All raw data, circuit hashes, and evaluation scripts are in the repository.
+### Actively Seeking:
+- **Research collaborations** — neuromorphic memory systems, lifelong learning, and agentic AI architectures
+- **Peer review & benchmarking** — evaluation of the cognitive gradient design, forgetting curves, and consolidation mechanics
+- **Cross-validation** — empirical validation of memory reconsolidation across diverse LLM agent frameworks
 
-### I'm actively seeking:
-- **Research collaborations** — quantum error mitigation, neuromorphic memory, agentic AI architectures
-- **Peer review** — feedback on falsification methodology and the cognitive gradient design
-- **Cross-validation** — especially on the biological plausibility of the reconsolidation model
-- **Speaking engagements** — on post-academic science and the factory-to-researcher journey
-
-### Contact
+### Contact & Links
 - **ORCID**: [0009-0003-3986-6039](https://orcid.org/0009-0003-3986-6039)
 - **Email**: [materobi86@gmail.com](mailto:materobi86@gmail.com)
 - **Sponsor**: [github.com/sponsors/silentnoisehun](https://github.com/sponsors/silentnoisehun)
@@ -390,130 +385,65 @@ cargo build --target wasm32-unknown-unknown --release \
 
 > **Note**: Without the `embeddings` feature, semantic recall falls back to a mock provider. The build succeeds but will refuse to return meaningless results — verify `data/embeddings.bin` exists before measuring. Available providers: `mock` (hash-derived, default), `candle` (BERT), `onnx`. See `scripts/eval_real.sh` for reproducing published retrieval numbers.
 
-## Shared-Mind Scripts & Multi-Body Orchestration
+## 🔌 AI Agent Integration
 
-The `scripts/` directory turns `microscope-mem` into a **shared mind** where
-`jcode` is the central cortex (O) and several agent bodies (Cline, Pi, OpenCode,
-jcode itself) act as independent CLIs — each in its own terminal window,
-each "awake" from the same consciousness. The full producer→consumer loop is
-closed: jcode routes a task, writes a wake-up block into `shared-space.md`, and
-the target body's watcher claims it.
+Microscope Memory provides direct, low-latency cognitive memory integration for AI agents (Claude Code, MiniMax Code, Codex CLI, Goose, Antigravity, OMP).
 
-### Topology
+### 1. Universal Native Hook (`integrations/ai-agent-hook/`)
 
-```
-(O) jcode  ->  classifier + wake-up trigger + dispatcher
-  ├─ Cline      -> research & discovery
-  ├─ Pi         -> planning & testing
-  └─ OpenCode   -> testing & fixing
-        (unified-mind bodies poke/status = physical cross-body control plane)
-```
+For maximum performance, the native hook bypasses JSON-RPC/HTTP overhead, communicating directly with the `microscope-mem` binary via sequential sub-millisecond lookups:
 
-### Scripts
+- **Auto-Context on Startup:** Injects active project state, recent timeline events, core memories (`importance >= 7`), and open loops.
+- **Turn Context Retrieval:** Dynamically extracts multi-word phrases and surfaces related memories before tool invocation.
+- **Auto-Capture & Sleep Consolidation:** Persists tool interactions and automatically triggers background memory consolidation.
+- **Resilient Path Sanitization:** Native parser safely handles raw Windows path backslashes, preventing JSON syntax parse failures.
 
-| Script | Purpose |
-|--------|---------|
-| `microscope-jcode-hook.ps1` | jcode native hook (`turn_end` / `post_tool`) → stores to mind |
-| `microscope-recall-hook.ps1` | Stop/PostToolUse persistence with jcode identity |
-| `microscope-dispatch.ps1` | (O) classifier: routes task → body, writes wake-up block to `shared-space.md` |
-| `microscope-body-watcher.ps1` | Consumer: claims `[jcode -> <Body>]` blocks (idempotent, isolated) |
-| `microscope-wake.ps1` | Wake-up trigger on coding intent (auto-context + recall) |
-| `microscope-launch.ps1` | Start/stop/status body **background processes** (spine-driven, no windows) |
-| `microscope-body-boot.ps1` | Body entrypoint: auto-context + spine listener + shared-space watcher loop |
-| `microscope-models.ps1` | jcode auto model orchestration with provider failover |
-| `microscope-model-mesh.ps1` | **Model Mesh**: async health monitor, cache, free-model routing (29+ models) |
-| `model-mesh.toml` | 29 free models, providers (ollama-local first, groq/tokenrouter fallback) |
-| `microscope-octopus.ps1` | Octopus primary head: parallel arms + council (consensus deliberation) |
-| `microscope-log.ps1` | SHA-256 chained control log + microscope store |
-| `microscope-snapshot.ps1` | MemVid `.mv2` + git snapshot for restore |
-| `hope-terminal.ps1` | **Clean HopeTerminal**: live chat-view of the shared mind - bodies, models, chain, events |
-| `routing.toml` | Body roles, trigger words, prompt templates |
-| `bodies.toml` | Test→background-process registry for the launcher |
-| `models.toml` | Body→preferred/fallback provider with failover order |
-
-### Control Plane: Spine + Octopus + Microscope (no windows)
-
-Bodies run as **background processes** (headless). Control
-and communication flow over the **spine** — binary lock-free ring buffer
-and `shared-space.md` (text namespace).
-jcode is the orchestrator; **Octopus** (`octopus-runtime.exe`) is the primary
-execution head running parallel arms (Cline=research, Pi=planning, OpenCode=implementation).
-
-```powershell
-microscope-launch.ps1 -Body Pi -Action start       # background body process (spine)
-microscope-launch.ps1 -Body OpenCode -Action stop  # terminate the body PID
-microscope-launch.ps1 -Body Pi -Action compact     # suspend to BACKGROUND (process keeps running)
-microscope-launch.ps1 -Body Pi -Action resume      # resume from background
-microscope-models.ps1 -Action resolve               # auto-picks models (with provider failover)
-microscope-octopus.ps1 -Goal "plan and fix" -Arms "Pi + OpenCode"   # parallel arms
-microscope-octopus.ps1 -Council "architectural decision" -Arms "Cline+Pi+OpenCode"  # consensus council
+```bash
+# Easy setup via PowerShell installer
+pwsh ./integrations/ai-agent-hook/install.ps1 -Target all
 ```
 
-Every control event is written **into the shared mind** (`microscope-mem.exe
-store`, already a SHA-256 Merkle tree) **and** into a local **SHA-256 chained
-log** (`state/controlchain.log`):
-```powershell
-microscope-log.ps1 -Event "Pi start" -Kind body        # append to chain + mind
-microscope-log.ps1 -Action verify                       # chain integrity check
+Or configure manually in your agent's `hooks.json`:
+```json
+{
+  "SessionStart": [{ "matcher": "*", "hooks": [{ "command": "node integrations/ai-agent-hook/microscope-hook.js session-start" }] }],
+  "UserPromptSubmit": [{ "hooks": [{ "command": "node integrations/ai-agent-hook/microscope-hook.js prompt" }] }],
+  "PostToolUse": [{ "matcher": "*", "hooks": [{ "command": "node integrations/ai-agent-hook/microscope-hook.js tool-result" }] }]
+}
 ```
 
-State is snapshotted for restore via **MemVid** (`.mv2` frame timeline) + **git**:
-```powershell
-microscope-snapshot.ps1 -Action save -Msg "daily snapshot"  # mv2 + git + chain
-microscope-snapshot.ps1 -Action list                        # mv2 timeline
+### 2. Model Context Protocol (MCP) Server
+
+Microscope Memory includes a native MCP server for platforms supporting Model Context Protocol:
+
+```bash
+# Start MCP server via stdio
+microscope-mem mcp
+
+# Print ready-to-use client configurations
+microscope-mem config claude
+microscope-mem config cursor
+microscope-mem config generic
 ```
 
-### Clean HopeTerminal (live view)
+Available MCP tools:
+- `memory_recall` — Hierarchical recall across memory depths (D0–D8).
+- `memory_find` — Sub-microsecond phrase and keyword lookup.
+- `memory_auto_context` — Compact operational session context.
+- `memory_timeline` — Chronological memory stream inspection.
+- `memory_doctor` — Autonomous integrity verification and self-healing.
 
-`hope-terminal.ps1` is a clean live console view of the whole shared mind — it
-shows each body (jcode O + Cline/Pi/OpenCode) with status + active model, the
-SHA-256 chain tail, and the last control events. From the prompt you can
-start/stop/compact/resume bodies, call a council, or take a snapshot.
+### 3. REST API Bridge
 
-```powershell
-hope-terminal.ps1            # live panel (refreshes, interactive prompt)
-hope-terminal.ps1 -NoLoop    # single render
-# inside:  start [name] | stop [name] | compact [name] | resume [name] | compact-all | route [task] [capability] | health | self-manage | monitor | council [question] | snapshot [message] | narr on/off | status | help | exit
+Run the embedded HTTP API server:
+
+```bash
+microscope-mem serve --host 127.0.0.1 --port 8080
 ```
 
-`HopeTerminal` is also available on `PATH` — run `HopeTerminal -NoLoop` from any directory.
-
-### One-Command Bootstrap
-
-`hope-bootstrap.ps1` initializes the entire shared mind in one shot:
-- Starts the Model Mesh async health monitor (background job)
-- Creates the `spine.bus` ring buffer (2048 bytes)
-- Ensures `shared-space.md` exists
-- Launches HopeTerminal
-
-```powershell
-hope-bootstrap.ps1              # full init + terminal
-hope-bootstrap.ps1 -NoTerminal  # mesh + spine only
-hope-bootstrap.ps1 -Force       # restart everything (kills old processes/jobs)
-```
-
-### Voice Narration (TTS Engine)
-
-Optionally, the system can narrate actions aloud using Edge TTS / System.Speech at each
-control step. Toggle with `narr on` / `narr off` inside HopeTerminal (or set
-`state/narration.state` to `on`). Every command and event is also auto-stored into
-the shared mind (`microscope-mem`), so the system remembers.
-
-### Cross-Body Control Plane
-
-`unified-mind` (sibling crate) already provides `bodies list | poke <name> |
-status` — `poke` wakes a body from the mind, and `respond`/`bridge`
-makes every CLI answer from the shared memory. The launcher above is
-the management layer on top of that control plane.
-
-### Validated Loops
-
-- Dispatch routes 3/3 (research/planning/fix) + fallback (jcode direct).
-- Watcher claims are idempotent, cross-body isolated, and collision-safe.
-- Concurrent dual-body race (Cline + OpenCode) claims only own blocks (0 remainder).
-- Multiplexer start→stop kills the real window via `taskkill /T <boot_pid>`.
-
-## License
+- `POST /recall` — Query memory with automatic semantic ranking and supersession filtering.
+- `POST /store` — Append memory block with explicit layer and importance level.
+- `GET /health` — Check server status, index block count, and active configuration.
 
 ---
 
@@ -525,5 +455,5 @@ the management layer on top of that control plane.
 
 ## 🙏 Acknowledgements
 
-- Built by **Máté R. (Silent Noise)** — a factory worker who taught himself to code 2 years ago and ended up on a quantum computer.
+- Built by **Máté R. (Silent Noise)** — independent systems and cognitive architecture researcher.
 - Architecture inspired by: Hebb (1949), Damasio (1999), Tonegawa (2015), and the biological reality that memory is not storage — it is *becoming*.

@@ -477,7 +477,7 @@ file so a SciFact number can never be mistaken for a 60-fact number.
 
 ## Inverted text index and reinforcement cost (measured)
 
-This is the benchmark the project's own `.scratch_bench.ps1` performs: the
+This is the benchmark the project's own `scripts/benchmarks/windows/bench.ps1` performs: the
 inverted text index present versus removed, on the real `layers/` corpus.
 Reproduced by [`scripts/bench_text_index.sh`](scripts/bench_text_index.sh).
 

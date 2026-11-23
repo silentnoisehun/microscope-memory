@@ -8,7 +8,7 @@ $cfg = @"
 project_id = "global"
 
 [paths]
-layers_dir = "D:/codex/microscope-memory/layers"
+layers_dir = "$((Resolve-Path (Join-Path $PSScriptRoot '../../..') -ErrorAction SilentlyContinue)?.Path?.Replace('\','/') ?? '.')./layers"
 output_dir = "$outFwd/data/"
 temp_dir = "$outFwd/tmp/"
 

@@ -185,3 +185,10 @@ IMPLEMENTATION_NOTES.md
 TASK_SUMMARY.md
 FINAL_SUMMARY.md
 
+
+# Personal memory corpus — tracked locally only
+layers/*.txt
+layers/*.bin
+layers/*.wav
+!layers/demo.txt
+!layers/.gitkeep

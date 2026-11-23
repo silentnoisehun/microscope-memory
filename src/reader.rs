@@ -1281,6 +1281,13 @@ fn parse_append_log(data: &[u8], strict: bool) -> Result<Vec<AppendEntry>, Strin
     }
     let mut entries = Vec::new();
     let mut pos = 0;
+    if strict
+        && data.starts_with(b"APv")
+        && !data.starts_with(b"APv2")
+        && !data.starts_with(b"APv3")
+    {
+        return Err("unknown append log version".into());
+    }
 
     let (is_v2, is_v3) = if data.len() >= 4 {
         (&data[0..4] == b"APv2", &data[0..4] == b"APv3")
@@ -1618,18 +1625,24 @@ enum AppendFormat {
     V3,
 }
 
-fn detect_append_format(path: &Path) -> AppendFormat {
-    match fs::read(path) {
-        Ok(data) if data.len() >= 4 => {
-            if &data[0..4] == b"APv3" {
-                AppendFormat::V3
-            } else if &data[0..4] == b"APv2" {
-                AppendFormat::V2
-            } else {
-                AppendFormat::V3
-            }
+fn detect_append_format(path: &Path, project_id: ProjectId) -> Result<AppendFormat, String> {
+    let data = match fs::read(path) {
+        Ok(data) => data,
+        Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(AppendFormat::V3),
+        Err(e) => return Err(format!("read append format: {e}")),
+    };
+    if data.is_empty() || data.starts_with(b"APv3") {
+        Ok(AppendFormat::V3)
+    } else if data.starts_with(b"APv2") {
+        if !project_id.is_global() {
+            return Err(
+                "cannot append project-scoped memory to a legacy APv2 log; consolidate it first"
+                    .into(),
+            );
         }
-        _ => AppendFormat::V3,
+        Ok(AppendFormat::V2)
+    } else {
+        Err("cannot append to a legacy or unknown append log format; consolidate it first".into())
     }
 }
 
@@ -1716,17 +1729,14 @@ pub fn store_memory_temporary(
             .map(|m| m.len() == 0)
             .unwrap_or(true);
 
+    // Determine compatibility before opening for append. In particular, a
+    // headerless v1 log must not be followed by v3 records.
+    let format = detect_append_format(&append_path, config.project_id)?;
     let mut file = fs::OpenOptions::new()
         .create(true)
         .append(true)
         .open(&append_path)
         .map_err(|e| format!("open append log: {}", e))?;
-
-    let format = if needs_magic {
-        AppendFormat::V3
-    } else {
-        detect_append_format(&append_path)
-    };
 
     if needs_magic {
         let magic = match format {
@@ -1922,17 +1932,14 @@ fn store_memory_with_status_inner(
             .map(|m| m.len() == 0)
             .unwrap_or(true);
 
+    // Determine compatibility before opening for append. In particular, a
+    // headerless v1 log must not be followed by v3 records.
+    let format = detect_append_format(&append_path, config.project_id)?;
     let mut file = fs::OpenOptions::new()
         .create(true)
         .append(true)
         .open(&append_path)
         .map_err(|e| format!("open append log: {}", e))?;
-
-    let format = if needs_magic {
-        AppendFormat::V3
-    } else {
-        detect_append_format(&append_path)
-    };
 
     if needs_magic {
         let magic = match format {
@@ -1998,7 +2005,7 @@ fn store_memory_with_status_inner(
     if status == Some("open") {
         match crate::open_loops::append_open(output_dir, text, importance) {
             Ok(loop_id) => {
-                println!("  {} loop_id={}", "LOOP".cyan().bold(), loop_id);
+                eprintln!("  {} loop_id={}", "LOOP".cyan().bold(), loop_id);
             }
             Err(e) => {
                 eprintln!("  {} open loop: {}", "WARN".yellow(), e);
@@ -2022,7 +2029,7 @@ fn store_memory_with_status_inner(
     drop(_lock);
 
     match crate::build::maybe_auto_rebuild(config) {
-        Ok(Some(count)) => println!(
+        Ok(Some(count)) => eprintln!(
             "  {} {} append entries consolidated",
             "AUTO-REBUILD".cyan().bold(),
             count
@@ -2032,7 +2039,7 @@ fn store_memory_with_status_inner(
     }
 
     let elapsed = t0.elapsed();
-    println!(
+    eprintln!(
         "  {} D{} [{}/{}] ({:.3},{:.3},{:.3}) {}",
         "STORED".green().bold(),
         depth,
@@ -2050,9 +2057,9 @@ fn store_memory_with_status_inner(
             crate::timeline::STATUS_ARCHIVED => "archived",
             _ => "?",
         };
-        println!("  {} status={}", "TIMELINE".cyan().bold(), label);
+        eprintln!("  {} status={}", "TIMELINE".cyan().bold(), label);
     }
-    println!("  {} ns", elapsed.as_nanos());
+    eprintln!("  {} ns", elapsed.as_nanos());
     Ok(())
 }
 

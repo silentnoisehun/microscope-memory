@@ -214,3 +214,55 @@ fn oversized_memory_is_rejected_without_persisting_a_truncated_record() {
     assert!(!output.join("append.bin").exists());
     assert_eq!(fs::read(layer).unwrap(), before);
 }
+
+#[test]
+fn substring_in_another_memory_is_not_a_mirror() {
+    let (_tmp, config) = setup();
+    let layer = Path::new(&config.paths.layers_dir).join("long_term.txt");
+    let marker = "needle only memory";
+    store_memory(&config, marker, "long_term", 5).unwrap();
+    // Pretend the best-effort mirror failed. A larger entry containing the
+    // words is not the stored record and must not suppress re-mirroring.
+    fs::write(
+        &layer,
+        "(imp=5) other prefix needle only memory other suffix\n\nA separate baseline.",
+    )
+    .unwrap();
+    build::rebuild_pending(&config, false, false).unwrap();
+    let mirror = fs::read_to_string(&layer).unwrap();
+    assert!(mirror
+        .split("\n\n")
+        .any(|x| x == "(imp=5) needle only memory"));
+    build::rebuild_pending(&config, true, false).unwrap();
+    assert_find(&config, marker);
+}
+
+#[test]
+fn headerless_legacy_log_cannot_be_mixed_with_modern_records() {
+    let (_tmp, config) = setup();
+    let path = Path::new(&config.paths.output_dir).join("append.bin");
+    let text = b"legacy unique memory";
+    let mut data = Vec::new();
+    data.extend_from_slice(&(text.len() as u32).to_le_bytes());
+    data.extend_from_slice(&[0, 5]);
+    data.extend_from_slice(&[0; 12]);
+    data.extend_from_slice(text);
+    fs::write(&path, &data).unwrap();
+    let err = store_memory(&config, "must not corrupt legacy log", "long_term", 5).unwrap_err();
+    assert!(err.contains("legacy"), "{err}");
+    assert_eq!(fs::read(&path).unwrap(), data);
+    build::rebuild_pending(&config, false, false).unwrap();
+    store_memory(&config, "modern subsequent entry", "long_term", 5).unwrap();
+    assert_find(&config, "legacy unique memory");
+}
+
+#[test]
+fn multi_paragraph_pending_record_does_not_get_silently_cleared() {
+    let (_tmp, config) = setup();
+    let path = Path::new(&config.paths.output_dir).join("append.bin");
+    store_memory(&config, "first part\n\nsecond part", "long_term", 5).unwrap();
+    let before = fs::read(&path).unwrap();
+    let err = build::rebuild_pending(&config, false, false).unwrap_err();
+    assert!(err.contains("pending entry missing"), "{err}");
+    assert_eq!(fs::read(path).unwrap(), before);
+}

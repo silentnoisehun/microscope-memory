@@ -62,3 +62,11 @@ projects until end-to-end project isolation has been validated.
 Tests: `node --test integrations/ai-agent-hook/test/hook.test.mjs` uses a fake
 CLI for wiring; set `MICROSCOPE_TEST_BIN` to also exercise a real native CLI.
 The test does not establish real-model semantic accuracy.
+
+An unrepresentable pending record (for example, a multi-paragraph entry that
+the layer parser splits) blocks consolidation and remains in the append log.
+Legacy headerless logs must be consolidated before accepting another store.
+MCP `memory_store` rejects malformed inputs; if the content append succeeded
+but atom metadata failed it reports `PARTIAL STORE` and callers must inspect
+the data rather than blindly retry. This is reporting, not a transaction.
+Store diagnostics now go to stderr rather than stdout.

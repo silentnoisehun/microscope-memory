@@ -42,6 +42,7 @@ fn scratch_config(tmp: &Path) -> PathBuf {
     config.paths.temp_dir = tmp.join("tmp").to_string_lossy().to_string();
     config.memory_layers.layers = vec!["long_term".to_string()];
     config.embedding.provider = "mock".to_string();
+    config.index.auto_rebuild = false;
 
     let path = tmp.join("config.toml");
     std::fs::write(&path, toml::to_string(&config).unwrap()).unwrap();
@@ -267,4 +268,59 @@ fn a_notification_gets_no_response() {
     let out = drive(&input);
     assert_eq!(out.len(), 1, "a notification must not be answered: {out:?}");
     assert_eq!(out[0]["id"], 5);
+}
+
+#[test]
+fn store_validates_before_writing_and_reports_partial_atom_failure() {
+    let tmp = tempfile::tempdir().unwrap();
+    let config = scratch_config(tmp.path());
+    // Force atom persistence to fail after the primary append succeeds.
+    std::fs::create_dir(tmp.path().join("data/memory_atoms.bin")).unwrap();
+    let requests = [
+        json!({"text":"invalid supersession", "supersedes":"typo"}),
+        json!({"text":"invalid importance", "importance": 256}),
+        json!({"text":"invalid layer", "layer":"unknown"}),
+        json!({"text":"invalid emotion", "emotion":[0, 1]}),
+        json!({"text":"stored but atom failed", "layer":"long_term"}),
+    ];
+    let mut child = spawn(&config);
+    for (i, args) in requests.iter().enumerate() {
+        writeln!(
+            child.stdin.as_mut().unwrap(),
+            "{}",
+            json!({
+                "jsonrpc":"2.0", "id":i+1, "method":"tools/call",
+                "params":{"name":"memory_store", "arguments":args}
+            })
+        )
+        .unwrap();
+    }
+    drop(child.stdin.take());
+    let output = child.wait_with_output().unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let responses = parse_frames(&output.stdout);
+    assert_eq!(
+        responses.len(),
+        5,
+        "{:?}",
+        String::from_utf8_lossy(&output.stdout)
+    );
+    for response in &responses {
+        assert_eq!(response["result"]["isError"], true, "{response}");
+    }
+    assert!(responses[0]["result"]["content"][0]["text"]
+        .as_str()
+        .unwrap()
+        .contains("supersedes"));
+    assert!(responses[4]["result"]["content"][0]["text"]
+        .as_str()
+        .unwrap()
+        .contains("PARTIAL STORE"));
+    let entries = microscope_memory::reader::read_append_log(&tmp.path().join("data/append.bin"));
+    assert_eq!(entries.len(), 1);
+    assert!(entries[0].text.contains("stored but atom failed"));
 }

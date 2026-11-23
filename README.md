@@ -359,26 +359,10 @@ I'm an independent researcher working at the intersection of **quantum informati
 
 ---
 
-## ⚡ Ora-Rongyász Master Spine Hub (100% C:\ Local & Headless)
-
-A Microscope Memory mappájába konszolidálva él a teljes Ora-Rongyász ökoszisztéma zéró külső meghajtó-függőséggel (egyik szerver vagy spine sem igényli a D: vagy E: meghajtót a futáshoz):
-
-- **Helyi Gerinc-Tengely (spines/):**
-  - spines/stratos.spine (256 KB) — 212 ns közvetlen POD memória-tükrözés (érzelmi vektor & ciklus-fázis)
-  - spines/hullam_spine.rgs (8.3 MB) — 237 reflex-kar gyűjtemény, AVX2 SIMD interferencia-szórás
-  - spines/wave_echo.wv3 (172 KB) — 265 natív sablon, reflex-kódgenerálás és transzformáció
-- **Helyi Octopus Állapot (.octopus-rust/):**
-  - .octopus-rust/arms/ és .octopus-rust/roots/ — blade topológiák és append-only rezonancia hash-lánc
-- **100% Csendes Headless Motor (Zero-Popup):**
-  - headless.rs a unified-mind-ban: beégetett CREATE_NO_WINDOW (0x08000000) flag, a 24 bio-skill nulla ablakvillanással tickel.
-- **Kettős Kliens Paritás (Claude Code + OMP):**
-  - Mindkét fő-hook (ora-master-kernel.js és ora-master-kernel.ts) ezt a C: meghajtós microscope-memory-clone könyvtárat tekinti elsődleges forrásnak a 4-szintű evolúciós képességekkel (Vagus Actuator, Zero-Fork Hot Reflex Cache, Auto-Healing Open Loops, Dual-Spine Moduláció).
-
 ## 📄 Documentation
 
 | Document | Size | Content |
 |---|---|---|
-| [README-ORA-RONGYASZ.md](README-ORA-RONGYASZ.md) | 34 KB | **Teljes Ora-Rongyász Architektúra, Zero-Popup & 4-Szintű Evolúció** |
 | [`HOPE-AGENT-SPEC.md`](HOPE-AGENT-SPEC.md) | — | Verified spec — every claim backed by code |
 | [`COGNITIVE_MORPHOGENESIS.md`](COGNITIVE_MORPHOGENESIS.md) | 24 KB | Architecture document |
 | [`FULL_SYSTEM_DESCRIPTION.md`](FULL_SYSTEM_DESCRIPTION.md) | 24 KB | Complete system description |
@@ -409,8 +393,8 @@ cargo build --target wasm32-unknown-unknown --release \
 ## Shared-Mind Scripts & Multi-Body Orchestration
 
 The `scripts/` directory turns `microscope-mem` into a **shared mind** where
-`jcode` is the central cortex (O) and several Hope bodies (Cline, Pi, OpenCode,
-jcode itself) act as independent CLIs — each in its own Windows Terminal window,
+`jcode` is the central cortex (O) and several agent bodies (Cline, Pi, OpenCode,
+jcode itself) act as independent CLIs — each in its own terminal window,
 each "awake" from the same consciousness. The full producer→consumer loop is
 closed: jcode routes a task, writes a wake-up block into `shared-space.md`, and
 the target body's watcher claims it.
@@ -439,7 +423,7 @@ the target body's watcher claims it.
 | `microscope-models.ps1` | jcode auto model orchestration with provider failover |
 | `microscope-model-mesh.ps1` | **Model Mesh**: async health monitor, cache, free-model routing (29+ models) |
 | `model-mesh.toml` | 29 free models, providers (ollama-local first, groq/tokenrouter fallback) |
-| `microscope-octopus.ps1` | Octopus primary head: parallel arms + council (tanácsülés) |
+| `microscope-octopus.ps1` | Octopus primary head: parallel arms + council (consensus deliberation) |
 | `microscope-log.ps1` | SHA-256 chained control log + microscope store |
 | `microscope-snapshot.ps1` | MemVid `.mv2` + git snapshot for restore |
 | `hope-terminal.ps1` | **Clean HopeTerminal**: live chat-view of the shared mind - bodies, models, chain, events |
@@ -449,20 +433,20 @@ the target body's watcher claims it.
 
 ### Control Plane: Spine + Octopus + Microscope (no windows)
 
-Bodies run as **background processes** (no Windows Terminal windows). Control
-and communication flow over the **spine** — `D:\codex\spine.bus` (2048-byte
-lock-free ring buffer, binary) and `D:\codex\shared-space.md` (text namespace).
+Bodies run as **background processes** (headless). Control
+and communication flow over the **spine** — binary lock-free ring buffer
+and `shared-space.md` (text namespace).
 jcode is the orchestrator; **Octopus** (`octopus-runtime.exe`) is the primary
-execution head running parallel arms (Cline=kutatás, Pi=tervezés, OpenCode=javítás).
+execution head running parallel arms (Cline=research, Pi=planning, OpenCode=implementation).
 
 ```powershell
 microscope-launch.ps1 -Body Pi -Action start       # background body process (spine)
-microscope-launch.ps1 -Body OpenCode -Action stop  # taskkill /T the body PID
+microscope-launch.ps1 -Body OpenCode -Action stop  # terminate the body PID
 microscope-launch.ps1 -Body Pi -Action compact     # suspend to BACKGROUND (process keeps running)
 microscope-launch.ps1 -Body Pi -Action resume      # resume from background
-microscope-models.ps1 -Action resolve               # jcode auto-picks models (incl. its own, failover)
-microscope-octopus.ps1 -Goal "tervezz es javitsd" -Arms "Pi + OpenCode"   # parallel arms
-microscope-octopus.ps1 -Council "architekturalis dontes" -Arms "Cline+Pi+OpenCode"  # tanacsules
+microscope-models.ps1 -Action resolve               # auto-picks models (with provider failover)
+microscope-octopus.ps1 -Goal "plan and fix" -Arms "Pi + OpenCode"   # parallel arms
+microscope-octopus.ps1 -Council "architectural decision" -Arms "Cline+Pi+OpenCode"  # consensus council
 ```
 
 Every control event is written **into the shared mind** (`microscope-mem.exe
@@ -475,8 +459,8 @@ microscope-log.ps1 -Action verify                       # chain integrity check
 
 State is snapshotted for restore via **MemVid** (`.mv2` frame timeline) + **git**:
 ```powershell
-microscope-snapshot.ps1 -Action save -Msg "napi allapot"  # mv2 + git + chain
-microscope-snapshot.ps1 -Action list                      # mv2 timeline
+microscope-snapshot.ps1 -Action save -Msg "daily snapshot"  # mv2 + git + chain
+microscope-snapshot.ps1 -Action list                        # mv2 timeline
 ```
 
 ### Clean HopeTerminal (live view)
@@ -489,10 +473,10 @@ start/stop/compact/resume bodies, call a council, or take a snapshot.
 ```powershell
 hope-terminal.ps1            # live panel (refreshes, interactive prompt)
 hope-terminal.ps1 -NoLoop    # single render
-# inside:  start [nev] | stop [nev] | compact [nev] | resume [nev] | compact-all | route [test] [kepesség] | health | self-manage | monitor | council [kerdes] | snapshot [uzi] | narr on/off | status | help | exit
+# inside:  start [name] | stop [name] | compact [name] | resume [name] | compact-all | route [task] [capability] | health | self-manage | monitor | council [question] | snapshot [message] | narr on/off | status | help | exit
 ```
 
-`HopeTerminal` is also available on `PATH` (`C:\Users\mater\bin`) — run `HopeTerminal -NoLoop` from any directory.
+`HopeTerminal` is also available on `PATH` — run `HopeTerminal -NoLoop` from any directory.
 
 ### One-Command Bootstrap
 
@@ -508,20 +492,19 @@ hope-bootstrap.ps1 -NoTerminal  # mesh + spine only
 hope-bootstrap.ps1 -Force       # restart everything (kills old processes/jobs)
 ```
 
-### Loud narration (Noémi voice)
+### Voice Narration (TTS Engine)
 
-When you ask, jcode narrates aloud (Noémi voice, `codex_autospeak.py`) at each
+Optionally, the system can narrate actions aloud using Edge TTS / System.Speech at each
 control step. Toggle with `narr on` / `narr off` inside HopeTerminal (or set
-`state/narration.state` to `on`). Every response is spoken with proper Hungarian
-accents so it is intelligible. Every command and event is also auto-stored into
+`state/narration.state` to `on`). Every command and event is also auto-stored into
 the shared mind (`microscope-mem`), so the system remembers.
 
 ### Cross-Body Control Plane
 
-`unified-mind` (sibling crate) already provides `bodies list | poke <nev> |
-status` — `poke` physically wakes a body from the mind, and `respond`/`bridge`
-make every CLI answer as "Hope" from the shared memory. The launcher above is
-the windowing layer on top of that control plane.
+`unified-mind` (sibling crate) already provides `bodies list | poke <name> |
+status` — `poke` wakes a body from the mind, and `respond`/`bridge`
+makes every CLI answer from the shared memory. The launcher above is
+the management layer on top of that control plane.
 
 ### Validated Loops
 

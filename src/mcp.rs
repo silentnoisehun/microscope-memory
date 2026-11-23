@@ -431,7 +431,7 @@ fn handle_tools_list(id: &Value, config: &Config) -> Value {
                         "properties": {
                             "text": { "type": "string", "description": "Memory text to store" },
                             "layer": { "type": "string", "description": "Memory layer (long_term, short_term, session, associative, emotional, relational, reflections, echo_cache)", "default": "long_term" },
-                            "importance": { "type": "integer", "description": "Importance level 1-10", "default": 5 },
+                            "importance": { "type": "integer", "description": "Importance level 1-10", "default": 5, "minimum": 1, "maximum": 10 },
                             "status": { "type": "string", "description": "Status flag: open (an unfinished loop to come back to) | resolved | archived | superseded | normal", "default": "normal", "enum": ["normal", "open", "resolved", "archived", "superseded"] },
                             "kind": { "type": "string", "description": "Durable memory atom kind", "default": "observation", "enum": ["observation", "fact", "preference", "decision", "correction", "task", "episode"] },
                             "subject": { "type": "string", "description": "Subject key used to detect contradictory statements and supersessions" },
@@ -1072,62 +1072,91 @@ fn tool_store(config: &Config, args: &Value) -> Result<String, String> {
         .get("text")
         .and_then(|v: &Value| v.as_str())
         .ok_or("Missing required parameter: text")?;
-    let layer = args
-        .get("layer")
-        .and_then(|v: &Value| v.as_str())
-        .unwrap_or("long_term");
-    let importance = args
-        .get("importance")
-        .and_then(|v: &Value| v.as_u64())
-        .unwrap_or(5) as u8;
+    let layer = match args.get("layer") {
+        None => "long_term",
+        Some(value) => value.as_str().ok_or("layer must be a string")?,
+    };
+    if text.trim().is_empty() {
+        return Err("text must not be empty".into());
+    }
+    if !LAYER_NAMES.contains(&layer)
+        || !config.memory_layers.layers.iter().any(|name| name == layer)
+    {
+        return Err(format!("unknown or unconfigured memory layer: {layer}"));
+    }
+    let importance = match args.get("importance") {
+        None => 5,
+        Some(value) => value
+            .as_u64()
+            .filter(|v| (1..=10).contains(v))
+            .ok_or("importance must be an integer from 1 to 10")? as u8,
+    };
     // Optional status flag: "open" turns the memory into an unfinished-work
     // loop (it shows up in the open loop list and in the next session's
     // auto-context), "resolved"/"archived" close or retire one.
-    let status = args
-        .get("status")
-        .and_then(|v: &Value| v.as_str())
-        .filter(|s| {
-            matches!(
-                *s,
-                "normal" | "open" | "resolved" | "archived" | "superseded"
-            )
-        })
-        .unwrap_or("normal");
-    let kind = args
-        .get("kind")
-        .and_then(|v: &Value| v.as_str())
-        .and_then(crate::memory_atom::AtomKind::parse)
-        .unwrap_or(crate::memory_atom::AtomKind::Observation);
-    let subject = args
-        .get("subject")
-        .and_then(|v: &Value| v.as_str())
-        .unwrap_or("");
-    let source = args
-        .get("source")
-        .and_then(|v: &Value| v.as_str())
-        .unwrap_or("agent");
-    let confidence = args
-        .get("confidence")
-        .and_then(|v: &Value| v.as_u64())
-        .unwrap_or(50)
-        .min(100) as u8;
-    let supersedes = args
-        .get("supersedes")
-        .and_then(|v: &Value| v.as_str())
-        .and_then(parse_atom_id_hex);
+    let status = match args.get("status") {
+        None => "normal",
+        Some(value) => value
+            .as_str()
+            .filter(|s| {
+                matches!(
+                    *s,
+                    "normal" | "open" | "resolved" | "archived" | "superseded"
+                )
+            })
+            .ok_or("invalid memory status")?,
+    };
+    let kind = match args.get("kind") {
+        None => crate::memory_atom::AtomKind::Observation,
+        Some(value) => value
+            .as_str()
+            .and_then(crate::memory_atom::AtomKind::parse)
+            .ok_or("invalid memory kind")?,
+    };
+    let subject = match args.get("subject") {
+        None => "",
+        Some(value) => value.as_str().ok_or("subject must be a string")?,
+    };
+    let source = match args.get("source") {
+        None => "agent",
+        Some(value) => value.as_str().ok_or("source must be a string")?,
+    };
+    let confidence = match args.get("confidence") {
+        None => 50,
+        Some(value) => value
+            .as_u64()
+            .filter(|v| *v <= 100)
+            .ok_or("confidence must be an integer from 0 to 100")? as u8,
+    };
+    let supersedes = match args.get("supersedes") {
+        None => None,
+        Some(value) => Some(
+            value
+                .as_str()
+                .and_then(parse_atom_id_hex)
+                .ok_or("supersedes must be a 32-character hexadecimal atom id")?,
+        ),
+    };
 
     // Parse optional 21D emotion vector
-    let emotion: Option<[f32; 21]> = args.get("emotion").and_then(|v: &Value| {
-        let arr = v.as_array()?;
-        if arr.len() != 21 {
-            return None;
+    let emotion: Option<[f32; 21]> = match args.get("emotion") {
+        None => None,
+        Some(value) => {
+            let arr = value
+                .as_array()
+                .filter(|arr| arr.len() == 21)
+                .ok_or("emotion must contain 21 finite numbers")?;
+            let mut emo = [0.0f32; 21];
+            for (i, val) in arr.iter().enumerate() {
+                let number = val
+                    .as_f64()
+                    .filter(|v| v.is_finite() && v.abs() <= f32::MAX as f64)
+                    .ok_or("emotion must contain 21 finite numbers")?;
+                emo[i] = number as f32;
+            }
+            Some(emo)
         }
-        let mut emo = [0.0f32; 21];
-        for (i, val) in arr.iter().enumerate() {
-            emo[i] = val.as_f64().unwrap_or(0.0) as f32;
-        }
-        Some(emo)
-    });
+    };
 
     let sid = std::process::id();
     let tagged = format!("[sid-{:04}] {}", sid % 10000, text);
@@ -1143,7 +1172,7 @@ fn tool_store(config: &Config, args: &Value) -> Result<String, String> {
         source,
         confidence,
         supersedes,
-    )?;
+    ).map_err(|e| format!("PARTIAL STORE: memory content was appended, but atom metadata failed: {e}. Do not blindly retry; inspect and repair the atom ledger."))?;
 
     // Keep the persisted row and the atom linked by the same canonical text.
     // The session marker is retained in the append log for provenance, while
@@ -1364,8 +1393,10 @@ fn tool_recall(config: &Config, args: &Value) -> Result<String, String> {
         let novel = all_results.first().is_none_or(|(d, _, _)| *d > 0.3);
 
         let qh_tg = crate::hebbian::query_hash(query);
-        if let Some(stream) = crate::consciousness_stream::global_stream() {
-            crate::consciousness_stream::ConsciousnessStream::feed_query(stream, qh_tg);
+        if !crate::no_learn::enabled() {
+            if let Some(stream) = crate::consciousness_stream::global_stream() {
+                crate::consciousness_stream::ConsciousnessStream::feed_query(stream, qh_tg);
+            }
         }
 
         let (mut thought_graph, mut pred_cache) =
@@ -1463,7 +1494,7 @@ fn tool_recall(config: &Config, args: &Value) -> Result<String, String> {
             .map(|(score, idx, _)| (*idx as u32, *score))
             .collect();
 
-        if !activated.is_empty() {
+        if !activated.is_empty() && !crate::no_learn::enabled() {
             let mut hebb =
                 crate::hebbian::HebbianState::load_or_init(output_dir, reader.block_count);
             let mut mirror = crate::mirror::MirrorState::load_or_init(output_dir);

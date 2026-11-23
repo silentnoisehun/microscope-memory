@@ -3,7 +3,7 @@
 //! and writes the binary output files (microscope.bin, data.bin, meta.bin, merkle.bin, embeddings.bin).
 
 use crate::config::Config;
-use crate::reader::{read_append_log, FileLock, MicroscopeReader};
+use crate::reader::{read_append_log_checked, FileLock, MicroscopeReader};
 use crate::types::BlockHeader;
 use crate::{
     crc16_ccitt, hex_str, layer_to_id, merkle, safe_truncate, to_block, BLOCK_DATA_SIZE,
@@ -47,7 +47,7 @@ pub fn rebuild_pending(
     let _lock = FileLock::acquire(config)?;
     let output_dir = Path::new(&config.paths.output_dir);
     let append_path = output_dir.join("append.bin");
-    let entries = read_append_log(&append_path);
+    let entries = read_append_log_checked(&append_path)?;
     let pending_entries = entries.len();
 
     if pending_entries == 0 && !force_when_empty {
@@ -91,7 +91,7 @@ pub fn rebuild_pending(
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => String::new(),
             Err(e) => return Err(format!("mirror read for layer {}: {}", layer_name, e)),
         };
-        if !entry.text.is_empty() && current.contains(entry.text.as_str()) {
+        if mirror_contains_entry(&file_path, layer_name, &entry.text) {
             continue;
         }
         // A failed mirror write must leave the durable log in place. In
@@ -127,9 +127,9 @@ pub fn rebuild_pending(
     for entry in &entries {
         let layer_name = crate::query::layer_name(entry.layer_id);
         let file_path = layers_dir.join(format!("{}.txt", layer_name));
-        let current = fs::read_to_string(&file_path)
+        fs::read_to_string(&file_path)
             .map_err(|e| format!("mirror verification for layer {}: {}", layer_name, e))?;
-        if !current.contains(entry.text.as_str()) {
+        if !mirror_contains_entry(&file_path, layer_name, &entry.text) {
             return Err(format!(
                 "cannot consolidate: pending entry missing from layer {} after mirroring (retention may be too small)",
                 layer_name
@@ -170,7 +170,7 @@ pub fn rebuild_append_embeddings(config: &Config) -> Result<usize, String> {
     use crate::embedding_index::{AppendEmbeddings, APPEND_EMBEDDINGS_FILE};
 
     let output_dir = Path::new(&config.paths.output_dir);
-    let appended = read_append_log(&output_dir.join("append.bin"));
+    let appended = read_append_log_checked(&output_dir.join("append.bin"))?;
     if appended.is_empty() {
         let sidecar = output_dir.join(APPEND_EMBEDDINGS_FILE);
         if sidecar.exists() {
@@ -270,7 +270,7 @@ pub fn maybe_auto_rebuild(config: &Config) -> Result<Option<usize>, String> {
 
     let output_dir = Path::new(&config.paths.output_dir);
     let append_path = output_dir.join("append.bin");
-    let pending_entries = read_append_log(&append_path).len();
+    let pending_entries = read_append_log_checked(&append_path)?.len();
     if pending_entries == 0 {
         return Ok(None);
     }
@@ -366,6 +366,42 @@ fn split_oversized_entry(line: &str) -> Vec<String> {
         pieces.push(line.to_string());
     }
     pieces
+}
+
+// An arbitrary substring in a larger memory is not an independently
+// recoverable entry. Match what the normal layer parser will actually index,
+// including its optional session timestamp, and reject any oversized block.
+fn mirror_text_matches(mirrored: &str, layer: &str, entry: &str) -> bool {
+    if mirrored.len() > BLOCK_DATA_SIZE {
+        return false;
+    }
+    if mirrored == entry {
+        return true;
+    }
+    if layer != "session" {
+        return false;
+    }
+    let Some(prefix) = mirrored.get(..19) else {
+        return false;
+    };
+    let bytes = prefix.as_bytes();
+    let timestamp = bytes[0] == b'['
+        && bytes[5] == b'-'
+        && bytes[8] == b'-'
+        && bytes[11] == b' '
+        && bytes[14] == b':'
+        && bytes[17] == b']'
+        && bytes[18] == b' '
+        && [1, 2, 3, 4, 6, 7, 9, 10, 12, 13, 15, 16]
+            .iter()
+            .all(|&i| bytes[i].is_ascii_digit());
+    timestamp && mirrored.get(19..) == Some(entry)
+}
+
+fn mirror_contains_entry(path: &Path, layer: &str, entry: &str) -> bool {
+    extract_texts_from_file(path)
+        .iter()
+        .any(|(text, _)| mirror_text_matches(text, layer, entry))
 }
 
 // Files are read and split into blocks by default.
@@ -592,7 +628,7 @@ fn build_inner(
     // entries may already be in the index, and re-adding them would
     // resurrect the content the retention cap trimmed.
     let pending_entries = if consolidating {
-        read_append_log(&output_dir.join("append.bin"))
+        read_append_log_checked(&output_dir.join("append.bin"))?
     } else {
         Vec::new()
     };
@@ -602,18 +638,16 @@ fn build_inner(
     for name in layer_files {
         let path = layers_dir.join(format!("{}.txt", name));
         let mut texts = extract_texts_from_file(&path);
-        let mirrored: String = texts
-            .iter()
-            .map(|(t, _)| t.as_str())
-            .collect::<Vec<_>>()
-            .join("\n");
+
         let mut added = 0usize;
         for entry in &pending_entries {
             if crate::query::layer_name(entry.layer_id) != name.as_str() {
                 continue;
             }
-            // Match the entire stored append text, not a potentially shared prefix.
-            if !entry.text.is_empty() && mirrored.contains(entry.text.as_str()) {
+            if texts
+                .iter()
+                .any(|(text, _)| mirror_text_matches(text, name, &entry.text))
+            {
                 continue;
             }
             texts.push((entry.text.clone(), entry.importance));

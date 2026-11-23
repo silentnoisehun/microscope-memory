@@ -4,19 +4,20 @@ Universal, high-performance cognitive memory bridge for AI coding agents (**Clau
 
 ## Why this Hook?
 
-- **Zero-MCP Overhead:** Calls the native `microscope-mem` binary directly via sequential CLI queries (~95 ms), avoiding HTTP / JSON-RPC / WebSocket latency and handshake bottlenecks.
+- **Native CLI:** Calls the configured `microscope-mem` binary directly. Latency depends on the machine, model and index.
 - **Resilient JSON Parsing:** Implements multi-tier JSON sanitization fixing Windows unescaped path backslashes (e.g. `C:\Users\...` escaping into illegal escape sequences like `\U`), completely eliminating `Bad escaped character in JSON` crashes.
-- **Windows mmap Collision Safety:** Executes multi-phrase retrievals sequentially to prevent Windows mmap lock collisions.
+- **Query-aware recall:** Sends the full prompt to `recall` once. A configured semantic index can supply paraphrase candidates; degraded search is labelled.
 - **Detached Index Rebuilding:** Auto-rebuild is uncoupled from hook turns; costly folding runs in a detached child process without blocking the agent.
-- **Fail-Silent Contract:** Every hook handler is guaranteed to exit `0` within safe execution budgets (<8s), ensuring agent workflows are never interrupted.
+- **Non-blocking failure contract:** Hook handlers exit `0`; retrieval failures are explicitly surfaced as unavailable context, not confused with an empty result. The detached rebuild worker has no fixed time limit.
 
 ## Architecture & Lifecycle Events
 
 ```
 SessionStart       ──▶ Auto-Context Injection (Core Memories imp>=7, Open Loops, Timeline)
-UserPromptSubmit   ──▶ Semantic Phrase Search (Multi-word phrase extraction -> find)
-PostToolUse        ──▶ Automatic Memory Storage (Code/Session layer, Importance 5-8)
-Rebuild Trigger    ──▶ Background Detached Rebuild (every 20 stores)
+UserPromptSubmit   ──▶ Full-question recall (unverified item candidates; read-only)
+PostToolUse        ──▶ Automatic Memory Storage (Code/Session layer, Importance 5/6)
+Rebuild Trigger    ──▶ Background locked rebuild (every 20 successful stores)
+Stop               ──▶ Logging only (no automatic digest or loop resolution)
 ```
 
 ## Quick Start & Installation
@@ -42,3 +43,30 @@ Or configure manually in your agent's `hooks.json`:
 - `MICROSCOPE_MEMORY_ENABLED`: `1` to enable (default), `0` to disable.
 - `MICROSCOPE_MAX_HITS`: Maximum retrieved memory chunks to inject (default: `4`).
 - `MICROSCOPE_REBUILD_EVERY`: Stores between background index rebuilds (default: `20`).
+
+## Safety and retrieval limits
+
+Retrieved candidates are not verified answers: the hook cannot reliably prove
+that a topic is absent and does not resolve open loops automatically. It omits
+D0-D2 derived summaries, which can contain old versions of corrected facts;
+the selected D3 items and pending records should still be checked against the
+question. The 2,400-character context budget may clip content.
+
+The hook uses a separate config copy with `auto_rebuild = false`, then runs the
+locked `rebuild` command in the background every configured number of successful
+stores. This does not make rebuilding crash-atomic. After a crash a leftover
+`microscope.lock` requires manual inspection; remove it only after confirming
+that no writer or rebuild process is running. Use separate data directories for
+projects until end-to-end project isolation has been validated.
+
+Tests: `node --test integrations/ai-agent-hook/test/hook.test.mjs` uses a fake
+CLI for wiring; set `MICROSCOPE_TEST_BIN` to also exercise a real native CLI.
+The test does not establish real-model semantic accuracy.
+
+An unrepresentable pending record (for example, a multi-paragraph entry that
+the layer parser splits) blocks consolidation and remains in the append log.
+Legacy headerless logs must be consolidated before accepting another store.
+MCP `memory_store` rejects malformed inputs; if the content append succeeded
+but atom metadata failed it reports `PARTIAL STORE` and callers must inspect
+the data rather than blindly retry. This is reporting, not a transaction.
+Store diagnostics now go to stderr rather than stdout.

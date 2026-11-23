@@ -20,8 +20,18 @@ jobs:
         run: cargo test --locked --features embeddings --test consolidation_durability
       - name: Library and integration tests
         run: |
-          cargo test --locked --features embeddings --lib
-          cargo test --locked --features embeddings --test integration
+          set -o pipefail
+          for target in "--lib" "--test integration" "--test mcp_no_learn" "--test mcp_stdio"; do
+            if ! cargo test --locked --features embeddings $target > /tmp/microscope-test.log 2>&1; then
+              cat /tmp/microscope-test.log
+              python3 -c 'import pathlib; s=pathlib.Path("/tmp/microscope-test.log").read_text(errors="replace")[-12000:]; print("::error::" + s.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A"))'
+              exit 1
+            fi
+            cat /tmp/microscope-test.log
+          done
+
+      - name: Hook integration against native CLI
+        run: MICROSCOPE_TEST_BIN="$PWD/target/debug/microscope-mem" node --test integrations/ai-agent-hook/test/hook.test.mjs
 
   linux:
     name: Linux x86_64

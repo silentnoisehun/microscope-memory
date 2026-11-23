@@ -23,6 +23,11 @@ jobs:
         run: |
           cargo test --release --locked --features embeddings --lib
           cargo test --release --locked --features embeddings --test integration
+          cargo test --release --locked --features embeddings --test mcp_no_learn
+          cargo test --release --locked --features embeddings --test mcp_stdio
+
+      - name: Hook integration against native CLI
+        run: MICROSCOPE_TEST_BIN="$PWD/target/release/microscope-mem" node --test integrations/ai-agent-hook/test/hook.test.mjs
 
   build-windows:
     needs: durability-gate

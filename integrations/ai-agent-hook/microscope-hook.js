@@ -8,7 +8,7 @@
  * Core Features:
  *  - Bulletproof JSON parsing with Windows backslash sanitization (prevents JSON escape syntax errors)
  *  - Dynamic multi-platform binary & config resolution (no hardcoded user paths)
- *  - Sequential mmap-safe phrase retrieval (eliminates Windows lock collisions)
+ *  - Query-aware retrieval through the native recall command
  *  - Auto-context injection on session start and prompt submission
  *  - Automatic memory capture on tool results with dynamic importance classification
  *  - Detached background index rebuild (never blocks agent execution)
@@ -78,7 +78,6 @@ const CANONICAL_CONFIG = resolveCanonicalConfig();
 const ENABLED = process.env.MICROSCOPE_MEMORY_ENABLED !== "0";
 const AUTO_STORE = process.env.MICROSCOPE_AUTO_STORE !== "0";
 const RETRIEVAL = process.env.MICROSCOPE_RETRIEVAL !== "0";
-const MAX_PHRASES = Number(process.env.MICROSCOPE_MAX_PHRASES || "4");
 const MAX_HITS = Number(process.env.MICROSCOPE_MAX_HITS || "4");
 const CONTEXT_MAX_CHARS = Number(process.env.MICROSCOPE_CONTEXT_MAX_CHARS || "2400");
 const REBUILD_EVERY = Number(process.env.MICROSCOPE_REBUILD_EVERY || "20");
@@ -135,72 +134,85 @@ function safeJsonParse(raw) {
 // Native Binary Invocation
 // ---------------------------------------------------------------------------
 
-function runBin(args, timeoutMs = CALL_TIMEOUT_MS) {
+function runBin(args, timeoutMs = CALL_TIMEOUT_MS, extraEnv = {}) {
   return new Promise((resolve) => {
     let child;
     try {
       child = spawn(BIN, args, {
-        env: { ...process.env, MICROSCOPE_CONFIG: BRIDGE_CONFIG },
+        env: { ...process.env, ...extraEnv, MICROSCOPE_CONFIG: BRIDGE_CONFIG },
         windowsHide: true,
         stdio: ["ignore", "pipe", "pipe"],
       });
     } catch (e) {
-      trace("WARN", `spawn failed: ${e && e.message}`);
-      return resolve("");
+      trace("WARN", `spawn failed for ${args[0]}: ${e && e.message}`);
+      return resolve({ ok: false, out: "", err: "spawn failed" });
     }
 
     let out = "";
+    let err = "";
     let done = false;
-    const finish = (value) => {
+    let timer;
+    const finish = (result, terminate = false) => {
       if (done) return;
       done = true;
-      try { child.kill(); } catch { /* ignore */ }
-      resolve(value);
+      if (timer) clearTimeout(timer);
+      if (terminate) {
+        try { child.kill(); } catch { /* ignore */ }
+      }
+      resolve(result);
     };
 
-    const timer = setTimeout(() => {
-      trace("WARN", `timeout after ${timeoutMs}ms: ${args.join(" ")}`);
-      finish("");
-    }, timeoutMs);
-
-    try {
-      child.stdout.on("data", (d) => { out += d.toString(); });
-      child.stderr.on("data", () => {});
-      child.on("error", (e) => {
-        clearTimeout(timer);
-        trace("WARN", `child error: ${e && e.message}`);
-        finish("");
-      });
-      child.on("close", (code) => {
-        clearTimeout(timer);
-        if (code !== 0) {
-          trace("WARN", `child exit ${code}: ${args.join(" ")}`);
-          finish("");
-          return;
-        }
-        finish(out);
-      });
-    } catch (e) {
-      clearTimeout(timer);
-      trace("WARN", `stream error: ${e && e.message}`);
-      finish("");
+    if (timeoutMs > 0) {
+      timer = setTimeout(() => {
+        trace("WARN", `timeout after ${timeoutMs}ms: ${args[0]}`);
+        finish({ ok: false, out: "", err: "timeout" }, true);
+      }, timeoutMs);
     }
+
+    child.stdout.on("data", (d) => { out += d.toString(); });
+    child.stderr.on("data", (d) => { err = (err + d.toString()).slice(-8192); });
+    child.on("error", (e) => {
+      trace("WARN", `child error for ${args[0]}: ${e && e.message}`);
+      finish({ ok: false, out: "", err: "child error" });
+    });
+    child.on("close", (code) => {
+      if (code !== 0) {
+        trace("WARN", `child exit ${code}: ${args[0]}`);
+        finish({ ok: false, out: "", err });
+        return;
+      }
+      finish({ ok: true, out, err });
+    });
   });
 }
 
 function syncBridgeConfig() {
   try {
-    if (!existsSync(CANONICAL_CONFIG)) return;
+    if (!existsSync(CANONICAL_CONFIG)) {
+      trace("WARN", "canonical config not found");
+      return false;
+    }
     const raw = readFileSync(CANONICAL_CONFIG, "utf8");
-    // Ensure auto_rebuild = false in bridge so hook never blocks on 15s rebuild
-    const patched = raw.replace(
-      /^(auto_rebuild\s*=\s*)true\s*$/m,
-      "$1false",
-    );
+    // Only edit [index], including configurations where the key is omitted.
+    // Explicitly disable auto-rebuild so a store hook never triggers a rebuild
+    // synchronously. The detached worker uses the locked rebuild command.
+    const section = /^\[index\][^\S\r\n]*(?:#.*)?\r?\n([\s\S]*?)(?=^\[|$(?![\s\S]))/m;
+    let patched;
+    if (section.test(raw)) {
+      patched = raw.replace(section, (match, body) => {
+        const key = /^(\s*auto_rebuild\s*=\s*)(?:true|false)(?=\s*(?:#.*)?$)/m;
+        const next = key.test(body) ? body.replace(key, "$1false") : `auto_rebuild = false\n${body}`;
+        return match.replace(body, next);
+      });
+    } else {
+      patched = `${raw}\n[index]\nauto_rebuild = false\n`;
+    }
     mkdirSync(LOG_DIR, { recursive: true });
     writeFileSync(BRIDGE_CONFIG, patched, "utf8");
+    return true;
   } catch (e) {
     trace("WARN", `config sync failed: ${e && e.message}`);
+    return false;
   }
 }
 
@@ -228,45 +240,19 @@ function writeState(state) {
 }
 
 // ---------------------------------------------------------------------------
-// Phrase Extraction & Search
+// Recall output: accept only actual native result rows, not diagnostic text.
 // ---------------------------------------------------------------------------
 
-const STOPWORDS = new Set([
-  "a", "az", "egy", "és", "de", "hogy", "is", "nem", "van", "meg", "el", "the",
-  "and", "for", "with", "that", "this", "from", "you", "your", "not", "but", "has",
-  "have", "was", "were", "are", "will", "can", "should", "would", "into", "when",
-  "then", "than", "also", "all", "any", "how", "what", "why", "who", "where",
-  "which", "about", "just", "like", "make", "made", "need", "want", "use", "used",
-  "using", "run", "runs", "running", "it", "its", "there", "their", "them", "they",
-  "we", "our", "these", "those", "been", "being", "does", "did", "done", "get", "got",
-]);
-
-function extractPhrases(text) {
-  if (!text || typeof text !== "string") return [];
-  const clean = text
-    .replace(/[^\p{L}\p{N}_\-\s]/gu, " ")
-    .toLowerCase()
-    .split(/\s+/)
-    .filter((w) => w.length > 2 && !STOPWORDS.has(w));
-
-  const phrases = [];
-  for (let i = 0; i < clean.length - 1; i++) {
-    phrases.push(`${clean[i]} ${clean[i + 1]}`);
-    if (i < clean.length - 2) {
-      phrases.push(`${clean[i]} ${clean[i + 1]} ${clean[i + 2]}`);
-    }
-  }
-  return [...new Set(phrases)].slice(0, MAX_PHRASES);
-}
-
-function parseFindOutput(raw) {
+function parseRecallOutput(raw) {
   const hits = [];
-  for (const line of String(raw || "").split(/\r?\n/)) {
-    const m = /\[([^\]]+)\]\s*(.+)$/.exec(line.trim());
-    if (m) {
-      const text = m[2].trim();
-      if (text) hits.push({ layer: m[1].trim(), text });
-    }
+  const clean = String(raw || "").replace(/\x1b\[[0-9;]*m/g, "");
+  for (const line of clean.split(/\r?\n/)) {
+    const m = /^\s*D([0-8])\s+L2=\S+\s+\[([^\]]+)\]\s+(.+)$/.exec(line);
+    if (!m) continue;
+    // D0-D2 are derived summaries and may contain superseded facts. Only
+    // inject full item blocks (D3) and pending append records.
+    if (m[1] !== "3" && !m[2].endsWith("/new")) continue;
+    hits.push({ layer: m[2].trim(), text: m[3].trim() });
   }
   return hits;
 }
@@ -282,11 +268,18 @@ function clip(text, maxChars) {
 
 async function onSessionStart(payload) {
   if (!ENABLED) return 0;
-  syncBridgeConfig();
+  if (!syncBridgeConfig()) {
+    process.stdout.write("[MICROSCOPE MEMORY] Context unavailable: config not found or unreadable.\n");
+    return 0;
+  }
 
   trace("INFO", `session_start: id=${payload.session_id || "none"}`);
-  const out = await runBin(["auto-context", "--compact"]);
-  if (!out || !out.trim()) return 0;
+  const result = await runBin(["auto-context", "--compact"]);
+  if (!result.ok || !result.out.trim()) {
+    process.stdout.write("[MICROSCOPE MEMORY] Session context unavailable; memory status is unknown.\n");
+    return 0;
+  }
+  const out = result.out;
 
   const context =
     `[MICROSCOPE MEMORY - Auto-Loaded Context]\n` +
@@ -302,43 +295,55 @@ async function onUserPromptSubmit(payload) {
   const prompt = payload.prompt || "";
   if (!prompt || prompt.length < 5) return 0;
 
-  const phrases = extractPhrases(prompt);
-  if (phrases.length === 0) return 0;
-
-  // IMPORTANT: Sequential execution to avoid Windows mmap lock collisions
-  const hits = [];
-  const seen = new Set();
-
-  for (const phrase of phrases) {
-    const raw = await runBin(["find", phrase, "--limit", "3"]);
-    const items = parseFindOutput(raw);
-    for (const item of items) {
-      if (!seen.has(item.text)) {
-        seen.add(item.text);
-        hits.push(item);
-        if (hits.length >= MAX_HITS) break;
-      }
-    }
-    if (hits.length >= MAX_HITS) break;
+  if (!syncBridgeConfig()) {
+    process.stdout.write("[MICROSCOPE MEMORY] Retrieval unavailable: config not found or unreadable.\n");
+    return 0;
   }
 
-  if (hits.length === 0) return 0;
+  // Use the whole question with the semantic-capable recall path, once. A
+  // lexical-only fallback is explicitly marked rather than called semantic.
+  const result = await runBin(["recall", prompt.slice(0, 3000), "20"], CALL_TIMEOUT_MS, {
+    MICROSCOPE_NO_LEARN: "1",
+    NO_COLOR: "1",
+  });
+  if (!result.ok || !result.out.trim()) {
+    process.stdout.write("[MICROSCOPE MEMORY] Retrieval unavailable; do not interpret this as no memory.\n");
+    return 0;
+  }
+  const seen = new Set();
+  const hits = [];
+  for (const item of parseRecallOutput(result.out)) {
+    if (!seen.has(item.text)) {
+      seen.add(item.text);
+      hits.push(item);
+      if (hits.length >= MAX_HITS) break;
+    }
+  }
+  const degraded = /semantic[^\n]*(?:degraded|mismatch|failed)|lexical[- ](?:only|path only)/i.test(result.err);
+  const warning = degraded ? " Semantic index degraded; lexical fallback.\n" : "\n";
+  if (hits.length === 0) {
+    process.stdout.write(
+      "[MICROSCOPE MEMORY] No candidate returned; this does not prove the information is absent." + warning
+    );
+    return 0;
+  }
 
-  const formatted = hits
-    .map((h) => `• [${h.layer}] ${h.text}`)
-    .join("\n");
+  const formatted = hits.map((h) => `• [${h.layer}] ${h.text}`).join("\n");
   const content =
-    `[MICROSCOPE MEMORY - Retrieved Turn Context]\n` +
-    clip(formatted, CONTEXT_MAX_CHARS) + "\n";
-
+    "[MICROSCOPE MEMORY - Unverified retrieved candidates; check relevance and supersession]" +
+    warning + clip(formatted, CONTEXT_MAX_CHARS) + "\n";
   process.stdout.write(content);
-  trace("INFO", `prompt injected ${hits.length} hits`);
+  trace("INFO", `prompt injected ${hits.length} candidates`);
   return 0;
 }
 
 async function onPostToolUse(payload) {
   if (!ENABLED || !AUTO_STORE) return 0;
 
+  if (!syncBridgeConfig()) {
+    trace("WARN", "store skipped: config unavailable");
+    return 0;
+  }
   const toolName = payload.tool_name || "";
   const toolInput = typeof payload.tool_input === "string"
     ? payload.tool_input
@@ -366,8 +371,12 @@ async function onPostToolUse(payload) {
   const summary = `Tool ${toolName}: ${isError ? "FAILED" : "SUCCESS"}. In: ${toolInput.slice(0, 100)} Out: ${toolResult.slice(0, 200)}`;
   const cleanSummary = summary.replace(/[\r\n]+/g, " ").trim();
 
-  await runBin(["store", cleanSummary, "--layer", layer, "--importance", String(importance)]);
-  trace("INFO", `stored: [${layer}:${importance}] ${cleanSummary.slice(0, 80)}`);
+  const stored = await runBin(["store", cleanSummary, "--layer", layer, "--importance", String(importance)]);
+  if (!stored.ok) {
+    trace("WARN", "store failed; rebuild counter unchanged");
+    return 0;
+  }
+  trace("INFO", `stored: [${layer}:${importance}]`);
 
   // Check rebuild threshold
   const state = readState();
@@ -408,9 +417,12 @@ function triggerDetachedRebuild() {
 async function runRebuildWorker() {
   trace("INFO", "detached rebuild worker starting");
   const start = Date.now();
-  await runBin(["build"], 30000);
+  if (!syncBridgeConfig()) return 0;
+  // Rebuild holds the store lock and preserves pending records. Do not kill a
+  // long build on a timer: the current index writer is not crash-atomic.
+  const result = await runBin(["rebuild"], 0);
   const dur = Date.now() - start;
-  trace("INFO", `detached rebuild worker finished in ${dur}ms`);
+  trace(result.ok ? "INFO" : "WARN", `detached rebuild ${result.ok ? "finished" : "failed"} in ${dur}ms`);
   return 0;
 }
 

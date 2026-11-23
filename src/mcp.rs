@@ -1364,8 +1364,10 @@ fn tool_recall(config: &Config, args: &Value) -> Result<String, String> {
         let novel = all_results.first().is_none_or(|(d, _, _)| *d > 0.3);
 
         let qh_tg = crate::hebbian::query_hash(query);
-        if let Some(stream) = crate::consciousness_stream::global_stream() {
-            crate::consciousness_stream::ConsciousnessStream::feed_query(stream, qh_tg);
+        if !crate::no_learn::enabled() {
+            if let Some(stream) = crate::consciousness_stream::global_stream() {
+                crate::consciousness_stream::ConsciousnessStream::feed_query(stream, qh_tg);
+            }
         }
 
         let (mut thought_graph, mut pred_cache) =
@@ -1463,7 +1465,7 @@ fn tool_recall(config: &Config, args: &Value) -> Result<String, String> {
             .map(|(score, idx, _)| (*idx as u32, *score))
             .collect();
 
-        if !activated.is_empty() {
+        if !activated.is_empty() && !crate::no_learn::enabled() {
             let mut hebb =
                 crate::hebbian::HebbianState::load_or_init(output_dir, reader.block_count);
             let mut mirror = crate::mirror::MirrorState::load_or_init(output_dir);

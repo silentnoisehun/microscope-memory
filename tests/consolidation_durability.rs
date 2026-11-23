@@ -170,3 +170,47 @@ fn unchanged_layers_missing_semantic_sidecar_are_rebuilt() {
     assert!(index.block_count() > 0);
     assert_eq!(index.dim(), 64);
 }
+
+#[test]
+fn truncated_append_is_never_cleared_or_appended_to() {
+    use std::io::Write;
+
+    for damaged_tail in [
+        vec![1, 2, 3],
+        vec![8, 0, 0, 0].into_iter().chain([0; 32]).collect(),
+    ] {
+        let (_tmp, mut config) = setup();
+        store_memory(&config, "valid pending durable memory", "long_term", 5).unwrap();
+        let output = Path::new(&config.paths.output_dir);
+        let append = output.join("append.bin");
+        let mut f = fs::OpenOptions::new().append(true).open(&append).unwrap();
+        f.write_all(&damaged_tail).unwrap();
+        drop(f);
+        let original_log = fs::read(&append).unwrap();
+        let original_index = fs::read(output.join("microscope.bin")).unwrap();
+
+        let err = build::rebuild_pending(&config, false, false).unwrap_err();
+        assert!(err.contains("incomplete append"), "{err}");
+        config.index.auto_rebuild = true;
+        assert!(build::maybe_auto_rebuild(&config).is_err());
+        assert!(store_memory(&config, "must not append", "long_term", 5).is_err());
+        assert_eq!(fs::read(&append).unwrap(), original_log);
+        assert_eq!(
+            fs::read(output.join("microscope.bin")).unwrap(),
+            original_index
+        );
+    }
+}
+
+#[test]
+fn oversized_memory_is_rejected_without_persisting_a_truncated_record() {
+    let (_tmp, config) = setup();
+    let output = Path::new(&config.paths.output_dir);
+    let layer = Path::new(&config.paths.layers_dir).join("long_term.txt");
+    let before = fs::read(&layer).unwrap();
+    let text = format!("{}á", "a".repeat(microscope_memory::BLOCK_DATA_SIZE - 1));
+    let err = store_memory(&config, &text, "long_term", 5).unwrap_err();
+    assert!(err.contains("maximum"), "{err}");
+    assert!(!output.join("append.bin").exists());
+    assert_eq!(fs::read(layer).unwrap(), before);
+}

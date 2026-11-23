@@ -3,7 +3,7 @@
 //! and writes the binary output files (microscope.bin, data.bin, meta.bin, merkle.bin, embeddings.bin).
 
 use crate::config::Config;
-use crate::reader::{read_append_log, FileLock, MicroscopeReader};
+use crate::reader::{read_append_log_checked, FileLock, MicroscopeReader};
 use crate::types::BlockHeader;
 use crate::{
     crc16_ccitt, hex_str, layer_to_id, merkle, safe_truncate, to_block, BLOCK_DATA_SIZE,
@@ -47,7 +47,7 @@ pub fn rebuild_pending(
     let _lock = FileLock::acquire(config)?;
     let output_dir = Path::new(&config.paths.output_dir);
     let append_path = output_dir.join("append.bin");
-    let entries = read_append_log(&append_path);
+    let entries = read_append_log_checked(&append_path)?;
     let pending_entries = entries.len();
 
     if pending_entries == 0 && !force_when_empty {
@@ -170,7 +170,7 @@ pub fn rebuild_append_embeddings(config: &Config) -> Result<usize, String> {
     use crate::embedding_index::{AppendEmbeddings, APPEND_EMBEDDINGS_FILE};
 
     let output_dir = Path::new(&config.paths.output_dir);
-    let appended = read_append_log(&output_dir.join("append.bin"));
+    let appended = read_append_log_checked(&output_dir.join("append.bin"))?;
     if appended.is_empty() {
         let sidecar = output_dir.join(APPEND_EMBEDDINGS_FILE);
         if sidecar.exists() {
@@ -270,7 +270,7 @@ pub fn maybe_auto_rebuild(config: &Config) -> Result<Option<usize>, String> {
 
     let output_dir = Path::new(&config.paths.output_dir);
     let append_path = output_dir.join("append.bin");
-    let pending_entries = read_append_log(&append_path).len();
+    let pending_entries = read_append_log_checked(&append_path)?.len();
     if pending_entries == 0 {
         return Ok(None);
     }
@@ -592,7 +592,7 @@ fn build_inner(
     // entries may already be in the index, and re-adding them would
     // resurrect the content the retention cap trimmed.
     let pending_entries = if consolidating {
-        read_append_log(&output_dir.join("append.bin"))
+        read_append_log_checked(&output_dir.join("append.bin"))?
     } else {
         Vec::new()
     };

@@ -375,6 +375,16 @@ pub fn render(ctx: &AutoContext) -> String {
 /// Compact version of the auto-context (for embedding in recall output).
 pub fn render_compact(ctx: &AutoContext) -> String {
     let mut out = String::new();
+    // Core first so a downstream context budget does not silently clip it.
+    if !ctx.core_memories.is_empty() {
+        out.push_str(&format!("{} core memories:\n", AUTO_CONTEXT_HEADER));
+        for memory in &ctx.core_memories {
+            out.push_str(&format!(
+                "  • [{}] imp={} {}\n",
+                memory.layer, memory.importance, memory.text
+            ));
+        }
+    }
     if !ctx.timeline_entries.is_empty() {
         out.push_str(&format!(
             "{} last session: {} stores.\n",
@@ -468,6 +478,9 @@ mod tests {
         let rendered = render(&ctx);
         assert!(rendered.contains("CORE MEMORIES"));
         assert!(rendered.contains("durable preference"));
+        let compact = render_compact(&ctx);
+        assert!(compact.contains("core memories"));
+        assert!(compact.contains("durable preference"));
     }
 
     #[test]

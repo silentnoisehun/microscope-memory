@@ -47,7 +47,7 @@
         "hooks": [
           {
             "type": "command",
-            "name": "Microscope Memory: Session Digest",
+            "name": "Microscope Memory: Session Stop",
             "command": "node \"${HOOKS_DIR}/microscope-hook.js\" stop",
             "commandWindows": "node \"${HOOKS_DIR}\\microscope-hook.js\" stop",
             "timeout": 10

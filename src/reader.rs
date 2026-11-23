@@ -1259,14 +1259,26 @@ impl MicroscopeReader {
 
 #[allow(dead_code)]
 pub fn read_append_log(path: &Path) -> Vec<AppendEntry> {
-    if !path.exists() {
-        return vec![];
-    }
     let data = fs::read(path).unwrap_or_default();
-    if data.is_empty() {
-        return vec![];
-    }
+    // The read-only query path retains its legacy best-effort behaviour.
+    parse_append_log(&data, false).unwrap_or_default()
+}
 
+/// Read the complete log before modifying or consolidating it. Unlike the
+/// best-effort query API, an unreadable or incomplete log is never accepted.
+pub(crate) fn read_append_log_checked(path: &Path) -> Result<Vec<AppendEntry>, String> {
+    let data = match fs::read(path) {
+        Ok(data) => data,
+        Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(Vec::new()),
+        Err(e) => return Err(format!("read append log: {e}")),
+    };
+    parse_append_log(&data, true)
+}
+
+fn parse_append_log(data: &[u8], strict: bool) -> Result<Vec<AppendEntry>, String> {
+    if data.is_empty() {
+        return Ok(Vec::new());
+    }
     let mut entries = Vec::new();
     let mut pos = 0;
 
@@ -1319,10 +1331,19 @@ pub fn read_append_log(path: &Path) -> Vec<AppendEntry> {
                 .unwrap(),
         );
         pos += header_size;
-        if pos + len > data.len() {
-            break;
+        if len > data.len() - pos {
+            if strict {
+                return Err(format!("incomplete append record at byte {pos}"));
+            }
+            return Ok(entries);
         }
-        let text = String::from_utf8_lossy(&data[pos..pos + len]).to_string();
+        let text = if strict {
+            std::str::from_utf8(&data[pos..pos + len])
+                .map_err(|e| format!("invalid append text at byte {pos}: {e}"))?
+                .to_string()
+        } else {
+            String::from_utf8_lossy(&data[pos..pos + len]).to_string()
+        };
         pos += len;
         entries.push(AppendEntry {
             text,
@@ -1336,7 +1357,10 @@ pub fn read_append_log(path: &Path) -> Vec<AppendEntry> {
             project_id,
         });
     }
-    entries
+    if strict && pos != data.len() {
+        return Err(format!("incomplete append header at byte {pos}"));
+    }
+    Ok(entries)
 }
 
 /// Display a single append-log result entry.
@@ -1397,11 +1421,6 @@ impl ResultSet {
     }
 }
 
-/// A lock file is considered stale when untouched for this many seconds,
-/// regardless of content (covers lock files from older versions that carry no
-/// owner token at all).
-const LOCK_STALE_SECS: u64 = 300;
-
 /// Total time we are willing to wait for a live lock before giving up.
 const LOCK_ACQUIRE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(15);
 
@@ -1437,12 +1456,6 @@ impl FileLock {
                     });
                 }
                 Err(e) if e.kind() == io::ErrorKind::AlreadyExists => {
-                    if lock_is_stale(lock_path) {
-                        // Another process may race us to remove and recreate the
-                        // file; just retry create_new after the removal.
-                        let _ = fs::remove_file(lock_path);
-                        continue;
-                    }
                     if std::time::Instant::now() >= deadline {
                         let mtime = fs::metadata(lock_path)
                             .and_then(|m| m.modified())
@@ -1475,55 +1488,10 @@ fn lock_token() -> String {
     format!("{}:{}", std::process::id(), unix_ms)
 }
 
-/// First field (before ':') of a lock token, when present and numeric.
-#[cfg(windows)]
-fn lock_owner_pid(content: &str) -> Option<u32> {
-    content.split(':').next()?.trim().parse().ok()
-}
-
-/// Returns true when the existing lock file can safely be broken.
-fn lock_is_stale(path: &Path) -> bool {
-    // Primary check: file age. A lock untouched for LOCK_STALE_SECS is stale
-    // even if it has no readable owner token.
-    if let Ok(meta) = fs::metadata(path) {
-        if let Ok(modified) = meta.modified() {
-            if let Ok(age) = modified.elapsed() {
-                if age.as_secs() > LOCK_STALE_SECS {
-                    return true;
-                }
-            }
-        }
-    }
-    // Secondary check (Windows only): the recorded owner PID is no longer
-    // alive. On non-Windows platforms we deliberately rely on the mtime check
-    // alone: std has no portable process-existence probe and adding libc just
-    // for this would be a new dependency.
-    #[cfg(windows)]
-    {
-        if let Ok(content) = fs::read_to_string(path) {
-            if let Some(pid) = lock_owner_pid(&content) {
-                return !pid_is_alive(pid);
-            }
-        }
-    }
-    false
-}
-
-/// Windows-only process liveness probe using the already-available
-/// windows-sys dependency (OpenProcess with the limited query right).
-#[cfg(windows)]
-fn pid_is_alive(pid: u32) -> bool {
-    use windows_sys::Win32::Foundation::CloseHandle;
-    use windows_sys::Win32::System::Threading::{OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION};
-    unsafe {
-        let handle = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid);
-        if handle == 0 {
-            return false;
-        }
-        CloseHandle(handle);
-        true
-    }
-}
+// Never automatically break a lock based on age or PID: a rebuild may run
+// for longer than any timeout, and removing a checked path races another
+// process acquiring it. After a crash, an operator must verify that every
+// writer has stopped before removing the lock file.
 
 impl Drop for FileLock {
     fn drop(&mut self) {
@@ -1724,6 +1692,13 @@ pub fn store_memory_temporary(
     layer: &str,
     importance: u8,
 ) -> Result<(), String> {
+    if text.len() > BLOCK_DATA_SIZE {
+        return Err(format!(
+            "memory is {} bytes; maximum is {} bytes (split it before storing)",
+            text.len(),
+            BLOCK_DATA_SIZE
+        ));
+    }
     let _lock = FileLock::acquire(config)?;
     let (x, y, z) = crate::content_coords_blended_with_config(
         text,
@@ -1735,6 +1710,7 @@ pub fn store_memory_temporary(
     let depth = auto_depth(text);
 
     let append_path = Path::new(&config.paths.output_dir).join("append.bin");
+    read_append_log_checked(&append_path)?;
     let needs_magic = !append_path.exists()
         || fs::metadata(&append_path)
             .map(|m| m.len() == 0)
@@ -1762,7 +1738,7 @@ pub fn store_memory_temporary(
     }
 
     let text_bytes = text.as_bytes();
-    let len = text_bytes.len().min(BLOCK_DATA_SIZE);
+    let len = text_bytes.len();
 
     write_append_entry(
         &mut file,
@@ -1920,6 +1896,13 @@ fn store_memory_with_status_inner(
     emotion: Option<[f32; 21]>,
     precomputed: Option<Vec<f32>>,
 ) -> Result<(), String> {
+    if text.len() > BLOCK_DATA_SIZE {
+        return Err(format!(
+            "memory is {} bytes; maximum is {} bytes (split it before storing)",
+            text.len(),
+            BLOCK_DATA_SIZE
+        ));
+    }
     let _lock = FileLock::acquire(config)?;
     let t0 = std::time::Instant::now();
     let (x, y, z) = crate::content_coords_blended_with_config(
@@ -1932,6 +1915,7 @@ fn store_memory_with_status_inner(
     let depth = auto_depth(text);
 
     let append_path = Path::new(&config.paths.output_dir).join("append.bin");
+    read_append_log_checked(&append_path)?;
 
     let needs_magic = !append_path.exists()
         || fs::metadata(&append_path)
@@ -1960,7 +1944,7 @@ fn store_memory_with_status_inner(
     }
 
     let text_bytes = text.as_bytes();
-    let len = text_bytes.len().min(BLOCK_DATA_SIZE);
+    let len = text_bytes.len();
 
     write_append_entry(
         &mut file,
@@ -2356,14 +2340,13 @@ mod tests {
         }
     }
 
-    #[cfg(windows)]
     #[test]
-    fn dead_owner_pid_is_broken() {
+    fn unknown_owner_lock_is_not_broken_automatically() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("microscope.lock");
         fs::write(&path, "4294967295:0").unwrap();
-        let lock = FileLock::acquire_inner(&path, Duration::from_secs(2)).unwrap();
-        assert_eq!(fs::read_to_string(&path).unwrap(), lock.token);
+        assert!(FileLock::acquire_inner(&path, Duration::from_millis(100)).is_err());
+        assert_eq!(fs::read_to_string(&path).unwrap(), "4294967295:0");
     }
 
     #[test]

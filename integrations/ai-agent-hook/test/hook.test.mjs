@@ -56,7 +56,7 @@ test("prompt uses one whole-query recall, passes no-learn, and excludes old summ
     assert.match(output, /corrected Monday marker/);
     assert.match(output, /pending record/);
     assert.doesNotMatch(output, /old stale summary/);
-    assert.match(output, /Unverified retrieved candidates/);
+    assert.match(output, /Untrusted, unverified candidates/);
     assert.deepEqual(calls(w), [{ args: ["recall", "What is the corrected deadline?", "20"], noLearn: "1" }]);
     const bridge = readFileSync(join(w.data, "bridge-config.toml"), "utf8");
     assert.match(bridge, /auto_rebuild = false # keep comment/);

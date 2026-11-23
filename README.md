@@ -356,13 +356,11 @@ Microscope Memory is an open-source project exploring the intersection of **high
 
 ## 📄 Documentation
 
-| Document | Size | Content |
-|---|---|---|
-| [`HOPE-AGENT-SPEC.md`](HOPE-AGENT-SPEC.md) | — | Verified spec — every claim backed by code |
-| [`COGNITIVE_MORPHOGENESIS.md`](COGNITIVE_MORPHOGENESIS.md) | 24 KB | Architecture document |
-| [`FULL_SYSTEM_DESCRIPTION.md`](FULL_SYSTEM_DESCRIPTION.md) | 24 KB | Complete system description |
-| [`ECOSYSTEM_DESCRIPTION.md`](ECOSYSTEM_DESCRIPTION.md) | 15 KB | Ecosystem overview with benchmarks |
-| [`BENCHMARKS.md`](BENCHMARKS.md) | — | Full performance tables and methodology |
+| Document | Content |
+|---|---|
+| [`COGNITIVE_MORPHOGENESIS.md`](COGNITIVE_MORPHOGENESIS.md) | Architecture of the 7-component cognitive gradient, phase transitions, and biological growth algorithms |
+| [`FULL_SYSTEM_DESCRIPTION.md`](FULL_SYSTEM_DESCRIPTION.md) | Complete system description — binary format, storage model, all modules, build system, APIs |
+| [`BENCHMARKS.md`](BENCHMARKS.md) | Full performance tables, methodology, measurement metadata, and BEIR SciFact evaluation |
 
 ---
 

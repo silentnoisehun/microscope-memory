@@ -274,6 +274,10 @@ fn a_notification_gets_no_response() {
 fn store_validates_before_writing_and_reports_partial_atom_failure() {
     let tmp = tempfile::tempdir().unwrap();
     let config = scratch_config(tmp.path());
+    let mut writable: microscope_memory::config::Config =
+        toml::from_str(&std::fs::read_to_string(&config).unwrap()).unwrap();
+    writable.hooks.read_only = false;
+    std::fs::write(&config, toml::to_string(&writable).unwrap()).unwrap();
     // Force atom persistence to fail after the primary append succeeds.
     std::fs::create_dir(tmp.path().join("data/memory_atoms.bin")).unwrap();
     let requests = [

@@ -1,4 +1,8 @@
-﻿# 🧠 Microscope Memory
+<p align="center">
+  <img src="assets/banner.jpg" alt="Microscope Memory" width="100%">
+</p>
+
+# 🧠 Microscope Memory
 
 **A living, self-organizing cognitive memory engine for AI agents.**  
 Not a database. Not a vector store. A *system that learns, dreams, and remembers* — written in 62,938 lines of pure Rust.
@@ -8,6 +12,10 @@ Not a database. Not a vector store. A *system that learns, dreams, and remembers
 [![License](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)](LICENSE)
 [![MCP Server](https://img.shields.io/badge/MCP-Server-orange?style=for-the-badge)](https://modelcontextprotocol.io)
 [![ORCID](https://img.shields.io/badge/ORCID-0009--0003--3986--6039-60BE52?style=for-the-badge&logo=orcid)](https://orcid.org/0009-0003-3986-6039)
+[![Release](https://img.shields.io/github/v/release/silentnoisehun/microscope-memory?style=for-the-badge&color=blue)](https://github.com/silentnoisehun/microscope-memory/releases)
+[![Windows Download](https://img.shields.io/badge/Windows-microscope--mem.exe-0078D6?style=for-the-badge&logo=windows)](https://github.com/silentnoisehun/microscope-memory/releases/latest)
+[![Linux Download](https://img.shields.io/badge/Linux-x86__64-FCC624?style=for-the-badge&logo=linux&logoColor=black)](https://github.com/silentnoisehun/microscope-memory/releases/latest)
+[![WASM Download](https://img.shields.io/badge/WASM-web--pkg-654FF0?style=for-the-badge&logo=webassembly)](https://github.com/silentnoisehun/microscope-memory/releases/latest)
 
 ---
 

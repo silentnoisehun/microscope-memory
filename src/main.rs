@@ -7496,7 +7496,7 @@ async fn async_main() {
                         None => {
                             eprintln!("  {} OCTOPUS_BIN is not set and octopus-runtime was not found in PATH.", "ERROR".red());
                             eprintln!("  Set OCTOPUS_BIN environment variable or install octopus-runtime.");
-                            return;
+                            std::process::exit(1);
                         }
                     };
                     let output1 = Command::new(&oct_bin)
@@ -7603,6 +7603,7 @@ async fn async_main() {
                 _ => {
                     eprintln!("  Ismeretlen művelet: {}", operation);
                     eprintln!("  Használat: octopus [full-pipeline|scan|cycle]");
+                    std::process::exit(1);
                 }
             }
         }

@@ -456,17 +456,23 @@ impl AutonomousEngine {
     }
 
     /// Append log rebuild — a dream consolidation után automatikusan
-    fn run_rebuild(&mut self, config: &Config, output_dir: &Path) -> String {
+    fn run_rebuild(&mut self, config: &Config, output_dir: &Path, heavy: bool) -> String {
         let append_path = output_dir.join("append.bin");
         if !append_path.exists() {
             let msg = "🔄 Rebuild: nincs függő append entry".to_string();
             println!("  {}", msg.cyan());
             return msg;
         }
-        match build::build(config, true, true) {
-            Ok(()) => {
-                let _ = std::fs::remove_file(&append_path);
-                let msg = "🔄 Rebuild: append log beépítve és törölve".to_string();
+        match build::rebuild_pending(config, false, heavy) {
+            Ok(outcome) => {
+                let msg = if outcome.rebuilt {
+                    format!(
+                        "🔄 Rebuild: {} append log entry beépítve és törölve",
+                        outcome.pending_entries
+                    )
+                } else {
+                    "🔄 Rebuild: nincs függő append entry".to_string()
+                };
                 println!("  {}", msg.green());
                 self.speak("Append log újraépítve és törölve.");
                 msg
@@ -588,7 +594,8 @@ impl AutonomousEngine {
         let stores_since_dream = read_store_counter(&output_dir.join("store_counter.bin"));
         let dream_due_by_stores = self.config.dream_store_threshold > 0
             && stores_since_dream >= self.config.dream_store_threshold;
-        let dream_due_by_interval = should_run(self.config.dream_interval);
+        let dream_due_by_interval =
+            self.config.dream_interval > 0 && cycle.is_multiple_of(self.config.dream_interval);
 
         if dream_due_by_interval || dream_due_by_stores {
             if dream_due_by_stores {
@@ -603,6 +610,10 @@ impl AutonomousEngine {
             reset_store_counter(&output_dir.join("store_counter.bin"));
             self.executive.set_module_state("dream", ModuleState::Idle);
             outputs.push(out);
+
+            // Dream consolidation után rebuild
+            let rebuild_out = self.run_rebuild(config, output_dir, true);
+            outputs.push(rebuild_out);
         }
 
         // Executive statok kiírása
@@ -616,9 +627,12 @@ impl AutonomousEngine {
             attention * 100.0
         );
 
-        // Minden ciklus végén: append log rebuild (ha van mit)
-        let rebuild_out = self.run_rebuild(config, output_dir);
-        outputs.push(rebuild_out);
+        // Függő append entryk konszolidálása ha elérték a konfigurált küszöböt
+        let pending = crate::reader::read_append_log(&output_dir.join("append.bin")).len();
+        if pending >= config.index.auto_rebuild_entries && config.index.auto_rebuild_entries > 0 {
+            let rebuild_out = self.run_rebuild(config, output_dir, config.index.auto_rebuild_heavy);
+            outputs.push(rebuild_out);
+        }
 
         // Tároljuk a ciklus összefoglalót
         let summary = format!(

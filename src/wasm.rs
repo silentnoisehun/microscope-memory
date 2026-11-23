@@ -10,8 +10,8 @@ use wasm_bindgen::prelude::*;
 use web_sys::console;
 
 use crate::{
-    content_coords_blended, BlockHeader, DEPTH_ENTRY_SIZE, HEADER_SIZE, LAYER_NAMES,
-    META_HEADER_SIZE,
+    content_coords_blended, BlockHeader, ProjectId, DEPTH_ENTRY_SIZE, HEADER_SIZE, LAYER_NAMES,
+    LEGACY_HEADER_SIZE, META_HEADER_SIZE,
 };
 
 /// JavaScript-accessible block result
@@ -75,6 +75,7 @@ struct WasmReader {
     headers: Vec<u8>,
     data: Vec<u8>,
     block_count: usize,
+    header_stride: usize,
     depth_ranges: [(u32, u32); 9],
     /// Precomputed lowercase copy of every block's text, built once at load
     /// time. Search hot paths (`find_text` / `recall`) read this instead of
@@ -88,12 +89,17 @@ impl WasmReader {
             return Err("meta.bin too small".into());
         }
         let magic = &meta[0..4];
-        if magic != b"MSCM" && magic != b"MSC2" {
+        if magic != b"MSCM" && magic != b"MSC2" && magic != b"MSC3" && magic != b"MSC4" {
             return Err(format!("invalid magic: {:?}", &meta[0..4]));
         }
+        let header_stride = if magic == b"MSC4" {
+            HEADER_SIZE
+        } else {
+            LEGACY_HEADER_SIZE
+        };
         let block_count = u32::from_le_bytes(meta[8..12].try_into().unwrap()) as usize;
 
-        let expected_hdr_size = block_count * HEADER_SIZE;
+        let expected_hdr_size = block_count * header_stride;
         if headers.len() < expected_hdr_size {
             return Err(format!(
                 "headers too small: {} < {}",
@@ -114,6 +120,7 @@ impl WasmReader {
             headers,
             data,
             block_count,
+            header_stride,
             depth_ranges,
             search_texts: Vec::new(),
         };
@@ -133,9 +140,45 @@ impl WasmReader {
     }
 
     #[inline(always)]
-    fn header(&self, i: usize) -> &BlockHeader {
+    fn header(&self, i: usize) -> BlockHeader {
         debug_assert!(i < self.block_count);
-        unsafe { &*(self.headers.as_ptr().add(i * HEADER_SIZE) as *const BlockHeader) }
+        let off = i * self.header_stride;
+        let ptr = unsafe { self.headers.as_ptr().add(off) };
+        if self.header_stride == HEADER_SIZE {
+            unsafe { std::ptr::read_unaligned(ptr as *const BlockHeader) }
+        } else {
+            let mut bytes = [0u8; LEGACY_HEADER_SIZE];
+            unsafe {
+                std::ptr::copy_nonoverlapping(ptr, bytes.as_mut_ptr(), LEGACY_HEADER_SIZE);
+            }
+            let x = f32::from_le_bytes(bytes[0..4].try_into().unwrap());
+            let y = f32::from_le_bytes(bytes[4..8].try_into().unwrap());
+            let z = f32::from_le_bytes(bytes[8..12].try_into().unwrap());
+            let zoom = f32::from_le_bytes(bytes[12..16].try_into().unwrap());
+            let depth = bytes[16];
+            let layer_id = bytes[17];
+            let data_offset = u32::from_le_bytes(bytes[18..22].try_into().unwrap());
+            let data_len = u16::from_le_bytes(bytes[22..24].try_into().unwrap());
+            let parent_idx = u32::from_le_bytes(bytes[24..28].try_into().unwrap());
+            let child_count = u16::from_le_bytes(bytes[28..30].try_into().unwrap());
+            let crc16 = [bytes[30], bytes[31]];
+            BlockHeader {
+                x,
+                y,
+                z,
+                zoom,
+                depth,
+                layer_id,
+                data_offset,
+                data_len,
+                parent_idx,
+                child_count,
+                crc16,
+                project_id: ProjectId::GLOBAL,
+                importance: 5,
+                flags: 0,
+            }
+        }
     }
 
     #[inline(always)]

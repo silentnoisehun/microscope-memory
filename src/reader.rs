@@ -1791,9 +1791,6 @@ pub fn store_memory_temporary(
         eprintln!("  {} append timeline: {}", "WARN".yellow(), e);
     }
 
-    // Persistent store counter for autonomous daemon dream trigger
-    crate::autonomous::increment_store_counter(&output_dir.join("store_counter.bin"));
-
     Ok(())
 }
 
@@ -2009,6 +2006,9 @@ fn store_memory_with_status_inner(
     if let Err(e) = crate::timeline::append_entry(&output_dir.join("timeline.bin"), &entry) {
         eprintln!("  {} append timeline: {}", "WARN".yellow(), e);
     }
+
+    // Persistent store counter for autonomous daemon dream trigger (durable stores only)
+    crate::autonomous::increment_store_counter(&output_dir.join("store_counter.bin"));
 
     // ─── Open loops (only when status=open) ────────────────
     if status == Some("open") {

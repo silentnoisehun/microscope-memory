@@ -7,7 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.3] - 2026-11-23
+
+### Fixed
+
+- Reject consolidation if a pending entry cannot be mirrored, leaving the
+  append log and existing index intact. Version 1.4.2 could clear the log
+  after a failed mirror write, losing that entry on a later rebuild.
+- Check that the entire pending batch remains in the mirror before clearing
+  the log and avoid mistaking a shared text prefix for a full entry.
+- Report the package version in the WASM initialization message.
+
+### Limits
+
+- The configured layer retention policy can still remove older memories.
+  A pending batch that cannot fit under the retention limit is not cleared.
+- The targeted regression uses synthetic data and does not establish a
+  power-loss, concurrent-writer, or real-model durability guarantee. Back up
+  valuable data; this fix does not restore memories already missing from an
+  index.
+
 ## [1.4.2] - 2026-11-23
+
+> Correction: the P1 claim below was incomplete. If mirroring failed during
+> consolidation, a later consolidation could still lose a pending record.
+> See the 1.4.3 fix above.
 
 ### Fixed
 

@@ -85,6 +85,9 @@ jobs:
       - name: Core integration tests
         run: cargo test --test integration --locked
 
+      - name: Consolidation durability regression
+        run: cargo test --test consolidation_durability --locked
+
       - name: Spine tearing regression
         # Read it together with src/spine.rs: this is the measurement that says
         # the publish window works, so a gate that does not run it is not a gate.

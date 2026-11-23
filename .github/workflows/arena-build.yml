@@ -1,0 +1,102 @@
+name: Verified branch builds
+
+# Build downloadable artifacts without publishing or modifying a release.
+on:
+  push:
+    branches: ["arena/**"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    name: Regression gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Consolidation and semantic recovery
+        run: cargo test --locked --features embeddings --test consolidation_durability
+      - name: Library and integration tests
+        run: |
+          cargo test --locked --features embeddings --lib
+          cargo test --locked --features embeddings --test integration
+
+  linux:
+    name: Linux x86_64
+    needs: regression
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Build and smoke test
+        run: |
+          cargo build --release --locked --features embeddings --bin microscope-mem
+          target/release/microscope-mem --help
+          mkdir package
+          cp target/release/microscope-mem package/microscope-mem-linux-x86_64
+          cd package
+          sha256sum microscope-mem-linux-x86_64 > SHA256SUMS-linux.txt
+          tar -czf microscope-mem-linux-x86_64.tar.gz microscope-mem-linux-x86_64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: microscope-memory-linux-x86_64
+          path: package/*
+          if-no-files-found: error
+          retention-days: 14
+
+  windows:
+    name: Windows x86_64
+    needs: regression
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Build and smoke test
+        shell: bash
+        run: |
+          cargo build --release --locked --features embeddings --bin microscope-mem
+          target/release/microscope-mem.exe --help
+          mkdir package
+          cp target/release/microscope-mem.exe package/
+          cd package
+          sha256sum microscope-mem.exe > SHA256SUMS-windows.txt
+          tar -czf microscope-mem-windows-x86_64.tar.gz microscope-mem.exe
+      - uses: actions/upload-artifact@v4
+        with:
+          name: microscope-memory-windows-x86_64
+          path: package/*
+          if-no-files-found: error
+          retention-days: 14
+
+  wasm:
+    name: WASM
+    needs: regression
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - name: Install matching wasm-bindgen
+        run: |
+          WANT=$(awk '/^name = "wasm-bindgen"$/{getline; sub(/^version = /, ""); gsub(/[",]/, ""); print; exit}' Cargo.lock)
+          test -n "$WANT"
+          cargo install wasm-bindgen-cli --version "$WANT" --locked
+      - name: Build and package
+        run: |
+          cargo build --target wasm32-unknown-unknown --release --locked --no-default-features --features wasm
+          WASM=$(find target/wasm32-unknown-unknown/release -maxdepth 1 -name '*.wasm' | head -1)
+          test -n "$WASM"
+          mkdir -p wasm-pkg package
+          wasm-bindgen "$WASM" --target web --out-dir wasm-pkg
+          tar -C wasm-pkg -czf package/microscope-memory-wasm.tar.gz .
+          cd package
+          sha256sum microscope-memory-wasm.tar.gz > SHA256SUMS-wasm.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: microscope-memory-wasm
+          path: package/*
+          if-no-files-found: error
+          retention-days: 14

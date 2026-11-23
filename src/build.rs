@@ -35,11 +35,10 @@ pub struct RebuildOutcome {
 /// ## Durability guarantee
 ///
 /// The append log is the durable store; the layer mirror (`layers/*.txt`) is
-/// best-effort. Before rebuilding, any append entry not yet reflected in the
-/// mirror is written there so that the new index (which reads from the mirror)
-/// captures it. The mirror is then the authoritative source for all future
-/// rebuilds, meaning a successfully acknowledged record survives arbitrarily
-/// many subsequent consolidations — not just the first one.
+/// best-effort at store time. Consolidation refuses to build or clear the log
+/// if any pending entry cannot be mirrored. After all writes, it verifies that
+/// every pending entry is still present (including after retention trimming).
+/// The configured retention policy can still remove older mirrored entries.
 pub fn rebuild_pending(
     config: &Config,
     force_when_empty: bool,
@@ -69,28 +68,34 @@ pub fn rebuild_pending(
     //
     // Writing the entry to the mirror *before* the build — and before the
     // append log is cleared — means the layer file becomes the canonical
-    // record. The build_consolidating duplicate-detection (60-char prefix
-    // check) prevents double-counting for entries that were already mirrored.
+    // record. Full-text matching avoids mistaking a shared prefix for the entry.
     let layers_dir = Path::new(&config.paths.layers_dir);
     for entry in &entries {
         let layer_name = crate::query::layer_name(entry.layer_id);
         let file_path = layers_dir.join(format!("{}.txt", layer_name));
-        // Read the current mirror content (empty string if the file does not
-        // exist — that is fine, the entry will be written fresh).
-        let current = if file_path.exists() {
-            fs::read_to_string(&file_path).unwrap_or_default()
-        } else {
-            String::new()
+        if !config
+            .memory_layers
+            .layers
+            .iter()
+            .any(|name| name == layer_name)
+        {
+            return Err(format!(
+                "cannot consolidate append entry: layer {} is not configured",
+                layer_name
+            ));
+        }
+        // Only an absent file is an empty mirror. Permission, encoding and
+        // other read errors must not turn existing content into an empty file.
+        let current = match fs::read_to_string(&file_path) {
+            Ok(content) => content,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => String::new(),
+            Err(e) => return Err(format!("mirror read for layer {}: {}", layer_name, e)),
         };
-        // Skip if the mirror already contains this entry (60-char prefix, same
-        // as build_consolidating's dedup check).
-        let needle = entry.text.get(..60).unwrap_or(entry.text.as_str());
-        if !needle.is_empty() && current.contains(needle) {
+        if !entry.text.is_empty() && current.contains(entry.text.as_str()) {
             continue;
         }
-        // Append to the mirror. Errors here are non-fatal (the append log is
-        // still present and will be retried on the next consolidation), but we
-        // log them so they are visible in daemon output.
+        // A failed mirror write must leave the durable log in place. In
+        // particular, never proceed to build and then clear it on failure.
         let stamped = format!("(imp={}) {}", entry.importance, entry.text);
         let sep = if current.is_empty() { "" } else { "\n\n" };
         let new_content = format!("{}{}{}", current, sep, stamped);
@@ -111,22 +116,24 @@ pub fn rebuild_pending(
             new_content
         };
         let tmp = file_path.with_extension("txt.tmp");
-        if let Err(e) = fs::write(&tmp, &capped) {
-            eprintln!(
-                "  {} mirror write for layer {}: {}",
-                "WARN".yellow(),
-                layer_name,
-                e
-            );
-            continue;
-        }
-        if let Err(e) = fs::rename(&tmp, &file_path) {
-            eprintln!(
-                "  {} mirror rename for layer {}: {}",
-                "WARN".yellow(),
-                layer_name,
-                e
-            );
+        fs::write(&tmp, &capped)
+            .map_err(|e| format!("mirror write for layer {}: {}", layer_name, e))?;
+        fs::rename(&tmp, &file_path)
+            .map_err(|e| format!("mirror rename for layer {}: {}", layer_name, e))?;
+    }
+
+    // A later entry can trim an earlier pending entry out of the mirror.
+    // Do not clear the log unless the entire batch is still represented.
+    for entry in &entries {
+        let layer_name = crate::query::layer_name(entry.layer_id);
+        let file_path = layers_dir.join(format!("{}.txt", layer_name));
+        let current = fs::read_to_string(&file_path)
+            .map_err(|e| format!("mirror verification for layer {}: {}", layer_name, e))?;
+        if !current.contains(entry.text.as_str()) {
+            return Err(format!(
+                "cannot consolidate: pending entry missing from layer {} after mirroring (retention may be too small)",
+                layer_name
+            ));
         }
     }
 
@@ -137,7 +144,7 @@ pub fn rebuild_pending(
     build_consolidating(config, true, heavy)?;
 
     // Phase 3: clear the append log *only* after a successful build.
-    if append_path.exists() {
+    if pending_entries > 0 && append_path.exists() {
         fs::remove_file(&append_path).map_err(|e| format!("clear append log: {}", e))?;
         // The append-log vectors are keyed by position in that log, so they die
         // with it: the entries are now main blocks and were embedded by the
@@ -492,10 +499,9 @@ pub fn build(config: &Config, force: bool, heavy: bool) -> Result<(), String> {
 ///
 /// Two things differ from a plain build:
 ///
-/// * the pending append-log entries are merged in. The append log is the
-///   durable store and the mirror write is best effort, so an entry whose
-///   mirror write failed would be lost by a rebuild that only reads the
-///   mirror. The merge is consolidation-only on purpose: a plain build does
+/// * the pending append-log entries are merged in. This also handles entries
+///   not represented by the extracted layer texts. The merge is
+///   consolidation-only on purpose: a plain build does
 ///   not clear the append log, so its entries may already be consolidated
 ///   and re-adding them would resurrect content the retention cap trimmed.
 /// * a shrink is guarded. A rebuild that would produce a smaller index is
@@ -578,12 +584,9 @@ fn build_inner(
 
     let layer_files = &config.memory_layers.layers;
 
-    // The append log is the durable store; the mirror (layers/*.txt) is
-    // best-effort - a failed mirror write is only a WARN - and the retention
-    // cap trims it. A build that only read the mirror would therefore drop
-    // pending entries the mirror no longer holds, so on the consolidation
-    // path the pending entries are merged in. Entries the mirror already
-    // contains are skipped, so a successful mirror write is not duplicated.
+    // Merge pending entries not represented by the extracted layer texts.
+    // rebuild_pending verifies the mirror first; this merge is also used by
+    // direct callers of build_consolidating, which does not clear the log.
     //
     // Consolidation-only: a plain build does not clear the append log, so its
     // entries may already be in the index, and re-adding them would
@@ -609,10 +612,8 @@ fn build_inner(
             if crate::query::layer_name(entry.layer_id) != name.as_str() {
                 continue;
             }
-            // The mirror may store a truncated view of the text, so compare on
-            // a short prefix.
-            let needle = entry.text.get(..60).unwrap_or(entry.text.as_str());
-            if !needle.is_empty() && mirrored.contains(needle) {
+            // Match the entire stored append text, not a potentially shared prefix.
+            if !entry.text.is_empty() && mirrored.contains(entry.text.as_str()) {
                 continue;
             }
             texts.push((entry.text.clone(), entry.importance));

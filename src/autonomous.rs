@@ -634,7 +634,11 @@ impl AutonomousEngine {
             outputs.push(rebuild_out);
         }
 
-        // Tároljuk a ciklus összefoglalót
+        // Log the cycle summary to stdout only — deliberately NOT stored to the
+        // append log. The summary is an internal daemon heartbeat: writing it
+        // durable would increment the append entry count on every cycle and
+        // trigger a spurious threshold-based rebuild, which in turn produces a
+        // new summary entry, creating a self-sustaining rebuild loop.
         let summary = format!(
             "Autonomous cycle #{}: {} modules executed. Energy: {:.1}%, Attention: {:.1}%",
             cycle,
@@ -642,7 +646,7 @@ impl AutonomousEngine {
             energy * 100.0,
             attention * 100.0
         );
-        self.store_result(config, &summary, "session", 3);
+        println!("  📋 {}", summary.dimmed());
 
         if !outputs.is_empty() {
             self.speak(&format!(

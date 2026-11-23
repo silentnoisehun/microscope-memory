@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.2] - 2026-11-23
+
+### Fixed
+
+- **P1 — Acknowledged records survive all subsequent consolidations.**
+  `rebuild_pending` now mirrors every pending append entry to its layer file
+  *before* building the binary index. Previously the `build_consolidating` path
+  merged append entries transiently into the block list but did not write them
+  back to the layer file; a later rebuild that found the entry absent from both
+  the layer file and the (now-cleared) append log silently dropped it. With this
+  fix the layer file becomes the canonical record for all future rebuilds,
+  regardless of corpus size or how many consolidations have occurred.
+  (`src/build.rs` — `rebuild_pending`)
+
+- **P2 — Daemon no longer generates a self-sustaining rebuild loop.**
+  The per-cycle summary string was being written to the durable append log via
+  `store_result`, which incremented the append entry count on every cycle and
+  could trigger a threshold-based rebuild. That rebuild produced a new summary
+  entry, restarting the cycle. The summary is now printed to stdout only and
+  never written to the append log.
+  (`src/autonomous.rs` — `run_cycle`)
+
+- **P2 — Heavy rebuild actually restores a missing `embeddings.bin`.**
+  The incremental build early-exit (`layers unchanged → skip`) fired even when
+  `embeddings.bin` was absent, so the daemon's idle-time restore path logged
+  success while the sidecar remained missing. The early-exit now falls through
+  when `heavy = true`, the embedding provider is not `none`, and `embeddings.bin`
+  does not exist, allowing the sidecar to be regenerated without touching any
+  other index file.
+  (`src/build.rs` — `build_inner`)
+
 ## [1.3.1] - 2026-11-17
 
 ### Fixed

@@ -31,6 +31,15 @@ pub struct RebuildOutcome {
 /// (embedding vectors + structural fingerprint links). The auto-rebuild path
 /// passes `false`: it consolidates the append log fast and drops stale
 /// positional sidecars instead of re-serving them after a content shift.
+///
+/// ## Durability guarantee
+///
+/// The append log is the durable store; the layer mirror (`layers/*.txt`) is
+/// best-effort. Before rebuilding, any append entry not yet reflected in the
+/// mirror is written there so that the new index (which reads from the mirror)
+/// captures it. The mirror is then the authoritative source for all future
+/// rebuilds, meaning a successfully acknowledged record survives arbitrarily
+/// many subsequent consolidations — not just the first one.
 pub fn rebuild_pending(
     config: &Config,
     force_when_empty: bool,
@@ -39,7 +48,8 @@ pub fn rebuild_pending(
     let _lock = FileLock::acquire(config)?;
     let output_dir = Path::new(&config.paths.output_dir);
     let append_path = output_dir.join("append.bin");
-    let pending_entries = read_append_log(&append_path).len();
+    let entries = read_append_log(&append_path);
+    let pending_entries = entries.len();
 
     if pending_entries == 0 && !force_when_empty {
         return Ok(RebuildOutcome {
@@ -48,11 +58,85 @@ pub fn rebuild_pending(
         });
     }
 
-    // The shrink guard lives inside build(), before the new index is
-    // installed: a refusal there keeps the previous index intact. Here we only
-    // build and clear the log afterwards.
+    // Phase 1: mirror any append entry that is not yet in the layer file.
+    //
+    // The build_consolidating path already merges the append log into the
+    // block list at build time, but that merge is transient: the resulting
+    // blocks live in the binary index, not back in the layer file. The *next*
+    // rebuild reads only the layer files (plus whatever is in a fresh append
+    // log), so an entry whose mirror write had previously failed would be
+    // silently lost on the second consolidation.
+    //
+    // Writing the entry to the mirror *before* the build — and before the
+    // append log is cleared — means the layer file becomes the canonical
+    // record. The build_consolidating duplicate-detection (60-char prefix
+    // check) prevents double-counting for entries that were already mirrored.
+    let layers_dir = Path::new(&config.paths.layers_dir);
+    for entry in &entries {
+        let layer_name = crate::query::layer_name(entry.layer_id);
+        let file_path = layers_dir.join(format!("{}.txt", layer_name));
+        // Read the current mirror content (empty string if the file does not
+        // exist — that is fine, the entry will be written fresh).
+        let current = if file_path.exists() {
+            fs::read_to_string(&file_path).unwrap_or_default()
+        } else {
+            String::new()
+        };
+        // Skip if the mirror already contains this entry (60-char prefix, same
+        // as build_consolidating's dedup check).
+        let needle = entry.text.get(..60).unwrap_or(entry.text.as_str());
+        if !needle.is_empty() && current.contains(needle) {
+            continue;
+        }
+        // Append to the mirror. Errors here are non-fatal (the append log is
+        // still present and will be retried on the next consolidation), but we
+        // log them so they are visible in daemon output.
+        let stamped = format!("(imp={}) {}", entry.importance, entry.text);
+        let sep = if current.is_empty() { "" } else { "\n\n" };
+        let new_content = format!("{}{}{}", current, sep, stamped);
+        // Apply layer_retention_entries cap if configured.
+        let cap = config.index.layer_retention_entries;
+        let capped = if cap > 0 {
+            let parts: Vec<&str> = new_content
+                .split("\n\n")
+                .filter(|s| !s.trim().is_empty())
+                .collect();
+            if parts.len() > cap {
+                let start = parts.len() - cap;
+                parts[start..].join("\n\n")
+            } else {
+                new_content
+            }
+        } else {
+            new_content
+        };
+        let tmp = file_path.with_extension("txt.tmp");
+        if let Err(e) = fs::write(&tmp, &capped) {
+            eprintln!(
+                "  {} mirror write for layer {}: {}",
+                "WARN".yellow(),
+                layer_name,
+                e
+            );
+            continue;
+        }
+        if let Err(e) = fs::rename(&tmp, &file_path) {
+            eprintln!(
+                "  {} mirror rename for layer {}: {}",
+                "WARN".yellow(),
+                layer_name,
+                e
+            );
+        }
+    }
+
+    // Phase 2: build the binary index (reads from the now-updated mirrors +
+    // append log for any entries still not in the mirror after Phase 1).
+    // The shrink guard inside build_consolidating fires *before* any index
+    // file is written, so a refusal keeps the installed index intact.
     build_consolidating(config, true, heavy)?;
 
+    // Phase 3: clear the append log *only* after a successful build.
     if append_path.exists() {
         fs::remove_file(&append_path).map_err(|e| format!("clear append log: {}", e))?;
         // The append-log vectors are keyed by position in that log, so they die
@@ -430,7 +514,12 @@ fn build_inner(
 ) -> Result<(), String> {
     let layers_hash = compute_layers_hash(config);
 
-    // Incremental build check — skip if layers unchanged
+    // Incremental build check — skip if layers unchanged.
+    //
+    // Even when layers are unchanged, a heavy rebuild must still proceed if
+    // the semantic sidecar (embeddings.bin) is missing, because the daemon
+    // restore path would otherwise log "success" without actually writing the
+    // file (the hash-match early-exit fires first).
     if !force {
         let output_dir = Path::new(&config.paths.output_dir);
         let meta_path = output_dir.join("meta.bin");
@@ -438,8 +527,22 @@ fn build_inner(
             if meta.len() >= 152 && (&meta[0..4] == b"MSC3" || &meta[0..4] == b"MSC4") {
                 let stored_hash = &meta[120..152];
                 if stored_hash == &layers_hash[..] {
-                    println!("{}", "Layers unchanged — skipping rebuild".green().bold());
-                    return Ok(());
+                    // If this is a heavy build and embeddings.bin is absent,
+                    // fall through so the sidecar is regenerated. For any
+                    // other case the index is current — skip.
+                    let emb_missing = heavy
+                        && config.embedding.provider != "none"
+                        && !output_dir.join("embeddings.bin").exists();
+                    if !emb_missing {
+                        println!("{}", "Layers unchanged — skipping rebuild".green().bold());
+                        return Ok(());
+                    }
+                    println!(
+                        "{}",
+                        "Layers unchanged but embeddings.bin missing — rebuilding sidecars"
+                            .yellow()
+                            .bold()
+                    );
                 }
             }
         }

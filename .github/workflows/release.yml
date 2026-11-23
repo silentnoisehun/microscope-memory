@@ -12,7 +12,20 @@ permissions:
   contents: write
 
 jobs:
+  durability-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Acknowledged-store and semantic restoration regressions
+        run: cargo test --release --locked --features embeddings --test consolidation_durability
+      - name: Existing library and integration regressions
+        run: |
+          cargo test --release --locked --features embeddings --lib
+          cargo test --release --locked --features embeddings --test integration
+
   build-windows:
+    needs: durability-gate
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -38,6 +51,7 @@ jobs:
             target/release/SHA256SUMS.txt
 
   build-linux:
+    needs: durability-gate
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -63,6 +77,7 @@ jobs:
             target/release/SHA256SUMS-linux.txt
 
   build-wasm:
+    needs: durability-gate
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

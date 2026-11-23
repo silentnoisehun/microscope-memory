@@ -1,7 +1,7 @@
 name: release
 
-# On any v* tag push, build the Windows release binary and attach it (plus a
-# SHA256SUMS) to the GitHub Release, so users never have to build themselves.
+# On any v* tag push, build Windows, Linux, and WASM release artifacts
+# and attach them (plus SHA256SUMS) to the GitHub Release.
 
 on:
   push:
@@ -19,18 +19,14 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
 
       - name: Build (release)
-        # The `embeddings` feature is what carries the candle provider and the
-        # multilingual encoder. Without it the binary refuses to serve a
-        # configured `provider = "candle"` index at all, and the release asset
-        # would ship a retrieval path that cannot retrieve. `default` already
-        # contains `native`, so `--features embeddings` is the whole delta.
         run: cargo build --release --locked --features embeddings
 
-      - name: Create checksums
+      - name: Create checksums & package
         shell: bash
         run: |
           cd target/release
-          sha256sum *.exe > SHA256SUMS.txt
+          sha256sum microscope-mem.exe > SHA256SUMS.txt
+          tar -czf microscope-mem-windows-x86_64.tar.gz microscope-mem.exe
 
       - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v2
@@ -38,4 +34,66 @@ jobs:
           tag_name: ${{ github.ref_name }}
           files: |
             target/release/microscope-mem.exe
+            target/release/microscope-mem-windows-x86_64.tar.gz
             target/release/SHA256SUMS.txt
+
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Build (release)
+        run: cargo build --release --locked --features embeddings
+
+      - name: Package Linux Binary
+        run: |
+          cd target/release
+          cp microscope-mem microscope-mem-linux-x86_64
+          sha256sum microscope-mem-linux-x86_64 > SHA256SUMS-linux.txt
+          tar -czf microscope-mem-linux-x86_64.tar.gz microscope-mem-linux-x86_64
+
+      - name: Upload to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: |
+            target/release/microscope-mem-linux-x86_64
+            target/release/microscope-mem-linux-x86_64.tar.gz
+            target/release/SHA256SUMS-linux.txt
+
+  build-wasm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Install wasm-bindgen-cli
+        run: |
+          WANT=$(awk '/^name = "wasm-bindgen"$/{getline; sub(/^version = /, ""); gsub(/[",]/, ""); print; exit}' Cargo.lock)
+          if [ -z "$WANT" ]; then
+            echo "::error::could not read wasm-bindgen version from Cargo.lock" >&2
+            exit 1
+          fi
+          cargo install wasm-bindgen-cli --version "$WANT" --locked
+
+      - name: Build WASM library & bindings
+        run: |
+          cargo build --target wasm32-unknown-unknown --release --locked --no-default-features --features wasm
+          WASM=$(find target/wasm32-unknown-unknown/release -maxdepth 1 -name "*.wasm" | head -1)
+          mkdir -p wasm-pkg
+          wasm-bindgen "$WASM" --target web --out-dir wasm-pkg
+          cd wasm-pkg
+          tar -czf ../microscope-memory-wasm.tar.gz *
+          cd ..
+          sha256sum microscope-memory-wasm.tar.gz > SHA256SUMS-wasm.txt
+
+      - name: Upload to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: |
+            microscope-memory-wasm.tar.gz
+            SHA256SUMS-wasm.txt

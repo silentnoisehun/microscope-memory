@@ -142,7 +142,6 @@ effective_gradient = positive_gradient × (1 − absence_shadow)
 
 The shadow term prevents growth toward areas with weak evidence, without blocking exploration entirely.
 
-![Cognitive Gradient Diagram](docs/architecture/cognitive_gradient.png)
 *The seven-component cognitive gradient drives every learning decision. Bottom-up causality: node → path → organism → field → phase. Top-down: phase → field → growth rule → path → node.*
 
 ---
@@ -359,7 +358,7 @@ Microscope Memory is an open-source project exploring the intersection of **high
 | Document | Content |
 |---|---|
 | [`COGNITIVE_MORPHOGENESIS.md`](COGNITIVE_MORPHOGENESIS.md) | Architecture of the 7-component cognitive gradient, phase transitions, and biological growth algorithms |
-| [`FULL_SYSTEM_DESCRIPTION.md`](FULL_SYSTEM_DESCRIPTION.md) | Complete system description — binary format, storage model, all modules, build system, APIs |
+| [`FULL_SYSTEM_DESCRIPTION.md`](docs/FULL_SYSTEM_DESCRIPTION.md) | Complete system description — binary format, storage model, all modules, build system, APIs |
 | [`BENCHMARKS.md`](BENCHMARKS.md) | Full performance tables, methodology, measurement metadata, and BEIR SciFact evaluation |
 
 ---

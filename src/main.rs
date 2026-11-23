@@ -4270,20 +4270,22 @@ async fn async_main() {
             confidence,
             supersedes,
         } => {
-            crate::reader::store_memory_with_status(
+            if let Err(e) = crate::reader::store_memory_with_status(
                 &config,
                 &text,
                 &layer,
                 importance,
                 status.as_deref(),
                 None,
-            )
-            .expect("store failed");
+            ) {
+                eprintln!("  {} store: {}", "ERR".red(), e);
+                std::process::exit(1);
+            }
 
             let kind = microscope_memory::memory_atom::AtomKind::parse(&kind)
                 .unwrap_or(microscope_memory::memory_atom::AtomKind::Observation);
             let supersedes_id = supersedes.as_deref().and_then(parse_atom_id_hex);
-            let atom = microscope_memory::memory_atom::record_atom(
+            let atom = match microscope_memory::memory_atom::record_atom(
                 Path::new(&config.paths.output_dir),
                 &config.project_id.0,
                 &text,
@@ -4292,8 +4294,13 @@ async fn async_main() {
                 &source,
                 confidence,
                 supersedes_id,
-            )
-            .expect("memory atom failed");
+            ) {
+                Ok(a) => a,
+                Err(e) => {
+                    eprintln!("  {} memory atom: {}", "ERR".red(), e);
+                    std::process::exit(1);
+                }
+            };
             println!(
                 "  {} atom={} kind={} relation={}",
                 "ATOM".cyan().bold(),
@@ -4783,8 +4790,13 @@ async fn async_main() {
         }
         Cmd::Rebuild => {
             println!("{}", "Rebuilding with append log...".cyan());
-            let outcome = microscope_memory::build::rebuild_pending(&config, true, true)
-                .expect("rebuild failed");
+            let outcome = match microscope_memory::build::rebuild_pending(&config, true, true) {
+                Ok(o) => o,
+                Err(e) => {
+                    eprintln!("  {} rebuild: {}", "ERR".red(), e);
+                    std::process::exit(1);
+                }
+            };
             println!(
                 "  Append log cleared after consolidating {} entries.",
                 outcome.pending_entries

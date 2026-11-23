@@ -1,8 +1,8 @@
 {
   "name": "microscope-memory",
-  "version": "1.4.1",
-  "description": "[![Rust](https://img.shields.io/badge/language-Rust-orange.svg)](https://www.rust-lang.org)\r [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)\r [![Zero-JSON](https://img.shields.io/badge/Architecture-Zero--JSON-green.svg)](#core-pillars)\r [![API v1](https://img.shields.io/badge/API-v1.0-cyan.svg)](#-spine-bridge-api-v1)\r [![Doctor](https://img.shields.io/badge/Reliability-Doctor--Cmd-green.svg)](#-reliability--doctor-command)",
-  "main": "index.js",
+  "version": "1.4.3",
+  "description": "Hierarchical cognitive memory engine — zero-JSON binary format, sub-microsecond recall, 12-layer storage. Rust-native, MCP-compatible.",
+  "main": "mcp-server/index.js",
   "directories": {
     "example": "examples",
     "test": "tests"
@@ -16,7 +16,7 @@
   },
   "keywords": [],
   "author": "",
-  "license": "ISC",
+  "license": "MIT",
   "type": "module",
   "bugs": {
     "url": "https://github.com/silentnoisehun/microscope-memory/issues"

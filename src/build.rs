@@ -227,6 +227,8 @@ mod append_embedding_tests {
 /// Consolidate the append log automatically when the configured threshold is
 /// reached, or immediately when no main index exists yet.
 
+// ─────────────────────────────────────────────────────────────────────────────
+
 /// State model for the semantic embedding index.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SemanticIndexState {

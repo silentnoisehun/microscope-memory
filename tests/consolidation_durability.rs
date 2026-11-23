@@ -244,7 +244,7 @@ fn headerless_legacy_log_cannot_be_mixed_with_modern_records() {
     let text = b"legacy unique memory";
     let mut data = Vec::new();
     data.extend_from_slice(&(text.len() as u32).to_le_bytes());
-    data.extend_from_slice(&[0, 5]);
+    data.extend_from_slice(&[microscope_memory::layer_to_id("long_term"), 5]);
     data.extend_from_slice(&[0; 12]);
     data.extend_from_slice(text);
     fs::write(&path, &data).unwrap();

@@ -371,11 +371,17 @@ fn split_oversized_entry(line: &str) -> Vec<String> {
 // An arbitrary substring in a larger memory is not an independently
 // recoverable entry. Match what the normal layer parser will actually index,
 // including its optional session timestamp, and reject any oversized block.
+//
+// Both `mirrored` (from `extract_texts_from_file`) and `entry` (from the
+// append log) are normalised with `canonicalize_entry_text` before comparison,
+// so trailing whitespace and internal double-newlines (e.g. from daemon-generated
+// Daydream content) do not cause a spurious mismatch.
 fn mirror_text_matches(mirrored: &str, layer: &str, entry: &str) -> bool {
     if mirrored.len() > BLOCK_DATA_SIZE {
         return false;
     }
-    if mirrored == entry {
+    let canonical = canonicalize_entry_text(entry);
+    if mirrored == canonical {
         return true;
     }
     if layer != "session" {
@@ -395,7 +401,33 @@ fn mirror_text_matches(mirrored: &str, layer: &str, entry: &str) -> bool {
         && [1, 2, 3, 4, 6, 7, 9, 10, 12, 13, 15, 16]
             .iter()
             .all(|&i| bytes[i].is_ascii_digit());
-    timestamp && mirrored.get(19..) == Some(entry)
+    timestamp && mirrored.get(19..) == Some(canonical.as_str())
+}
+
+/// Canonical text representation for mirror storage and comparison.
+///
+/// Collapses runs of two-or-more consecutive newlines (the layer-file entry
+/// separator) into a single newline, then trims leading/trailing whitespace.
+/// This ensures that:
+///
+/// - Entries with trailing spaces round-trip correctly through the mirror.
+/// - Multi-paragraph entries produced by daemon Daydream (which contain `\n\n`)
+///   are stored and matched in the same normalised form.
+///
+/// Only the *text* portion is normalised; `imp=` markers are handled by the
+/// caller after extraction.
+pub(crate) fn canonicalize_entry_text(s: &str) -> String {
+    // Split on runs of 2+ newlines, trim each part, rejoin with single newline.
+    // A single trailing/leading newline is covered by the outer trim().
+    let parts: Vec<&str> = s
+        .split("\n\n")
+        .map(|chunk| chunk.trim())
+        .filter(|chunk| !chunk.is_empty())
+        .collect();
+    if parts.is_empty() {
+        return String::new();
+    }
+    parts.join("\n")
 }
 
 fn mirror_contains_entry(path: &Path, layer: &str, entry: &str) -> bool {
@@ -1754,6 +1786,86 @@ mod tests {
         let entry = "A short fact that fits in a block. Another sentence.";
         let pieces = split_oversized_entry(entry);
         assert_eq!(pieces, vec![entry.to_string()]);
+    }
+
+    // ── canonicalize_entry_text ──────────────────────────────────────────────
+
+    /// Trailing whitespace must be stripped so the mirror lookup does not miss
+    /// an entry that was stored with a trailing space.
+    #[test]
+    fn canonicalize_strips_trailing_whitespace() {
+        assert_eq!(canonicalize_entry_text("hello world "), "hello world");
+        assert_eq!(canonicalize_entry_text("  leading and trailing  "), "leading and trailing");
+    }
+
+    /// Double (or more) newlines — the layer-file entry separator — must be
+    /// collapsed to a single newline so the entry does not get split across
+    /// paragraphs when the mirror is read back.
+    #[test]
+    fn canonicalize_collapses_double_newlines() {
+        assert_eq!(
+            canonicalize_entry_text("paragraph one\n\nparagraph two"),
+            "paragraph one\nparagraph two"
+        );
+        assert_eq!(
+            canonicalize_entry_text("a\n\n\n\nb"),
+            "a\nb"
+        );
+    }
+
+    /// Single newlines (line wraps inside one paragraph) are preserved as-is.
+    #[test]
+    fn canonicalize_preserves_single_newlines() {
+        assert_eq!(
+            canonicalize_entry_text("line one\nline two"),
+            "line one\nline two"
+        );
+    }
+
+    /// Empty-or-whitespace-only input returns an empty string.
+    #[test]
+    fn canonicalize_empty_input() {
+        assert_eq!(canonicalize_entry_text(""), "");
+        assert_eq!(canonicalize_entry_text("   "), "");
+        assert_eq!(canonicalize_entry_text("\n\n"), "");
+    }
+
+    // ── mirror_text_matches ──────────────────────────────────────────────────
+
+    /// An entry with trailing whitespace must still be found in the mirror
+    /// (regression for the B-case from the v1.4.4 audit).
+    #[test]
+    fn mirror_matches_entry_with_trailing_space() {
+        // `mirrored` is what extract_texts_from_file returns: already trimmed.
+        // `entry` is the raw append-log text, which may have trailing whitespace.
+        assert!(mirror_text_matches("hello world", "long_term", "hello world "));
+        assert!(mirror_text_matches("hello world", "long_term", "hello world\n"));
+    }
+
+    /// An entry with internal double-newlines (daemon Daydream content) must
+    /// be found after canonicalisation collapses it to single newlines.
+    #[test]
+    fn mirror_matches_entry_with_double_newline() {
+        // The mirror file stores "paragraph one\nparagraph two" because
+        // persist_to_layer_file canonicalises before writing.
+        // The append log entry still has the original "\n\n".
+        assert!(mirror_text_matches(
+            "paragraph one\nparagraph two",
+            "associative",
+            "paragraph one\n\nparagraph two"
+        ));
+    }
+
+    /// A clean entry without any whitespace quirks must still match normally.
+    #[test]
+    fn mirror_matches_clean_entry() {
+        assert!(mirror_text_matches("plain fact", "long_term", "plain fact"));
+    }
+
+    /// An entry that differs in content (not just whitespace) must NOT match.
+    #[test]
+    fn mirror_does_not_match_different_entry() {
+        assert!(!mirror_text_matches("fact A", "long_term", "fact B"));
     }
 
     /// A layer file with one entry per line must yield one block per line.

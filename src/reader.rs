@@ -1550,10 +1550,22 @@ fn persist_to_layer_file(
             .unwrap_or_default()
             .as_secs();
         let datetime = chrono_stamp(ts);
-        stamped = format!("(imp={}) [{}] {}", importance, datetime, text);
+        // Canonicalise the text so that trailing whitespace and internal
+        // double-newlines (the layer-file entry separator) cannot corrupt
+        // the mirror or cause a rebuild mismatch later.
+        stamped = format!(
+            "(imp={}) [{}] {}",
+            importance,
+            datetime,
+            crate::build::canonicalize_entry_text(text)
+        );
         &stamped
     } else {
-        stamped = format!("(imp={}) {}", importance, text);
+        stamped = format!(
+            "(imp={}) {}",
+            importance,
+            crate::build::canonicalize_entry_text(text)
+        );
         &stamped
     };
     let mut entries: Vec<&str> = content
@@ -1968,6 +1980,17 @@ fn store_memory_with_status_inner(
     file.flush()
         .map_err(|e| format!("flush append log: {}", e))?;
 
+    // The append entry is now flushed and durable. Release the writer and
+    // the file lock *before* the embedding step: the embedding provider may
+    // call std::process::exit(2) on model-load failure, which bypasses Drop
+    // and would otherwise leave a stale microscope.lock behind. Releasing
+    // here is safe because append.bin is already durable; subsequent readers
+    // are serialised by the atomic log format, not by this lock.
+    // The same early release also allows maybe_auto_rebuild (further below)
+    // to re-acquire the lock without deadlocking.
+    drop(file);
+    drop(_lock);
+
     // Append-log vector: embed the stored text once so the semantic path can
     // reach it before the next rebuild (see `embed_appended_entry_with`). Done
     // before the layer-file write so a slow provider cannot delay persistence.
@@ -2022,11 +2045,6 @@ fn store_memory_with_status_inner(
             eprintln!("  {} append emotion log: {}", "WARN".yellow(), e);
         }
     }
-
-    // Release the writer and process lock before a possible rebuild. The
-    // rebuild helper acquires the same lock and rechecks the threshold.
-    drop(file);
-    drop(_lock);
 
     match crate::build::maybe_auto_rebuild(config) {
         Ok(Some(count)) => eprintln!(

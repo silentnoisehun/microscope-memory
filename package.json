@@ -1,8 +1,8 @@
 {
   "name": "microscope-memory",
-  "version": "1.4.3",
+  "version": "1.4.4",
   "description": "Hierarchical cognitive memory engine — zero-JSON binary format, sub-microsecond recall, 12-layer storage. Rust-native, MCP-compatible.",
-  "main": "mcp-server/index.js",
+  "main": "integrations/ai-agent-hook/microscope-hook.js",
   "directories": {
     "example": "examples",
     "test": "tests"

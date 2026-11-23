@@ -33,7 +33,7 @@ jobs:
       - name: Build and smoke test
         run: |
           cargo build --release --locked --features embeddings --bin microscope-mem
-          target/release/microscope-mem --version
+          target/release/microscope-mem --help
           mkdir package
           cp target/release/microscope-mem package/microscope-mem-linux-x86_64
           cd package
@@ -57,7 +57,7 @@ jobs:
         shell: bash
         run: |
           cargo build --release --locked --features embeddings --bin microscope-mem
-          target/release/microscope-mem.exe --version
+          target/release/microscope-mem.exe --help
           mkdir package
           cp target/release/microscope-mem.exe package/
           cd package

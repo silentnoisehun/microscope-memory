@@ -45,6 +45,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
+          draft: true
           files: |
             target/release/microscope-mem.exe
             target/release/microscope-mem-windows-x86_64.tar.gz
@@ -71,6 +72,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
+          draft: true
           files: |
             target/release/microscope-mem-linux-x86_64
             target/release/microscope-mem-linux-x86_64.tar.gz
@@ -109,6 +111,32 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
+          draft: true
           files: |
             microscope-memory-wasm.tar.gz
             SHA256SUMS-wasm.txt
+
+  publish:
+    # Do not expose a partial release if a build, test, or upload fails.
+    needs: [build-linux, build-windows, build-wasm]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Verify all release assets exist before publishing
+        shell: bash
+        run: |
+          set -euo pipefail
+          assets=$(gh release view "$GITHUB_REF_NAME" --json assets --jq '.assets[].name')
+          for name in microscope-mem.exe microscope-mem-windows-x86_64.tar.gz SHA256SUMS.txt \
+            microscope-mem-linux-x86_64 microscope-mem-linux-x86_64.tar.gz SHA256SUMS-linux.txt \
+            microscope-memory-wasm.tar.gz SHA256SUMS-wasm.txt; do
+            printf '%s\n' "$assets" | grep -Fx -- "$name" > /dev/null || {
+              echo "Missing release asset: $name" >&2
+              exit 1
+            }
+          done
+      - name: Publish completed release
+        run: gh release edit "$GITHUB_REF_NAME" --draft=false --latest

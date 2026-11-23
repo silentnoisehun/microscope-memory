@@ -401,7 +401,13 @@ pub struct MicroscopeWasm {
 impl MicroscopeWasm {
     #[wasm_bindgen(constructor)]
     pub fn new() -> Self {
-        console::log_1(&"Microscope Memory WASM v0.2.0 initialized".into());
+        console::log_1(
+            &format!(
+                "Microscope Memory WASM v{} initialized",
+                env!("CARGO_PKG_VERSION")
+            )
+            .into(),
+        );
         Self {
             reader: None,
             append_entries: Vec::new(),

@@ -1022,7 +1022,7 @@ Two separate measurements, both reproduced by scripts committed to the
 repository.
 
 **Text index and reinforcement cost.** Reproducing the project's own latency
-benchmark (`.scratch_bench.ps1`) on the real corpus -- 694,868 blocks, warm page
+benchmark (`scripts/benchmarks/windows/bench.ps1`) on the real corpus -- 694,868 blocks, warm page
 cache, one end-to-end invocation per row -- via
 [`scripts/bench_text_index.sh`](scripts/bench_text_index.sh):
 

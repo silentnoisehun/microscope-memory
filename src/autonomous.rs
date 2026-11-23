@@ -67,12 +67,12 @@ pub fn read_store_counter(path: &Path) -> u64 {
 pub fn increment_store_counter(path: &Path) -> u64 {
     let current = read_store_counter(path);
     let next = current.saturating_add(1);
-    let _ = std::fs::write(path, &next.to_le_bytes());
+    let _ = std::fs::write(path, next.to_le_bytes());
     next
 }
 
 pub fn reset_store_counter(path: &Path) {
-    let _ = std::fs::write(path, &0u64.to_le_bytes());
+    let _ = std::fs::write(path, 0u64.to_le_bytes());
 }
 
 // ─── AutonomousConfig ──────────────────────────────────────

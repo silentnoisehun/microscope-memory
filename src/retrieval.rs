@@ -220,6 +220,7 @@ pub fn is_superseded_or_inactive(
     false
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn rank_candidates(
     config: &Config,
     reader: &MicroscopeReader,

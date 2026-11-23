@@ -2306,7 +2306,8 @@ async fn async_main() {
         } => {
             use microscope_memory::code_memory::{CodeEntryType, CodeMemory, CodeQuery};
 
-            let code_mem = CodeMemory::new();
+            let output_dir = std::path::Path::new(&config.paths.output_dir);
+            let code_mem = CodeMemory::load_or_init(output_dir);
 
             if let Some(entry_str) = store {
                 let parts: Vec<&str> = entry_str.splitn(6, ':').collect();
@@ -2337,6 +2338,7 @@ async fn async_main() {
                         id,
                         parts.get(1).unwrap_or(&"")
                     );
+                    let _ = code_mem.save(output_dir);
                 }
             }
 
@@ -2351,6 +2353,7 @@ async fn async_main() {
                         "default",
                     );
                     println!("  {} Stored error-solution #{}", "FIX".green().bold(), id);
+                    let _ = code_mem.save(output_dir);
                 }
             }
 
@@ -7430,7 +7433,55 @@ async fn async_main() {
         Cmd::Octopus { operation } => {
             use std::process::Command;
 
-            let octopus_bin = r"C:\Users\mater\.agents\skills\octopus\bin\octopus-runtime.exe";
+            let current_exe = std::env::current_exe()
+                .unwrap_or_else(|_| std::path::PathBuf::from("microscope-mem"));
+            let config_env = std::env::var("MICROSCOPE_CONFIG").ok();
+            let project_dir =
+                std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
+
+            // Resolve octopus binary: OCTOPUS_BIN -> PATH -> standard locations
+            let resolve_octopus_bin = || -> Option<std::path::PathBuf> {
+                if let Ok(p) = std::env::var("OCTOPUS_BIN") {
+                    let pb = std::path::PathBuf::from(p);
+                    if pb.exists() {
+                        return Some(pb);
+                    }
+                }
+                let exe_name = if cfg!(windows) {
+                    "octopus-runtime.exe"
+                } else {
+                    "octopus-runtime"
+                };
+                if let Ok(path_var) = std::env::var("PATH") {
+                    for dir in std::env::split_paths(&path_var) {
+                        let candidate = dir.join(exe_name);
+                        if candidate.is_file() {
+                            return Some(candidate);
+                        }
+                    }
+                }
+                let home = std::env::var("USERPROFILE")
+                    .or_else(|_| std::env::var("HOME"))
+                    .ok()
+                    .map(std::path::PathBuf::from);
+                if let Some(h) = home {
+                    let candidates = [
+                        h.join(".hope").join("bin").join(exe_name),
+                        h.join(".agents")
+                            .join("skills")
+                            .join("octopus")
+                            .join("bin")
+                            .join(exe_name),
+                        h.join(".minimax").join("bin").join(exe_name),
+                    ];
+                    for c in &candidates {
+                        if c.exists() {
+                            return Some(c.clone());
+                        }
+                    }
+                }
+                None
+            };
 
             match operation.as_str() {
                 "full-pipeline" => {
@@ -7440,11 +7491,19 @@ async fn async_main() {
 
                     // Arm 1: Absentia scan
                     println!("  ├─ Arm 1: Absentia scan...");
-                    let output1 = Command::new(octopus_bin)
+                    let oct_bin = match resolve_octopus_bin() {
+                        Some(b) => b,
+                        None => {
+                            eprintln!("  {} OCTOPUS_BIN is not set and octopus-runtime was not found in PATH.", "ERROR".red());
+                            eprintln!("  Set OCTOPUS_BIN environment variable or install octopus-runtime.");
+                            return;
+                        }
+                    };
+                    let output1 = Command::new(&oct_bin)
                         .args([
                             "run",
                             "code-reader",
-                            &format!("{}{}", "absentia scan — ", "D:\\codex\\microscope-memory"),
+                            &format!("absentia scan — {}", project_dir.display()),
                         ])
                         .output();
                     match output1 {
@@ -7465,15 +7524,12 @@ async fn async_main() {
 
                     // Arm 2: Morphogenesis cycle
                     println!("  ├─ Arm 2: Morphogenesis cycle...");
-                    let output2 = Command::new(
-                        "D:\\codex\\microscope-memory\\target\\release\\microscope-mem.exe",
-                    )
-                    .args(["morphogenesis", "run"])
-                    .env(
-                        "MICROSCOPE_CONFIG",
-                        "D:\\codex\\microscope-memory\\config.toml",
-                    )
-                    .output();
+                    let mut cmd2 = Command::new(&current_exe);
+                    cmd2.args(["morphogenesis", "run"]);
+                    if let Some(ref c) = config_env {
+                        cmd2.env("MICROSCOPE_CONFIG", c);
+                    }
+                    let output2 = cmd2.output();
                     match output2 {
                         Ok(o) => {
                             let _stdout = String::from_utf8_lossy(&o.stdout);
@@ -7488,15 +7544,12 @@ async fn async_main() {
 
                     // Arm 3: Intent generation
                     println!("  └─ Arm 3: Intent generation...");
-                    let output3 = Command::new(
-                        "D:\\codex\\microscope-memory\\target\\release\\microscope-mem.exe",
-                    )
-                    .args(["intent", "generate"])
-                    .env(
-                        "MICROSCOPE_CONFIG",
-                        "D:\\codex\\microscope-memory\\config.toml",
-                    )
-                    .output();
+                    let mut cmd3 = Command::new(&current_exe);
+                    cmd3.args(["intent", "generate"]);
+                    if let Some(ref c) = config_env {
+                        cmd3.env("MICROSCOPE_CONFIG", c);
+                    }
+                    let output3 = cmd3.output();
                     match output3 {
                         Ok(o) => {
                             let stdout = String::from_utf8_lossy(&o.stdout);
@@ -7517,15 +7570,12 @@ async fn async_main() {
                 }
                 "scan" => {
                     println!("{}", "OCTOPUS SCAN".cyan().bold());
-                    let output = Command::new(
-                        "D:\\codex\\microscope-memory\\target\\release\\microscope-mem.exe",
-                    )
-                    .args(["absentia", "scan"])
-                    .env(
-                        "MICROSCOPE_CONFIG",
-                        "D:\\codex\\microscope-memory\\config.toml",
-                    )
-                    .output();
+                    let mut cmd = Command::new(&current_exe);
+                    cmd.args(["absentia", "scan"]);
+                    if let Some(ref c) = config_env {
+                        cmd.env("MICROSCOPE_CONFIG", c);
+                    }
+                    let output = cmd.output();
                     match output {
                         Ok(o) => {
                             let stdout = String::from_utf8_lossy(&o.stdout);
@@ -7536,15 +7586,12 @@ async fn async_main() {
                 }
                 "cycle" => {
                     println!("{}", "OCTOPUS CYCLE".cyan().bold());
-                    let output = Command::new(
-                        "D:\\codex\\microscope-memory\\target\\release\\microscope-mem.exe",
-                    )
-                    .args(["morphogenesis", "run"])
-                    .env(
-                        "MICROSCOPE_CONFIG",
-                        "D:\\codex\\microscope-memory\\config.toml",
-                    )
-                    .output();
+                    let mut cmd = Command::new(&current_exe);
+                    cmd.args(["morphogenesis", "run"]);
+                    if let Some(ref c) = config_env {
+                        cmd.env("MICROSCOPE_CONFIG", c);
+                    }
+                    let output = cmd.output();
                     match output {
                         Ok(o) => {
                             let stdout = String::from_utf8_lossy(&o.stdout);
@@ -7775,13 +7822,20 @@ async fn async_main() {
             interval,
             max_cycles,
         } => {
-            let auto_config = microscope_memory::autonomous::AutonomousConfig {
-                cycle_interval_secs: interval,
-                tts_enabled: tts,
-                daemon_mode: daemon,
-                max_cycles,
-                ..Default::default()
-            };
+            let mut auto_config =
+                microscope_memory::autonomous::AutonomousConfig::from_config(&config);
+            if tts {
+                auto_config.tts_enabled = true;
+            }
+            if daemon {
+                auto_config.daemon_mode = true;
+            }
+            if interval != 30 || auto_config.cycle_interval_secs == 0 {
+                auto_config.cycle_interval_secs = interval;
+            }
+            if max_cycles.is_some() {
+                auto_config.max_cycles = max_cycles;
+            }
             microscope_memory::autonomous::print_autonomous_header(&auto_config);
             let engine = microscope_memory::autonomous::AutonomousEngine::new(auto_config);
             engine.run(&config);

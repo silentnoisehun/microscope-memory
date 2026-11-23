@@ -16,7 +16,9 @@ use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-#[derive(Debug, Clone, PartialEq)]
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum CodeEntryType {
     /// Függvény/metódus definíció
     Function,
@@ -38,7 +40,7 @@ pub enum CodeEntryType {
     Note,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CodeEntry {
     pub id: u64,
     pub entry_type: CodeEntryType,
@@ -85,6 +87,50 @@ impl CodeMemory {
             project_index: Arc::new(RwLock::new(HashMap::new())),
             symbol_index: Arc::new(RwLock::new(HashMap::new())),
         }
+    }
+
+    pub fn load_or_init(output_dir: &std::path::Path) -> Self {
+        let path = output_dir.join("code_memory.bin");
+        if let Ok(data) = std::fs::read(&path) {
+            if data.len() >= 4 && &data[0..4] == b"CDM1" {
+                if let Ok(entries) = bincode::deserialize::<Vec<CodeEntry>>(&data[4..]) {
+                    let mut project_index: HashMap<String, Vec<u64>> = HashMap::new();
+                    let mut symbol_index: HashMap<String, Vec<u64>> = HashMap::new();
+                    let mut max_id: u64 = 0;
+                    for e in &entries {
+                        if e.id > max_id {
+                            max_id = e.id;
+                        }
+                        project_index
+                            .entry(e.project.clone())
+                            .or_default()
+                            .push(e.id);
+                        for s in &e.symbols {
+                            symbol_index.entry(s.to_lowercase()).or_default().push(e.id);
+                        }
+                    }
+                    return Self {
+                        entries: Arc::new(RwLock::new(entries)),
+                        next_id: Arc::new(RwLock::new(max_id + 1)),
+                        project_index: Arc::new(RwLock::new(project_index)),
+                        symbol_index: Arc::new(RwLock::new(symbol_index)),
+                    };
+                }
+            }
+        }
+        Self::new()
+    }
+
+    pub fn save(&self, output_dir: &std::path::Path) -> Result<(), String> {
+        let path = output_dir.join("code_memory.bin");
+        let entries = crate::sync_guard::read_lock(&self.entries).clone();
+        let encoded = bincode::serialize(&entries)
+            .map_err(|e| format!("Failed to serialize code memory: {e}"))?;
+        let mut data = Vec::with_capacity(4 + encoded.len());
+        data.extend_from_slice(b"CDM1");
+        data.extend_from_slice(&encoded);
+        std::fs::write(&path, data).map_err(|e| format!("Failed to write code_memory.bin: {e}"))?;
+        Ok(())
     }
 
     fn nid(&self) -> u64 {
@@ -313,5 +359,37 @@ impl std::fmt::Display for CodeEntryType {
             CodeEntryType::Structure => write!(f, "Structure"),
             CodeEntryType::Note => write!(f, "Note"),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_code_memory_persistence() {
+        let dir = tempfile::tempdir().unwrap();
+        let mem = CodeMemory::new();
+        let id = mem.store(
+            CodeEntryType::Function,
+            "test_fn",
+            "fn test_fn() {}",
+            "src/test.rs",
+            "rust",
+            "my_project",
+            vec!["test_fn".into()],
+            vec!["unit-test".into()],
+        );
+        assert_eq!(id, 1);
+        mem.save(dir.path()).unwrap();
+
+        let loaded = CodeMemory::load_or_init(dir.path());
+        let list = loaded.list_by_type(CodeEntryType::Function);
+        assert_eq!(list.len(), 1);
+        assert_eq!(list[0].title, "test_fn");
+        assert_eq!(list[0].project, "my_project");
+
+        let sym_results = loaded.recall_by_symbol("test_fn");
+        assert_eq!(sym_results.len(), 1);
     }
 }

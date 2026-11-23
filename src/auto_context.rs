@@ -57,7 +57,7 @@ pub struct AutoContext {
     pub core_memories: Vec<CoreMemory>,
 }
 
-fn latest_observation_states(
+pub fn latest_observation_states(
     entries: &[timeline::TimelineEntry],
 ) -> std::collections::HashMap<String, (u64, u8)> {
     let mut states = std::collections::HashMap::new();

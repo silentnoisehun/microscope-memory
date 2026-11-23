@@ -725,19 +725,55 @@ fn recall_internal(
     let reader = MicroscopeReader::open(&state.config)
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
-    let query_lower = query.to_lowercase();
     let (qx, qy, qz) =
         crate::content_coords_blended(query, "long_term", state.config.search.semantic_weight);
-    let depth = crate::auto_depth(query);
-    let results = reader.radial_search(&state.config, qx, qy, qz, depth, 0.5, k);
+
+    let semantic_candidates =
+        crate::retrieval::collect_semantic_candidates(&state.config, &reader, query, k);
+
+    let append_path = std::path::Path::new(&state.config.paths.output_dir).join("append.bin");
+    let appended = crate::read_append_log(&append_path);
+
+    let ranked = crate::retrieval::rank_candidates(
+        &state.config,
+        &reader,
+        &appended,
+        query,
+        &semantic_candidates,
+        qx,
+        qy,
+        qz,
+        None,
+        None,
+    );
 
     let mut response = Vec::new();
-    for res in results.all() {
-        if !res.is_main {
-            continue;
-        }
-        let h = reader.header(res.block_idx);
-        let raw_text = reader.text(res.block_idx).to_string();
+    for hit in ranked {
+        let (raw_text, depth, layer) = match hit.id {
+            crate::retrieval::MemoryId::Main(idx) => {
+                let h = reader.header(idx);
+                let text = reader.text(idx).to_string();
+                let layer = LAYER_NAMES
+                    .get(h.layer_id as usize)
+                    .copied()
+                    .unwrap_or("unknown")
+                    .to_string();
+                (text, h.depth, layer)
+            }
+            crate::retrieval::MemoryId::Append(idx) => {
+                if let Some(entry) = appended.get(idx) {
+                    let layer = LAYER_NAMES
+                        .get(entry.layer_id as usize)
+                        .copied()
+                        .unwrap_or("long_term")
+                        .to_string();
+                    (entry.text.clone(), 4, layer)
+                } else {
+                    continue;
+                }
+            }
+        };
+
         let text = if let Some(uid) = user_scope {
             match strip_user_scope(&raw_text, uid) {
                 Some(t) => t,
@@ -746,16 +782,12 @@ fn recall_internal(
         } else {
             raw_text
         };
-        let layer = LAYER_NAMES
-            .get(h.layer_id as usize)
-            .copied()
-            .unwrap_or("unknown")
-            .to_string();
+
         response.push(MemoryResponse {
             text,
-            depth: h.depth,
+            depth,
             layer,
-            distance: res.dist_sq.sqrt(),
+            distance: hit.distance,
             memory_scope: if user_scope.is_some() {
                 "personal"
             } else {
@@ -766,45 +798,6 @@ fn recall_internal(
         });
     }
 
-    let append_path = std::path::Path::new(&state.config.paths.output_dir).join("append.bin");
-    let appended = crate::read_append_log(&append_path);
-    for entry in &appended {
-        if response.len() >= k {
-            break;
-        }
-        if !entry.text.to_lowercase().contains(&query_lower) {
-            continue;
-        }
-        let text = if let Some(uid) = user_scope {
-            match strip_user_scope(&entry.text, uid) {
-                Some(t) => t,
-                None => continue,
-            }
-        } else {
-            entry.text.clone()
-        };
-        let layer = LAYER_NAMES
-            .get(entry.layer_id as usize)
-            .copied()
-            .unwrap_or("long_term")
-            .to_string();
-        response.push(MemoryResponse {
-            text,
-            depth: 4,
-            layer,
-            distance: 0.1,
-            memory_scope: if user_scope.is_some() {
-                "personal"
-            } else {
-                "shared"
-            }
-            .to_string(),
-            dedup_depths: Vec::new(),
-        });
-    }
-
-    // Deduplicate on text and apply the k limit to distinct facts, so one fact
-    // stored at several depths cannot occupy the whole top-k.
     Ok(dedup_by_text(response, k))
 }
 

@@ -142,6 +142,36 @@ mod append_embedding_tests {
 
 /// Consolidate the append log automatically when the configured threshold is
 /// reached, or immediately when no main index exists yet.
+
+/// State model for the semantic embedding index.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SemanticIndexState {
+    /// Embeddings index exists and matches configured embedding model.
+    Ready,
+    /// Embeddings index is missing; retrieval operates in degraded mode.
+    Degraded,
+    /// Index is actively being rebuilt.
+    Rebuilding,
+}
+
+/// Query the semantic index state for the given configuration.
+pub fn semantic_index_state(config: &Config) -> SemanticIndexState {
+    if config.embedding.provider == "none" {
+        return SemanticIndexState::Ready;
+    }
+    let output_dir = Path::new(&config.paths.output_dir);
+    let emb_path = output_dir.join("embeddings.bin");
+    if !emb_path.exists() {
+        return SemanticIndexState::Degraded;
+    }
+    if let Some(index) = crate::embedding_index::open_embedding_cached(&emb_path) {
+        if index.matches_config(&config.embedding) {
+            return SemanticIndexState::Ready;
+        }
+    }
+    SemanticIndexState::Degraded
+}
+
 pub fn maybe_auto_rebuild(config: &Config) -> Result<Option<usize>, String> {
     if !config.index.auto_rebuild {
         return Ok(None);
@@ -160,7 +190,8 @@ pub fn maybe_auto_rebuild(config: &Config) -> Result<Option<usize>, String> {
         return Ok(None);
     }
 
-    let outcome = rebuild_pending(config, false, false)?;
+    let heavy = config.index.auto_rebuild_heavy && config.embedding.provider != "none";
+    let outcome = rebuild_pending(config, false, heavy)?;
     Ok(outcome.rebuilt.then_some(outcome.pending_entries))
 }
 
@@ -1212,6 +1243,12 @@ fn build_inner(
             "  {} heavy sidecars skipped (embeddings, fingerprint); stale copies removed",
             "LIGHT".cyan()
         );
+        if config.embedding.provider != "none" {
+            println!(
+                "  {} [SEMANTIC: DEGRADED] embeddings.bin removed; will be rebuilt on next heavy/daemon build",
+                "WARN".yellow()
+            );
+        }
     } else {
         println!(
             "  {} layers unchanged — heavy sidecars kept",

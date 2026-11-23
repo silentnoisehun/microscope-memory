@@ -1,0 +1,59 @@
+{
+  "enabled": true,
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "name": "Microscope Memory: Session Context",
+            "command": "node \"${HOOKS_DIR}/microscope-hook.js\" session-start",
+            "commandWindows": "node \"${HOOKS_DIR}\\microscope-hook.js\" session-start",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "name": "Microscope Memory: Retrieved Context",
+            "command": "node \"${HOOKS_DIR}/microscope-hook.js\" prompt",
+            "commandWindows": "node \"${HOOKS_DIR}\\microscope-hook.js\" prompt",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "name": "Microscope Memory: Store Tool Interaction",
+            "command": "node \"${HOOKS_DIR}/microscope-hook.js\" tool-result",
+            "commandWindows": "node \"${HOOKS_DIR}\\microscope-hook.js\" tool-result",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "name": "Microscope Memory: Session Digest",
+            "command": "node \"${HOOKS_DIR}/microscope-hook.js\" stop",
+            "commandWindows": "node \"${HOOKS_DIR}\\microscope-hook.js\" stop",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

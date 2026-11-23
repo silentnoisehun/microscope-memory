@@ -370,7 +370,7 @@ pub enum Cmd {
         #[arg(long)]
         fix: bool,
     },
-    /// Start the Mermaid Terminal (WebSocket + HTML UI on port 8080)
+    /// Start the Mermaid Terminal (WebSocket + HTML UI on port 8080) [NOT YET IMPLEMENTED - use serve]
     Mermaid {
         #[arg(short, long, default_value = "8080")]
         port: u16,

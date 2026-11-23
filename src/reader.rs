@@ -1791,6 +1791,9 @@ pub fn store_memory_temporary(
         eprintln!("  {} append timeline: {}", "WARN".yellow(), e);
     }
 
+    // Persistent store counter for autonomous daemon dream trigger
+    crate::autonomous::increment_store_counter(&output_dir.join("store_counter.bin"));
+
     Ok(())
 }
 

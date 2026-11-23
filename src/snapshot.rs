@@ -151,6 +151,8 @@ pub fn diff(a_path: &Path, b_path: &Path) -> Result<(), String> {
     println!("  {} vs {}", a_path.display(), b_path.display());
 
     // Compare Merkle roots if both have meta.bin
+    let a_has_meta = a_files.contains_key("meta.bin");
+    let b_has_meta = b_files.contains_key("meta.bin");
     let a_root = extract_merkle_root(&a_files);
     let b_root = extract_merkle_root(&b_files);
     match (a_root, b_root) {
@@ -163,7 +165,13 @@ pub fn diff(a_path: &Path, b_path: &Path) -> Result<(), String> {
                 println!("  DIFF Merkle roots differ — data changed");
             }
         }
-        _ => println!("  (cannot compare Merkle roots — meta.bin missing)"),
+        _ => {
+            if !a_has_meta || !b_has_meta {
+                println!("  (cannot compare Merkle roots — meta.bin missing)");
+            } else {
+                println!("  (cannot compare Merkle roots — missing or unsupported Merkle root in meta.bin)");
+            }
+        }
     }
 
     // Per-file size comparison
@@ -245,7 +253,11 @@ fn read_archive(path: &Path) -> Result<std::collections::HashMap<String, Vec<u8>
 
 fn extract_merkle_root(files: &std::collections::HashMap<String, Vec<u8>>) -> Option<[u8; 32]> {
     let meta = files.get("meta.bin")?;
-    if meta.len() < 4 || &meta[0..4] != b"MSC2" {
+    if meta.len() < 4 {
+        return None;
+    }
+    let magic = &meta[0..4];
+    if magic != b"MSC2" && magic != b"MSC3" && magic != b"MSC4" {
         return None;
     }
     let offset = crate::META_HEADER_SIZE + 9 * crate::DEPTH_ENTRY_SIZE;
@@ -312,5 +324,20 @@ mod tests {
         );
 
         let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_extract_merkle_root_msc4() {
+        let mut meta = vec![0u8; 200];
+        meta[0..4].copy_from_slice(b"MSC4");
+        let offset = crate::META_HEADER_SIZE + 9 * crate::DEPTH_ENTRY_SIZE;
+        let expected_root = [0x42u8; 32];
+        meta[offset..offset + 32].copy_from_slice(&expected_root);
+
+        let mut files = std::collections::HashMap::new();
+        files.insert("meta.bin".to_string(), meta);
+
+        let root = extract_merkle_root(&files);
+        assert_eq!(root, Some(expected_root));
     }
 }

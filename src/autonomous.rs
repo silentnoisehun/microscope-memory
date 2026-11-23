@@ -53,6 +53,28 @@ pub const SELF_MODEL_INTERVAL: usize = 7;
 /// Hány ciklus után jöjjön a narrative memory építés
 pub const NARRATIVE_INTERVAL: usize = 2;
 
+// ─── Store Counter Persistence ───────────────────────────
+
+pub fn read_store_counter(path: &Path) -> u64 {
+    if let Ok(bytes) = std::fs::read(path) {
+        if bytes.len() >= 8 {
+            return u64::from_le_bytes(bytes[0..8].try_into().unwrap_or([0u8; 8]));
+        }
+    }
+    0
+}
+
+pub fn increment_store_counter(path: &Path) -> u64 {
+    let current = read_store_counter(path);
+    let next = current.saturating_add(1);
+    let _ = std::fs::write(path, &next.to_le_bytes());
+    next
+}
+
+pub fn reset_store_counter(path: &Path) {
+    let _ = std::fs::write(path, &0u64.to_le_bytes());
+}
+
 // ─── AutonomousConfig ──────────────────────────────────────
 
 #[derive(Debug, Clone)]
@@ -68,22 +90,45 @@ pub struct AutonomousConfig {
     pub tts_enabled: bool,
     pub daemon_mode: bool,
     pub max_cycles: Option<usize>,
+    pub dream_store_threshold: u64,
+}
+
+impl AutonomousConfig {
+    pub fn from_config(config: &Config) -> Self {
+        let a = &config.autonomous;
+        Self {
+            cycle_interval_secs: a.cycle_interval_secs,
+            daydream_interval: a.daydream_interval,
+            curiosity_interval: a.curiosity_interval,
+            monologue_interval: a.monologue_interval,
+            reflect_interval: a.reflect_interval,
+            dream_interval: a.dream_interval,
+            self_model_interval: a.self_model_interval,
+            narrative_interval: a.narrative_interval,
+            tts_enabled: a.tts,
+            daemon_mode: false,
+            max_cycles: a.max_cycles,
+            dream_store_threshold: a.dream_store_threshold,
+        }
+    }
 }
 
 impl Default for AutonomousConfig {
     fn default() -> Self {
+        let a = crate::config::Autonomous::default();
         Self {
-            cycle_interval_secs: CYCLE_INTERVAL_SECS,
-            daydream_interval: DAYDREAM_INTERVAL,
-            curiosity_interval: CURIOSITY_INTERVAL,
-            monologue_interval: MONOLOGUE_INTERVAL,
-            reflect_interval: REFLECT_INTERVAL,
-            dream_interval: DREAM_INTERVAL,
-            self_model_interval: SELF_MODEL_INTERVAL,
-            narrative_interval: NARRATIVE_INTERVAL,
-            tts_enabled: false,
+            cycle_interval_secs: a.cycle_interval_secs,
+            daydream_interval: a.daydream_interval,
+            curiosity_interval: a.curiosity_interval,
+            monologue_interval: a.monologue_interval,
+            reflect_interval: a.reflect_interval,
+            dream_interval: a.dream_interval,
+            self_model_interval: a.self_model_interval,
+            narrative_interval: a.narrative_interval,
+            tts_enabled: a.tts,
             daemon_mode: false,
-            max_cycles: None,
+            max_cycles: a.max_cycles,
+            dream_store_threshold: a.dream_store_threshold,
         }
     }
 }
@@ -540,10 +585,22 @@ impl AutonomousEngine {
             outputs.push(out);
         }
 
-        if should_run(self.config.dream_interval) {
+        let stores_since_dream = read_store_counter(&output_dir.join("store_counter.bin"));
+        let dream_due_by_stores = self.config.dream_store_threshold > 0
+            && stores_since_dream >= self.config.dream_store_threshold;
+        let dream_due_by_interval = should_run(self.config.dream_interval);
+
+        if dream_due_by_interval || dream_due_by_stores {
+            if dream_due_by_stores {
+                println!(
+                    "  💤 Álom konszolidáció triggerelve: {} új tárolás érkezett (küszöb: {})",
+                    stores_since_dream, self.config.dream_store_threshold
+                );
+            }
             self.executive
                 .set_module_state("dream", ModuleState::Running);
             let out = self.run_dream(config, output_dir);
+            reset_store_counter(&output_dir.join("store_counter.bin"));
             self.executive.set_module_state("dream", ModuleState::Idle);
             outputs.push(out);
         }
@@ -653,11 +710,27 @@ impl AutonomousEngine {
             self.run_cycle(config);
 
             if self.config.daemon_mode {
-                println!(
-                    "  {} Várakozás {} másodperc...",
-                    "⏳".cyan(),
-                    interval.as_secs()
-                );
+                // Idle-time check: if semantic index is degraded, run heavy rebuild to restore embeddings.bin
+                if crate::build::semantic_index_state(config)
+                    == crate::build::SemanticIndexState::Degraded
+                {
+                    println!(
+                        "  {} [IDLE] Degraded semantic index detected — executing heavy rebuild to restore embeddings...",
+                        "⚡".cyan()
+                    );
+                    if let Err(e) = crate::build::build(config, false, true) {
+                        eprintln!(
+                            "  {} Background heavy rebuild failed: {}",
+                            "WARN".yellow(),
+                            e
+                        );
+                    } else {
+                        println!(
+                            "  {} [IDLE] Heavy rebuild completed successfully",
+                            "✓".green()
+                        );
+                    }
+                }
                 std::thread::sleep(interval);
             } else {
                 break;
@@ -745,4 +818,27 @@ pub fn print_autonomous_header(config: &AutonomousConfig) {
         "{}",
         "╚══════════════════════════════════════════════════════╝".cyan()
     );
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_store_counter_persistence() {
+        let temp_dir = std::env::temp_dir().join("test_store_counter");
+        let _ = std::fs::create_dir_all(&temp_dir);
+        let counter_file = temp_dir.join("store_counter.bin");
+        let _ = std::fs::remove_file(&counter_file);
+
+        assert_eq!(read_store_counter(&counter_file), 0);
+        assert_eq!(increment_store_counter(&counter_file), 1);
+        assert_eq!(increment_store_counter(&counter_file), 2);
+        assert_eq!(read_store_counter(&counter_file), 2);
+
+        reset_store_counter(&counter_file);
+        assert_eq!(read_store_counter(&counter_file), 0);
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
+    }
 }

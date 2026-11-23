@@ -18,6 +18,8 @@
 use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use serde::{Deserialize, Serialize};
+
 use crate::absentia::AbsentiaState;
 use crate::epistemic::EvidenceLedger;
 use crate::hebbian::HebbianState;
@@ -36,7 +38,7 @@ fn now_ms() -> u64 {
 ///
 /// Nem tudást ad — hanem értékelési keretet.
 /// Azt mondja: "ez az, ami fontos, ez az, ami tilos, ez az, ami engedélyezett."
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Genome {
     /// A rendszer neve / azonosítója.
     pub identity: String,
@@ -52,14 +54,14 @@ pub struct Genome {
     pub preferences: Vec<String>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Constraint {
     pub name: String,
     pub description: String,
     pub severity: ConstraintSeverity,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ConstraintSeverity {
     /// Soha nem sérthető meg.
     Absolute,
@@ -129,7 +131,7 @@ impl Genome {
 ///
 /// Nem egy döntés — hanem egy állapot, ami a Genome + memória + hiány +
 /// predikció metszetéből áll elő. Minden lépés visszavezethő.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Intent {
     pub id: u64,
     pub timestamp_ms: u64,
@@ -156,7 +158,7 @@ pub struct Intent {
     pub audit_chain: Vec<IntentAuditStep>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AbsenceSignal {
     pub missing_topic: String,
     pub absence_score: f32,
@@ -164,14 +166,14 @@ pub struct AbsenceSignal {
     pub pattern: String,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PredictionSignal {
     pub predicted_query: String,
     pub confidence: f32,
     pub pattern_id: u32,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EvidenceSignal {
     pub topic: String,
     pub confidence: u8,
@@ -179,14 +181,14 @@ pub struct EvidenceSignal {
     pub refute_count: u32,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GrowthSignal {
     pub direction: (f64, f64, f64),
     pub gradient_strength: f64,
     pub phase: String,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IntentCandidate {
     /// Mit akarok tenni?
     pub action: IntentAction,
@@ -196,7 +198,7 @@ pub struct IntentCandidate {
     pub strength: f32,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum IntentAction {
     /// Kérdés feltevése a felhasználónak.
     AskUser { question: String },
@@ -225,7 +227,7 @@ impl std::fmt::Display for IntentAction {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IntentEvaluation {
     /// Engedélyezett?
     pub allowed: bool,
@@ -237,7 +239,7 @@ pub struct IntentEvaluation {
     pub requires_approval: bool,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IntentAuditStep {
     pub timestamp_ms: u64,
     pub step: String,
@@ -248,7 +250,7 @@ pub struct IntentAuditStep {
 // ─── IntentPipeline ─────────────────────────────────
 
 /// Az Intent Pipeline — auditálható szándék-generálás.
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct IntentPipeline {
     pub genome: Genome,
     pub audit_log: Vec<Intent>,
@@ -266,14 +268,26 @@ impl IntentPipeline {
         let path = output_dir.join("intent_audit.bin");
         if let Ok(data) = std::fs::read(&path) {
             if data.len() >= 4 && &data[0..4] == b"INT1" {
-                // TODO: decode
+                if let Ok(audit_log) = bincode::deserialize::<Vec<Intent>>(&data[4..]) {
+                    return Self {
+                        genome: Genome::default_hope(),
+                        audit_log,
+                    };
+                }
             }
         }
         Self::new(Genome::default_hope())
     }
 
-    pub fn save(&self, _output_dir: &Path) -> Result<(), String> {
-        // TODO: encode
+    pub fn save(&self, output_dir: &Path) -> Result<(), String> {
+        let path = output_dir.join("intent_audit.bin");
+        let encoded = bincode::serialize(&self.audit_log)
+            .map_err(|e| format!("Failed to serialize intent audit log: {e}"))?;
+        let mut data = Vec::with_capacity(4 + encoded.len());
+        data.extend_from_slice(b"INT1");
+        data.extend_from_slice(&encoded);
+        std::fs::write(&path, data)
+            .map_err(|e| format!("Failed to write intent_audit.bin: {e}"))?;
         Ok(())
     }
 
@@ -539,4 +553,50 @@ pub struct IntentStats {
     pub allowed: usize,
     pub blocked: usize,
     pub approval_required: usize,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_intent_save_load_roundtrip() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut pipeline = IntentPipeline::new(Genome::default_hope());
+
+        let intent = Intent {
+            id: 12345,
+            timestamp_ms: 1000,
+            absence_signal: None,
+            prediction_signal: None,
+            evidence_signal: None,
+            growth_signal: None,
+            candidate: IntentCandidate {
+                action: IntentAction::Observe,
+                rationale: vec!["test rationale".to_string()],
+                strength: 0.5,
+            },
+            evaluation: IntentEvaluation {
+                allowed: true,
+                reason: "test".to_string(),
+                constraint: None,
+                requires_approval: false,
+            },
+            audit_chain: vec![IntentAuditStep {
+                timestamp_ms: 1000,
+                step: "TEST".to_string(),
+                result: "ok".to_string(),
+                data: "info".to_string(),
+            }],
+        };
+        pipeline.audit_log.push(intent);
+        pipeline.save(dir.path()).unwrap();
+
+        let loaded = IntentPipeline::load_or_init(dir.path());
+        assert_eq!(loaded.audit_log.len(), 1);
+        assert_eq!(loaded.audit_log[0].id, 12345);
+        assert_eq!(loaded.audit_log[0].candidate.strength, 0.5);
+        assert_eq!(loaded.audit_log[0].audit_chain.len(), 1);
+        assert_eq!(loaded.audit_log[0].audit_chain[0].step, "TEST");
+    }
 }

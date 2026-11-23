@@ -129,6 +129,9 @@ pub fn collect_semantic_candidates(
     let emb_path = output_dir.join("embeddings.bin");
 
     let Some(index) = crate::embedding_index::open_embedding_cached(&emb_path) else {
+        if config.embedding.provider != "none" {
+            eprintln!("  [SEMANTIC: DEGRADED] embeddings.bin is missing; running lexical-only fallback until next heavy rebuild");
+        }
         return out;
     };
     if !index.matches_config(&config.embedding) {
@@ -199,6 +202,24 @@ pub fn collect_semantic_candidates(
 // The argument list mirrors the production call sites (CLI and MCP) on
 // purpose: the two surfaces must not be able to drift apart again.
 #[allow(clippy::too_many_arguments)]
+/// Check if a memory text is superseded or inactive via durable memory atoms or timeline.
+pub fn is_superseded_or_inactive(
+    text: &str,
+    atom_ledger: &crate::memory_atom::AtomLedger,
+    observation_state: &std::collections::HashMap<String, (u64, u8)>,
+) -> bool {
+    let trimmed = text.trim();
+    if atom_ledger.is_inactive_text(trimmed) {
+        return true;
+    }
+    if let Some((_, status)) = observation_state.get(trimmed) {
+        if crate::timeline::is_inactive_status(*status) {
+            return true;
+        }
+    }
+    false
+}
+
 pub fn rank_candidates(
     config: &Config,
     reader: &MicroscopeReader,
@@ -211,6 +232,11 @@ pub fn rank_candidates(
     query_emotion: Option<[f32; 21]>,
     emotion_lookup: Option<&dyn Fn(usize) -> Option<[f32; 21]>>,
 ) -> Vec<RankedHit> {
+    let output_dir = Path::new(&config.paths.output_dir);
+    let atom_ledger = crate::memory_atom::AtomLedger::load(&output_dir.join("memory_atoms.bin"));
+    let observation_state = crate::auto_context::latest_observation_states(
+        &crate::timeline::read_all(&output_dir.join("timeline.bin")),
+    );
     let relevance_query = crate::relevance::RelevanceQuery::new(query);
     let min_matches: u32 = std::env::var("MICROSCOPE_LEX_MIN_MATCHES")
         .ok()
@@ -233,6 +259,9 @@ pub fn rank_candidates(
 
     for index in candidates {
         let text = reader.text(index);
+        if is_superseded_or_inactive(text, &atom_ledger, &observation_state) {
+            continue;
+        }
         let lexical_score = relevance_query.lexical_score(text);
         let similarity = semantic.main_score(index);
         if lexical_score <= 0.0 && similarity.is_none() {
@@ -269,6 +298,9 @@ pub fn rank_candidates(
     }
 
     for (index, entry) in appended.iter().enumerate() {
+        if is_superseded_or_inactive(&entry.text, &atom_ledger, &observation_state) {
+            continue;
+        }
         let dx = entry.x - qx;
         let dy = entry.y - qy;
         let dz = entry.z - qz;
@@ -447,5 +479,48 @@ mod tests {
         assert_eq!(unique.len(), 2);
         assert_eq!(unique[0].id, MemoryId::Main(11));
         assert_eq!(unique[1].id, MemoryId::Main(12));
+    }
+
+    #[test]
+    fn test_superseded_memory_is_detected_and_filtered() {
+        let dir = tempfile::tempdir().unwrap();
+        let project = [0u8; 16];
+        let atom1 = crate::memory_atom::record_atom(
+            dir.path(),
+            &project,
+            "gamma pilot deadline is Friday",
+            crate::memory_atom::AtomKind::Fact,
+            "gamma pilot deadline",
+            "test",
+            8,
+            None,
+        )
+        .unwrap();
+        let _atom2 = crate::memory_atom::record_atom(
+            dir.path(),
+            &project,
+            "gamma pilot deadline is Monday",
+            crate::memory_atom::AtomKind::Fact,
+            "gamma pilot deadline",
+            "test",
+            9,
+            Some(atom1.id),
+        )
+        .unwrap();
+
+        let loaded_ledger =
+            crate::memory_atom::AtomLedger::load(&dir.path().join("memory_atoms.bin"));
+        let obs = std::collections::HashMap::new();
+
+        assert!(is_superseded_or_inactive(
+            "gamma pilot deadline is Friday",
+            &loaded_ledger,
+            &obs
+        ));
+        assert!(!is_superseded_or_inactive(
+            "gamma pilot deadline is Monday",
+            &loaded_ledger,
+            &obs
+        ));
     }
 }

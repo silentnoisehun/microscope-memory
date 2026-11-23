@@ -57,6 +57,8 @@ pub struct Config {
     pub project_id: ProjectId,
     #[serde(default)]
     pub epistemic: EpistemicConfig,
+    #[serde(default)]
+    pub autonomous: Autonomous,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -111,6 +113,10 @@ pub struct Index {
     /// Minimum Hebbian recall energy for automatic importance promotion.
     #[serde(default = "default_promote_energy_threshold")]
     pub promote_energy_threshold: f32,
+    /// When auto_rebuild triggers, run a heavy rebuild instead of light rebuild
+    /// so that embeddings.bin and sidecars are immediately regenerated.
+    #[serde(default)]
+    pub auto_rebuild_heavy: bool,
 }
 
 impl Default for Index {
@@ -124,6 +130,7 @@ impl Default for Index {
             max_blocks: default_max_blocks(),
             protect_min_importance: default_protect_min_importance(),
             promote_energy_threshold: default_promote_energy_threshold(),
+            auto_rebuild_heavy: false,
         }
     }
 }
@@ -517,6 +524,78 @@ impl Config {
     }
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Autonomous {
+    #[serde(default = "default_auto_cycle_interval_secs")]
+    pub cycle_interval_secs: u64,
+    #[serde(default = "default_auto_daydream_interval")]
+    pub daydream_interval: usize,
+    #[serde(default = "default_auto_curiosity_interval")]
+    pub curiosity_interval: usize,
+    #[serde(default = "default_auto_monologue_interval")]
+    pub monologue_interval: usize,
+    #[serde(default = "default_auto_reflect_interval")]
+    pub reflect_interval: usize,
+    #[serde(default = "default_auto_dream_interval")]
+    pub dream_interval: usize,
+    #[serde(default = "default_auto_self_model_interval")]
+    pub self_model_interval: usize,
+    #[serde(default = "default_auto_narrative_interval")]
+    pub narrative_interval: usize,
+    #[serde(default)]
+    pub tts: bool,
+    #[serde(default)]
+    pub max_cycles: Option<usize>,
+    #[serde(default = "default_auto_dream_store_threshold")]
+    pub dream_store_threshold: u64,
+}
+
+fn default_auto_cycle_interval_secs() -> u64 {
+    30
+}
+fn default_auto_daydream_interval() -> usize {
+    3
+}
+fn default_auto_curiosity_interval() -> usize {
+    2
+}
+fn default_auto_monologue_interval() -> usize {
+    5
+}
+fn default_auto_reflect_interval() -> usize {
+    4
+}
+fn default_auto_dream_interval() -> usize {
+    10
+}
+fn default_auto_self_model_interval() -> usize {
+    7
+}
+fn default_auto_narrative_interval() -> usize {
+    2
+}
+fn default_auto_dream_store_threshold() -> u64 {
+    10
+}
+
+impl Default for Autonomous {
+    fn default() -> Self {
+        Self {
+            cycle_interval_secs: default_auto_cycle_interval_secs(),
+            daydream_interval: default_auto_daydream_interval(),
+            curiosity_interval: default_auto_curiosity_interval(),
+            monologue_interval: default_auto_monologue_interval(),
+            reflect_interval: default_auto_reflect_interval(),
+            dream_interval: default_auto_dream_interval(),
+            self_model_interval: default_auto_self_model_interval(),
+            narrative_interval: default_auto_narrative_interval(),
+            tts: false,
+            max_cycles: None,
+            dream_store_threshold: default_auto_dream_store_threshold(),
+        }
+    }
+}
+
 impl Default for Config {
     fn default() -> Self {
         Self {
@@ -532,6 +611,7 @@ impl Default for Config {
             hooks: HooksConfig::default(),
             project_id: ProjectId::GLOBAL,
             epistemic: EpistemicConfig::default(),
+            autonomous: Autonomous::default(),
         }
     }
 }

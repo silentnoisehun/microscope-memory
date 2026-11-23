@@ -3588,6 +3588,7 @@ mod tests {
                 max_blocks: 0,
                 protect_min_importance: 8,
                 promote_energy_threshold: 0.35,
+                auto_rebuild_heavy: false,
             },
             search: crate::config::Search {
                 default_k: 10,
@@ -3625,6 +3626,7 @@ mod tests {
             hooks: crate::config::HooksConfig::default(),
             project_id: ProjectId::GLOBAL,
             epistemic: crate::config::EpistemicConfig::default(),
+            autonomous: crate::config::Autonomous::default(),
         }
     }
 

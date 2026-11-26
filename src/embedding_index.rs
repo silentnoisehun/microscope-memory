@@ -191,6 +191,22 @@ impl EmbeddingIndex {
             self.header_size,
             self.embedded_count,
             self.block_ids(),
+            similarity_floor(),
+        )
+    }
+
+    /// Search for top-k most similar blocks without applying `similarity_floor()`.
+    /// Used as a fallback when floored search yields fewer candidates than requested.
+    pub fn search_unfloored(&self, query_emb: &[f32], k: usize) -> Vec<(f32, usize)> {
+        search_with_floor(
+            query_emb,
+            k,
+            self.dim,
+            &self.data,
+            self.header_size,
+            self.embedded_count,
+            self.block_ids(),
+            f32::NEG_INFINITY,
         )
     }
 
@@ -515,6 +531,15 @@ impl AppendEmbeddings {
     /// Top-k by cosine as (similarity, append index), with the same floor the
     /// main index uses so the two candidate sources stay comparable.
     pub fn search(&self, query_emb: &[f32], k: usize) -> Vec<(f32, u32)> {
+        self.search_with_min_sim(query_emb, k, similarity_floor())
+    }
+
+    /// Top-k by cosine without applying `similarity_floor()`.
+    pub fn search_unfloored(&self, query_emb: &[f32], k: usize) -> Vec<(f32, u32)> {
+        self.search_with_min_sim(query_emb, k, f32::NEG_INFINITY)
+    }
+
+    fn search_with_min_sim(&self, query_emb: &[f32], k: usize, floor: f32) -> Vec<(f32, u32)> {
         if query_emb.len() != self.dim {
             return vec![];
         }
@@ -523,7 +548,7 @@ impl AppendEmbeddings {
             .iter()
             .filter_map(|(i, v)| {
                 let sim = cosine_similarity_simd(query_emb, v);
-                (sim > similarity_floor()).then_some((sim, *i))
+                (sim.is_finite() && sim > floor).then_some((sim, *i))
             })
             .collect();
         out.sort_by(|a, b| b.0.total_cmp(&a.0));
@@ -568,6 +593,7 @@ pub fn similarity_floor() -> f32 {
 ///
 /// Split out so a test can measure a different floor without going through the
 /// process-wide environment read, which happens once per process.
+#[allow(clippy::too_many_arguments)]
 fn search_with_floor(
     query_emb: &[f32],
     k: usize,
@@ -576,11 +602,11 @@ fn search_with_floor(
     header: usize,
     count: usize,
     ids: &[u32],
+    floor: f32,
 ) -> Vec<(f32, usize)> {
     if query_emb.len() != dim {
         return vec![];
     }
-    let floor = similarity_floor();
     let mut results: Vec<(f32, usize)> = (0..count)
         .into_par_iter()
         .filter_map(|i| {
@@ -589,7 +615,7 @@ fn search_with_floor(
             // Safety: validated in open(); i < count.
             let emb = unsafe { std::slice::from_raw_parts(ptr, dim) };
             let sim = cosine_similarity_simd(query_emb, emb);
-            (sim > floor).then_some((sim, ids[i] as usize))
+            (sim.is_finite() && sim > floor).then_some((sim, ids[i] as usize))
         })
         .collect();
 
@@ -1124,6 +1150,54 @@ mod tests {
         let path = dir.join("embeddings.bin");
         fs::write(&path, [0u8; 4]).unwrap();
         assert!(EmbeddingIndex::open(&path).is_none());
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn search_unfloored_recovers_below_floor_entries_for_top_k() {
+        let dir = std::env::temp_dir().join("mscope_emb_unfloored_test");
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("embeddings.bin");
+
+        // Three unit vectors: block 0 has sim 0.15 (< 0.2 floor), block 1 has 0.10, block 2 has 0.05.
+        let mut buf = Vec::new();
+        buf.extend_from_slice(&3u32.to_le_bytes()); // embedded_count
+        buf.extend_from_slice(&4u32.to_le_bytes()); // dim
+        buf.extend_from_slice(&1u32.to_le_bytes()); // max_depth
+        for id in [0u32, 1, 2] {
+            buf.extend_from_slice(&id.to_le_bytes());
+        }
+        let vecs = [
+            [0.15f32, (1.0f32 - 0.15 * 0.15).sqrt(), 0.0, 0.0],
+            [0.10f32, 0.0, (1.0f32 - 0.10 * 0.10).sqrt(), 0.0],
+            [0.05f32, 0.0, 0.0, (1.0f32 - 0.05 * 0.05).sqrt()],
+        ];
+        for v in &vecs {
+            for f in v {
+                buf.extend_from_slice(&f.to_le_bytes());
+            }
+        }
+        fs::write(&path, &buf).unwrap();
+
+        let idx = EmbeddingIndex::open(&path).unwrap();
+        let query = [1.0f32, 0.0, 0.0, 0.0];
+        assert!(idx.search(&query, 3).is_empty());
+        let unfloored = idx.search_unfloored(&query, 3);
+        assert_eq!(unfloored.len(), 3);
+        assert_eq!(unfloored[0].1, 0);
+        assert_eq!(unfloored[1].1, 1);
+        assert_eq!(unfloored[2].1, 2);
+
+        let mut side = AppendEmbeddings::new(4);
+        side.push(0, vecs[0].to_vec());
+        side.push(1, vecs[2].to_vec());
+        assert!(side.search(&query, 2).is_empty());
+        let side_unfloored = side.search_unfloored(&query, 2);
+        assert_eq!(side_unfloored.len(), 2);
+        assert_eq!(side_unfloored[0].1, 0);
+        assert_eq!(side_unfloored[1].1, 1);
+
         let _ = fs::remove_dir_all(&dir);
     }
 }

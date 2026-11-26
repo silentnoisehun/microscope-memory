@@ -177,12 +177,40 @@ pub fn collect_semantic_candidates(
             }
         }
     }
+    // If the similarity floor left fewer unique candidates than `want` (which
+    // caused `recall N` to return fewer than N hits and dropped low-cosine gold
+    // turns), top up from the unfloored scan so `recall N` can return N hits.
+    if out.main.len() < want {
+        for (similarity, block_idx) in index.search_unfloored(&query_embedding, raw_want) {
+            if out.main.contains_key(&block_idx) {
+                continue;
+            }
+            if block_idx < reader.block_count
+                && seen_text.insert(canonical_result_text(reader.text(block_idx)))
+            {
+                out.main.insert(block_idx, similarity);
+                if out.main.len() >= want {
+                    break;
+                }
+            }
+        }
+    }
 
     let sidecar_path = output_dir.join(crate::embedding_index::APPEND_EMBEDDINGS_FILE);
     if let Some(sidecar) = crate::embedding_index::open_append_cached(&sidecar_path, index.dim()) {
         if sidecar.matches_config(&config.embedding) {
             for (similarity, append_idx) in sidecar.search(&query_embedding, want) {
                 out.appended.insert(append_idx as usize, similarity);
+            }
+            if out.appended.len() < want {
+                for (similarity, append_idx) in sidecar.search_unfloored(&query_embedding, want) {
+                    out.appended
+                        .entry(append_idx as usize)
+                        .or_insert(similarity);
+                    if out.appended.len() >= want {
+                        break;
+                    }
+                }
             }
         } else {
             eprintln!("  semantic: append embedding sidecar provider/model mismatch — ignored");

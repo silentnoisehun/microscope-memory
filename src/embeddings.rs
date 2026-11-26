@@ -586,6 +586,161 @@ pub struct EmbeddedBlockHeader {
 
 // ─── Candle-based real embedding provider ────────────
 #[cfg(feature = "embeddings")]
+fn hf_hub_cache_dir() -> std::path::PathBuf {
+    if let Ok(p) = std::env::var("HF_HUB_CACHE") {
+        let trimmed = p.trim();
+        if !trimmed.is_empty() {
+            return std::path::PathBuf::from(trimmed);
+        }
+    }
+    if let Ok(p) = std::env::var("HF_HOME") {
+        let trimmed = p.trim();
+        if !trimmed.is_empty() {
+            return std::path::PathBuf::from(trimmed).join("hub");
+        }
+    }
+    if let Ok(p) = std::env::var("XDG_CACHE_HOME") {
+        let trimmed = p.trim();
+        if !trimmed.is_empty() {
+            return std::path::PathBuf::from(trimmed)
+                .join("huggingface")
+                .join("hub");
+        }
+    }
+    let home = std::env::var("HOME")
+        .or_else(|_| std::env::var("USERPROFILE"))
+        .unwrap_or_else(|_| ".".to_string());
+    std::path::PathBuf::from(home)
+        .join(".cache")
+        .join("huggingface")
+        .join("hub")
+}
+
+#[cfg(feature = "embeddings")]
+fn resolve_hf_model_file(
+    model_id: &str,
+    filename: &str,
+) -> Result<std::path::PathBuf, EmbeddingError> {
+    let cache_dir = hf_hub_cache_dir();
+    let repo_dir = cache_dir.join(format!("models--{}", model_id.replace('/', "--")));
+    let snapshots_dir = repo_dir.join("snapshots");
+
+    // 1. Check `refs/main` snapshot if present (standard hf-hub / Python layout).
+    if let Ok(rev) = std::fs::read_to_string(repo_dir.join("refs").join("main")) {
+        let rev = rev.trim();
+        if !rev.is_empty() {
+            let candidate = snapshots_dir.join(rev).join(filename);
+            if candidate.is_file() {
+                return Ok(candidate);
+            }
+        }
+    }
+
+    // 2. Check `snapshots/main/<file>` or any existing snapshot directory.
+    let main_dir = snapshots_dir.join("main");
+    let main_candidate = main_dir.join(filename);
+    if main_candidate.is_file() {
+        return Ok(main_candidate);
+    }
+    if let Ok(entries) = std::fs::read_dir(&snapshots_dir) {
+        for entry in entries.flatten() {
+            let candidate = entry.path().join(filename);
+            if candidate.is_file() {
+                return Ok(candidate);
+            }
+        }
+    }
+
+    // 3. Download via rustls-backed reqwest (no OpenSSL dependency).
+    let url = format!(
+        "https://huggingface.co/{}/resolve/main/{}",
+        model_id, filename
+    );
+    let manual_hint = || {
+        format!(
+            "If offline or behind a firewall, manually download tokenizer.json, \
+             model.safetensors, and config.json from https://huggingface.co/{}/tree/main \
+             and place them in: {}",
+            model_id,
+            main_dir.display()
+        )
+    };
+
+    if let Err(e) = std::fs::create_dir_all(&main_dir) {
+        return Err(EmbeddingError::ApiError(format!(
+            "cannot create HuggingFace cache dir {}: {}. {}",
+            main_dir.display(),
+            e,
+            manual_hint()
+        )));
+    }
+
+    let client = reqwest::blocking::Client::builder()
+        .timeout(std::time::Duration::from_secs(120))
+        .build()
+        .map_err(|e| {
+            EmbeddingError::ApiError(format!(
+                "HTTP client init failed while fetching '{}' for '{}': {}. {}",
+                filename,
+                model_id,
+                e,
+                manual_hint()
+            ))
+        })?;
+
+    let resp = client.get(&url).send().map_err(|e| {
+        EmbeddingError::ApiError(format!(
+            "failed to download '{}' from {}: {}. {}",
+            filename,
+            url,
+            e,
+            manual_hint()
+        ))
+    })?;
+
+    if !resp.status().is_success() {
+        return Err(EmbeddingError::ApiError(format!(
+            "HTTP {} while downloading '{}' from {}. {}",
+            resp.status(),
+            filename,
+            url,
+            manual_hint()
+        )));
+    }
+
+    let bytes = resp.bytes().map_err(|e| {
+        EmbeddingError::ApiError(format!(
+            "failed reading '{}' body from {}: {}. {}",
+            filename,
+            url,
+            e,
+            manual_hint()
+        ))
+    })?;
+
+    let part_path = main_dir.join(format!("{}.part", filename));
+    if let Err(e) = std::fs::write(&part_path, &bytes) {
+        return Err(EmbeddingError::ApiError(format!(
+            "failed writing {}: {}. {}",
+            part_path.display(),
+            e,
+            manual_hint()
+        )));
+    }
+    if let Err(e) = std::fs::rename(&part_path, &main_candidate) {
+        let _ = std::fs::remove_file(&part_path);
+        return Err(EmbeddingError::ApiError(format!(
+            "failed finalizing {}: {}. {}",
+            main_candidate.display(),
+            e,
+            manual_hint()
+        )));
+    }
+
+    Ok(main_candidate)
+}
+
+#[cfg(feature = "embeddings")]
 pub struct CandleEmbeddingProvider {
     model: candle_transformers::models::bert::BertModel,
     tokenizer: tokenizers::Tokenizer,
@@ -612,7 +767,6 @@ impl CandleEmbeddingProvider {
         use_gpu: bool,
     ) -> Result<Self, EmbeddingError> {
         use candle_core::Device;
-        use hf_hub::api::sync::Api;
 
         // Lazy GPU activation: try CUDA only if requested and available.
         let device = if use_gpu {
@@ -629,20 +783,14 @@ impl CandleEmbeddingProvider {
         } else {
             Device::Cpu
         };
-        let api = Api::new().map_err(|_| EmbeddingError::NetworkError)?;
-        let repo = api.model(model_id.to_string());
 
         // Load tokenizer
-        let tokenizer_path = repo
-            .get("tokenizer.json")
-            .map_err(|_| EmbeddingError::NetworkError)?;
+        let tokenizer_path = resolve_hf_model_file(model_id, "tokenizer.json")?;
         let tokenizer = tokenizers::Tokenizer::from_file(tokenizer_path)
             .map_err(|e| EmbeddingError::ApiError(format!("tokenizer load: {}", e)))?;
 
         // Load model weights
-        let weights_path = repo
-            .get("model.safetensors")
-            .map_err(|_| EmbeddingError::NetworkError)?;
+        let weights_path = resolve_hf_model_file(model_id, "model.safetensors")?;
         // Safety: safetensors file is valid and will remain mapped for the lifetime of the model
         let vb = unsafe {
             candle_nn::VarBuilder::from_mmaped_safetensors(
@@ -654,14 +802,16 @@ impl CandleEmbeddingProvider {
         .map_err(|e| EmbeddingError::ApiError(format!("varbuilder: {}", e)))?;
 
         // Load config: either from override, or from model's config.json
+        let config_path = if config_override.is_none() || dim_override == 0 {
+            Some(resolve_hf_model_file(model_id, "config.json")?)
+        } else {
+            None
+        };
         let config = if let Some(cfg) = config_override {
             cfg
         } else {
-            // Try to load config.json from the model repo
-            let config_path = repo
-                .get("config.json")
-                .map_err(|_| EmbeddingError::NetworkError)?;
-            let config_str = std::fs::read_to_string(&config_path)
+            let config_path = config_path.as_ref().expect("resolved above");
+            let config_str = std::fs::read_to_string(config_path)
                 .map_err(|e| EmbeddingError::ApiError(format!("config read: {}", e)))?;
             serde_json::from_str(&config_str)
                 .map_err(|e| EmbeddingError::ApiError(format!("config parse: {}", e)))?
@@ -676,10 +826,9 @@ impl CandleEmbeddingProvider {
             dim_override
         } else {
             // Re-read the raw JSON: the typed Config does not expose hidden_size.
-            let raw = repo
-                .get("config.json")
-                .ok()
-                .and_then(|p| std::fs::read_to_string(&p).ok())
+            let raw = config_path
+                .as_ref()
+                .and_then(|p| std::fs::read_to_string(p).ok())
                 .and_then(|s| serde_json::from_str::<serde_json::Value>(&s).ok())
                 .and_then(|v| v.get("hidden_size").and_then(|h| h.as_u64()))
                 .ok_or_else(|| {

@@ -175,6 +175,55 @@ These are single-observation measurements from `BENCHMARKS.md` — recorded on o
 
 See [`BENCHMARKS.md`](BENCHMARKS.md) for full methodology, χ² goodness-of-fit (95% confidence), and the 2Q parity analysis (95% χ²<sub>red</sub>).
 
+## Benchmarks: what is measured and what is not
+
+Two different things are timed. They must not be read as one claim.
+
+### Table 1: coordinate lookup (not text search)
+
+| Operation | Time | Note |
+|-----------|------|------|
+| D0 coordinate lookup | about 605 ns | structural lookup by coordinate, no text search, no embedding |
+
+### Table 2: text recall (query in, ranked text out)
+
+| System | Time | What it includes |
+|--------|------|------------------|
+| Microscope text recall | about 87 ms | end to end, including process start, no LLM call |
+| FAISS IndexFlatIP | about 0.054 ms | query only, vectors already in memory, no process start |
+
+These two rows are not like for like. How much of the 87 ms is process start has not been measured; a resident / daemon-mode measurement is planned. Index build takes about 25.5 s for about 500 turns (every depth level is materialized).
+
+### Retrieval quality: LongMemEval-S, 60-question pilot
+
+Retrieval only, no LLM, zero cost. 60 questions, seed 42, 10 per type, MiniLM-L6-v2, max_depth=3, read-only mode (`MICROSCOPE_NO_LEARN=1`), v1.4.5. Compared with FAISS IndexFlatIP on the same embeddings. Protocol: [`docs/eval/PROTOCOL.md`](docs/eval/PROTOCOL.md) (written before the fixes).
+
+| Metric (turn level) | Microscope | FAISS |
+|---------------------|-----------:|------:|
+| NDCG@10 | 58.3 | 58.1 |
+| turn recall@3 | 50.6 | 54.7 |
+| turn recall@5 | 62.5 | 66.7 |
+| turn recall@10 | 79.7 | 77.8 |
+
+| NDCG@10 by type | Microscope | FAISS |
+|-----------------|-----------:|------:|
+| knowledge-update | 67.4 | 53.7 |
+| single-session-assistant | 86.5 | 67.8 |
+| single-session-user | 79.1 | 77.8 |
+| multi-session | 51.7 | 56.2 |
+| temporal-reasoning | 38.9 | 41.9 |
+| single-session-preference | 26.4 | 50.9 |
+
+Session level (a looser metric): `recall_any@10` is 98.3 for both; `recall_any@1` is 93.3 for both.
+
+### Honest summary
+
+- Overall the two are equal at the turn level on this pilot (NDCG@10 58.3 vs 58.1). This does not show the engine is better than FAISS.
+- The engine is ahead on questions whose wording overlaps the stored text (assistant, knowledge-update) and behind on indirect, preference-style questions (26.4 vs 50.9). That is the known weak spot and the target of the planned fix.
+- The sample is small (10 questions per type). The full 500-question run is the confirmation and is not done yet.
+- These are retrieval numbers. They are not answer accuracy and cannot be compared with other systems' accuracy scores.
+- Results after the fix will be added here whatever they show.
+
 ---
 
 ## 🛠️ CLI Commands

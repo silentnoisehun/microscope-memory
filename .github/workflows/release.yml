@@ -1,7 +1,7 @@
 name: release
 
 # On any v* tag push, build Windows, Linux, and WASM release artifacts
-# and attach them (plus SHA256SUMS) to the GitHub Release.
+# and attach them (plus per-platform SHA256SUMS and commit SHA) to the GitHub Release.
 
 on:
   push:
@@ -51,6 +51,8 @@ jobs:
         with:
           tag_name: ${{ github.ref_name }}
           draft: true
+          body: |
+            Commit: ${{ github.sha }}
           files: |
             target/release/microscope-mem.exe
             target/release/microscope-mem-windows-x86_64.tar.gz
@@ -58,7 +60,9 @@ jobs:
 
   build-linux:
     needs: durability-gate
-    runs-on: ubuntu-latest
+    # Ubuntu 22.04 builds against glibc 2.35 so the binary runs on Ubuntu 22.04+
+    # without sideloading a newer libc.
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -78,6 +82,8 @@ jobs:
         with:
           tag_name: ${{ github.ref_name }}
           draft: true
+          body: |
+            Commit: ${{ github.sha }}
           files: |
             target/release/microscope-mem-linux-x86_64
             target/release/microscope-mem-linux-x86_64.tar.gz
@@ -145,3 +151,10 @@ jobs:
           done
       - name: Publish completed release
         run: gh release edit "$GITHUB_REF_NAME" --draft=false --latest
+=======
+          body: |
+            Commit: ${{ github.sha }}
+          files: |
+            target/release/microscope-mem-linux-x86_64
+            target/release/SHA256SUMS-linux-x86_64.txt
+>>>>>>> bd7d0a8 (fix(retrieval,release): unfloored semantic fallback, rustls HF loader, ubuntu-22.04 release & eval protocol)

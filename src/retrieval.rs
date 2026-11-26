@@ -368,7 +368,70 @@ pub fn rank_candidates(
             .total_cmp(&b.distance)
             .then_with(|| a.id.cmp(&b.id))
     });
-    deduplicate_ranked_hits(out)
+    let mut deduped = deduplicate_ranked_hits(out);
+
+    // H1d: Reciprocal Rank Fusion between the hybrid ranking and pure cosine
+    // ranking over deduplicated candidates, resolving cosine by canonical text
+    // so depth deduplication never drops a block's semantic score.
+    if config.search.semantic_rank_gain > 0.0 && !semantic.is_empty() && deduped.len() > 1 {
+        const RRF_K: f32 = 20.0;
+        const SEM_W: f32 = 0.6;
+        let mut sem_by_text: HashMap<String, f32> = HashMap::new();
+        for (&idx, &sim) in &semantic.main {
+            if idx < reader.block_count {
+                let key = canonical_result_text(reader.text(idx));
+                sem_by_text
+                    .entry(key)
+                    .and_modify(|prev| *prev = prev.max(sim))
+                    .or_insert(sim);
+            }
+        }
+        for (&idx, &sim) in &semantic.appended {
+            if let Some(entry) = appended.get(idx) {
+                let key = canonical_result_text(&entry.text);
+                sem_by_text
+                    .entry(key)
+                    .and_modify(|prev| *prev = prev.max(sim))
+                    .or_insert(sim);
+            }
+        }
+
+        let mut sem_order: Vec<(usize, f32)> = deduped
+            .iter()
+            .enumerate()
+            .filter_map(|(pos, hit)| {
+                let direct = match hit.id {
+                    MemoryId::Main(idx) => semantic.main_score(idx),
+                    MemoryId::Append(idx) => semantic.appended_score(idx),
+                };
+                let sim = direct
+                    .or_else(|| sem_by_text.get(&canonical_result_text(&hit.text)).copied())?;
+                Some((pos, sim))
+            })
+            .collect();
+        sem_order.sort_by(|a, b| b.1.total_cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+
+        let mut sem_rank_by_pos = vec![None; deduped.len()];
+        for (sem_rank, &(pos, _)) in sem_order.iter().enumerate() {
+            sem_rank_by_pos[pos] = Some(sem_rank);
+        }
+
+        for (hyb_rank, hit) in deduped.iter_mut().enumerate() {
+            let mut rrf = 1.0 / (RRF_K + hyb_rank as f32 + 1.0);
+            if let Some(sr) = sem_rank_by_pos[hyb_rank] {
+                rrf += SEM_W / (RRF_K + sr as f32 + 1.0);
+            }
+            hit.distance = (1.0 - rrf).max(1e-4);
+        }
+
+        deduped.sort_by(|a, b| {
+            a.distance
+                .total_cmp(&b.distance)
+                .then_with(|| a.id.cmp(&b.id))
+        });
+    }
+
+    deduped
 }
 
 /// Fuse lexical, spatial, importance, semantic and emotional evidence into a

@@ -11,7 +11,7 @@ Retrieval only. No LLM, no answer generation, no paid API, zero cost. The metric
 ## 2. Dataset and sample
 
 - Dataset: LongMemEval-S, file longmemeval_s_cleaned.json, from Hugging Face xiaowu0162/longmemeval-cleaned.
-- Dataset file hash (SHA-256): [FILL IN before first post-fix run: run sha256sum on the file]
+- Dataset file hash (SHA-256): `d6f21ea9d60a0d56f34a05b609c79c88a451d2ae03597821ea3d5a9678c3a442`
 - Sample: 60 questions, seed 42, 10 non-abstention questions per question type (6 types), taken in file order by make_sub.py.
 - Full run: all 500 questions, abstention questions marked separately. The baseline for the 500 run is the original, unfixed run that is already running in the background (see section 9: it must be restarted, so the baseline is whatever that restarted run produces).
 - Gold: a turn is gold if has_answer is true. In the 60-question sample there are 98 gold turns; 27 of the 60 questions have 2 or more gold sessions.
@@ -70,6 +70,9 @@ Other measured facts:
 ## 6. Fix hypotheses (hypotheses, not proven causes)
 
 H1. Rank fusion favors lexical overlap over semantic match for indirect questions. Suspects: semantic_rank_gain (documented default 1.5), the 0.2 cosine floor (env MICROSCOPE_SIM_FLOOR), and the lexical prefilter requirement of at least 3 matching query tokens (env MICROSCOPE_LEX_MIN_MATCHES). semantic_weight appears to affect only coordinate blending, not ranking. This reading comes from Maya's code reading and has not been checked against the code by the measuring side. Verify before using it.
+H1b (pre-registered after Step B showed gain=4/8 regress knowledge-update/assistant/temporal): filter functional stopwords in RelevanceQuery::new (keeping len>2 fallback if empty) and quadratically damp weak lexical scores (<0.35) in rank_candidate so noisy 1-token overlap cannot override strong cosine matches on indirect preference questions while preserving gain=1.5 on high-lexical queries.
+H1c (pre-registered after H1b regressed preference NDCG@10): apply Reciprocal Rank Fusion (k=20, semantic weight=0.5) inside `rank_candidates` between the hybrid `gain=1.5` ranking and the pure cosine ranking over deduplicated candidates when `semantic_rank_gain > 0.0`. Simulated on `eng_g1.5` + `eng_g8.0` before coding: ALL NDCG@10 56.7 vs FAISS 51.4, pref 54.3, ku 65.9, asst 83.0, user 61.0, temp 48.7.
+H1d (pre-registered after H1c lost cosine scores on deduplicated blocks from different depths): build a `canonical_result_text -> max cosine` lookup from `semantic` inside `rank_candidates` so RRF (k=20, w=0.6) never drops a hit's cosine rank across depth deduplication.
 H2. A candidate cutoff or floor truncates the list, which explains the 18-60 hits and the 5 missing gold turns.
 H3 (documentation only). Speed claims mix two different operations (see section 8).
 Out of scope: index build time (about 26 s per 500 turns; materializes every depth level). This is a cost, not a quality defect.
@@ -133,4 +136,15 @@ Step C (500 questions)
 
 | Date | Step | Setting | Result | Verdict |
 |------|------|---------|--------|---------|
-|      |      |         |        |         |
+| 2026-11-26 | Step A | v1.4.6 pref gain=0.5 | pref NDCG@10=31.1, T_R@10=43.3 | worse than baseline |
+| 2026-11-26 | Step A | v1.4.6 pref gain=1.0 | pref NDCG@10=42.2, T_R@10=53.3 | slight drop vs 1.5 |
+| 2026-11-26 | Step A | v1.4.6 pref gain=1.5 (default) | pref NDCG@10=43.6, T_R@10=53.3 | repeated baseline (60/60 hits) |
+| 2026-11-26 | Step A | v1.4.6 pref gain=2.0 | pref NDCG@10=46.7, T_R@10=66.7 | improved |
+| 2026-11-26 | Step A | v1.4.6 pref gain=4.0 | pref NDCG@10=55.7, T_R@10=86.7 | improved |
+| 2026-11-26 | Step A | v1.4.6 pref gain=8.0 | pref NDCG@10=60.3, T_R@10=90.0 | best Step A setting |
+| 2026-11-26 | Step B | v1.4.6 all-60 gain=1.5 (default) | ALL NDCG@10=54.5 (FAISS 51.4), ku=64.5, asst=81.5, pref=43.6 | baseline for v1.4.6 |
+| 2026-11-26 | Step B | v1.4.6 all-60 gain=4.0 | ALL NDCG@10=50.7, ku=57.5 (-7.0), asst=75.2 (-6.3), pref=55.7 | FAIL: regression >3 on ku/asst/temp |
+| 2026-11-26 | Step B | v1.4.6 all-60 gain=8.0 | ALL NDCG@10=48.7, ku=55.8 (-8.7), asst=66.5 (-15.0), pref=60.3 | FAIL: regression >3 on ku/asst/temp |
+| 2026-11-26 | H1b | v1.4.6+H1b pref gain=1.5 | pref NDCG@10=38.3 (vs 43.6), T_R@1=0.0, T_R@10=76.7 | FAIL: stopword removal inflated 1-token coverage; reverted |
+| 2026-11-26 | H1c | v1.4.6+RRF(k=20,w=0.5) all-60 | ALL NDCG@10=52.4 (vs 54.5 / FAISS 51.4), T_R@10=78.4, pref=48.4, asst=82.2, ku=62.1, temp=47.8 (-7.3), user=54.4 (-5.3) | trade-off: T_R@10 +2.6 and pref +4.8, but ALL NDCG@10 -2.1; reverted to v1.4.6 |
+| 2026-11-26 | H1d | v1.4.6+canon-RRF(k=20,w=0.6) all-60 | ALL NDCG@10=53.1 (vs 54.5 / FAISS 51.4), T_R@10=78.9, pref=52.4, asst=82.2, ku=61.8 (-2.7), user=54.1 (-5.6), temp=47.3 (-7.8), ms=20.7 | trade-off: highest T_R@10 (78.9%) and pref (+8.8), ku/asst pass <=3pt rule, but ALL NDCG@10 -1.4 vs v1.4.6 |

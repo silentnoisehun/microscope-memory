@@ -151,10 +151,3 @@ jobs:
           done
       - name: Publish completed release
         run: gh release edit "$GITHUB_REF_NAME" --draft=false --latest
-=======
-          body: |
-            Commit: ${{ github.sha }}
-          files: |
-            target/release/microscope-mem-linux-x86_64
-            target/release/SHA256SUMS-linux-x86_64.txt
->>>>>>> bd7d0a8 (fix(retrieval,release): unfloored semantic fallback, rustls HF loader, ubuntu-22.04 release & eval protocol)

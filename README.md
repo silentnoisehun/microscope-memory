@@ -224,7 +224,8 @@ Session level (a looser metric): `recall_any@10` is 98.3 for both; `recall_any@1
 - These are retrieval numbers. They are not answer accuracy and cannot be compared with other systems' accuracy scores.
 - Results after the fix (`v1.4.6` unfloored candidate fallback and `v1.4.7` canonical-text RRF, local 60-question pilot vs FAISS `IndexFlatIP`):
   - `v1.4.6` (`gain=1.5`): ALL NDCG@10 **54.5** vs FAISS **51.4** (`turn recall@10`: 75.8% vs 72.2%; `single-session-preference`: 43.6 vs 69.1).
-  - `v1.4.7` (`H1d` canonical-text RRF): ALL NDCG@10 **53.1** vs FAISS **51.4** (`turn recall@10`: **78.9%** vs 72.2%; `single-session-preference`: **52.4** vs 69.1; `single-session-assistant`: **82.2** vs 61.7; `knowledge-update`: **61.8** vs 57.8 with 100.0% recall@10; `temporal-reasoning`: **47.3** vs 43.9; `single-session-user`: **54.1** vs 51.3; `multi-session`: 20.7 vs 24.6). Full results and failed/trade-off runs are logged in [`docs/eval/PROTOCOL.md`](docs/eval/PROTOCOL.md).
+  - `v1.4.7` (`H1d` canonical-text RRF, 60-question pilot): ALL NDCG@10 **53.1** vs FAISS **51.4** (`turn recall@10`: **78.9%** vs 72.2%; `single-session-preference`: **52.4** vs 69.1).
+  - `v1.4.7` full 500-question run (`470` non-abstention + `30` abstention): ALL NDCG@10 **51.7** vs FAISS **52.2**; `turn recall@1/3/5/10`: **21.0/44.4/58.1/74.8%** vs **23.8/44.2/57.2/72.7%**; `session recall_any@10`: **97.2%** vs **97.2%**. Ahead on `single-session-assistant` (77.6 vs 71.1), `single-session-user` (67.8 vs 65.4), `knowledge-update` (57.5 vs 55.3); behind on `single-session-preference` (40.3 vs 52.7), `multi-session` (41.6 vs 44.2), and `temporal-reasoning` NDCG@10 (41.2 vs 43.0, though ahead on `turn recall@10` 64.4% vs 59.1%). Full results and failed/trade-off runs are logged in [`docs/eval/PROTOCOL.md`](docs/eval/PROTOCOL.md).
 
 ---
 
